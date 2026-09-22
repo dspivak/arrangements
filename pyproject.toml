@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arrangements"
+version = "0.1.0"
+description = "The category of arrangements, executable: forcing one-forms, integrators as coalgebras, and one dynamics functor compiling an arrangement to a discrete dynamical system."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "David I. Spivak" }]
+dependencies = ["jax>=0.4", "numpy>=1.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+arrangements = "arrangements.build:main"
+arrangements-demo = "arrangements.demo:main"
+
+[tool.setuptools.packages.find]
+include = ["arrangements*"]

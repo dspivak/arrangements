@@ -1,0 +1,213 @@
+"""``pc^(2)``: general two-stage coalgebras ``[p,q]^{∘2}``-Coalg (rmk.multistage).
+
+A morphism in ``pc^(2)`` from ``p`` to ``q`` is a coalgebra
+``β : S → [p,q]([p,q](S))`` for the substitution ``[p,q]^{∘2} = [p,q] ◁ [p,q]``.
+In Moore form it is **two interaction rounds** per macro-tick. The key is the
+substitution: round 1 emits a ``q``-position, receives a ``q``-direction, returns
+a ``p``-direction, and lands *not* in a new state ``S`` but in an **inner 1-stage
+``[p,q]``-coalgebra** — an element of ``[p,q](S)``, i.e. an ``pc.PCMorphism``.
+Round 2 runs that inner coalgebra and lands in ``S``.
+
+This module is the **general datatype**, independent of any integrator: ``step``
+may be *any* such two-round behavior. A two-stage coalgebra (``coalgebra.CotCoalg2``;
+``leapfrog.py``) is one instance built on top of it. Composition ``parallel`` and
+``pre_static`` mirror ``pc.PCMorphism``, delegating the inner round to the
+1-stage versions.
+
+Caveat: this provides the datatype, its execution, and these two composites
+(tested). The claim that ``arr → pc^(2)`` is a lax monoidal *functor*
+(the K=2 case of rmk.multistage) is conjectural and is **not** proved here.
+EXTENSION (beyond the paper): ``Phi2`` is the two-stage analog of the one dynamics
+functor ``Phi`` for arrangements whose parameter is a ``CotCoalg2``.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+
+from .pc import PCMorphism
+from .polynomial import DirichletProduct, PolyMap
+
+
+@dataclass(frozen=True)
+class PCMorphism2:
+    """A ``[p,q]^{∘2}``-coalgebra: a morphism in ``pc^(2)``, in two-round Moore form.
+
+    ``step(state)`` returns ``(act, fiber)`` with
+
+        act    : PolyMap p → q                    -- round-1 action a^β(state)
+        fiber  : in_pos → (out_pos, at_pos)
+        at_pos : in_dir → (out_dir, inner)        -- inner : pc.PCMorphism (round 2)
+
+    where ``inner`` is the 1-stage coalgebra that round 2 runs.
+    """
+
+    src_poly: Any
+    tgt_poly: Any
+    state: Any
+    step: Callable
+
+    def with_state(self, state: Any) -> "PCMorphism2":
+        return PCMorphism2(self.src_poly, self.tgt_poly, state, self.step)
+
+    # ---- execution ----
+
+    def run_two(self, in_pos1, in_dir_from1, in_pos2, in_dir_from2):
+        """General two-round execution.
+
+        Returns ``(out_pos1, out_dir1, out_pos2, out_dir2, new_state)``. The two
+        environments may differ (round 2 sees the inner coalgebra produced by
+        round 1).
+        """
+        act, fiber = self.step(self.state)
+        out_pos1, at_pos1 = fiber(in_pos1)
+        out_dir1, inner = at_pos1(in_dir_from1(out_pos1))
+        out_pos2, out_dir2, new_state = inner.run_one(in_pos2, in_dir_from2)
+        return out_pos1, out_dir1, out_pos2, out_dir2, new_state
+
+    def run_one(self, in_pos, in_dir_from):
+        """Closed-system convenience: the same environment at both rounds.
+
+        Returns ``(out_pos1, out_pos2, new_state)``.
+        """
+        op1, _, op2, _, new_state = self.run_two(in_pos, in_dir_from, in_pos, in_dir_from)
+        return op1, op2, new_state
+
+    # ---- composition (mirrors pc.PCMorphism, lifted to two stages) ----
+
+    def pre_static(self, before: PolyMap) -> "PCMorphism2":
+        """Pre-compose a static polynomial map ``before : o -> p``, giving ``o -> q``.
+
+        Each round reads its incoming ``o``-position through ``before`` and pushes
+        the ``p``-direction it returns on to an ``o``-direction; see
+        ``pc.PCMorphism.pre_static``.
+        """
+
+        def new_step(s):
+            inner_act, inner_fiber = self.step(s)
+            composed_act = PolyMap(
+                src=before.src,
+                tgt=inner_act.tgt,
+                position_action=lambda i: inner_act.on_position(before.on_position(i)),
+                direction_action=lambda i, d: before.on_direction(
+                    i, inner_act.on_direction(before.on_position(i), d)
+                ),
+                label=f"{before.label};{inner_act.label}",
+            )
+
+            def fiber(i_before):
+                inner_pos = before.on_position(i_before)
+                inner_out_pos, inner_at_pos = inner_fiber(inner_pos)
+
+                def at_pos(d_tgt):
+                    out_dir_inner, inner_round2 = inner_at_pos(d_tgt)
+                    out_dir = before.on_direction(i_before, out_dir_inner)
+                    return out_dir, inner_round2.pre_static(before)
+
+                return inner_out_pos, at_pos
+
+            return composed_act, fiber
+
+        return PCMorphism2(before.src, self.tgt_poly, self.state, new_step)
+
+    def parallel(self, other: "PCMorphism2") -> "PCMorphism2":
+        """Monoidal product: two ``pc^(2)`` morphisms run side by side."""
+
+        def new_step(s):
+            s1, s2 = s
+            act1, fiber1 = self.step(s1)
+            act2, fiber2 = other.step(s2)
+
+            act = PolyMap(
+                src=DirichletProduct(act1.src, act2.src),
+                tgt=DirichletProduct(act1.tgt, act2.tgt),
+                position_action=lambda i: (act1.on_position(i[0]), act2.on_position(i[1])),
+                direction_action=lambda i, d: (
+                    act1.on_direction(i[0], d[0]),
+                    act2.on_direction(i[1], d[1]),
+                ),
+            )
+
+            def fiber(i):
+                op1, at1 = fiber1(i[0])
+                op2, at2 = fiber2(i[1])
+
+                def at_pos(d):
+                    od1, inner1 = at1(d[0])
+                    od2, inner2 = at2(d[1])
+                    return (od1, od2), inner1.parallel(inner2)  # round 2 in parallel
+
+                return (op1, op2), at_pos
+
+            return act, fiber
+
+        return PCMorphism2(
+            DirichletProduct(self.src_poly, other.src_poly),
+            DirichletProduct(self.tgt_poly, other.tgt_poly),
+            (self.state, other.state),
+            new_step,
+        )
+
+
+def Phi2(arr) -> PCMorphism2:
+    """The two-stage dynamics of an arrangement whose parameter is a ``CotCoalg2``
+    (the K=2 analog of ``functors.Phi`` / CDLM prop.integrator_to_pc).
+
+    Round 1 runs the interpretation at ``read1(state)`` and reads the parameter
+    covector ``xi_Q1``; ``advance`` produces the intermediate. Round 2 is a genuine
+    **1-stage** ``pc.PCMorphism`` built by ``functors.Phi`` from the 1-stage
+    coalgebra ``(read2, finish(state, -, -))`` on the same arrangement -- so
+    ``pc^(2)`` is assembled the same way ``pc`` is, just from a two-stage parameter.
+    """
+    from dataclasses import replace
+
+    from .coalgebra import CotCoalg, CotCoalg2
+    from .functors import Phi, phi_box_poly
+    from .interpretation import interpretation
+
+    P = arr.P
+    if not isinstance(P, CotCoalg2):
+        raise TypeError(f"Phi2: the parameter must be a CotCoalg2, got {type(P).__name__}")
+    interp = interpretation(arr)
+    src_p = phi_box_poly(arr.out_dim_M, arr.in_dim_M)
+    tgt_p = phi_box_poly(arr.out_dim_N, arr.in_dim_N)
+
+    def step(state):
+        q1 = P.read1(state)
+        position_action, direction_action = interp(q1)
+
+        def act_positions(in_pos):
+            out_m, omega_M = in_pos
+            return position_action(out_m, omega_M)
+
+        def act_directions(in_pos, in_dir):
+            out_m, omega_M = in_pos
+            xi_N, in_n = in_dir
+            _, xi_M, in_m = direction_action(out_m, omega_M, xi_N, in_n)
+            return (xi_M, in_m)
+
+        act = PolyMap(src_p, tgt_p, act_positions, act_directions, label="stage1")
+
+        def fiber(in_pos):
+            out_m, omega_M = in_pos
+            out_pos = position_action(out_m, omega_M)  # emit at read1(state)
+
+            def at_pos(in_dir):
+                xi_N, in_n = in_dir
+                xi_Q1, xi_M, in_m = direction_action(out_m, omega_M, xi_N, in_n)
+                mid = P.advance(state, xi_Q1)
+                # round 2: a 1-stage pc-morphism from the 1-stage coalgebra (read2, finish)
+                round2 = CotCoalg(
+                    Q_dim=P.Q_dim, init=mid, position=P.read2,
+                    step=lambda s, xi_Q2, st=state: P.finish(st, s, xi_Q2),
+                    label="stage2",
+                )
+                inner = Phi(replace(arr, P=round2))
+                return (xi_M, in_m), inner
+
+            return out_pos, at_pos
+
+        return act, fiber
+
+    return PCMorphism2(src_p, tgt_p, P.init, step)
