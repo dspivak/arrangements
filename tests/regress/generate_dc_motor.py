@@ -1,11 +1,11 @@
-"""Record CDLM (``dap-core-old``) DC-motor trajectories for the regression test (STATUS.md §1).
+"""Record CDLM (``dap-core``) DC-motor trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_dc_motor.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_dc_motor.py
 
 Writes ``dc_motor.npz`` into this directory: the inputs of the scenarios of
-``dap-core-old/dap/tests/test_dc_motor.py`` (constants, seeds replayed into the
+``dap-core/dap/tests/test_dc_motor.py`` (constants, seeds replayed into the
 recorded initial states) and the outputs the old package produces -- the
 ``Phiconf`` trajectories of the monolithic, compositional, sentence-encoding,
 Bateman and flow-coordinate arrangements, and the covector ``xi_Q`` the old
@@ -38,8 +38,8 @@ from dap.functors import Phiconf
 from dap.interpretation import smooth_interpretation, trivial_omega
 from dap.wiring import compose_seq, tensor_arrangements
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

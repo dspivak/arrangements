@@ -149,8 +149,8 @@ rock–paper–scissors, which the structured versions reject.
 This implements the category of arrangements developed in *Articulating Forms that
 Matter* (D. I. Spivak, in preparation), Chapter 3, with the attention operad of a
 companion paper. It replaces the executable companion to *Compositional dynamics in
-learning and mechanics*, which is preserved at tag `cdlm-final` of
-[dspivak/dap](https://github.com/dspivak/dap). Docstrings cite the source statement they
+learning and mechanics*, which lives unmodified at
+[dspivak/dap](https://github.com/dspivak/dap) and was copied from, not changed. Docstrings cite the source statement they
 implement, so a reader with either draft can find it. `notes/` holds the design notes
 the code was built against, kept as the record of why it is shaped this way.
 

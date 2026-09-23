@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) replicator trajectories for the regression test.
+"""Record CDLM (``dap-core``) replicator trajectories for the regression test.
 
 Run from the OLD package, like ``generate_cdlm.py``:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_replicator.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_replicator.py
 
 Writes ``replicator.npz``: for the scenarios of the old ``test_replicator.py`` --
 the keystone one-step check (standard and log charts), the simplex-invariance
@@ -25,8 +25,8 @@ import numpy as np
 
 from dap.replicator import log_replicator_dynamics, replicator_dynamics, replicator_step
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

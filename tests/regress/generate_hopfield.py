@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) Hopfield trajectories for the regression test (STATUS.md §1).
+"""Record CDLM (``dap-core``) Hopfield trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_hopfield.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_hopfield.py
 
 Writes ``hopfield.npz`` into this directory: the inputs the old test file
 (``test_hopfield.py``) drew (seeds replayed, so the new test need not reproduce
@@ -25,8 +25,8 @@ from dap.functors import Phiconf
 from dap.hopfield import hebbian_weights, hopfield_arrangement
 from dap.interpretation import trivial_omega
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

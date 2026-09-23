@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) trajectories for the regression tests (STATUS.md §1).
+"""Record CDLM (``dap-core``) trajectories for the regression tests (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_cdlm.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_cdlm.py
 
 (``PYTHONPATH=.`` because the old ``.venv`` was made when that directory was still
 called ``dap-core``; the new package is now ``arrangements``, so nothing shadows it.)
@@ -34,8 +34,8 @@ from dap.polynomial import nest_left, unnest_left
 from dap.rvect import diagonal, euclidean
 from dap.wiring import chain_wire, compose_chain, parallel_arrangements, tensor_arrangements
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

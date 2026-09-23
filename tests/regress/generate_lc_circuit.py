@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) LC-circuit trajectories for the regression test.
+"""Record CDLM (``dap-core``) LC-circuit trajectories for the regression test.
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_lc_circuit.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_lc_circuit.py
 
 Writes ``lc_circuit.npz``. Each array records either an *input* the old test
 supplied (constants, replayed seeds, drive frequencies) or an *output* the old
@@ -31,8 +31,8 @@ from dap.interpretation import trivial_omega
 from dap.leapfrog import Phileap
 from dap.lc_circuit import coupled_lc_pair, lc_cell, lc_conf
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

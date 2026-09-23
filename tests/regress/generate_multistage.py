@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) trajectories for the multi-stage regression tests.
+"""Record CDLM (``dap-core``) trajectories for the multi-stage regression tests.
 
 Run from the OLD package, like ``generate_cdlm.py``:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_multistage.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_multistage.py
 
 Writes ``multistage.npz``: leapfrog on the pinned harmonic chain, RK4 on a
 quadratic well, RK4 on the gyro phase system with drag and precession, and the
@@ -29,7 +29,7 @@ from dap.leapfrog import Phileap
 from dap.rvect import constant, diagonal, euclidean
 from dap.wiring import compose_chain
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__)
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

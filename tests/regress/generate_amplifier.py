@@ -1,11 +1,11 @@
-"""Record CDLM (``dap-core-old``) amplifier trajectories for the regression test (STATUS.md §1).
+"""Record CDLM (``dap-core``) amplifier trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_amplifier.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_amplifier.py
 
 Writes ``amplifier.npz`` into this directory: the inputs of the main scenarios of
-``dap-core-old/dap/tests/test_amplifier.py`` (constants; states) and the outputs
+``dap-core/dap/tests/test_amplifier.py`` (constants; states) and the outputs
 the old package produces (reported ``v``, the emitted reaction ``react`` on the
 drive port, updated states, settle trajectories), all in the old sign
 convention: ``react`` is CDLM's reaction covector ``omega_N(e_src)`` (published
@@ -26,8 +26,8 @@ import numpy as np
 
 from dap.amplifier import amp_state, black_amplifier, settle, stepper
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BETA = 0.1

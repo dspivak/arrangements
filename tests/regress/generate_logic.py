@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) CMOS-logic trajectories for the regression test (STATUS.md §1).
+"""Record CDLM (``dap-core``) CMOS-logic trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_logic.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_logic.py
 
 Writes ``logic.npz`` into this directory: the inputs the old test file
 (``test_logic.py``) used and the outputs the old package produced, in the old
@@ -41,8 +41,8 @@ from dap.logic import (
     stepper,
 )
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

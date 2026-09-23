@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) molecular-dynamics trajectories for the regression test.
+"""Record CDLM (``dap-core``) molecular-dynamics trajectories for the regression test.
 
 Run from the OLD package, like ``generate_cdlm.py``:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_moleculardyn.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_moleculardyn.py
 
 Writes ``moleculardyn.npz``: the scenarios of ``test_moleculardyn.py`` -- the LJ force
 covector at three separations, the 1-D pair under ``Phileap``, one ``Phileap``
@@ -28,8 +28,8 @@ from dap.interpretation import trivial_omega
 from dap.leapfrog import Phileap
 from dap.moleculardyn import md_arrangement, md_energy, md_force
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

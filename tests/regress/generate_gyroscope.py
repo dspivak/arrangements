@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) outputs for the gyroscope regression tests (STATUS.md §1).
+"""Record CDLM (``dap-core``) outputs for the gyroscope regression tests (STATUS.md §1).
 
 Run from the OLD package, like ``generate_cdlm.py``:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_gyroscope.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_gyroscope.py
 
 Writes ``gyroscope.npz`` (the harmonic surrogate, ``dap/gyroscope.py``: one-gyro
 ``Phigyro`` step, the damped free rollout, the drag rollout, the per-gyro-gamma
@@ -39,8 +39,8 @@ from dap.interpretation import trivial_omega
 from dap.rvect import constant
 from dap.wiring import compose_graph
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

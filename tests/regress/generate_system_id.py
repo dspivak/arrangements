@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) system-identification outputs for the regression test.
+"""Record CDLM (``dap-core``) system-identification outputs for the regression test.
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_system_id.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_system_id.py
 
 Writes ``system_id.npz``: the pendulum's closed phase trajectory (``Phiphase``)
 from a fixed initial state, and the trained MLP weights and loss history after
@@ -25,8 +25,8 @@ import numpy as np
 from dap.functors import Phiphase
 from dap.system_id import PENDULUM, identify, oscillator, trajectory
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

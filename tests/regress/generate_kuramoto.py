@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) Kuramoto trajectories for the regression test.
+"""Record CDLM (``dap-core``) Kuramoto trajectories for the regression test.
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_kuramoto.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_kuramoto.py
 
 Writes ``kuramoto.npz``. The system is closed (no environment covector), so no
 sign translation is needed on the inputs (STATUS.md §1 affects only covectors
@@ -27,8 +27,8 @@ from dap.functors import Phiconf, Phiphase
 from dap.interpretation import trivial_omega
 from dap.kuramoto import kuramoto_arrangement
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

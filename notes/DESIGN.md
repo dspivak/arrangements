@@ -5,6 +5,11 @@
 > the current API, and its process details (token budgets, staging, "stop and report")
 > are how the work was actually carried out. For what the library establishes and what
 > it does not, see [`STATUS.md`](../STATUS.md).
+>
+> Where it calls the source `dap-core-old` and cites a `cdlm-final` tag: during the port
+> that checkout was briefly renamed and tagged. Both were undone. CDLM's companion sits
+> unmodified at `dap-core` in the `dynamic-algebra-potentials` repo; we copied from it and
+> changed nothing.
 
 Design note (Claude, Opus 5, for David Spivak, 2026-09-21). This is the contract every
 stage of the port is built against. The mathematics it implements is the book

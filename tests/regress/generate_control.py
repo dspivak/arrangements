@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) impedance-control trajectories for the regression test.
+"""Record CDLM (``dap-core``) impedance-control trajectories for the regression test.
 
 Run from the OLD package, like ``generate_cdlm.py``:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_control.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_control.py
 
 Writes ``control.npz``: the scenarios of ``test_control.py`` -- the one-step
 ``Phiconf`` update on five replayed random draws, the step response with a mid-run
@@ -28,8 +28,8 @@ from dap.functors import Phiconf, Phiphase
 from dap.interpretation import trivial_omega
 from dap.rvect import diagonal, euclidean
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))

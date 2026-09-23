@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) reaction-network trajectories for the regression test.
+"""Record CDLM (``dap-core``) reaction-network trajectories for the regression test.
 
 Run from the OLD package, like ``generate_cdlm.py``:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_reaction_network.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_reaction_network.py
 
 Writes ``reaction_network.npz``: the scenarios of the old
 ``test_reaction_network.py`` -- one-step Onsager (monolithic) steps on the
@@ -30,8 +30,8 @@ from dap.reaction_network import (
     unimolecular_arrangement, unimolecular_dynamics, unimolecular_stoichiometry,
 )
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

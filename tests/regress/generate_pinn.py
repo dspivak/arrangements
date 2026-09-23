@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) deep-Ritz outputs for the regression test.
+"""Record CDLM (``dap-core``) deep-Ritz outputs for the regression test.
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_pinn.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_pinn.py
 
 Writes ``pinn.npz``: the grid, the exact discrete Poisson solution, the learned
 field and the per-step energy of a short ``solve_deep_ritz`` run (``Phiconf`` on
@@ -22,8 +22,8 @@ import numpy as np
 
 from dap.pinn import solve_deep_ritz
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

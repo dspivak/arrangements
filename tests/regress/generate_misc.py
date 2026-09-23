@@ -1,8 +1,8 @@
-"""Record CDLM (``dap-core-old``) trajectories for the module-less regression tests.
+"""Record CDLM (``dap-core``) trajectories for the module-less regression tests.
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
-    cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_misc.py
+    cd ../dynamic-algebra-potentials/dap-core && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_misc.py
 
 Writes ``misc.npz``, covering the four old test files that use only the core
 (``test_newton.py``, ``test_optimizers.py``, ``test_klein_gordon.py``,
@@ -34,8 +34,8 @@ from dap.interpretation import trivial_omega
 from dap.rvect import diagonal, euclidean, inverse_hessian
 from dap.wiring import compose_chain, compose_graph
 
-assert "dap-core-old" in os.path.abspath(sys.modules["dap"].__file__), \
-    "run this from dap-core-old with PYTHONPATH=. so that `dap` is the old package"
+assert "dap-core" in os.path.abspath(sys.modules["dap"].__file__), \
+    "run this from dap-core with PYTHONPATH=. so that `dap` is the old package"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _IN_POS = (jnp.zeros(0), trivial_omega(0))
