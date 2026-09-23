@@ -29,6 +29,8 @@ from . import attention
 
 # The worked examples (extensions beyond the paper are marked as such in each module).
 from . import amplifier
+from . import commons
+from . import commons_entry
 from . import control
 from . import dc_motor
 from . import gyroscope
@@ -83,6 +85,8 @@ __all__ = [
     "attention",
     # the worked examples:
     "amplifier",
+    "commons",
+    "commons_entry",
     "control",
     "dc_motor",
     "gyroscope",

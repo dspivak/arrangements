@@ -114,7 +114,40 @@ Leapfrog, RK4, and the K-stage machinery are present as datatypes with instances
 Whether the assignment from arrangements to K-stage coalgebras is a *functor*, and
 whether it is monoidal, is left open, exactly as in CDLM. Their docstrings say so.
 
-### 3.5 Functoriality is tested, not proved
+### 3.5 The commons model, and four things it corrected
+
+`commons.py` and `commons_entry.py` implement a shared-resource model — one resource, `N`
+extractors, and three wirings over one fixed cost — as genuine composites, so the fan-out's
+transpose delivering the total to the resource is read off rather than written by hand.
+Running it corrected four claims that had been made *on paper* and were wrong. They are
+recorded because each was plausible and each was believed:
+
+1. **An external enforcer applying a fixed rule is exact, not unilateral.** A coupler
+   returning the same sanction to every participant while itself unmoved by them has a
+   symmetric returned-covector Jacobian, so `d omega = 0`. What is genuinely non-exact is an
+   enforcer whose **own state** sets the sanction while nothing comes back to it. The
+   distinction is discretion, not externality.
+2. **The mean readout is proximity-blind.** For a message `(kappa R, kappa)` the mean is `R`
+   for every `kappa`. Proximity changes the weight, never the mean, so a quantity that
+   should depend on being close cannot ride on the mean readout. Being near changes what you
+   can take, not what you believe.
+3. **A lifetime scaling derived at a settled state need not survive the driven regime.**
+   The predicted `1/N` scaling of a supply's lifetime held only when the stock moves slowly
+   against effort; at the reference starting point the stock is fast, effort is frozen, and
+   the measured ratio was 17 where 2 was predicted.
+4. **A convergence bound with a complex spectrum is not `2/|lambda_max|`** but
+   `min_j(-2 Re lambda_j)/|lambda_j|^2`. Under the un-sanctioned wiring `N` never enters the
+   effort rate at all, because the extractors are mutually invisible to one another.
+
+**What the model does not establish**, beyond the general caveats above. The sign of a
+placement coordinate's response is not fixed by the formalism — it says which boxes exist
+and how they couple, not which box owns a placement — and it was chosen by hand; the other
+choice reverses every entry result. Zero coupling is a fixed point with vanishing gradient,
+so a participant placed far away never arrives: entry must be seeded inside a pull region
+whose size nothing here fixes. The settling point is a set, not a number, selected by
+initial placements. And the economics is imported wholesale.
+
+### 3.6 Functoriality is tested, not proved
 
 That composition agrees with dynamics is checked on instances — chains, graphs, nests,
 and a non-exact coupler — not proved here. The proof belongs to the book. A passing test
