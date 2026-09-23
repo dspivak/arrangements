@@ -91,7 +91,7 @@ class PCMorphismK:
 
     def pre_static(self, before: PolyMap) -> "PCMorphismK":
         """Pre-compose a static polynomial map ``before : o -> p``, giving ``o -> q``
-        (sec.pc), in every one of the ``K`` rounds.
+        (CDLM sec.pc), in every one of the ``K`` rounds.
 
         Each round reads its incoming ``o``-position through ``before`` and pushes
         the ``p``-direction it returns on to an ``o``-direction; see
@@ -128,7 +128,7 @@ class PCMorphismK:
         return PCMorphismK(before.src, self.tgt_poly, self.K, self.state, new_step)
 
     def parallel(self, other: "PCMorphismK") -> "PCMorphismK":
-        """Monoidal product: two ``pc^(K)`` morphisms run side by side (sec.pc)."""
+        """Monoidal product: two ``pc^(K)`` morphisms run side by side (CDLM sec.pc)."""
         if self.K != other.K:
             raise ValueError(f"parallel needs equal stage counts, got {self.K} and {other.K}")
 

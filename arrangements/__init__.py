@@ -1,12 +1,13 @@
-"""dap: the category of arrangements ``arr``, executable.
+"""arrangements: the category of arrangements ``arr``, executable.
 
 A Python implementation of the principal constructions of *Articulating Forms
 that Matter*, Chapter 3 (def:arr): ``cot(Q)``-coalgebras as parameters
 (integrators are part of the arrangement), arrangements carrying a forcing
 one-form (exact or not), pullback-and-sum composition, the polynomial
 interpretation, and the one dynamics functor ``Phi : arr -> pc``
-(sec.dynamics_functor). Ported from CDLM's ``dap-core``; see README.md and
-notes/DESIGN.md for what changed.
+(sec.dynamics_functor). It replaces the executable companion of CDLM, which is
+left unmodified at ``dap``; see README.md for what changed and STATUS.md for what
+the tests do and do not establish.
 """
 
 from .rvect import ReactiveVectorSpace
@@ -24,12 +25,23 @@ from . import functors
 from . import wiring
 from . import learning
 
+from . import attention
+
 # The worked examples (extensions beyond the paper are marked as such in each module).
-from . import system_id
-from . import pinn
+from . import amplifier
+from . import control
+from . import dc_motor
 from . import gyroscope
 from . import gyroscope_faithful
+from . import hopfield
+from . import kuramoto
+from . import lc_circuit
 from . import logic
+from . import moleculardyn
+from . import pinn
+from . import reaction_network
+from . import replicator
+from . import system_id
 
 __all__ = [
     "ReactiveVectorSpace",
@@ -68,10 +80,20 @@ __all__ = [
     "functors",
     "wiring",
     "learning",
-    # extensions (beyond the paper):
-    "system_id",
-    "pinn",
+    "attention",
+    # the worked examples:
+    "amplifier",
+    "control",
+    "dc_motor",
     "gyroscope",
     "gyroscope_faithful",
+    "hopfield",
+    "kuramoto",
+    "lc_circuit",
     "logic",
+    "moleculardyn",
+    "pinn",
+    "reaction_network",
+    "replicator",
+    "system_id",
 ]

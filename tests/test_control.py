@@ -1,4 +1,4 @@
-"""Impedance (P-)control as a virtual spring (dap/control.py) -- audit tests.
+"""Impedance (P-)control as a virtual spring (control.py) -- audit tests.
 
 The claim under test: a stateless controller box whose forcing is
 ``omega_c = -d (k/2)(q_rep - s)^2``, wired to a zero-forcing plant, with the

@@ -43,7 +43,7 @@ device below does satisfy that too -- but vacuously, because it has no output po
 a transistor.  The kernel condition is input-side, and it is what buys
 non-reciprocity here.
 
-**The DIRECT realization** (``mosfet_direct``; notes/DESIGN.md §6(c)).  CDLM had to
+**The DIRECT realization** (``mosfet_direct``; STATUS.md §2, trick vs direct).  CDLM had to
 route the non-reciprocity through the sharp because its arrangement carried only
 a potential.  The book's arrangement carries a *forcing* that need not be exact
 (sec.forcing), so the same device is written with the plain parameter
@@ -231,7 +231,7 @@ def mosfet_direct(
 ) -> Arrangement:
     """The same MOSFET with the non-reciprocity in the FORCING, not the sharp.
 
-    The DIRECT realization (module header; notes/DESIGN.md §6(c)): parameter
+    The DIRECT realization (module header; STATUS.md §2, trick vs direct): parameter
     ``parameter(Q)`` on the plain Euclidean ``Q = R^2`` and the hand-written,
     *non-exact* one-form
 

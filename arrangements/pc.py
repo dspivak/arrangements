@@ -1,4 +1,4 @@
-"""``PCMorphism`` (sec.pc).
+"""``PCMorphism`` (CDLM sec.pc).
 
 A Moore-style coalgebraic representation of an ``[p, q]``-coalgebra
 (def.pq_coalg). Following VOCAB design (2)-(3), we never materialize
@@ -72,7 +72,7 @@ class PCMorphism:
             step=self.step,
         )
 
-    # ---- composition (sec.pc) ----
+    # ---- composition (CDLM sec.pc) ----
 
     def pre_static(self, before: PolyMap) -> "PCMorphism":
         """Pre-compose a static polynomial map ``before : o -> p``, giving ``o -> q``.
@@ -129,9 +129,9 @@ class PCMorphism:
 
         The result has the same state set as ``self``; the action on state ``s``
         is ``after o act^beta(s)``. This is ``then`` in the special case where the
-        second factor carries a single state, i.e. is a polynomial map (sec.pc);
+        second factor carries a single state, i.e. is a polynomial map (CDLM sec.pc);
         the paper's second pass post-composes exactly such a map, the static
-        ``Phi(wire_K)`` (sec.spring_second_pass).
+        ``Phi(wire_K)`` (CDLM sec.spring_second_pass).
         """
         from .polynomial import PolyMap as _PM
 
@@ -175,13 +175,13 @@ class PCMorphism:
 
     def then(self, other: "PCMorphism") -> "PCMorphism":
         """Sequential composition in pc: ``self : p -> q`` then ``other : q -> r``,
-        giving ``p -> r`` (sec.pc). State spaces multiply.
+        giving ``p -> r`` (CDLM sec.pc). State spaces multiply.
 
         Forward, a ``p``-position runs through ``self`` then ``other`` to an
         ``r``-position; backward, an ``r``-direction runs through ``other`` then
         ``self`` to a ``p``-direction, updating both states. This is the general
         ``pc`` composition on which the functoriality of ``Phi`` rests (the
-        second-pass audit, sec.spring_second_pass); ``post_static`` is the special
+        second-pass audit, CDLM sec.spring_second_pass); ``post_static`` is the special
         case where ``other`` carries a single state. Requires ``self.tgt_poly``
         and ``other.src_poly`` to agree.
         """
@@ -230,7 +230,7 @@ class PCMorphism:
         )
 
     def parallel(self, other: "PCMorphism") -> "PCMorphism":
-        """Monoidal parallel composition (sec.pc), state-spaces multiply."""
+        """Monoidal parallel composition (CDLM sec.pc), state-spaces multiply."""
 
         from .polynomial import PolyMap as _PM, DirichletProduct
 

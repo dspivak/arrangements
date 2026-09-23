@@ -5,7 +5,7 @@ game),
 
     x_i' = x_i ((A x)_i - x^T A x),
 
-is the dynamics of the closed arrangement (an sarr-scalar ``I -> I`` in CDLM's
+is the dynamics of the closed arrangement (an ``arr``-scalar ``I -> I`` (CDLM's
 terms, cf. test_newton.py; def:arr) whose parameter is the configuration
 coalgebra ``configuration(Q)`` on the reactive vector space ``Q = R^n`` with the
 *state-dependent* Shahshahani sharp

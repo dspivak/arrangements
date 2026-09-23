@@ -1,7 +1,7 @@
 """Kuramoto = ``Phi`` of an edge-box arrangement with configuration parameters;
 the swing equation = ``Phi`` of the same boxes with phase parameters.
 
-Audit of the claim (see ``dap/kuramoto.py``): the Kuramoto model
+Audit of the claim (see ``kuramoto.py``): the Kuramoto model
 
     theta_i' = omega_i + K * sum_{j ~ i} sin(theta_j - theta_i)
 

@@ -3,7 +3,7 @@
 The same chain wiring as test_heat_equation.py; the particles' parameter is
 ``phase(Q)`` instead of ``configuration(Q)``, which makes a *different*
 arrangement (def:arr), and ``Phi`` of it is the conservative second-order
-discrete wave equation. References in CDLM: sec.spring_first_pass
+discrete wave equation. References in CDLM: CDLM sec.spring_first_pass
 (the particle and wiring), eqn.potlens_composite_final (the state update),
 eqn.discrete_wave / eqn.wave_bc (pinned ends).
 
@@ -123,7 +123,7 @@ def test_discrete_wave_equation_with_pinned_ends():
 
 
 def test_heat_and_wave_are_two_arrangements_on_one_wiring():
-    """notes/DESIGN.md §5: the integrator is part of the arrangement. The same wiring
+    """STATUS.md §1: the integrator is part of the arrangement. The same wiring
     ``compose_chain`` on the same particle data gives two arrangements, one with
     ``configuration`` parameters and one with ``phase``; ``Phi`` takes no
     integrator, and the two differ in their parameter, not in their maps."""

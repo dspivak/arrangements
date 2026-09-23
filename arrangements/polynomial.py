@@ -3,7 +3,7 @@
 Polynomials in our subcategory of ``poly`` are built from four named
 constructors:
 
-* ``Yon``                 -- the unit ``y`` (sec.poly).
+* ``Yon``                 -- the unit ``y`` (CDLM sec.poly).
 * ``Cot(dim)``            -- ``cot(R^dim)`` (def.cot).
 * ``DirichletProduct``    -- the Dirichlet product ``p1 (x) ... (x) pk``.
 * ``PolyMap``             -- a polynomial map between any of the above.
@@ -22,7 +22,7 @@ from jax import Array
 
 @dataclass(frozen=True)
 class Yon:
-    """The unit polynomial ``y`` of the Dirichlet product (sec.poly)."""
+    """The unit polynomial ``y`` of the Dirichlet product (CDLM sec.poly)."""
 
     @property
     def position_shape(self) -> Tuple[int, ...]:
@@ -57,7 +57,7 @@ Poly = Union[Yon, Cot, "DirichletProduct"]
 
 @dataclass(frozen=True)
 class DirichletProduct:
-    """``p1 (x) ... (x) pk``, the Dirichlet product (sec.poly).
+    """``p1 (x) ... (x) pk``, the Dirichlet product (CDLM sec.poly).
 
     A position is a tuple of positions, a direction at it is a tuple of
     directions.
@@ -77,7 +77,7 @@ PolyValue = Union[Array, Tuple["PolyValue", ...]]
 
 @dataclass(frozen=True)
 class PolyMap:
-    """A polynomial map ``src -> tgt`` (sec.poly).
+    """A polynomial map ``src -> tgt`` (CDLM sec.poly).
 
     A morphism in poly between any two of ``Yon``, ``Cot``, and
     ``DirichletProduct``. Specified by:

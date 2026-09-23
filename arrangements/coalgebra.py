@@ -26,7 +26,7 @@ The standard coalgebras take a reactive vector space ``(Q, sharp_Q)`` as input
 * ``phase(Q)`` -- state ``S = T^*Q = Q x Q^*``, position the presented position
   ``q + sharp_q(xi)``, step one symplectic-Euler step of Hamilton's equations.
 
-The remaining constructors are EXTENSIONS (beyond the paper, notes/DESIGN.md §4), ported
+The remaining constructors are EXTENSIONS (beyond either paper, notes/DESIGN.md §4), ported
 from CDLM's ``integrator.py`` with their status kept verbatim:
 
 * ``damped(Q, c)`` -- the phase coalgebra with the damping one-form ``c*zeta``;
@@ -257,7 +257,7 @@ def gyro(
     """The phase coalgebra with a *damping* and a *gyroscopic* 1-form added.
 
     EXTENSION (beyond the paper). Like ``damped`` this lives in the readout slot
-    ``nu_{sigma^1, omega}`` (sec.phase_integrators), but adds, to the kinetic
+    ``nu_{sigma^1, omega}`` (CDLM sec.phase_integrators), but adds, to the kinetic
     1-form ``beta`` and the damping 1-form ``c*zeta``, a third, *skew* 1-form --
     the gyroscopic term of a spinning rotor. With a complex structure ``J`` (a
     block-diagonal 90-degree rotation, one ``[[0,-1],[1,0]]`` block per 2-D gyro),
@@ -277,7 +277,7 @@ def gyro(
     the velocity without changing its length -- and, unlike the potential, it is
     velocity-dependent, so it cannot be a ``dU``. Beware: this *explicit* discretization
     of the skew term is not symplectic; it mildly injects energy each step and is meant
-    to be run with the damping ``c`` (as in ``dap/gyroscope.py``), which keeps it
+    to be run with the damping ``c`` (as in ``gyroscope.py``), which keeps it
     bounded. Combined with damping the Hamilton step (eqn.phase_update) becomes, in the
     book's sign (``xi_Q`` added),
 
@@ -336,7 +336,7 @@ def gyro(
 def phase_on_cotangent(Q: ReactiveVectorSpace, damping: float = 0.0, init=None) -> CotCoalg:
     """The (damped) phase coalgebra presenting its whole state: base ``T^*Q``.
 
-    The DIRECT realization of velocity-dependent forcings (notes/DESIGN.md §6(c)): base
+    The DIRECT realization of velocity-dependent forcings (STATUS.md §2, trick vs direct): base
     ``Q' = Q x Q^* = R^{2 dim}``, state ``(q, xi)``, presented position
     ``(q~, xi)`` with ``q~ = q + sharp_q(xi)``, and step the damped Hamilton step
     driven by the ``Q``-component of the incoming covector on ``Q'`` (its ``Q^*``-

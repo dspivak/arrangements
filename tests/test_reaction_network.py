@@ -1,4 +1,4 @@
-"""Mass-action reaction networks as ``Phi`` of configuration arrangements (dap/reaction_network.py).
+"""Mass-action reaction networks as ``Phi`` of configuration arrangements (reaction_network.py).
 
 The frontier under test (module docstring of reaction_network.py):
 
@@ -693,7 +693,7 @@ def test_petri_log_x0_validation():
 
 
 # ---------------------------------------------------------------------------
-# 6. The DIRECT non-exact realization (module docstring, 6; notes/DESIGN.md §6(c)).
+# 6. The DIRECT non-exact realization (module docstring, 6; STATUS.md §2, trick vs direct).
 # The trick of 1 moves out of the sharp and into ``omega``.
 # ---------------------------------------------------------------------------
 

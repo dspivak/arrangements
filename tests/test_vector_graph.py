@@ -1,4 +1,4 @@
-"""R^d generalization of the prism graph-wiring (sec.graph_laplacian; Phase 3).
+"""R^d generalization of the prism graph-wiring (CDLM sec.graph_laplacian; Phase 3).
 
 The paper's prism wiring (``compose_graph``) couples scalar (R^1) vertices; this is
 its generalization to R^vdim vertices plus an optional on-site potential, so a network

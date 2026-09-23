@@ -65,7 +65,7 @@ def plant_box(Q: ReactiveVectorSpace, parameter=configuration) -> Arrangement:
     Parameter the coalgebra ``parameter(Q)`` on the given reactive vector space
     (the sharp carries the timestep/mass: ``euclidean(d, dt)`` for descent,
     ``diagonal([1/m]*d)`` for phase dynamics, per CDLM eqn.learning_sharp /
-    sec.spring_first_pass); output map the identity readout ``q``; no input
+    CDLM sec.spring_first_pass); output map the identity readout ``q``; no input
     ports; zero forcing.
     """
     d = Q.dim

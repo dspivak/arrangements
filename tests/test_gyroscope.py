@@ -1,4 +1,4 @@
-"""Gyroscopes-on-springs as a classifier (EXTENSION; dap/gyroscope.py).
+"""Gyroscopes-on-springs as a classifier (EXTENSION; gyroscope.py).
 
 A network of 2-D harmonic gyros with the ``gyro`` coalgebra as parameter, run by
 ``Phi``, is a harmonic surrogate of the system of Bull & Achour (unconv.ai, 2026). We
@@ -186,7 +186,7 @@ def test_regression_matches_cdlm():
 
 
 def test_direct_one_form_realization_agrees_with_trick():
-    """TRICK vs DIRECT (notes/DESIGN.md §6(c)): ``gyro_arrangement`` with the ``gyro``
+    """TRICK vs DIRECT (STATUS.md §2, trick vs direct): ``gyro_arrangement`` with the ``gyro``
     parameter smuggles damping, precession and drag into the coalgebra's step, its
     forcing being the exact ``-dU`` on ``Q``; ``gyro_arrangement_on_cotangent`` with
     ``phase_on_cotangent`` writes precession and drag into a non-exact forcing on

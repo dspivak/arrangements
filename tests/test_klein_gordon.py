@@ -1,7 +1,7 @@
 """End-to-end test: the chain-of-K-particles Klein-Gordon equation, phase parameters.
 
 The Klein-Gordon chain extends the harmonic chain (book sec.heat_waves; CDLM
-sec.wave_equation) by adding an on-site mass term ``(m_0^2/2) q^2`` to each
+CDLM sec.wave_equation) by adding an on-site mass term ``(m_0^2/2) q^2`` to each
 particle's cost:
 
     k(q, n_in) = (kappa/2)(q - n_in)^2 + (m_0^2/2) q^2,   omega = -dk.

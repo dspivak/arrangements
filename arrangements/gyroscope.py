@@ -8,7 +8,7 @@ slot of the arrangement framework (def:arr) -- the forward dynamics is *exactly*
 ``gyro`` coalgebra (coalgebra.py):
 
     gravity restoring   -> on-site forcing ``omega = -dU``   (harmonic well)
-    spring coupling     -> edge forcing ``omega = -dU``      (graph Laplacian, sec.graph_laplacian)
+    spring coupling     -> edge forcing ``omega = -dU``      (graph Laplacian, CDLM sec.graph_laplacian)
     inertia / mass      -> the reactive sharp                (``sharpR = 1/m``)
     damping             -> the damping 1-form                (``c*zeta``; ex.damping_one_form, ``damped``)
     gyroscopic torque   -> the skew 1-form                   (``gamma*omega_gyro``; ``gyro``)
@@ -31,7 +31,7 @@ realizes the same chain-rule pullbacks that ``cot`` encodes -- an AD-equivalence
 for genuine multi-stage *integrators* like leapfrog/RK4; the training rollout is not
 one.)
 
-Two realizations of the same dynamics live here (notes/DESIGN.md §6(c)):
+Two realizations of the same dynamics live here (STATUS.md §2, trick vs direct):
 
 * ``gyro_arrangement`` -- the TRICK: the forcing is exact, ``omega = -dU`` on ``Q``, and
   the velocity-dependent damping, gyroscopic and drag 1-forms are smuggled into the
@@ -239,7 +239,7 @@ def _gyro_rvect(cfg: GyroConfig, inv_mass: Array):
 def gyro_arrangement(
     cfg: GyroConfig, inv_mass: Array, kappa: Array, grav_k: Array, parameter=gyro,
 ) -> Arrangement:
-    """The 2-D gyro network as one ``Arrangement`` (sec.graph_laplacian at R^2,
+    """The 2-D gyro network as one ``Arrangement`` (CDLM sec.graph_laplacian at R^2,
     written directly), with an open force port on the input gyros.
 
     Parameter ``parameter(Q)`` on ``Q = R^{2V}`` (positions of all gyros), constant
@@ -250,7 +250,7 @@ def gyro_arrangement(
     drive`` (``gyro_potential``); its value (computed by the framework's backward pass)
     is the force the coalgebra's step integrates.
 
-    This is the TRICK realization (notes/DESIGN.md §6(c)): the forcing is exact on ``Q`` and
+    This is the TRICK realization (STATUS.md §2, trick vs direct): the forcing is exact on ``Q`` and
     the velocity-dependent damping, gyroscopic and drag 1-forms live inside the
     parameter's step (``coalgebra.gyro``). See ``gyro_arrangement_on_cotangent`` for
     the direct one.
@@ -280,7 +280,7 @@ def gyro_arrangement_on_cotangent(
 ) -> Arrangement:
     """The same gyro network with its gyroscopic and drag terms written as a forcing.
 
-    This is the DIRECT realization (notes/DESIGN.md §6(c)): the base is ``T^*Q = R^{4V}``,
+    This is the DIRECT realization (STATUS.md §2, trick vs direct): the base is ``T^*Q = R^{4V}``,
     the parameter ``parameter(Q)`` presents ``(q~, xi)`` (``coalgebra.phase_on_cotangent``,
     which keeps the paper's damping ``c*zeta`` in its step), and the forcing on
     ``T^*Q x M^+ x N^-`` is
@@ -492,7 +492,7 @@ def load_pendigits(cache_dir: str = None):
     import os
     import urllib.request
 
-    cache_dir = cache_dir or os.path.join(os.path.expanduser("~"), ".cache", "dap")
+    cache_dir = cache_dir or os.path.join(os.path.expanduser("~"), ".cache", "arrangements")
     os.makedirs(cache_dir, exist_ok=True)
 
     def fetch(split):
@@ -545,7 +545,7 @@ def show_predictions(params: Dict[str, Array], cfg: GyroConfig, X: Array, Y: Arr
 
 
 def main(rows: int = 4, cols: int = 5, epochs: int = 60, seed: int = 0):
-    """Train the harmonic gyro surrogate on PenDigits inside dap (``python -m dap.gyroscope``).
+    """Train the harmonic gyro surrogate on PenDigits (``python -m arrangements.gyroscope``).
 
     Trains the gyro network (``Phi`` with the ``gyro`` coalgebra) on PenDigits and
     prints its validation accuracy. The blog's reported numbers are shown for context
@@ -553,7 +553,7 @@ def main(rows: int = 4, cols: int = 5, epochs: int = 60, seed: int = 0):
     their result. Pass ``--show`` to also print per-digit accuracy and a few pen
     strokes with the guess.
 
-    Usage: ``python -m dap.gyroscope [rows cols epochs] [--show]``.
+    Usage: ``python -m arrangements.gyroscope [rows cols epochs] [--show]``.
     """
     import sys
 

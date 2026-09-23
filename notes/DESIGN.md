@@ -1,171 +1,139 @@
-# arrangements: the category of arrangements $\arr$, executable
+# How the mathematics maps onto the code
 
-> **Working design note, kept as the record of why the code is shaped this way.**
-> It was written before the code, to be executed against; it is not a specification of
-> the current API, and its process details (token budgets, staging, "stop and report")
-> are how the work was actually carried out. For what the library establishes and what
-> it does not, see [`STATUS.md`](../STATUS.md).
->
-> Where it calls the source `dap-core-old` and cites a `cdlm-final` tag: during the port
-> that checkout was briefly renamed and tagged. Both were undone. CDLM's companion sits
-> unmodified at `dap-core` in the `dynamic-algebra-potentials` repo; we copied from it and
-> changed nothing.
+This is the correspondence between the book's definitions and this library's datatypes.
+It says how the code is shaped and why. For what the tests establish and what they do
+not, see [`STATUS.md`](../STATUS.md); for conventions of sign and time, `STATUS.md` §1.
 
-Design note (Claude, Opus 5, for David Spivak, 2026-09-21). This is the contract every
-stage of the port is built against. The mathematics it implements is the book
-*Articulating Forms that Matter*, Chapter 3 (`3-arrangements-that-matter.tex`,
-`def:arr`) as elaborated in `AGENTDOCPLAN.md` §4.2, §4.8, §4.9; the source it is
-ported from is `../dynamic-algebra-potentials/dap-core-old` (tag `cdlm-final`), the executable companion of CDLM.
-Do not read `CDLM.tex` whole; read the old module you are porting.
+The ambient category is smooth sets, sheaves on Cartesian spaces. **The code stays on
+Cartesian spaces `R^d`**, an admissible subcategory containing every example, and records
+a smooth set by its dimension (`STATUS.md` §3.1).
 
-## 0. What changes, in one paragraph
+## 1. Objects and their datatypes
 
-CDLM's arrangement carries a **potential** $U\colon Q\times M^+\times N^-\to\mathbb R$ and
-chooses its **integrator** in the semantics (`Phiconf`, `Phiphase`). The book's
-arrangement carries a **forcing one-form** $\omega$ on $Q\times M^+\times N^-$, which need
-not be exact, and its **integrator is part of the arrangement**: the parameter is a
-$\cot(Q)$-coalgebra $(Q,S,u)$, not a reactive vector space. There is **one** dynamics
-functor $\Phi\colon\arr\to\pc$. Everything else (polynomials, $\pc$, the covector
-triple, lens internalization, wiring) is unchanged in substance.
-
-## 1. The mathematics, and the datatype for each piece
-
-Smooth sets are $\smoothset=\operatorname{Shv}(\operatorname{CartSp})$. In code, v1 stays
-on Cartesian spaces $\mathbb R^d$, as before (a "smooth set" is a dimension). This is
-the admissible subcategory of §4.8(c); say so in the docstring, do not pretend
-otherwise.
-
-| the book | code |
+| the mathematics | the code |
 |---|---|
-| interface $M=\langle M^-\mid M^+\rangle$, two smooth sets | `(in_dim, out_dim)` |
-| $\Omega^1$, one-forms; a map $X\to\Omega^1$ *is* a one-form on $X$; writer monad $\Omega(X)=X\times\Omega^1$ | a one-form on $\mathbb R^{a}\times\mathbb R^{b}\times\mathbb R^{c}$ is a callable `omega(x_a, x_b, x_c) -> (xi_a, xi_b, xi_c)` returning the covector's components on each factor at that point |
-| $\omegalens$ morphism $M\to N$: $f^+\colon M^+\to N^+$ and $f^-\colon M^+\times N^-\to\Omega(M^-)=M^-\times\Omega^1$ | `out_f(m_out) -> n_out`, `in_f(m_out, n_in) -> m_in`, and `omega(m_out, n_in) -> (xi_mout, xi_nin)`, a one-form on $M^+\times N^-$ |
-| Kleisli composition of $\omegalens$ = **pullback-and-sum** | see §2 |
-| $\cotcoalg$ object $(Q,S,u)$, $u\colon S\to\cot(Q)(S)$, i.e. $s\mapsto(q(s),\ \xi\mapsto s')$ | `CotCoalg(Q_dim, init: S, position: S -> Q, step: (S, xi_Q) -> S, label)`; the response $\sharp$ lives inside `step`, it is not a separate field |
-| tensor of coalgebras: base $Q\times Q'$, state $S\times S'$, product coalgebra | `CotCoalg.tensor` : state a pair, position the concatenation, step componentwise after splitting `xi_Q` |
-| morphism $(f,g)$ of coalgebras with $u'\circ g=\cot(f)_{S'}\circ\cot(Q)(g)\circ u$ | not a datatype; one test that checks the equation for a reparameterization (optional, stage c) |
-| $\arr=\para{\cotcoalg}{\omegalens}$; an arrangement $M\to N$ with parameter $P=(Q,S,u)$ is an $\omegalens$ morphism $Q\otimes M\to N$ | `Arrangement(P: CotCoalg, in_dim_M, out_dim_M, in_dim_N, out_dim_N, out_f(q, m_out), in_f(q, m_out, n_in), omega(q, m_out, n_in) -> (xi_q, xi_mout, xi_nin), label)` |
-| $\omega=dU$ when a potential exists | helper `exact(U)`: `omega = jax.grad(U, argnums=(0,1,2))`. Every CDLM example becomes `omega = exact(lambda q,m,n: -U_cdlm(q,m,n))`; see §3 |
-| dynamics functor $\Phi\colon\arr\to\pc$, one functor | `Phi(arr) -> PCMorphism`; no integrator argument; `Phiconf`/`Phiphase` are deleted |
-| $\Phi$ on an interface: positions $M^+\times\Omega(M^-)$ (the output and the one-form the box publishes on its input port), directions $(M^+)^*\times M^-$ | unchanged: `phi_box_poly`, `trivial_omega` |
-| displacement semantics: one covector, one step | the coalgebra step; time is discrete by design, no ODE reading |
+| interface `M = <M- \| M+>`, two smooth sets | a pair of dimensions, `in_dim` and `out_dim` |
+| `Omega^1`, one-forms; a map `X -> Omega^1` *is* a one-form on `X`; writer monad `Omega(X) = X x Omega^1` | a one-form on a product is a callable returning the covector's components on each factor: `omega(x_a, x_b, x_c) -> (xi_a, xi_b, xi_c)` |
+| a lens `M -> N` in `omegalens`: `f+ : M+ -> N+` and `f- : M+ x N- -> Omega(M-)` | `out_f(m_out) -> n_out`, `in_f(m_out, n_in) -> m_in`, and `omega(m_out, n_in)`, a one-form on `M+ x N-` |
+| Kleisli composition in `omegalens` | pullback-and-sum; §2 |
+| an object `(Q, S, u)` of `cotcoalg`, `u : S -> cot(Q)(S)`, i.e. `s |-> (q(s), xi |-> s')` | `CotCoalg(Q_dim, init, position, step)`. The response `sharp` lives *inside* `step`; it is not a field |
+| tensor of coalgebras: base `Q x Q'`, state `S x S'` | `CotCoalg.tensor`: state a pair, position the concatenation, step componentwise after splitting the covector |
+| `arr = Para(cotcoalg, omegalens)`; an arrangement with parameter `P` is a lens `Q (x) M -> N` | `Arrangement(P, in_dim_M, out_dim_M, in_dim_N, out_dim_N, out_f, in_f, omega)`, the maps now taking `q` first |
+| `omega = dU` where a potential exists | `exact(U)`, which is `jax.grad(U, argnums=(0,1,2))` |
+| the dynamics functor `Phi : arr -> pc` | `Phi(arr) -> PCMorphism`, taking no integrator argument |
+| `Phi` on an interface: positions `M+ x Omega(M-)`, directions `(M+)* x M-` | `phi_box_poly`, with `trivial_omega` for a trivial input side |
+| displacement semantics: one covector, one step | the coalgebra's `step` |
 
-## 2. Composition: pullback-and-sum
+## 2. Composition is pullback-and-sum
 
-For $f\colon L\to M$ with one-form $\omega_f$ on $L^+\times M^-$ and $g\colon M\to N$ with
-$\omega_g$ on $M^+\times N^-$, the composite $g\circ f$ has, at $(l,n)$,
-$$
-\omega_{g\circ f}(l,n)
-= \bigl((l,n)\mapsto(f^+(l),\,n)\bigr)^*\,\omega_g
-\;+\;
-\bigl((l,n)\mapsto(l,\,g^-(f^+(l),n))\bigr)^*\,\omega_f .
-$$
-In code: evaluate $\omega_g$ at $(f^+(l),n)$ and $\omega_f$ at $(l,g^-(f^+(l),n))$, and
-pull each back with `jax.vjp` of the map written above; add. With parameters, the
-same with $q$ and $q'$ carried along: the composite's parameter is $P\otimes P'$ and its
-one-form lives on $Q\times Q'\times L^+\times N^-$. **This replaces `compose_seq`'s "sum the
-two $U$'s at the composed points": by the chain rule the two agree when both are exact,
-and only the pullback form is right when they are not.** `parallel_arrangements` and
-`tensor_arrangements` are the direct sum of one-forms (no pullback). The wirings
-(`chain_wire`, `graph_wire`) have zero one-form and trivial parameter, as before.
+For `f : L -> M` carrying `omega_f` on `L+ x M-`, and `g : M -> N` carrying `omega_g` on
+`M+ x N-`, the composite carries, at `(l, n)`,
 
-The interpretation (`interpretation.py`) already pulls the *incoming* field
-$\omega_M$ back along `in_f` with `vjp`; the only change is that `jax.grad(U)` at three
-places becomes the corresponding component of `omega(q, out_m, in_n)`. The
-published field is $\omega_N(n)=(f^-(q,m,-))^*\omega_M+\omega(q,m,n)|_{N^-}$; the
-covector triple is $\xi_Q=(f^+)^*\xi_N|_Q+(f^-)^*\omega_M|_Q+\omega|_Q$, likewise for
-$\xi_M$.
+```
+omega_{g.f}(l, n) = A* omega_g  +  B* omega_f,
+    A : (l, n) |-> (f+(l), n)
+    B : (l, n) |-> (l, g-(f+(l), n))
+```
 
-## 3. Sign convention (the one place a port can go silently wrong)
+In code: evaluate each constituent at its own local point and pull it back with
+`jax.vjp` of the map above, then add. With parameters, `q` and `q'` come along: the
+composite's parameter is the tensor, and its one-form lives on `Q x Q' x L+ x N-`.
 
-The book: whenever a potential exists, $\omega=dU$; for a cost $k$ one has $U=-k$, so
-$\omega=-dk$; the configuration coalgebra **adds**: $q'=q+\sharp\,\omega$. Descent of $k$
-is then automatic.
+This is what replaces CDLM's "sum the two potentials at the composed points." By the
+chain rule the two agree whenever both are exact; when they are not, only the pullback
+form is correct. `parallel_arrangements` and `tensor_arrangements` are the direct sum of
+one-forms, with no pullback. Wirings (`chain_wire`, `graph_wire`) carry the zero one-form
+and a trivial parameter.
 
-CDLM and `dap-core-old`: `U` *is* the cost and the integrator subtracts,
-`s - Q.apply_sharp(s, xi)`.
+The interpretation pulls the *incoming* field back along `in_f`. The published field is
+`omega_N(n) = (f-(q, m, -))* omega_M + omega(q, m, n)|_{N-}`, and the covector triple is
+`xi_Q = (f+)* xi_N|_Q + (f-)* omega_M|_Q + omega|_Q`, likewise for `xi_M`.
 
-Translation, applied mechanically to every ported module: `U_old` becomes
-`omega = exact(lambda q, m, n: -U_old(q, m, n))`, and the configuration coalgebra's
-step becomes `s + sharp(s, xi)`. The phase coalgebra flips the sign of its kick the same
-way (the position half is unchanged). Incoming environment covectors `xi_N` and
-published fields are forcings, so a test that supplied a cost gradient in the old code
-supplies its negative here (a pin with cost $\tfrac{\kappa}{2}q^2$ sends $\xi_N=-\kappa q$);
-only states are unchanged. The retroactivity note's one-forms are also in CDLM's sign
-(`AGENTDOCPLAN.md` §4.9): import them with a minus.
-**Acceptance:** every ported example reproduces the old trajectory to machine precision
-(`jnp.allclose` with `rtol=1e-10` under `jax_enable_x64`) when the old test is run on
-`dap-core-old` and the new one on `arrangements`, on the same seeds and inputs. Write that
-comparison as a test that imports nothing from the old package: record the old
-trajectories once (a small `.npz` per example, generated by a script in
-`tests/regress/`, kept in the repo) and compare.
+## 3. Why the sign translation exists
 
-## 4. The standard coalgebras (what `rvect.py` becomes)
+The book takes `omega = dU`, so a cost `k` gives `U = -k` and `omega = -dk`, and the
+configuration coalgebra **adds**: `q' = q + sharp(omega)`. Descent of `k` is then
+automatic, carried by the forcing's own sign.
 
-Keep `ReactiveVectorSpace` (position-dependent sharp) as a *constructor input*, not as
-the parameter. Provide:
+CDLM instead calls the cost itself `U` and has the integrator subtract. So every ported
+example was translated: `U_old` became `exact(lambda q, m, n: -U_old(q, m, n))`, and the
+step became `s + sharp(s, xi)`. The phase coalgebra flips the sign of its kick the same
+way, the position half unchanged.
 
-- `configuration(Q: ReactiveVectorSpace) -> CotCoalg`: state $S=Q$, position the
-  identity, step $s+\sharp_s\xi$.
-- `phase(Q: ReactiveVectorSpace) -> CotCoalg`: state $T^*Q=Q\times Q^*$ in coordinates,
-  position the first factor, step the book's one-step phase update (port the old
-  `phase_integrator` with the sign of §3).
-- `damped(...)`, `gyro(...)`, and the multi-stage `Integrator2`/`IntegratorK`, `leapfrog`,
-  `rk4`: port as extensions in stage (c), docstrings keeping their "beyond the paper"
-  and "monoidality open" (§4.5 item 7) status verbatim. Anything the old code marks
-  EXTENSION stays marked EXTENSION.
+The translation reaches past the potentials. Environment covectors and published fields
+are forcings, so where the old code supplied a cost gradient this one supplies its
+negative: a pin with cost `(kappa/2) q^2` sends `xi_N = -kappa q`. States are unchanged.
+Sources written in CDLM's convention — the retroactivity note among them — are imported
+with a minus.
 
-## 5. Tests that are new, because they could not be written before
+Because a sign error here is silent, every ported example carries a recorded trajectory
+from the old implementation in `tests/regress/`, and reproduces it. See `STATUS.md` §2
+for what that does and does not show.
 
-- **Reciprocity.** A stateless two-port coupler with one-form $\omega$: check
-  $d\omega$ against the antisymmetric part of the returned-covector Jacobian, on the
-  pipe (exact, $d\omega=0$) and the waterfall $\omega=\varphi(e_1)(de_1-de_2)$
-  ($d\omega\ne0$); `background/note-retroactivity.tex` §3 in the book repo.
-- **Two tanks, three couplers** (book Ch 2 §2.1): pipe, waterfall, pump, each as an
-  arrangement; the composite ODE step matches the note's two lines; total water is
-  conserved for the pipe and for the waterfall (the stream lands in tank 2; what the
-  waterfall loses is reciprocity, not conservation) and not for a leak.
-- **Composition agrees with dynamics** for a non-exact coupler: run the composite of
-  two boxes and a waterfall as one arrangement and as `Phi` of the parts composed in
-  $\pc$; equal step-for-step. (The old `test_composition.py` does this for exact ones.)
-- **The integrator is part of the arrangement:** the same wiring with `configuration`
-  and with `phase` parameters is two *different* arrangements; `Phi` takes no
-  integrator; there is no way to run "the same arrangement two ways". A test that the
-  heat and wave examples are built as two arrangements on one wiring.
+## 4. The standard coalgebras
 
-## 6. Stages, caps, and what to report
+`ReactiveVectorSpace` survives as a *constructor input* — a position-dependent `sharp` —
+rather than as the parameter itself.
 
-Each stage is one agent run with a token cap; stop and report at the cap or at the
-end, whichever comes first. Do not start the next stage in the same run.
+- `configuration(Q)`: state `S = Q`, position the identity, step `s + sharp_s(xi)`.
+- `phase(Q)`: state `T*Q = Q x Q*`, position the first factor, one symplectic-Euler step.
+- `damped`, `gyro`, `phase_on_cotangent`, and the multi-stage `leapfrog`, `rk4`,
+  `CotCoalg2`, `CotCoalgK` are extensions beyond either paper, marked as such where they
+  are defined. Whether the multi-stage assignment is functorial is open (`STATUS.md` §3.4).
 
-- **(b) Core**, cap 250k. `arrangement.py`, `coalgebra.py` (new; `rvect.py` reduced per
-  §4), `interpretation.py`, `functors.py` (one `Phi`), `wiring.py`, `polynomial.py` and
-  `pc.py` copied unchanged. Port exactly these examples and their tests, with the
-  regression `.npz` files: `learning.py` (gradient descent, backprop),
-  `test_heat_equation.py` and `test_wave_equation.py` (one wiring, two arrangements),
-  `test_composition.py`, `test_functors.py`, `test_wiring.py`, `test_rvect.py`,
-  `test_polynomial.py`. Add the §5 reciprocity and two-tanks tests. Report: what was
-  ported, the test count old/new, the regression status per example, any place the
-  design note was wrong or silent.
-- **(c) Examples**, cap 250k, after David has read (b)'s report. The remaining modules,
-  one at a time, each with its regression test: amplifier, dc_motor, lc_circuit,
-  kuramoto, hopfield, replicator, moleculardyn, reaction_network, logic, control,
-  gyroscope(+faithful), system_id, pinn, newton/optimizers, the multi-stage
-  integrators, `build.py`/`demo.py`. Non-gradient examples the old code realized by
-  tricks (reaction networks with a detailed-balance potential, Lotka–Volterra with
-  oppositely signed sharps) keep those realizations *and* gain the direct non-exact
-  one-form realization as a second test, with a docstring saying which is which.
-- **(d) The commons**, separate design note first (book plan §6 item 43(b1)); not part
-  of this port.
+Since the parameter no longer exposes a `sharp`, tests that need one read it off the
+coalgebra as the Jacobian of `step` at zero covector. For a configuration coalgebra that
+*is* the sharp, and it turns assertions about a potential into assertions about the
+forcing, which are stronger: symmetry of a Hessian becomes exactness of the composite
+one-form.
 
-## 7. Rules
+## 5. The attention operad
 
-- Match the old code's idiom: docstrings cite the book's labels (`def:arr`,
-  `sec.forcing`, `sec.integrators`, …) the way the old ones cite CDLM's; where the
-  book has no label yet, cite `AGENTDOCPLAN.md §4.2` and say so.
-- Names follow the book's `NOTATION.md`: the parameter's base is $Q$, its state $S$,
-  the coalgebra $u$, the forcing $\omega$, the dynamics functor bare $\Phi$.
-- No new abstractions beyond the table in §1. If a datatype is not in the table, ask.
-- Never edit `dap-core-old`. Never commit. Run tests with `uv run pytest` from
-  `arrangements` (copy `.venv` handling from the old `pyproject.toml`; the lock file is
-  already here).
+An `n`-ary attention arrangement is `(I, l, T, k)`: an integrator, a placement map, a
+family of message transfers with zero diagonal, and a nonnegative cost quadratic in the
+interaction. The port is close to mechanical because the paper's data are already an
+arrangement's data:
+
+| the paper | the code |
+|---|---|
+| interaction space `D_n = M^n x E` | exactly the `(m_out, n_in)` pair |
+| sending map `sigma_a(q, m) = sum_j T_0j(q) m_j` | `out_f(q, m_out)` |
+| receiving map `rho_a(q, m, e)_i` | `in_f(q, m_out, n_in)` |
+| forcing `omega_a = -dk_a`, the *full* differential | `exact(lambda q, m, n: -k(q, m, n))` |
+
+The paper already uses the book's convention (`U = -k`, `omega = dU`), so there is **no
+sign translation here**, unlike every CDLM module.
+
+Two layers, matching the paper's own. `AttentionArrangement` is an element of
+`Attention(n)`, because substitution is defined on `(I, l, T, k)` and not on the lens
+they produce — a composite has to be substitutable again. Its `.arr()` is the operad
+morphism into `End_arr(B)`. Substitution is implemented twice on purpose: `substitute`
+follows the paper's explicit formulas with no reference to `wiring.py`, and the same
+composite is built by `compose_seq(tensor_arrangements(...), a)`. Testing that these
+agree is the operad-morphism proposition made executable.
+
+Two limits the module declares rather than hides. The integrator is `Store(S)` only, not
+the paper's general polynomial comonad (`STATUS.md` §3.3). And the operad laws hold up to
+the coherence isomorphism, not on the nose: substitution takes `Q_b = Q_a x prod_i Q_{a_i}`,
+so different bracketings order the configuration factors differently and the symmetric
+action permutes them; the tests compare after the evident block permutation, which
+Definition 1's "up to integrator isomorphism" licenses.
+
+Guards that must read concrete values — message admissibility, the mean readout's
+positive weight, `validate` — are eager-only and not `jit`-able, and `validate` checks
+the transfer conditions at one configuration, not for all `q`.
+
+## 6. What is worth testing, and why
+
+Three kinds of test carry the weight, and `STATUS.md` §2 says what each is worth:
+
+- **Closed forms.** Where a source states a formula, a limit, or an exact value, compute
+  it independently and compare.
+- **Two independent implementations.** The attention operad's substitution, above.
+- **Recorded trajectories.** Faithfulness of the port, nothing more.
+
+The tests that could not be written before forcing one-forms existed are the ones worth
+adding to first: reciprocity (`d omega = 0` for the pipe, nonzero for the waterfall, and
+`d omega` the antisymmetric part of the returned-covector Jacobian), the two tanks with
+three couplers, composition agreeing with dynamics for a non-exact coupler, and heat and
+wave built as two arrangements on one wiring.

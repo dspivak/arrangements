@@ -1,8 +1,8 @@
 """Run the worked examples and print what happens.
 
-Usage (from ``dap-core``):
+Usage (from the repository root):
 
-    uv run dap-demo        # or: uv run python -m dap.demo
+    uv run arrangements-demo   # or: uv run python -m arrangements.demo
 
 Each example builds an arrangement (def:arr) -- the integrator is its parameter
 coalgebra -- and applies the one dynamics functor ``Phi`` (sec.dynamics_functor):
@@ -213,7 +213,7 @@ def demo_gyroscope():
     Xva, Yva = synth(200)
     _, hist = train(cfg, Xtr, Ytr, Xva, Yva, epochs=15, batch=64, lr=5e-3, verbose=False)
     print(f"  gyroscope (springs net: gyro -> logits):  val_acc {max(h['val_acc'] for h in hist):.3f}  on a 2-class stroke task")
-    print("    (harmonic surrogate inspired by Bull & Achour; `python -m dap.gyroscope` -> ~0.83 at 3x4, ~0.87 at 4x5)")
+    print("    (harmonic surrogate inspired by Bull & Achour; `python -m arrangements.gyroscope` -> ~0.83 at 3x4, ~0.87 at 4x5)")
 
 
 def demo_faithful():
@@ -233,7 +233,7 @@ def demo_faithful():
 
 
 def main():
-    print("dap: worked examples (one functor Phi; the integrator is the arrangement's parameter)\n")
+    print("arrangements: worked examples (one functor Phi; the integrator is the arrangement's parameter)\n")
     print("configuration parameters -- descent dynamics:")
     demo_gradient_descent()
     demo_newton()

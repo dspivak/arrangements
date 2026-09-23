@@ -12,7 +12,7 @@ This module also exposes the cotangent functor ``cot`` on ``R^d``
 (sec.poly_smoothset), used to interpret interfaces, and ``phi_laxator``, the
 comparison map of the *lax* monoidal structure of ``Phi`` on objects, by which
 one combines several coalgebras before post-composing a wiring (CDLM
-sec.spring_second_pass; the book's Ch 4).
+CDLM sec.spring_second_pass; the book's Ch 4).
 """
 
 from __future__ import annotations

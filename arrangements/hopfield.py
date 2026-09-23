@@ -69,7 +69,7 @@ configuration coalgebra's descent structure; a run-time input would open the
 interface and make the energy statement conditional on the input being held
 constant.
 
-CDLM (``dap-core-old/dap/hopfield.py``) carried the costs ``U_i`` as potentials
+CDLM's companion (``hopfield.py`` there) carried the costs ``U_i`` as potentials
 and chose the integrator in the semantics (``Phiconf``); here each box carries
 ``omega = exact(-U)`` and its parameter is the coalgebra (STATUS.md §1). The
 composite's state is the pytree of the boxes' states in tensor order (a balanced

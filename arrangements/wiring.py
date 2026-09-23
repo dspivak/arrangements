@@ -9,7 +9,7 @@ Provides:
 * ``parallel_arrangements(p1, p2)`` / ``tensor_arrangements(parts)`` -- the
   monoidal product in ``arr``: direct sum of forcings, tensor of parameters.
 * ``finset_chain_wire(K)`` -- the lens ``phi_K`` of CDLM ex.lens_finsetop /
-  sec.spring_first_pass, as the underlying pair of finite-set functions.
+  CDLM sec.spring_first_pass, as the underlying pair of finite-set functions.
 * ``chain_wire(K)``        -- its image under ``R^-`` (CDLM lem.lens_pow),
   realized as a static arrangement: a ``K``-ary wiring ``box^K -> box`` with
   trivial parameter and zero forcing.
@@ -183,7 +183,7 @@ def tensor_arrangements(parts: Sequence[Arrangement]) -> Arrangement:
 
 
 # ---------------------------------------------------------------------------
-# The finset-op lens phi_K (CDLM ex.lens_finsetop, sec.spring_first_pass).
+# The finset-op lens phi_K (CDLM ex.lens_finsetop, CDLM sec.spring_first_pass).
 # ---------------------------------------------------------------------------
 
 

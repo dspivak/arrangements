@@ -25,7 +25,7 @@ composite's forcing comes from ``compose_seq``'s pullback-and-sum of the parent'
 prediction cost and the two subsidiary costs.
 
 The example-specific pieces -- the subsidiary's ``(1/2)(p - z)^2``, the parent's
-``(1/2)(g - (h_2 - h_1))^2`` -- live here and not in ``dap/attention.py``: they are the
+``(1/2)(g - (h_2 - h_1))^2`` -- live here and not in ``attention.py``: they are the
 paper's modeling choices, not operad structure. ``tests/test_cue.py`` imports them.
 """
 
@@ -349,7 +349,7 @@ def test_the_kernel_of_the_hessian_is_the_conserved_direction():
     """REPRODUCES A CLOSED FORM the paper proves (prop:meeting's proof): "The Hessian of
     ``K(0, -, -)`` is positive semidefinite with kernel ``z_1 = z_2 = x_1 = x_2``."
 
-    It matters for the discrete restatement the book owes (§5.9 item 1). notes/ATTENTION-DESIGN.md
+    It matters for the discrete restatement the book owes (§5.9 item 1). notes/DESIGN.md §5
     §4 states the bound as "converges iff every eigenvalue of ``D^{1/2} H D^{1/2}`` lies in
     ``(0, 2)``", which no mobility satisfies here: ``H`` has the eigenvalue ``0``, and that
     is not a failure of convergence but the conserved ``S``. The book's statement must read

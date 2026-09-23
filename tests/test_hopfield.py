@@ -1,6 +1,6 @@
 """Continuous Hopfield network = ``Phi`` of a neuron/synapse-box arrangement.
 
-Audit of the claim (see ``dap/hopfield.py``): the continuous Hopfield network
+Audit of the claim (see ``hopfield.py``): the continuous Hopfield network
 (Hopfield 1984, ``R_i = C_i = 1``)
 
     u_i' = -u_i + sum_j W_ij g(u_j) + I_i,        g = tanh,  W symmetric,

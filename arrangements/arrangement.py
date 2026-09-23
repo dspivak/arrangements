@@ -21,7 +21,7 @@ of ``SmSet``. A one-form on ``R^a x R^b x R^c`` is represented as a callable
 ``omega(x_a, x_b, x_c) -> (xi_a, xi_b, xi_c)`` returning the covector's components
 on each factor at that point. This is the object the dynamics functor ``Phi``
 (functors.py, sec.dynamics_functor) acts on; it was ``SmoothArrangement`` (with a
-reactive vector space ``Q`` and a potential ``U``) in CDLM's ``dap-core``.
+reactive vector space ``Q`` and a potential ``U``) in CDLM's companion.
 """
 
 from __future__ import annotations

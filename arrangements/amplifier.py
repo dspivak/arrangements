@@ -42,7 +42,7 @@ stage satisfies only in the composite, where it has no free output port left).
 
 HONESTY FLAG: ``in_f`` is *linear*, not a port re-plumbing.  def.potlens asks
 only that ``in_f`` be smooth, so this is a legitimate static morphism of
-``sarr``; but it is NOT in the image of ``R^-`` of a finset lens (lem.lens_pow)
+``arr``; but it is NOT in the image of ``R^-`` of a finset lens (lem.lens_pow)
 -- every wiring in ``wiring.py`` is a coordinate routing (``nand_wire`` at most
 stacks the constant 0).  If "wiring" in the remark means the operadic
 (finset-induced) wiring, the summing junction is outside it; the subtraction
@@ -217,7 +217,7 @@ def feedback_wire(beta: float) -> Arrangement:
 
     ``out_f = m_out`` (pass the report through), ``in_f = n_in - beta * m_out``
     (the inverting summing junction), zero forcing, trivial parameter.  A
-    morphism of ``sarr`` (smooth ``in_f`` is all def.potlens asks) but *linear*,
+    morphism of ``arr`` (smooth ``in_f`` is all def.potlens asks) but *linear*,
     not a finset port-routing -- see the module docstring's honesty flag.
     """
 

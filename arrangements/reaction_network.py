@@ -215,7 +215,7 @@ THE VERIFIED FRONTIER.
    positive, monotone, and stable at every ``dt``.
 
 6. DIRECT, any network (the book's non-exact forcing, def:arr, sec.forcing;
-   notes/DESIGN.md §6(c)). An arrangement's forcing need not be exact, so the
+   STATUS.md §2, trick vs direct). An arrangement's forcing need not be exact, so the
    mass-action field itself is admissible as a one-form.
    ``mass_action_arrangement`` is the closed one-box arrangement whose
    parameter is the PLAIN configuration coalgebra on ``R^n`` with the
@@ -1083,7 +1083,7 @@ def log_mass_action_step(
 
 # ---------------------------------------------------------------------------
 # 6. The DIRECT encoding: the mass-action field as a non-exact forcing on the
-#    plain configuration coalgebra (module docstring, 6; notes/DESIGN.md §6(c)).
+#    plain configuration coalgebra (module docstring, 6; STATUS.md §2, trick vs direct).
 # ---------------------------------------------------------------------------
 
 

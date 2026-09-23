@@ -45,14 +45,14 @@ are ``omega_+ = 1/sqrt(LC)`` (charges in phase; the coupling capacitor carries
 no charge) and ``omega_- = sqrt(1/(LC) + 2/(L C_c))`` (charges in antiphase).
 
 The two-box configuration encoding (CDLM ex.further_reach, "LC circuit") comes
-in two realizations, a TRICK and a DIRECT one (notes/DESIGN.md §6(c)):
+in two realizations, a TRICK and a DIRECT one (STATUS.md §2, trick vs direct):
 
 * ``lc_conf`` -- the TRICK: an inductor cell and a capacitor cell with
   OPPOSITELY-SIGNED sharps, wired by a stateless coupler whose forcing is exact,
   ``-d(i*v)``. CDLM's arrangement carried only a potential, and a potential
   coupling has a symmetric cross-Hessian, so producing a rotation forced the two
   cells' sharps to differ in sign (the Lotka-Volterra / DC-motor mechanism,
-  cf. dap/dc_motor.py point 2).
+  cf. dc_motor.py point 2).
 * ``lc_conf_direct`` -- the DIRECT realization: both sharps positive (plain
   ``configuration`` parameters, the inductance and capacitance where they
   belong) and the coupler carrying the NON-EXACT one-form ``v di - i dv`` on its
@@ -150,10 +150,10 @@ def inductor_cell(L: float, R: float = 0.0, parameter=configuration) -> Arrangem
     Parameter ``i`` (the current through the inductor), constant scalar sharp
     ``-1/L`` (NEGATIVE: a potential coupling has a symmetric cross-Hessian, so
     producing a rotation forces the two cells' sharps to differ in sign -- the
-    Lotka-Volterra / DC-motor mechanism, cf. dap/dc_motor.py point 2),
+    Lotka-Volterra / DC-motor mechanism, cf. dc_motor.py point 2),
     reporting ``i`` on its single output port. An optional series resistance
     ``R`` enters as the potential ``-(R/2) i^2`` -- NEGATED, because the cell's
-    sharp is negative (dap/dc_motor.py's mechanical-cell convention: the flow
+    sharp is negative (dc_motor.py's mechanical-cell convention: the flow
     ``-sharp(dU)`` is invariant under ``(sharp, U) -> (-sharp, -U)``); the
     self-dynamics is then the damped ``i -> i + (v - R i)/L``. In the book's
     sign the forcing is ``omega = -dU = +d((R/2) i^2)``.
@@ -176,7 +176,7 @@ def inductor_cell(L: float, R: float = 0.0, parameter=configuration) -> Arrangem
 def capacitor_cell(C: float, parameter=configuration) -> Arrangement:
     """The capacitor as a configuration cell ``<R^0|R^0> -> <R^1_out | R^0_in>``:
     parameter ``v`` (the voltage across it), constant scalar sharp ``+1/C``,
-    zero forcing, reporting ``v``. (Same convention as dap/logic.py's
+    zero forcing, reporting ``v``. (Same convention as logic.py's
     ``node``: state = voltage, sharp = 1/C.) Shared by the trick and the direct
     realization."""
     return Arrangement(
@@ -235,7 +235,7 @@ def lc_conf(L: float, C: float, R: float = 0.0, parameter=configuration) -> Arra
 
 # ---------------------------------------------------------------------------
 # The DIRECT realization: positive sharps, the rotation carried by a non-exact
-# forcing on the coupler's two ports (notes/DESIGN.md §6(c)).
+# forcing on the coupler's two ports (STATUS.md §2, trick vs direct).
 # ---------------------------------------------------------------------------
 
 

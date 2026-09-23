@@ -1,4 +1,4 @@
-"""Replicator dynamics as Phi of the Shahshahani configuration arrangement (dap/replicator.py).
+"""Replicator dynamics as Phi of the Shahshahani configuration arrangement (replicator.py).
 
 Four checks:
 * one Phi step from a simplex point IS the forward-Euler replicator step

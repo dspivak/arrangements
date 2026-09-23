@@ -2,7 +2,7 @@
 
 Usage (from the ``misc`` directory):
 
-    ../.venv/bin/python -m dap.build
+    uv run arrangements   # or: uv run python -m arrangements.build
 
 You pick the parameter coalgebra (``phase`` = Hamilton/conservative, ``conf`` =
 descent/dissipative, ``leapfrog`` = two-stage), pick a system from a small palette

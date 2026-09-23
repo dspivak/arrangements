@@ -12,7 +12,7 @@ i.e. ``[phi'; p'] = (Jgyr - Rdiss) grad H + u`` with ``Jgyr = [[0,-K],[K,0]]``,
 ``Rdiss = diag(R, b)``, ``u = (V, -tau)``. We write ``i = phi/L`` (current) and
 ``omega = p/J`` (angular velocity) for the two *flows*.
 
-THE SENTENCE UNDER AUDIT (the paper's conclusion): "We expect sarr to
+THE SENTENCE UNDER AUDIT (the paper's conclusion): "We expect [the syntax operad] to
 accommodate the DC motor by coupling an electrical and a mechanical system so
 that the torque is proportional to current and the voltage is proportional to
 angular velocity. A first pass suggests that configuration dynamics Phiconf
@@ -34,7 +34,7 @@ composite, i.e. ``q - sharp_q(d U_total)``; ``compose_seq`` sums the pulled-back
 forcings, which for exact forcings is the sum of the potentials at the composed
 points; sharps direct-sum blockwise):
 
-1. "sarr accommodates the DC motor by coupling an electrical and a mechanical
+1. "[it] accommodates the DC motor by coupling an electrical and a mechanical
    system, torque prop. to current, voltage prop. to angular velocity" -- TRUE,
    and the configuration coalgebra suffices, but with ONE-dimensional boxes,
    not T^*R:
@@ -103,7 +103,7 @@ points; sharps direct-sum blockwise):
 
 5. "the electrical system reports its momentum and the mechanical reports its
    position" -- HALF WRONG. Electrical: ``phi`` is the electrical momentum (the
-   flux linkage, conjugate to charge -- cf. dap/lc_circuit.py) and the cell
+   flux linkage, conjugate to charge -- cf. lc_circuit.py) and the cell
    reports ``i = phi/L``, its momentum up to the fixed scalar ``1/L``: right.
    Mechanical: back-EMF is proportional to angular VELOCITY, so the mechanical
    cell must report ``omega = p/J`` -- its MOMENTUM (up to ``1/J``), not its
@@ -131,8 +131,8 @@ horizon -- while the energy trades fully between ``phi^2/(2L)`` and
 ``p^2/(2J)`` at frequency ``omega0``.
 
 Units: the coalgebra tick is unit time; the physical time step ``dt`` lives in
-the sharps (as in dap/kuramoto.py). ``locked_rotor=True`` freezes the
-mechanical state by the degenerate sharp ``0`` (as dap/logic.py freezes its
+the sharps (as in kuramoto.py). ``locked_rotor=True`` freezes the
+mechanical state by the degenerate sharp ``0`` (as logic.py freezes its
 voltage rails), which holds ``omega = 0``: the stall configuration, in-framework.
 
 State shapes: each constructor takes a ``parameter`` keyword, the coalgebra
@@ -227,7 +227,7 @@ def electrical_cell(
     """The electrical (armature) cell ``<R^0|R^0> -> <R^1_out | R^0_in>``.
 
     Parameter the coalgebra ``parameter(Q)`` on ``Q = phi`` (flux linkage --
-    the electrical MOMENTUM, conjugate to charge, cf. dap/lc_circuit.py),
+    the electrical MOMENTUM, conjugate to charge, cf. lc_circuit.py),
     constant scalar sharp ``+dt*L``, cost
 
         U_e(phi) = (R/2) i^2 - V i,     i = phi/L,
@@ -277,7 +277,7 @@ def mechanical_cell(
     the load opposes; only the gyrator coupling sees the sign.
 
     ``locked=True`` replaces the sharp by the degenerate ``0`` (def.rvect
-    allows it; cf. the frozen rails of dap/logic.py): the rotor is held, the
+    allows it; cf. the frozen rails of logic.py): the rotor is held, the
     stall configuration. ``sharp_sign=+1.0`` is the audit's negative control
     (same-signed sharps), under which the torque comes out REVERSED (test 8).
     """

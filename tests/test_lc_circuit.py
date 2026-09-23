@@ -1,6 +1,6 @@
 """The LC circuit: one lens datum, two parameters; the electrical reading acquires magnetism.
 
-The module (dap/lc_circuit.py) stores the capacitor charge ``q`` with reactive
+The module (lc_circuit.py) stores the capacitor charge ``q`` with reactive
 sharp ``xi |-> xi/L`` (inductance in the mass slot) and forcing ``omega = -dU``
 for the capacitor energy ``U(q) = q^2/(2C)``. The claims under audit:
 
@@ -14,7 +14,7 @@ for the capacitor energy ``U(q) = q^2/(2C)``. The claims under audit:
 * Coupled pair: two capacitor boxes wired through a stateless coupling box
   exhibit the two normal modes ``omega_+ = 1/sqrt(LC)`` and
   ``omega_- = sqrt(1/(LC) + 2/(L C_c))``.
-* Trick vs direct (notes/DESIGN.md §6(c)): the two-box LC rotation, realized by
+* Trick vs direct (STATUS.md §2, trick vs direct): the two-box LC rotation, realized by
   CDLM's oppositely-signed sharps with an exact forcing (``lc_conf``) and
   directly by the non-exact coupler one-form ``v di - i dv`` with both sharps
   positive (``lc_conf_direct``); the two agree step for step.
@@ -420,7 +420,7 @@ def test_lc_conf_energy_law_and_period():
 
     (a) the energy H = (L i^2 + C v^2)/2 grows by EXACTLY 1 + 1/(LC) per tick
         (in scaled coordinates the map is sqrt(1 + omega^2) times a rotation,
-        omega = 1/sqrt(LC); cf. dap/dc_motor.py's lossless law);
+        omega = 1/sqrt(LC); cf. dc_motor.py's lossless law);
     (b) the rotation angle per tick is arctan(omega), so the measured period
         is 2 pi / arctan(omega) ticks, within the continuum 2 pi sqrt(LC) up
         to the forward-Euler period bias omega^2/3 (arctan(w) = w - w^3/3 + ...).
@@ -509,7 +509,7 @@ def test_direct_realization_agrees_with_trick():
     """``lc_conf_direct`` (positive sharps, non-exact coupler one-form) and
     ``lc_conf`` (oppositely-signed sharps, exact forcing) step identically,
     driven and undriven -- the trick moves out of the sharp and into ``omega``
-    (notes/DESIGN.md §6(c))."""
+    (STATUS.md §2, trick vs direct)."""
     L, C, R = 20.0, 20.0, 0.2
     trick, direct = lc_conf(L, C, R), lc_conf_direct(L, C, R)
 

@@ -9,7 +9,7 @@ operation of the symmetric operad ``A_B``; ``prop:operad`` says that
 such ``a`` is a morphism ``B^(x)n -> B`` of ``arr``. The interface is
 ``B = (E, M)`` with message space ``M = H x W``, ``W = R``, and input space
 ``E = M x P``; in the notation of def:arr, ``B^+ = M`` and ``B^- = E``, so the
-paper's interaction space ``D_n = M^n x E`` *is* dap's pair ``(M^+, N^-)`` for an
+paper's interaction space ``D_n = M^n x E`` *is* an ``Arrangement``'s pair ``(M^+, N^-)`` for an
 arrangement ``B^(x)n -> B``, and the port dimensions are
 
     out_dim_M = n * (dim_H + 1),    in_dim_M = n * (dim_H + 1 + dim_P),
@@ -328,7 +328,7 @@ class AttentionArrangement:
         d = self.input_dim
         return self.rho(q, m_out, n_in)[(i - 1) * d: i * d]
 
-    # ---- the image in arr (notes/ATTENTION-DESIGN.md §1) ----
+    # ---- the image in arr (notes/DESIGN.md §5) ----
 
     def arr(self) -> Arrangement:
         """``a`` as a morphism ``B^(x)n -> B`` of ``arr`` (prop:operad).

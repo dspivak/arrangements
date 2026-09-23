@@ -6,7 +6,7 @@ omega = p/J):
     phi' = -(R/L) phi - K omega + V
     p'   =  K i - (b/J) p - tau
 
-The claims audited here (see dap/dc_motor.py for the full verdict). Everything
+The claims audited here (see dc_motor.py for the full verdict). Everything
 runs through the one dynamics functor ``Phi`` (sec.dynamics_functor) applied to
 arrangements whose parameter is the configuration coalgebra (sec.integrators) --
 CDLM's ``Phiconf`` -- with each cell's cost ``U`` entering as the forcing
