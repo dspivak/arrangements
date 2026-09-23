@@ -71,7 +71,7 @@ constant.
 
 CDLM (``dap-core-old/dap/hopfield.py``) carried the costs ``U_i`` as potentials
 and chose the integrator in the semantics (``Phiconf``); here each box carries
-``omega = exact(-U)`` and its parameter is the coalgebra (DESIGN.md §3). The
+``omega = exact(-U)`` and its parameter is the coalgebra (STATUS.md §1). The
 composite's state is the pytree of the boxes' states in tensor order (a balanced
 tree of pairs, see ``_tensor_balanced``, then paired with the wire's ``R^0``);
 its presented position is the flat ``u in R^N``.

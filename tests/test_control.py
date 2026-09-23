@@ -18,7 +18,7 @@ step ``q <- q + dt * (-k(q - s))``) and, for phase dynamics, one coalgebra step
 is one unit of time with ``sharp = xi/m`` (as in test_wave_equation), so "small
 dt" means small ``k/m``.
 
-Signs (DESIGN.md §3): the covector the coalgebra consumes is the forcing
+Signs (STATUS.md §1): the covector the coalgebra consumes is the forcing
 ``xi_Q = -k(q_eval - s)`` and the coalgebra *adds* it, where CDLM's was the cost
 gradient ``+k(q_eval - s)`` and its integrator subtracted; the field published on
 the setpoint port is likewise negated. States are identical.
@@ -160,7 +160,7 @@ def test_phase_oscillates_about_setpoint_at_sqrt_k_over_m():
 def test_setpoint_port_receives_equal_and_opposite_covector():
     """The composite EMITS, in its outer position, the one-form
     ``omega_N(s) = omega_c|_{N^-} = k(q_eval - s)`` on the setpoint port
-    (sec.forcing; CDLM eqn.omegaprime negated, DESIGN.md §3) -- equal and
+    (sec.forcing; CDLM eqn.omegaprime negated, STATUS.md §1) -- equal and
     opposite to the parameter covector ``xi_Q = -k(q_eval - s)`` the coalgebra
     consumes, because both are components of the one shared exact forcing
     (Newton's third law of the virtual spring). ``q_eval`` is the coalgebra's
@@ -205,7 +205,7 @@ def test_setpoint_port_receives_equal_and_opposite_covector():
 
 def test_regression_matches_cdlm():
     """The CDLM runs (``regress/control.npz``) are reproduced to rtol 1e-10
-    (DESIGN.md §3): states and reported positions identical, the emitted field
+    (STATUS.md §1): states and reported positions identical, the emitted field
     on the setpoint port negated."""
     R = load_regress("control")
     tol = dict(rtol=1e-10, atol=1e-12)

@@ -16,7 +16,7 @@ and for a pinned chain of length K the Dirichlet eigenmodes are
 
 Environment covectors are forcings in the book's sign: the pin ``q~_{K+1} = 0``
 is ``xi_N = -kappa * q~_K`` (CDLM seeded ``+kappa * q~_K`` and its integrator
-subtracted; DESIGN.md §3). States are unchanged.
+subtracted; STATUS.md §1). States are unchanged.
 """
 
 import os
@@ -166,7 +166,7 @@ def test_kg_long_horizon_bounded():
 
 def test_regression_matches_cdlm():
     """``regress/misc.npz``: the one-step samples and the pinned trajectory reproduce
-    CDLM, with ``xi_N`` negated on the way in (DESIGN.md §3)."""
+    CDLM, with ``xi_N`` negated on the way in (STATUS.md §1)."""
     R = load_regress("misc")
 
     K, m, kappa, m0 = int(R["kg_step_params"][0]), *(float(v) for v in R["kg_step_params"][1:])

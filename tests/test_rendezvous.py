@@ -4,8 +4,8 @@ The mathematics is ``background/affine_quadratic_operad.tex`` in the book reposi
 cited by its own labels (eq:meeting-maps, eq:subsidiary-cost, eq:parent-meeting-cost,
 eq:meeting-cost, eq:meeting-dynamics, prop:meeting, eq:meeting-point). **Every docstring
 below says which of three things its test does** -- reproduce a closed form the paper
-proves, check a discrete-time analogue the book still has to prove (AGENTDOCPLAN.md §5.9
-item 1), or merely illustrate (ATTENTION-DESIGN.md §4).
+proves, check a discrete-time analogue the book still has to prove (STATUS.md §3.2
+item 1), or merely illustrate (STATUS.md §3.2).
 
 The parent ``a_m in A_B(2)`` is an attention arrangement (pure placement transfers, a
 private prediction cost on the requested separation). The two subsidiaries are *not*
@@ -181,7 +181,7 @@ def hessian_of_K():
 
 
 def spectrum(H, D):
-    """The eigenvalues of ``D^{1/2} H D^{1/2}``, ``D = diag(mobilities)`` (ATTENTION-DESIGN.md §4)."""
+    """The eigenvalues of ``D^{1/2} H D^{1/2}``, ``D = diag(mobilities)`` (STATUS.md §3.2)."""
     R = np.sqrt(np.diag(np.asarray(D, float)))
     return np.linalg.eigvalsh(R @ H @ R)
 
@@ -282,10 +282,10 @@ def test_the_jitted_closed_step_is_Phi():
 
 
 def test_meeting_point_for_equal_mobilities():
-    """CHECKS THE DISCRETE ANALOGUE the book still has to prove (AGENTDOCPLAN.md §5.9
+    """CHECKS THE DISCRETE ANALOGUE the book still has to prove (STATUS.md §3.2
     item 1). prop:meeting is a statement about the *flow* eq:meeting-dynamics; here the
     same data are run as the book's displacement map, one covector one step, with all
-    four mobilities ``0.4`` -- inside the bound of ATTENTION-DESIGN.md §4, see
+    four mobilities ``0.4`` -- inside the bound of STATUS.md §3.2, see
     ``test_the_mobility_bound_is_real``. From ``(z, x) = (0, 1, 0, 1)`` the run converges
     to the common point eq:meeting-point predicts, ``c = 1/2``."""
     b = rendezvous(alphas=(0.4, 0.4), betas=(0.4, 0.4))
@@ -306,7 +306,7 @@ def test_meeting_point_with_a_less_mobile_component():
 
 
 def test_S_is_conserved_exactly_by_the_discrete_map():
-    """CHECKS THE DISCRETE ANALOGUE (ATTENTION-DESIGN.md §4, third bullet) of the
+    """CHECKS THE DISCRETE ANALOGUE (STATUS.md §3.2, third bullet) of the
     conserved quantity in prop:meeting's proof,
 
         S = z_1/alpha_1 + z_2/alpha_2 + x_1/beta_1 + x_2/beta_2.
@@ -341,7 +341,7 @@ def test_S_is_conserved_exactly_by_the_discrete_map():
 
 
 # ---------------------------------------------------------------------------
-# The mobility bound (ATTENTION-DESIGN.md §4), exhibited failing.
+# The mobility bound (STATUS.md §3.2), exhibited failing.
 # ---------------------------------------------------------------------------
 
 
@@ -349,7 +349,7 @@ def test_the_kernel_of_the_hessian_is_the_conserved_direction():
     """REPRODUCES A CLOSED FORM the paper proves (prop:meeting's proof): "The Hessian of
     ``K(0, -, -)`` is positive semidefinite with kernel ``z_1 = z_2 = x_1 = x_2``."
 
-    It matters for the discrete restatement the book owes (§5.9 item 1). ATTENTION-DESIGN.md
+    It matters for the discrete restatement the book owes (§5.9 item 1). notes/ATTENTION-DESIGN.md
     §4 states the bound as "converges iff every eigenvalue of ``D^{1/2} H D^{1/2}`` lies in
     ``(0, 2)``", which no mobility satisfies here: ``H`` has the eigenvalue ``0``, and that
     is not a failure of convergence but the conserved ``S``. The book's statement must read

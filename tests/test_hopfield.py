@@ -40,7 +40,7 @@ Checks:
 CDLM read the emergent *potential* off the arrangement (``arr.U``); the book's
 arrangement carries the forcing, so checks 0 and 2 read the forcing
 ``arr.omega`` and compare ``-omega|_Q`` with ``dU`` of the hand formula
-(DESIGN.md §3). The arrangement is closed, so the states themselves are
+(STATUS.md §1). The arrangement is closed, so the states themselves are
 unchanged by the sign translation.
 """
 
@@ -328,7 +328,7 @@ def test_regression_matches_cdlm():
     """The CDLM trajectories (``regress/hopfield.npz``) are reproduced to rtol 1e-10.
 
     The arrangement is closed (no port covector crosses an interface), so the
-    inputs need no sign translation and the states are identical (DESIGN.md §3).
+    inputs need no sign translation and the states are identical (STATUS.md §1).
     """
     R = load_regress("hopfield")
 

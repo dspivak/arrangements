@@ -41,7 +41,7 @@ def trivial_parameter() -> CotCoalg:
 
 
 # ---------------------------------------------------------------------------
-# Sequential composition in arr: pullback-and-sum (sec.forcing, DESIGN.md §2).
+# Sequential composition in arr: pullback-and-sum (sec.forcing, notes/DESIGN.md §2).
 # ---------------------------------------------------------------------------
 
 

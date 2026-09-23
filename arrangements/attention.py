@@ -19,19 +19,19 @@ arrangement ``B^(x)n -> B``, and the port dimensions are
 ``omega_a = -dk_a`` (eq:forcing) -- the *full* differential on ``Q x D_n``, not
 just the differential in ``q`` -- is ``exact(lambda q, m, n: -k(q, m, n))``. The
 paper already uses the book's convention ``U = -k``, ``omega = dU``, so unlike
-every CDLM port there is no sign translation here (DESIGN.md §3).
+every CDLM port there is no sign translation here (STATUS.md §1).
 
 **What is not implemented.** The paper's integrator is ``I = (Q, C, iota)`` with
 ``C`` an arbitrary polynomial comonad in ``Cat^#``; the response category can
 encode more state than the configuration ``q in Q``. The book's ``arr`` uses the
-concrete ``Store(S)`` comonad only (AGENTDOCPLAN.md §5.2, §5.9 item 2), so here
+concrete ``Store(S)`` comonad only (STATUS.md §3.3), so here
 ``CotCoalg`` -- a ``cot(Q)``-coalgebra ``(Q, S, u)``, i.e. ``Store(S) => cot(Q)``
 -- *is* the whole of the integrator. The general ``C`` is not implemented, and
 ``CotCoalg`` is not to be presented as the paper's ``I``; nothing in this module
 or in the tests needs the extra generality.
 
 Two constraints that ``R^d`` does not enforce are guarded rather than pretended
-away (ATTENTION-DESIGN.md §3):
+away (notes/ATTENTION-STATUS.md §1):
 
 * the admissible messages are ``{0_M} u (H x R_{>0})``; a transfer preserves them
   (``gamma > 0``), but nothing stops a caller from handing in a negative weight,
@@ -328,7 +328,7 @@ class AttentionArrangement:
         d = self.input_dim
         return self.rho(q, m_out, n_in)[(i - 1) * d: i * d]
 
-    # ---- the image in arr (ATTENTION-DESIGN.md §1) ----
+    # ---- the image in arr (notes/ATTENTION-DESIGN.md §1) ----
 
     def arr(self) -> Arrangement:
         """``a`` as a morphism ``B^(x)n -> B`` of ``arr`` (prop:operad).

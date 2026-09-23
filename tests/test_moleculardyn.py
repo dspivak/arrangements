@@ -37,7 +37,7 @@ the traced program); it does not replace them.
 
 The MD arrangement is closed, so no environment covector crosses a port and
 there is nothing to sign-translate from CDLM but the force itself: CDLM's
-``-xi_Q`` is the new ``xi_Q`` (DESIGN.md §3); states are identical.
+``-xi_Q`` is the new ``xi_Q`` (STATUS.md §1); states are identical.
 """
 
 import jax
@@ -334,7 +334,7 @@ def test_three_dimensional_instance():
 
 def test_regression_matches_cdlm():
     """The CDLM forces, states and energies (``regress/moleculardyn.npz``) are
-    reproduced to rtol 1e-10 (DESIGN.md §3): the leapfrog pair and trimer, the
+    reproduced to rtol 1e-10 (STATUS.md §1): the leapfrog pair and trimer, the
     phase trimer, the configuration pairs in 1-D and 3-D. The recorded force is
     CDLM's ``-xi_Q``, which is the new ``xi_Q``."""
     R = load_regress("moleculardyn")

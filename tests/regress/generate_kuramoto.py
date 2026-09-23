@@ -5,7 +5,7 @@ Run from the OLD package so that ``import dap`` is CDLM's:
     cd ../dynamic-algebra-potentials/dap-core-old && PYTHONPATH=. uv run --no-sync python ../../arrangements/tests/regress/generate_kuramoto.py
 
 Writes ``kuramoto.npz``. The system is closed (no environment covector), so no
-sign translation is needed on the inputs (DESIGN.md §3 affects only covectors
+sign translation is needed on the inputs (STATUS.md §1 affects only covectors
 crossing a port); the recorded *states* -- angles and momenta -- are what the
 new package must reproduce. Covered dynamics: ``Phiconf`` one step on the
 4-oscillator graph, ``Phiconf`` locking above threshold and drift below it on

@@ -1,4 +1,4 @@
-"""Record CDLM (``dap-core-old``) outputs for the gyroscope regression tests (DESIGN.md §3).
+"""Record CDLM (``dap-core-old``) outputs for the gyroscope regression tests (STATUS.md §1).
 
 Run from the OLD package, like ``generate_cdlm.py``:
 

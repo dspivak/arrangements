@@ -59,7 +59,7 @@ def test_conf_phase_share_readout():
 
 
 def test_regression_matches_cdlm():
-    """``regress/functors.npz``: CDLM's single-particle updates, with xi_N negated (DESIGN.md §3)."""
+    """``regress/functors.npz``: CDLM's single-particle updates, with xi_N negated (STATUS.md §1)."""
     R = load_regress("functors")
     m, kappa = 2.0, 3.0
     q0, p0 = jnp.array([0.7]), jnp.array([1.1])

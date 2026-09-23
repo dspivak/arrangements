@@ -6,7 +6,7 @@ remark proposes — and an arrangement whose parameter it is has ``pc2.Phi2``
 dynamics, an ``pc^(2)`` morphism. This is exactly parallel to the 1-stage story
 (a 1-stage ``CotCoalg`` parameter + ``functors.Phi`` gives an ``pc`` morphism).
 The kick/drift/kick lives once, in the coalgebra, in the book's sign (the
-covector is *added*, DESIGN.md §3):
+covector is *added*, STATUS.md §1):
 
     read1(q, ξ)   = q
     advance       : ξ½ = ξ + ½ ξ_Q(q),   q' = q + sharp_q(ξ½)     (mid = (q', ξ½))

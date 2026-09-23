@@ -693,7 +693,7 @@ def test_petri_log_x0_validation():
 
 
 # ---------------------------------------------------------------------------
-# 6. The DIRECT non-exact realization (module docstring, 6; DESIGN.md §6(c)).
+# 6. The DIRECT non-exact realization (module docstring, 6; notes/DESIGN.md §6(c)).
 # The trick of 1 moves out of the sharp and into ``omega``.
 # ---------------------------------------------------------------------------
 
@@ -774,7 +774,7 @@ def test_direct_runs_what_the_no_go_excludes():
 
 
 # ---------------------------------------------------------------------------
-# Regression against CDLM (``regress/reaction_network.npz``, DESIGN.md §3).
+# Regression against CDLM (``regress/reaction_network.npz``, STATUS.md §1).
 # ---------------------------------------------------------------------------
 
 
@@ -783,7 +783,7 @@ def test_regression_matches_cdlm():
 
     Closed systems throughout, so no environment covector is translated; the
     recorded composite potential gradients ``*_grad_U`` are CDLM's ``dU`` and
-    the new forcing is their negative (DESIGN.md §3).
+    the new forcing is their negative (STATUS.md §1).
     """
     R = load_regress("reaction_network")
     tol = dict(rtol=1e-10, atol=1e-12)

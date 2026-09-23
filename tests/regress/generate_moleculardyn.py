@@ -9,7 +9,7 @@ covector at three separations, the 1-D pair under ``Phileap``, one ``Phileap``
 macro-tick on a 2-D pair, the 2-D trimer under ``Phileap`` and ``Phiphase`` (with
 the energies), the 1-D and 3-D pairs relaxing under ``Phiconf``. The MD arrangement
 is closed (0-ary), so no environment covector crosses a port: the recorded force is
-CDLM's ``-xi_Q`` (the new package's ``xi_Q`` is the force itself, DESIGN.md §3);
+CDLM's ``-xi_Q`` (the new package's ``xi_Q`` is the force itself, STATUS.md §1);
 states are identical in both conventions.
 """
 

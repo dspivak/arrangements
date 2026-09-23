@@ -8,7 +8,7 @@ per-vertex harmonic particles ``Part_v``. We check:
 * the composite forcing ``-d sum_e (kappa/2)(q_tgt - q_src)^2`` (minus CDLM's
   eqn.graph_potential) EMERGES from the wiring -- it is not written by hand;
   CDLM's ``compose_seq`` summed potentials and the old test inspected ``arr.U``,
-  while the book's composite carries only ``omega`` (DESIGN.md §2), so the oracle
+  while the book's composite carries only ``omega`` (notes/DESIGN.md §2), so the oracle
   is differentiated and compared with the forcing's ``Q``-component;
 * the prism input map ``inpt f`` is a bijection on ``R^E`` (CDLM eqn.prism_f);
 * the same graph with *phase* vertex parameters is the discrete graph-wave

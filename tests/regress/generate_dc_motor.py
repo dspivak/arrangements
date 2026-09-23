@@ -1,4 +1,4 @@
-"""Record CDLM (``dap-core-old``) DC-motor trajectories for the regression test (DESIGN.md §3).
+"""Record CDLM (``dap-core-old``) DC-motor trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
@@ -11,7 +11,7 @@ recorded initial states) and the outputs the old package produces -- the
 Bateman and flow-coordinate arrangements, and the covector ``xi_Q`` the old
 interpretation hands the integrator. All in the old sign convention: ``xi_Q``
 is CDLM's ``d(U_total)``-covector, which the integrator SUBTRACTS. The new test
-translates per DESIGN.md §3: ``xi_Q_new = -xi_Q_old``, states identical.
+translates per STATUS.md §1: ``xi_Q_new = -xi_Q_old``, states identical.
 """
 
 import os

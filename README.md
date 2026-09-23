@@ -1,47 +1,118 @@
-# arrangements — the category of arrangements, executable
+# arrangements
 
-Companion implementation for *Articulating Forms that Matter*, Chapter 3: the
-category of arrangements `arr = Para(cotcoalg, omegalens)` (`def:arr`), compiled by
-the dynamics functor `Phi : arr -> pc` into discrete dynamical systems you can step.
-It is a port of `dap-core-old`, the executable companion of CDLM (tag `cdlm-final`).
+Build a dynamical system by wiring together components that each know only their own
+physics, and get the composite — loading effects, back-reaction, and all — generated for
+you rather than derived by hand.
 
-## What changed from CDLM
+Each component publishes what it reports forward and what it demands backward. Wiring
+them determines the dynamics of the whole; nothing about the interconnection has to be
+modeled separately. Kirchhoff's current law comes out as the transpose of copying a
+value, action–reaction as the symmetry of second derivatives, and "insulation" as an
+exact geometric condition rather than an idealization.
 
-CDLM's arrangement carries a **potential** `U : Q x M+ x N- -> R` and chooses its
-**integrator** in the semantics (`Phiconf`, `Phiphase`). The book's arrangement carries
-a **forcing one-form** `omega` on `Q x M+ x N-`, which need not be exact, and its
-**integrator is part of the arrangement**: the parameter is a `cot(Q)`-coalgebra
-`(Q, S, u)`, not a reactive vector space. There is **one** dynamics functor
-`Phi : arr -> pc`. Everything else (polynomials, `pc`, the covector triple, lens
-internalization, wiring) is unchanged in substance.
+```python
+import jax; jax.config.update("jax_enable_x64", True)
+import jax.numpy as jnp
 
-Concretely (see `DESIGN.md`):
+from arrangements.arrangement import Arrangement, exact, zero_form
+from arrangements.coalgebra import configuration
+from arrangements.functors import Phi
+from arrangements.interpretation import trivial_omega
+from arrangements.rvect import ReactiveVectorSpace
+from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
 
-- `Arrangement(P, in_dim_M, out_dim_M, in_dim_N, out_dim_N, out_f, in_f, omega)`,
-  with `omega(q, m_out, n_in) -> (xi_q, xi_mout, xi_nin)` a one-form given by its
-  components. `exact(U)` is `dU`; a CDLM cost `U_cdlm` becomes
-  `exact(lambda q, m, n: -U_cdlm(q, m, n))`.
-- `CotCoalg(Q_dim, init, position, step)` is the parameter; `configuration(Q)` and
-  `phase(Q)` are the standard ones, built from a reactive vector space `Q` (the
-  response `sharp`), and `CotCoalg.tensor` is the parallel product (state a pair).
-- The configuration step **adds**, `s + sharp_s(xi)`: the forcing's sign
-  (`omega = dU = -dk`) already makes it descend a cost.
-- `compose_seq` composes forcings by **pullback-and-sum** (Kleisli composition for
-  the writer monad `Omega`), which agrees with CDLM's "sum the potentials" when both
-  are exact and is the only right answer when they are not.
-- `Phi(arr)` takes no integrator argument. Heat and wave are two arrangements on
-  one wiring, not one arrangement read two ways.
+C = 9.81  # weight density
 
-## Quickstart
+def tank(A, v0):
+    """State is the volume; the tank reports the pressure at its base."""
+    Q = ReactiveVectorSpace(dim=1, sharp_fn=lambda v: jnp.array([[A / C]]))
+    return Arrangement(
+        P=configuration(Q, init=jnp.array([v0])),
+        in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+        out_f=lambda v, m_out: C * jnp.array([v[0] / A]),
+        in_f=lambda v, m_out, n_in: jnp.zeros(0),
+        omega=zero_form, label="tank")
 
-```bash
-git clone git@github.com:dspivak/arrangements.git && cd arrangements
-uv run --extra test pytest   # first run installs pytest from the `test` extra
-uv run pytest                # thereafter
+def pipe(kappa):
+    """Stateless: hears both pressures, returns a covector to each."""
+    V = lambda e: 0.5 * kappa * (e[0] - e[1]) ** 2
+    return Arrangement(
+        P=trivial_parameter(),
+        in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, e: jnp.zeros(0),
+        in_f=lambda q, e, n: jnp.zeros(0),
+        omega=exact(lambda q, e, n: -V(e)), label="pipe")
+
+system = compose_seq(tensor_arrangements([tank(1.0, 3.0), tank(1.0, 1.0)]), pipe(0.05))
+O = Phi(system)
+
+state, IN_POS = O.state, (jnp.zeros(0), trivial_omega(0))
+for _ in range(60):
+    _, _, state = O.with_state(state).run_one(
+        IN_POS, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+
+(v1, v2), _ = state
+print(v1[0], v2[0], v1[0] + v2[0])   # 2.0  2.0  4.0, to the last ulp
 ```
 
-Requires Python >= 3.10; pulls in JAX and NumPy. Tests run under `jax_enable_x64`
-(`tests/conftest.py`).
+Nobody wrote down that tank 1's outflow depends on tank 2's level. It follows from the
+pipe's potential and the wiring, and total water is conserved, because the two
+covectors the pipe generates are equal and opposite. Change the tank's shape and only its
+own `sharp` changes; change the coupler and only the coupler changes.
+
+Conservation here is not a numerical accident and not a property of the step size: the
+pipe's two covectors are equal and opposite whatever `kappa` and whatever the tanks'
+shapes, so the sum is preserved by the update rule itself, up to floating point.
+
+The same six primitives cover gradient descent with backpropagation, the heat and wave
+equations on a graph, LC circuits, transistors wired into NAND gates and latches,
+DC motors, molecular dynamics, Kuramoto oscillators, Hopfield networks (whose energy
+function *emerges* as the composite potential), replicator dynamics, mass-action reaction
+networks, and an operad of attention arrangements.
+
+## Install
+
+```bash
+git clone https://github.com/dspivak/arrangements.git && cd arrangements
+uv run --extra test pytest    # 308 tests; first run installs the test extra
+```
+
+Python ≥ 3.10, JAX and NumPy. Tests run under `jax_enable_x64`.
+
+## The two ideas
+
+**Forcing, not potential.** A component's driving datum is a one-form `omega`, which need
+not be exact. This matters because one-way influence — a waterfall, a sensor, a
+controller — *cannot* come from a potential: for an energy-derived coupling, port `i`'s
+load depends on port `j` exactly when `j`'s depends on `i`, so a one-way coupler forces
+`d omega != 0`. Couplers are not required to be power-conserving, and interconnection
+never produces algebraic constraints.
+
+**The integrator is part of the arrangement.** A parameter is a `cot(Q)`-coalgebra
+`(Q, S, u)`: a state space with a rule for turning an incoming covector into a new state.
+So there is one dynamics functor `Phi`, taking no integrator argument, and "the same
+system run two ways" is not expressible. The heat equation and the wave equation are two
+*different* arrangements sharing one wiring and one forcing, differing only in `u`.
+
+Composition of forcings is pullback-and-sum, which agrees with "add the potentials" when
+both are exact and is the only correct rule when they are not.
+
+## Honest limits
+
+[`STATUS.md`](STATUS.md) is the account this library keeps of itself: the conventions,
+what the tests are evidence *of*, and the open questions the code depends on. Three
+things from it worth knowing before you trust a number:
+
+- **Expressibility is not a result.** Any smooth vector field can be written as a forcing
+  by taking `omega = V^flat`, making one step `x + dt V(x)`. What that buys is nothing.
+  Five examples carry such a direct realization beside a structured one, and the
+  difference is the point: the structured version certifies a Lyapunov function and
+  dissipativity inherited under interconnection, and the direct one certifies nothing.
+- **The regression tests prove faithfulness, not correctness.** Ported examples reproduce
+  trajectories from the predecessor implementation to 1.4e-12 or better, but that
+  implementation was never independently audited. Agreement is consistency, not truth.
+- **Functoriality is tested on instances, not proved.** A passing suite is a warning
+  system, not a certificate.
 
 ## What's here
 
@@ -49,25 +120,36 @@ Requires Python >= 3.10; pulls in JAX and NumPy. Tests run under `jax_enable_x64
 |---|---|
 | `coalgebra.py` | `cot(Q)`-coalgebras (parameters, integrators): `CotCoalg`, `configuration`, `phase`, `tensor` |
 | `rvect.py` | reactive vector spaces (the response `sharp`), as constructor inputs |
-| `arrangement.py` | an arrangement (a morphism of `arr`), `exact`, `zero_form` |
-| `polynomial.py`, `pc.py` | polynomials and `[p,q]`-coalgebras (Moore form), unchanged |
+| `arrangement.py` | an arrangement, plus `exact` and `zero_form` |
+| `polynomial.py`, `pc.py` | polynomials and `[p,q]`-coalgebras (Moore form) |
 | `interpretation.py` | the state-free polynomial interpretation at a parameter position |
-| `functors.py` | the dynamics functor `Phi`, `cot`, and `phi_laxator` |
-| `wiring.py` | composition in `arr` (pullback-and-sum), chains, graphs, tensor |
+| `functors.py` | the dynamics functor `Phi`, `cot`, `phi_laxator` |
+| `wiring.py` | composition (pullback-and-sum), chains, graphs, tensor |
 | `learning.py` | gradient descent with backpropagation |
-| `leapfrog.py`, `rk4.py` | multi-stage coalgebras (EXTENSION): `leapfrog`, `rk4`, `rk4_gyro` |
-| `pc2.py`, `pcK.py` | `pc^(2)`, `pc^(K)` and their dynamics `Phi2`, `PhiK` (EXTENSION; functoriality open) |
-| examples | `amplifier`, `dc_motor`, `lc_circuit`, `kuramoto`, `hopfield`, `replicator`, `moleculardyn`, `reaction_network`, `logic`, `control`, `gyroscope`(+`_faithful`), `system_id`, `pinn` |
-| `build.py`, `demo.py` | the `dap` and `dap-demo` scripts |
+| `attention.py` | the attention operad: placements, transfers, substitution, spatial kernels |
+| `leapfrog.py`, `rk4.py`, `pc2.py`, `pcK.py` | multi-stage integrators (functoriality open) |
+| examples | `amplifier`, `dc_motor`, `lc_circuit`, `kuramoto`, `hopfield`, `replicator`, `moleculardyn`, `reaction_network`, `logic`, `control`, `gyroscope`, `system_id`, `pinn` |
 
-Non-gradient examples that CDLM realized by a trick -- a detailed-balance
-potential (`reaction_network`), oppositely signed sharps (`replicator`,
-`lc_circuit`, `logic`), the gyro and drag one-forms smuggled into the integrator
-(`gyroscope`) -- keep that realization *and* carry a second arrangement realizing
-the same dynamics directly as a non-exact forcing, with a test that the two agree
-step for step.
+`arrangements` and `arrangements-demo` are installed as scripts: the first builds and
+runs an arrangement interactively, the second runs the worked examples.
 
-`tests/` holds the ported tests, the new reciprocity and two-tanks tests, and
-`tests/regress/` with trajectories recorded from `dap-core-old` (now `../dynamic-algebra-potentials/dap-core-old`) (generated by the
-`tests/regress/generate_*.py` scripts, run against the old package) that every
-ported example must reproduce to `rtol=1e-10`.
+Non-gradient examples that the predecessor realized by a trick — a detailed-balance
+potential, oppositely signed sharps, forcing terms smuggled into the integrator — keep
+that realization *and* carry a second one as a genuine non-exact forcing, with a test
+that the two agree step for step. The direct realization extends reach: mass action then
+runs Wegscheider-violating and irreversible networks, and the replicator runs
+rock–paper–scissors, which the structured versions reject.
+
+## The mathematics
+
+This implements the category of arrangements developed in *Articulating Forms that
+Matter* (D. I. Spivak, in preparation), Chapter 3, with the attention operad of a
+companion paper. It replaces the executable companion to *Compositional dynamics in
+learning and mechanics*, which is preserved at tag `cdlm-final` of
+[dspivak/dap](https://github.com/dspivak/dap). Docstrings cite the source statement they
+implement, so a reader with either draft can find it. `notes/` holds the design notes
+the code was built against, kept as the record of why it is shaped this way.
+
+## License
+
+See [LICENSE](LICENSE).

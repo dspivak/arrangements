@@ -6,7 +6,7 @@ charge ``q``, with
 
 * reactive sharp  ``sharp(xi) = xi / L``     -- the inductance ``L`` in the mass slot,
 * forcing         ``omega = -dU``, ``U(q) = q^2 / (2 C)`` -- the capacitor's
-  electrostatic energy (a cost; DESIGN.md §3),
+  electrostatic energy (a cost; STATUS.md §1),
 
 made into two arrangements (def:arr) by two parameters (sec.integrators), read
 by the one dynamics functor ``Phi`` (sec.dynamics_functor):
@@ -45,7 +45,7 @@ are ``omega_+ = 1/sqrt(LC)`` (charges in phase; the coupling capacitor carries
 no charge) and ``omega_- = sqrt(1/(LC) + 2/(L C_c))`` (charges in antiphase).
 
 The two-box configuration encoding (CDLM ex.further_reach, "LC circuit") comes
-in two realizations, a TRICK and a DIRECT one (DESIGN.md §6(c)):
+in two realizations, a TRICK and a DIRECT one (notes/DESIGN.md §6(c)):
 
 * ``lc_conf`` -- the TRICK: an inductor cell and a capacitor cell with
   OPPOSITELY-SIGNED sharps, wired by a stateless coupler whose forcing is exact,
@@ -235,7 +235,7 @@ def lc_conf(L: float, C: float, R: float = 0.0, parameter=configuration) -> Arra
 
 # ---------------------------------------------------------------------------
 # The DIRECT realization: positive sharps, the rotation carried by a non-exact
-# forcing on the coupler's two ports (DESIGN.md §6(c)).
+# forcing on the coupler's two ports (notes/DESIGN.md §6(c)).
 # ---------------------------------------------------------------------------
 
 

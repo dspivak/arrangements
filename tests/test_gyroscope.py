@@ -15,7 +15,7 @@ the DIRECT realization of the gyro/drag terms as a non-exact forcing on ``T^*Q``
 
 The drives ``f`` in these tests enter as *positions* ``n_in`` on the input port, and
 every environment covector ``xi_N`` is zero, so no input is sign-translated from CDLM
-(DESIGN.md §3); only the module's cost became the forcing ``omega = -dU``.
+(STATUS.md §1); only the module's cost became the forcing ``omega = -dU``.
 """
 
 import jax.numpy as jnp
@@ -147,7 +147,7 @@ def test_classifier_trains_and_separates():
 
 def test_regression_matches_cdlm():
     """The CDLM outputs (``regress/gyroscope.npz``) are reproduced to rtol 1e-10
-    (DESIGN.md §3): the one-gyro step, the damped free rollout, and the classifier's
+    (STATUS.md §1): the one-gyro step, the damped free rollout, and the classifier's
     initial loss, training history and trained parameters after 15 epochs."""
     R = load_regress("gyroscope")
 
@@ -186,7 +186,7 @@ def test_regression_matches_cdlm():
 
 
 def test_direct_one_form_realization_agrees_with_trick():
-    """TRICK vs DIRECT (DESIGN.md §6(c)): ``gyro_arrangement`` with the ``gyro``
+    """TRICK vs DIRECT (notes/DESIGN.md §6(c)): ``gyro_arrangement`` with the ``gyro``
     parameter smuggles damping, precession and drag into the coalgebra's step, its
     forcing being the exact ``-dU`` on ``Q``; ``gyro_arrangement_on_cotangent`` with
     ``phase_on_cotangent`` writes precession and drag into a non-exact forcing on

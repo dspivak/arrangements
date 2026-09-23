@@ -101,7 +101,7 @@ def squared_error_forcing(y: Array, lam: Array) -> Array:
     """The forcing ``omega = -dk(-, lambda)|_y = lambda - y`` of the regression cost.
 
     CDLM seeded ``dU|_y = y - lambda`` and let the integrator subtract; here the
-    sign is in the forcing and the coalgebra adds (DESIGN.md §3).
+    sign is in the forcing and the coalgebra adds (STATUS.md §1).
     """
     return lam - y
 

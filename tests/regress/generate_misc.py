@@ -15,7 +15,7 @@ Everything recorded is in the old sign convention: the potentials ``U`` are cost
 and the integrators subtract, and the environment covector ``xi_N`` seeded for the
 pinned Klein-Gordon chain is CDLM's ``+kappa * q~_K``. The new tests seed
 ``-kappa * q~_K`` and build ``omega = exact(-U)``; STATES (the trajectories here)
-are unchanged (DESIGN.md §3).
+are unchanged (STATUS.md §1).
 """
 
 import os

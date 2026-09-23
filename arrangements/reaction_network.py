@@ -76,7 +76,7 @@ THE VERIFIED FRONTIER.
 
        U(x) = sum_r (w_r / 2) (x_i/x_eq_i - x_j/x_eq_j)^2,
 
-   emerges from pullback-and-sum (sec.forcing, DESIGN.md §2), written nowhere
+   emerges from pullback-and-sum (sec.forcing, notes/DESIGN.md §2), written nowhere
    by hand. One ``Phi`` step is again EXACTLY the forward-Euler mass-action
    step: the covector reaction ``r`` returns to species ``i`` is ``-+ w_r (a_i
    - a_j) / x_eq_i`` (the ``1/x_eq_i`` from the readout's pullback), and the
@@ -215,7 +215,7 @@ THE VERIFIED FRONTIER.
    positive, monotone, and stable at every ``dt``.
 
 6. DIRECT, any network (the book's non-exact forcing, def:arr, sec.forcing;
-   DESIGN.md §6(c)). An arrangement's forcing need not be exact, so the
+   notes/DESIGN.md §6(c)). An arrangement's forcing need not be exact, so the
    mass-action field itself is admissible as a one-form.
    ``mass_action_arrangement`` is the closed one-box arrangement whose
    parameter is the PLAIN configuration coalgebra on ``R^n`` with the
@@ -1083,7 +1083,7 @@ def log_mass_action_step(
 
 # ---------------------------------------------------------------------------
 # 6. The DIRECT encoding: the mass-action field as a non-exact forcing on the
-#    plain configuration coalgebra (module docstring, 6; DESIGN.md §6(c)).
+#    plain configuration coalgebra (module docstring, 6; notes/DESIGN.md §6(c)).
 # ---------------------------------------------------------------------------
 
 

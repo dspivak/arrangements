@@ -15,7 +15,7 @@ dissipates to the pinned equilibrium ``q = 0``.
 
 The environment's covector is a forcing in the book's sign: pinning
 ``q_{K+1} = 0`` means ``xi_N = -kappa * q_K`` (CDLM seeded ``+kappa * q_K`` and
-its integrator subtracted; DESIGN.md §3).
+its integrator subtracted; STATUS.md §1).
 """
 
 import jax.numpy as jnp
@@ -94,7 +94,7 @@ def test_heat_dissipates_to_equilibrium():
 
 
 def test_regression_matches_cdlm():
-    """The CDLM trajectories (``regress/heat.npz``) are reproduced to rtol 1e-10 (DESIGN.md §3)."""
+    """The CDLM trajectories (``regress/heat.npz``) are reproduced to rtol 1e-10 (STATUS.md §1)."""
     R = load_regress("heat")
     for tag in ("a", "b"):
         K, T, m, kappa, seed = R[f"params_{tag}"]

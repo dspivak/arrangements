@@ -4,11 +4,11 @@ The mathematics is ``background/affine_quadratic_operad.tex`` in the book reposi
 cited by its own labels (eq:spatial-transfers, eq:prediction, eq:reader-cost,
 eq:reader-force). **Every docstring below says which of three things its test does** --
 reproduce a closed form the paper proves, check a discrete-time analogue the book still
-has to prove (AGENTDOCPLAN.md §5.9 item 1), or merely illustrate (ATTENTION-DESIGN.md §4).
+has to prove (STATUS.md §3.2), or merely illustrate (STATUS.md §3.2).
 
 **This example is a local response calculation, not a convergence claim, and the reader's
 private prediction is held fixed throughout.** The paper says so in as many words ("This
-is a local response calculation, not a convergence claim"), and AGENTDOCPLAN.md §5.4 says
+is a local response calculation, not a convergence claim"), and the book, Ch. 5 says
 not to restate it as convergence or as "the reader moves". Accordingly no test here runs
 to a limit and none is named for convergence; the one-step tests check the *initial*
 response at the stated configuration and nothing beyond it.
@@ -178,7 +178,7 @@ def test_positional_forcing_at_the_stated_configuration():
 
 
 def test_one_step_brings_the_reader_and_the_source_together():
-    """CHECKS THE DISCRETE ANALOGUE (AGENTDOCPLAN.md §5.9 item 1) of the paper's next
+    """CHECKS THE DISCRETE ANALOGUE (STATUS.md §3.2) of the paper's next
     sentence: "With positive scalar Euclidean mobility on each position coordinate, this
     force initially moves the reader and the source of signal ``1`` toward one another
     ... The reader's attention to the source of signal ``1`` therefore increases."
@@ -203,7 +203,7 @@ def test_one_step_brings_the_reader_and_the_source_together():
 
 def test_sources_with_zero_response_leave_the_reader_all_the_moving():
     """CHECKS THE DISCRETE ANALOGUE of the book's own observation, which the paper does
-    not make (AGENTDOCPLAN.md §5.4: "a source with zero response does not move, so the
+    not make (the book, Ch. 5: "a source with zero response does not move, so the
     reader does all the moving; that is a book"). The forcing is the same one-form -- the
     sources still receive their covectors -- and only the integrator differs: mobility
     ``0`` on ``p_2`` and ``p_3``. The reader's own displacement is unchanged by the

@@ -5,7 +5,7 @@ cited by its own labels (eq:context-preference, eq:cue-parent-cost, eq:autonomou
 eq:context-dynamics, prop:capture, eq:capture-condition, eq:short-cue, and the numerical
 table at the end). **Every docstring below says which of three things its test does** --
 reproduce a closed form the paper proves, check a discrete-time analogue the book still
-has to prove (AGENTDOCPLAN.md §5.9 item 1), or merely illustrate (ATTENTION-DESIGN.md §4).
+has to prove (STATUS.md §3.2), or merely illustrate (STATUS.md §3.2).
 
 The parent is the rendezvous parent with the requested separation promoted to an internal
 context coordinate: ``Q_* = P^2 x R``, configuration ``(x_1, x_2, g)``, same placement,
@@ -13,7 +13,7 @@ same transfers, same subsidiaries (imported from tests/test_rendezvous.py, where
 built and explained). Only the cost changes, to eq:cue-parent-cost.
 
 **The paper's table is RK4 of the ODE at step 1e-3; the book's dynamics is the discrete
-displacement map** (AGENTDOCPLAN.md §5.2). So no test here asserts the table's digits of a
+displacement map** (STATUS.md §1). So no test here asserts the table's digits of a
 discrete run. What is asserted is: the capture condition holds at the end of the cue; the
 autonomous run afterwards reaches the same limit; ``V`` decreases at every step under a
 mobility below ``2/L``; and the discrete trajectory approaches the table's sampled values
@@ -252,7 +252,7 @@ def test_the_resting_state_has_zero_cost_and_is_a_critical_point():
 
 
 def test_capture_condition_holds_at_the_end_of_the_cue():
-    """CHECKS THE DISCRETE ANALOGUE the book has to prove (AGENTDOCPLAN.md §5.9 item 1) of
+    """CHECKS THE DISCRETE ANALOGUE the book has to prove (STATUS.md §3.2) of
     eq:capture-condition, for the paper's concrete data: ``lambda = 64``, unit mobilities,
     ``u(t) = -12 b_0(t / 0.2)``, from the resting state ``(1, 0, 1, 0, 1)``. At ``T = 0.2``
     the discrete run has ``g(T) < 1/2`` and ``V(T) < lambda/64 = 1``, and the physical
@@ -297,7 +297,7 @@ def test_the_autonomous_run_completes_the_rendezvous():
 def test_V_decreases_at_every_step_after_the_cue_and_not_during_it():
     """CHECKS THE DISCRETE ANALOGUE (§5.9 item 1) of prop:capture's proof, whose
     continuous statement is ``Vdot <= 0`` after the cue. Discretely that is the descent
-    lemma, and it needs the mobility below ``2/L`` (ATTENTION-DESIGN.md §4, third bullet);
+    lemma, and it needs the mobility below ``2/L`` (STATUS.md §3.2, third bullet);
     at ``h = 0.01`` and ``L ~ 40.3`` (see the next test) it holds, and ``V`` decreases at
     *every* one of the four thousand steps, strictly.
 

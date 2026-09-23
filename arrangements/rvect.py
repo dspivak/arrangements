@@ -12,7 +12,7 @@ The reaction is *constant* if ``sharp_q = sharp_0`` for all ``q``, and
 
 In the book (def:arr, sec.integrators) the response is not a component of an
 arrangement: it lives inside the coalgebra ``u : S -> cot(Q)(S)`` that is the
-arrangement's parameter (AGENTDOCPLAN.md §4.2, "the integrator is part of the
+arrangement's parameter (STATUS.md §1, "the integrator is part of the
 parameter"). This module therefore keeps ``ReactiveVectorSpace`` only as the
 *input* to the standard coalgebra constructors ``coalgebra.configuration`` and
 ``coalgebra.phase`` -- the learning rate or inverse mass one hands to them -- not

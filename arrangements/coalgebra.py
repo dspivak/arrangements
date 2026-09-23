@@ -13,7 +13,7 @@ semantics to choose later, as there was in CDLM (``Phiconf``/``Phiphase``).
 The response ``sharp`` is not a separate field either; it lives inside ``step``.
 
 In v1 the smooth sets are Cartesian spaces ``R^d`` (the admissible subcategory
-of AGENTDOCPLAN.md §4.8(c)), recorded by their dimension; a state ``s in S`` is
+of STATUS.md §3.1), recorded by their dimension; a state ``s in S`` is
 whatever pytree the constructor chose (an array for ``configuration``, a pair
 for ``phase``, a pair of states for ``tensor``).
 
@@ -26,7 +26,7 @@ The standard coalgebras take a reactive vector space ``(Q, sharp_Q)`` as input
 * ``phase(Q)`` -- state ``S = T^*Q = Q x Q^*``, position the presented position
   ``q + sharp_q(xi)``, step one symplectic-Euler step of Hamilton's equations.
 
-The remaining constructors are EXTENSIONS (beyond the paper, DESIGN.md §4), ported
+The remaining constructors are EXTENSIONS (beyond the paper, notes/DESIGN.md §4), ported
 from CDLM's ``integrator.py`` with their status kept verbatim:
 
 * ``damped(Q, c)`` -- the phase coalgebra with the damping one-form ``c*zeta``;
@@ -108,7 +108,7 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
     """The configuration coalgebra on ``(Q, sharp_Q)``: ``S = Q``, one displacement per step.
 
     The state is the position, ``q(s) = s``, and an incoming covector displaces it
-    *along* the forcing (sec.displacement, AGENTDOCPLAN.md §4.2):
+    *along* the forcing (sec.displacement, STATUS.md §1):
 
         s |-> s + sharp_s(xi_Q).
 
@@ -156,7 +156,7 @@ def phase(Q: ReactiveVectorSpace, init=None) -> CotCoalg:
 
 # ---------------------------------------------------------------------------
 # EXTENSIONS (beyond the paper): damping, gyroscopic and drag terms, ported from
-# CDLM's ``integrator.py`` with the sign of DESIGN.md §3 (the covector is added).
+# CDLM's ``integrator.py`` with the sign of STATUS.md §1 (the covector is added).
 # ---------------------------------------------------------------------------
 
 
@@ -336,7 +336,7 @@ def gyro(
 def phase_on_cotangent(Q: ReactiveVectorSpace, damping: float = 0.0, init=None) -> CotCoalg:
     """The (damped) phase coalgebra presenting its whole state: base ``T^*Q``.
 
-    The DIRECT realization of velocity-dependent forcings (DESIGN.md §6(c)): base
+    The DIRECT realization of velocity-dependent forcings (notes/DESIGN.md §6(c)): base
     ``Q' = Q x Q^* = R^{2 dim}``, state ``(q, xi)``, presented position
     ``(q~, xi)`` with ``q~ = q + sharp_q(xi)``, and step the damped Hamilton step
     driven by the ``Q``-component of the incoming covector on ``Q'`` (its ``Q^*``-

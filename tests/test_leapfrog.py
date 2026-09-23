@@ -10,7 +10,7 @@ one chain wiring, next to heat (``configuration``) and wave (``phase``):
 The single-stage phase coalgebra is itself symplectic (presented-position
 readout), so it stays bounded too; leapfrog is a higher-order alternative.
 The boundary covector is a forcing: pinning ``q_{K+1} = 0`` is ``xi_N = -kappa q_K``
-(CDLM's ``+kappa q_K`` with a subtracting integrator; DESIGN.md §3).
+(CDLM's ``+kappa q_K`` with a subtracting integrator; STATUS.md §1).
 """
 
 import jax.numpy as jnp

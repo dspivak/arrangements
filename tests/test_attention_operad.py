@@ -5,7 +5,7 @@ repository, cited by its own labels. There is no old attention code and hence no
 regression ``.npz`` for this module: acceptance is against the paper's closed
 forms. **Every docstring below says which of three things its test does** --
 reproduce a closed form the paper proves, check a discrete-time analogue the book
-must still prove, or merely illustrate (ATTENTION-DESIGN.md §4).
+must still prove, or merely illustrate (STATUS.md §3.2).
 
 The test that earns the stage is ``test_substitution_agrees_with_composition_*``:
 the paper gives substitution twice over, explicitly
@@ -144,7 +144,7 @@ def fixed_transfers(n, gammas, mats=None):
 
 
 # ---------------------------------------------------------------------------
-# Messages, transfers, and the mean readout (ATTENTION-DESIGN.md §3).
+# Messages, transfers, and the mean readout (notes/ATTENTION-STATUS.md §1).
 # ---------------------------------------------------------------------------
 
 
@@ -175,7 +175,7 @@ def test_transfer_algebra_adds_and_composes():
 def test_transfers_preserve_admissible_messages():
     """REPRODUCES A CLOSED FORM the paper proves (eq:transfer): a message transfer
     preserves ``M_adm = {0_M} u (H x R_{>0})``, because ``gamma > 0``. The last two
-    assertions ILLUSTRATE the guard of ATTENTION-DESIGN.md §3: ``R^{dim_H+1}`` does
+    assertions ILLUSTRATE the guard of notes/ATTENTION-STATUS.md §1: ``R^{dim_H+1}`` does
     not enforce admissibility, so a negative weight is caught rather than ignored."""
     r = np.random.default_rng(12)
     T = transfer(0.6, r.standard_normal((DH, DH)))
@@ -315,7 +315,7 @@ def test_substitution_agrees_with_composition_two_level_nest():
     ``sigma``, ``rho`` and the whole forcing (the chain rule eq:chain-rule).
 
     The trajectory comparison is the book's DISCRETE reading, which the book still
-    has to state (AGENTDOCPLAN.md §5.9 item 1): here it follows from the equality of
+    has to state (STATUS.md §3.2): here it follows from the equality of
     the arrangement data, since both composites carry the same parameter, so it
     checks the port rather than the mathematics."""
     a = spatial_part(2, 1)

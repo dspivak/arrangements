@@ -86,7 +86,7 @@ Two distinct mechanisms, both present, doing different jobs:
 2. **Boundary discard (control.py mechanism), at the source only.**  The
    composite still *publishes* the one-form
    ``omega_N(e_src) = -kappa r A g'(e)`` on the drive port (eqn.omegaprime, in
-   the forcing sign of DESIGN.md §3: CDLM's reaction covector
+   the forcing sign of STATUS.md §1: CDLM's reaction covector
    ``+kappa r A g'(e)`` negated) --
    the amplifier's input current.  The runner discards it: the source is
    treated as infinitely stiff.  It vanishes at equilibrium (r = 0), but off
@@ -280,7 +280,7 @@ def stepper(arr: Arrangement):
 
     One application of the ``Phi(arr)`` coalgebra: the reported output, the
     published one-form ``omega_N`` *evaluated at the driven input* -- the
-    reaction on the source, in the forcing sign (DESIGN.md §3), which the caller
+    reaction on the source, in the forcing sign (STATUS.md §1), which the caller
     may discard (the ``control.py`` boundary situation) -- and the updated
     state.  ``xi_N`` is the covector the environment presents at the output
     port (the load); pass zeros for an unloaded output.

@@ -118,7 +118,7 @@ def solve_deep_ritz(
 
     The learner's parameter is the configuration coalgebra on ``(R^n, eta * I)``;
     the environment seeds the forcing ``-dE/du = b - L u`` of the energy (a cost),
-    which the coalgebra adds (DESIGN.md §3). Returns ``(u, u_star, history, x)``:
+    which the coalgebra adds (STATUS.md §1). Returns ``(u, u_star, history, x)``:
     the learned field on the grid, the exact discrete Poisson solution, the
     per-step energy, and the grid.
     """

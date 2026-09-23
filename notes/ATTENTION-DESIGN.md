@@ -1,5 +1,11 @@
 # arrangements stage (d): the attention operad
 
+> **Working design note, kept as the record of why the code is shaped this way.**
+> It was written before the code, to be executed against; it is not a specification of
+> the current API, and its process details (token budgets, staging, "stop and report")
+> are how the work was actually carried out. For what the library establishes and what
+> it does not, see [`STATUS.md`](../STATUS.md).
+
 Design note (Claude, Opus 5, for David Spivak, 2026-09-22). Companion to `DESIGN.md`,
 whose §§1–3 and §7 still bind: same datatypes, same sign convention, same rules. This
 note covers only what is new. The mathematics is

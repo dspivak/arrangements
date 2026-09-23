@@ -11,7 +11,7 @@ a port covector back by ``c h'(v) = c/A(h)`` and the response multiplies by
 ``A(h)/c``, the displacement is ``v' = v + F(e)`` whatever the tank's shape.
 
 The note writes its one-forms in CDLM's sign (``dot q = -sharp omega``); the
-book's forcing is the note's covector with a minus sign (AGENTDOCPLAN.md §4.9),
+book's forcing is the note's covector with a minus sign (STATUS.md §1),
 and the coalgebra adds:
 
 * pipe:      ``omega = -dV``, ``V = (kappa/2)((e_1 - e_2) + c z)^2``, so
@@ -133,7 +133,7 @@ def volumes(state):
 
 
 # ---------------------------------------------------------------------------
-# Reciprocity (DESIGN.md §5).
+# Reciprocity (notes/DESIGN.md §5).
 # ---------------------------------------------------------------------------
 
 
@@ -180,7 +180,7 @@ def test_retroactivity_pipe_yes_waterfall_no():
 
 
 # ---------------------------------------------------------------------------
-# Two tanks, three couplers (DESIGN.md §5).
+# Two tanks, three couplers (notes/DESIGN.md §5).
 # ---------------------------------------------------------------------------
 
 
@@ -248,7 +248,7 @@ def test_pipe_equalizes_levels():
 
 
 # ---------------------------------------------------------------------------
-# Composition agrees with dynamics for a non-exact coupler (DESIGN.md §5).
+# Composition agrees with dynamics for a non-exact coupler (notes/DESIGN.md §5).
 # ---------------------------------------------------------------------------
 
 

@@ -30,7 +30,7 @@ input.
 
 Boundary accounting: the composite's outer *position* also emits the one-form
 ``omega_N(s) = omega_c|_{N^-} = +k(q_rep - s)`` on the setpoint port
-(sec.forcing; CDLM eqn.omegaprime with the sign of DESIGN.md §3) -- the reaction
+(sec.forcing; CDLM eqn.omegaprime with the sign of STATUS.md §1) -- the reaction
 of the virtual spring on whoever holds its far end. It is equal and opposite to
 the covector ``xi_Q = -k(q_rep - s)`` that drives the plant, because both are
 components of the one shared exact forcing. ``run_tracking`` below *discards*

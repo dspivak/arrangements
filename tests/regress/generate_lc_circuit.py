@@ -8,7 +8,7 @@ Writes ``lc_circuit.npz``. Each array records either an *input* the old test
 supplied (constants, replayed seeds, drive frequencies) or an *output* the old
 package produced, in the old sign convention: the environment covector ``xi_N``
 is CDLM's (the integrator subtracts it). The new test translates per
-DESIGN.md §3 -- ``xi_N_new = -xi_N_old`` (the radio drive), states identical.
+STATUS.md §1 -- ``xi_N_new = -xi_N_old`` (the radio drive), states identical.
 
 Covered dynamics: ``Phiphase`` on ``lc_cell`` (three (L,C) pairs), ``Phileap``
 on ``lc_cell``, ``Phiconf`` on ``lc_cell`` (RC decay), ``Phiphase`` on the
@@ -127,7 +127,7 @@ def lc_circuit():
 
     # --- Phiconf on lc_conf with a series resistance: the radio sweep (test 6).
     # The drive covector ``xi_N(t) = sin(W t)`` is CDLM's sign; the new test
-    # feeds ``-sin(W t)`` (DESIGN.md §3).
+    # feeds ``-sin(W t)`` (STATUS.md §1).
     L4, C4, R4, n4 = 20.0, 20.0, 0.2, 2000
     w4 = 1.0 / np.sqrt(L4 * C4)
     freqs = np.array([0.6 * w4, 0.8 * w4, w4, 1.25 * w4, 1.6 * w4])

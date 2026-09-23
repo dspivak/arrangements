@@ -102,7 +102,7 @@ def test_per_gyro_gamma_precesses_independently():
 
 def test_regression_matches_cdlm():
     """CDLM's rod-gravity values/gradients and the per-gyro-gamma step
-    (``regress/gyroscope.npz``) are reproduced to rtol 1e-10 (DESIGN.md §3)."""
+    (``regress/gyroscope.npz``) are reproduced to rtol 1e-10 (STATUS.md §1)."""
     R = load_regress("gyroscope")
     g, L = R["rod_params"]
     U = rod_gravity(g, L)

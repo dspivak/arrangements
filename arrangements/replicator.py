@@ -14,7 +14,7 @@ coalgebra ``configuration(Q)`` on the reactive vector space ``Q = R^n`` with the
     sharpR_x    = dt * (diag(x) - x x^T),
 
 and whose forcing is exact, ``omega = dU`` for the mean fitness
-``U(x) = (1/2) x^T A x`` (CDLM carried the *cost* ``U_cdlm = -U``; DESIGN.md §3).
+``U(x) = (1/2) x^T A x`` (CDLM carried the *cost* ``U_cdlm = -U``; STATUS.md §1).
 
 Sign derivation against the code's conventions (no free choices left):
 the configuration coalgebra steps ``x -> x + sharpR_x(xi_Q)``
@@ -160,7 +160,7 @@ def replicator_arrangement(
         in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=0,
         out_f=lambda q, m_out: jnp.zeros(0),
         in_f=lambda q, m_out, n_in: jnp.zeros(0),
-        # omega = -dU_cdlm, U_cdlm = -(1/2) x^T A x (DESIGN.md §3)
+        # omega = -dU_cdlm, U_cdlm = -(1/2) x^T A x (STATUS.md §1)
         omega=exact(lambda q, m_out, n_in: 0.5 * jnp.dot(q, A @ q)),
         label="replicator",
     )
@@ -263,7 +263,7 @@ def log_replicator_arrangement(
 
     def U(q: Array, m_out: Array, n_in: Array) -> Array:
         x = jnp.exp(q)
-        return 0.5 * jnp.dot(x, A @ x)  # = -U_cdlm (DESIGN.md §3)
+        return 0.5 * jnp.dot(x, A @ x)  # = -U_cdlm (STATUS.md §1)
 
     return Arrangement(
         P=parameter(log_shahshahani(n, dt)),

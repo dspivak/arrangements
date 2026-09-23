@@ -8,7 +8,7 @@ from zero. We check exactness here.
 
 Sign: CDLM's cost ``U(q, m, n) = sum cos(n)`` becomes the forcing
 ``omega = -dU``, so the published field is minus CDLM's, ``+sin(n_in)``
-(DESIGN.md §3).
+(STATUS.md §1).
 """
 
 import jax.numpy as jnp

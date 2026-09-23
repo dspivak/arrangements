@@ -1,4 +1,4 @@
-"""Record CDLM (``dap-core-old``) CMOS-logic trajectories for the regression test (DESIGN.md §3).
+"""Record CDLM (``dap-core-old``) CMOS-logic trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
@@ -6,7 +6,7 @@ Run from the OLD package so that ``import dap`` is CDLM's:
 
 Writes ``logic.npz`` into this directory: the inputs the old test file
 (``test_logic.py``) used and the outputs the old package produced, in the old
-sign convention. The new test translates per DESIGN.md §3: the ``load``
+sign convention. The new test translates per STATUS.md §1: the ``load``
 presented at the output ports and the port currents ``run`` returns are
 negated (they are covectors crossing a port), states are identical.
 

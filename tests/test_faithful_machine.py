@@ -17,7 +17,7 @@ accuracy. We check:
   for 10 epochs, are reproduced.
 
 The drives enter as *positions* ``n_in`` and every environment covector is zero, so no
-input is sign-translated (DESIGN.md §3); CDLM's ``U`` became the forcing ``-dU``.
+input is sign-translated (STATUS.md §1); CDLM's ``U`` became the forcing ``-dU``.
 """
 
 import jax
@@ -149,7 +149,7 @@ def test_faithful_machine_trains_loss_decreases():
 
 def test_regression_matches_cdlm():
     """The CDLM outputs (``regress/gyroscope_faithful.npz``) are reproduced to rtol 1e-10
-    (DESIGN.md §3): the forcing (minus CDLM's ``dU``), the springs on/off readouts, one
+    (STATUS.md §1): the forcing (minus CDLM's ``dU``), the springs on/off readouts, one
     stroke's logits and loss gradients, the hard-drive readout, and the training history
     and parameters after 10 epochs."""
     R = load_regress("gyroscope_faithful")

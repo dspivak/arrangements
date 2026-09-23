@@ -6,7 +6,7 @@ that Matter*, Chapter 3 (def:arr): ``cot(Q)``-coalgebras as parameters
 one-form (exact or not), pullback-and-sum composition, the polynomial
 interpretation, and the one dynamics functor ``Phi : arr -> pc``
 (sec.dynamics_functor). Ported from CDLM's ``dap-core``; see README.md and
-DESIGN.md for what changed.
+notes/DESIGN.md for what changed.
 """
 
 from .rvect import ReactiveVectorSpace

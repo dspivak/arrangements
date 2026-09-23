@@ -68,7 +68,7 @@ def test_newton_exp_step_formula_and_convergence():
 
 
 def test_regression_matches_cdlm():
-    """``regress/misc.npz``: the Newton orbits are CDLM's (states are unchanged, DESIGN.md §3)."""
+    """``regress/misc.npz``: the Newton orbits are CDLM's (states are unchanged, STATUS.md §1)."""
     R = load_regress("misc")
     a = float(R["newton_quad_a"])
     cases = {

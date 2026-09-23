@@ -14,7 +14,7 @@ for the capacitor energy ``U(q) = q^2/(2C)``. The claims under audit:
 * Coupled pair: two capacitor boxes wired through a stateless coupling box
   exhibit the two normal modes ``omega_+ = 1/sqrt(LC)`` and
   ``omega_- = sqrt(1/(LC) + 2/(L C_c))``.
-* Trick vs direct (DESIGN.md §6(c)): the two-box LC rotation, realized by
+* Trick vs direct (notes/DESIGN.md §6(c)): the two-box LC rotation, realized by
   CDLM's oppositely-signed sharps with an exact forcing (``lc_conf``) and
   directly by the non-exact coupler one-form ``v di - i dv`` with both sharps
   positive (``lc_conf_direct``); the two agree step for step.
@@ -450,7 +450,7 @@ def test_lc_conf_picks_up_a_radio_signal():
     antenna, and the steady-state response peaks at omega = 1/sqrt(LC).
 
     The drive enters as the forcing ``xi_N(t) = -sin(Omega t)`` at the single
-    outer port (CDLM fed the cost gradient ``+sin``; DESIGN.md §3); its pullback
+    outer port (CDLM fed the cost gradient ``+sin``; STATUS.md §1); its pullback
     along the report ``(i, v) |-> v`` lands in the ``v``-slot, so the tick
     becomes ``v -> v - (i + sin(Omega t))/C``: an injected current. A small
     series resistance ``R`` (cost ``-(R/2) i^2`` in the negative-sharp inductor
@@ -509,7 +509,7 @@ def test_direct_realization_agrees_with_trick():
     """``lc_conf_direct`` (positive sharps, non-exact coupler one-form) and
     ``lc_conf`` (oppositely-signed sharps, exact forcing) step identically,
     driven and undriven -- the trick moves out of the sharp and into ``omega``
-    (DESIGN.md §6(c))."""
+    (notes/DESIGN.md §6(c))."""
     L, C, R = 20.0, 20.0, 0.2
     trick, direct = lc_conf(L, C, R), lc_conf_direct(L, C, R)
 
@@ -539,7 +539,7 @@ def test_direct_realization_agrees_with_trick():
 
 
 def test_regression_matches_cdlm():
-    """The CDLM trajectories (``regress/lc_circuit.npz``) to rtol 1e-10 (DESIGN.md §3).
+    """The CDLM trajectories (``regress/lc_circuit.npz``) to rtol 1e-10 (STATUS.md §1).
 
     Every distinct dynamics the old test ran is checked: the phase cell (three
     ``(L, C)``), the leapfrog cell, the configuration cell, the coupled pair in
@@ -598,7 +598,7 @@ def test_regression_matches_cdlm():
         ivs.append(np.asarray(_conf_flat(state)))
     np.testing.assert_allclose(np.stack(ivs), R["energy_iv"], rtol=1e-10, atol=1e-12)
 
-    # the driven radio sweep (inputs negated, DESIGN.md §3)
+    # the driven radio sweep (inputs negated, STATUS.md §1)
     L4, C4, R4, n4 = R["radio_params"]
     O4 = Phi(lc_conf(L4, C4, R4))
     for k, (row, W) in enumerate(zip(R["radio_v"], R["radio_freqs"])):

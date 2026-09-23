@@ -9,7 +9,7 @@ from a fixed initial state, and the trained MLP weights and loss history after
 a short ``identify`` run (``Phiconf`` on the learner). The training data are
 consecutive-state pairs, so no covector crosses a port in the old sign; the new
 test rebuilds the same run with the new package and compares states and
-parameters directly (they are unchanged by DESIGN.md §3).
+parameters directly (they are unchanged by STATUS.md §1).
 """
 
 import os

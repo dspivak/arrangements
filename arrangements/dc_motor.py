@@ -24,7 +24,7 @@ its position."
 In the book's terms (def:arr): "configuration dynamics" is the choice of the
 *configuration coalgebra* as the arrangement's parameter (sec.integrators), and
 there is one dynamics functor ``Phi`` (sec.dynamics_functor); a cost ``U``
-enters as the forcing ``omega = -dU`` (sec.forcing, DESIGN.md §3). Every cost
+enters as the forcing ``omega = -dU`` (sec.forcing, STATUS.md §1). Every cost
 below is CDLM's, unchanged in sign; only the arrangements' forcings carry the
 minus.
 

@@ -1,4 +1,4 @@
-"""Record CDLM (``dap-core-old``) trajectories for the regression tests (DESIGN.md §3).
+"""Record CDLM (``dap-core-old``) trajectories for the regression tests (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
@@ -12,7 +12,7 @@ Writes one ``.npz`` per example into this directory. Each file records the
 reproduce the draw order) and the *outputs* the old package produced, all in the
 old sign convention: environment covectors ``xi_N`` are CDLM's (the integrator
 subtracts them), published fields are ``pullback + dU``. The new tests translate
-per DESIGN.md §3: ``xi_N_new = -xi_N_old``, fields ``omega_N_new = -omega_N_old``,
+per STATUS.md §1: ``xi_N_new = -xi_N_old``, fields ``omega_N_new = -omega_N_old``,
 states identical.
 """
 

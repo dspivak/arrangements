@@ -287,7 +287,7 @@ def md_force(arr: Arrangement, q: Array) -> Array:
     covector every coalgebra consumes. Since the arrangement's forcing is
     ``-dU`` for the physical LJ energy, this is the physical force, with no
     ``dt`` factor (CDLM's integrator subtracted, so its force was ``-xi_Q``;
-    DESIGN.md §3).
+    STATUS.md §1).
     """
     _, direction_action = interpretation(arr)(jnp.asarray(q))
     xi_Q, _, _ = direction_action(

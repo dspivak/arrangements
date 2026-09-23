@@ -28,7 +28,7 @@ def test_regression_matches_cdlm():
     """``regress/pinn.npz``: the learned field, the exact solution, the grid and the
     per-step energy after a short deep-Ritz run reproduce CDLM (the forcing
     ``b - L u`` replaces CDLM's seeded gradient ``L u - b``; the weights' trajectory
-    is identical, DESIGN.md §3)."""
+    is identical, STATUS.md §1)."""
     R = load_regress("pinn")
     V, hidden, steps, seed = (int(v) for v in R["int_params"])
     eta = float(R["eta"])

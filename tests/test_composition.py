@@ -28,7 +28,7 @@ Operad-functoriality has two legs, and they are tested separately here.
   post-compose the static ``Phi(wire_K)``, and compare with the first pass
   ``Phi(compose_chain(Parts))``.
 
-* **Non-exact forcing** (``test_functoriality_non_exact_sequential``, DESIGN.md §5):
+* **Non-exact forcing** (``test_functoriality_non_exact_sequential``, notes/DESIGN.md §5):
   composition in ``arr`` is pullback-and-sum, and it must agree with composition
   in ``pc`` for forcings that come from no potential -- where CDLM's "sum the
   potentials" has no meaning.
@@ -328,7 +328,7 @@ def test_functoriality_non_exact_sequential_phase():
 
 
 # ---------------------------------------------------------------------------
-# Regression against CDLM (DESIGN.md §3).
+# Regression against CDLM (STATUS.md §1).
 # ---------------------------------------------------------------------------
 
 

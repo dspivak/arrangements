@@ -1,10 +1,10 @@
 """Placement changes the effective wiring (the book's reclustering point).
 
 The mathematics is ``background/affine_quadratic_operad.tex`` in the book repository
-(eq:spatial-transfers, eq:maps) read as AGENTDOCPLAN.md §5.4 reads it. **Every docstring
+(eq:spatial-transfers, eq:maps) read as the book, Ch. 5 reads it. **Every docstring
 below says which of three things its test does** -- reproduce a closed form the paper
-proves, check a discrete-time analogue the book still has to prove (AGENTDOCPLAN.md §5.9
-item 1), or merely illustrate (ATTENTION-DESIGN.md §4).
+proves, check a discrete-time analogue the book still has to prove (STATUS.md §3.2
+item 1), or merely illustrate (STATUS.md §3.2).
 
 No test in the paper isolates this. The paper supplies the kernel
 ``kappa_ij = exp(-||l_i - l_j||^2 / 2 tau)``; §5.4 draws the consequence: "coupling
@@ -112,7 +112,7 @@ def test_the_weight_multiplier_is_below_any_epsilon_past_a_separation():
 
 
 def test_a_run_drives_the_children_apart_and_unwires_them():
-    """CHECKS THE DISCRETE ANALOGUE the book still has to prove (AGENTDOCPLAN.md §5.9
+    """CHECKS THE DISCRETE ANALOGUE the book still has to prove (STATUS.md §3.2
     item 1) of the book's own reclustering point (§5.4(i)), which the paper does not state:
     the placements are descended coordinates, so the effective coupling changes *during a
     run*. Starting with both children at the same place -- ``kappa_12 = 1``, a fully wired

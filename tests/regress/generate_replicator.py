@@ -10,7 +10,7 @@ orbit, the coordination game, Hawk-Dove from two starts, and the standard/log
 convergence run -- the *inputs* (payoff matrices and initial states, with the
 seeds replayed here) and the *outputs* ``Phiconf`` produces. The system is
 closed (no environment covector), so there is nothing to sign-translate: states
-are identical under DESIGN.md §3.
+are identical under STATUS.md §1.
 """
 
 import os

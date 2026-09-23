@@ -9,7 +9,7 @@ eqn.discrete_wave / eqn.wave_bc (pinned ends).
 
 Environment covectors are forcings in the book's sign: the pin ``q_{K+1} = 0``
 is ``xi_N = -kappa * q~_K``; the published field is ``omega_N = pullback + omega|_N``,
-i.e. minus CDLM's ``dU``-based field (DESIGN.md §3).
+i.e. minus CDLM's ``dU``-based field (STATUS.md §1).
 """
 
 import jax.numpy as jnp
@@ -123,7 +123,7 @@ def test_discrete_wave_equation_with_pinned_ends():
 
 
 def test_heat_and_wave_are_two_arrangements_on_one_wiring():
-    """DESIGN.md §5: the integrator is part of the arrangement. The same wiring
+    """notes/DESIGN.md §5: the integrator is part of the arrangement. The same wiring
     ``compose_chain`` on the same particle data gives two arrangements, one with
     ``configuration`` parameters and one with ``phase``; ``Phi`` takes no
     integrator, and the two differ in their parameter, not in their maps."""
@@ -149,7 +149,7 @@ def test_heat_and_wave_are_two_arrangements_on_one_wiring():
 
 
 def test_regression_matches_cdlm():
-    """The CDLM outputs (``regress/wave.npz``) are reproduced to rtol 1e-10 (DESIGN.md §3):
+    """The CDLM outputs (``regress/wave.npz``) are reproduced to rtol 1e-10 (STATUS.md §1):
     states identical, environment covectors negated, published field negated."""
     R = load_regress("wave")
 

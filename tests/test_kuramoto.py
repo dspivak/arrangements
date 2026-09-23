@@ -106,7 +106,7 @@ def _rhs(theta, omegas, edges, K):
 
 
 def _cost(theta, omegas, edges, K):
-    """The cost ``k`` whose forcing is ``omega = -dk`` (DESIGN.md §3)."""
+    """The cost ``k`` whose forcing is ``omega = -dk`` (STATUS.md §1)."""
     return -float(np.dot(omegas, theta)) - K * sum(
         np.cos(theta[i] - theta[j]) for (i, j) in edges
     )
@@ -279,7 +279,7 @@ def test_phase_oscillates_without_decay():
 
 
 def test_regression_matches_cdlm():
-    """The CDLM trajectories (``regress/kuramoto.npz``) to rtol 1e-10 (DESIGN.md §3;
+    """The CDLM trajectories (``regress/kuramoto.npz``) to rtol 1e-10 (STATUS.md §1;
     the system is closed, so no covector crosses a port and only states are compared)."""
     R = load_regress("kuramoto")
 

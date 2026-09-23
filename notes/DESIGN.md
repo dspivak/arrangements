@@ -1,5 +1,11 @@
 # arrangements: the category of arrangements $\arr$, executable
 
+> **Working design note, kept as the record of why the code is shaped this way.**
+> It was written before the code, to be executed against; it is not a specification of
+> the current API, and its process details (token budgets, staging, "stop and report")
+> are how the work was actually carried out. For what the library establishes and what
+> it does not, see [`STATUS.md`](../STATUS.md).
+
 Design note (Claude, Opus 5, for David Spivak, 2026-09-21). This is the contract every
 stage of the port is built against. The mathematics it implements is the book
 *Articulating Forms that Matter*, Chapter 3 (`3-arrangements-that-matter.tex`,

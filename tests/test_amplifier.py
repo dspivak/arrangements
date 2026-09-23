@@ -28,7 +28,7 @@ Mechanism audit (which unilaterality operates):
     sharp scaled by ``dt``); output-port covectors land in its kernel exactly
     (load rejection), and so does the loop back-action.
 7.  The source-port one-form IS published (``omega_N = -kappa r A g'``, the
-    forcing sign of DESIGN.md §3, A-large off equilibrium) and merely discarded
+    forcing sign of STATUS.md §1, A-large off equilibrium) and merely discarded
     by the runner -- the ``control.py`` boundary situation, at the source only.
 8.  The audit's negative: the *bilateral* (reciprocal, gradient) stage has the
     SAME closed-loop equilibrium -- Black's formula does not need unilaterality
@@ -335,7 +335,7 @@ def test_bilateral_same_equilibrium():
 
 
 # ---------------------------------------------------------------------------
-# Regression: the CDLM trajectories, sign-translated (DESIGN.md §3).
+# Regression: the CDLM trajectories, sign-translated (STATUS.md §1).
 # ---------------------------------------------------------------------------
 
 
@@ -351,7 +351,7 @@ def _settle_traj(one, state, e_src, steps):
 
 def test_regression_matches_cdlm():
     """``regress/amplifier.npz`` is reproduced to rtol 1e-10: states identical,
-    the published one-form and the load covector negated (DESIGN.md §3)."""
+    the published one-form and the load covector negated (STATUS.md §1)."""
     R = load_regress("amplifier")
     close = lambda new, old: np.testing.assert_allclose(new, old, rtol=1e-10, atol=1e-12)
 

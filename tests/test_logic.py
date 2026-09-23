@@ -21,7 +21,7 @@ The claims under test:
     two realizations agree step for step, and it is the direct one whose
     ``d omega != 0`` exhibits the non-reciprocity without any adiabatic limit.
 
-Sign (DESIGN.md §3): the framework's port covector is now minus the current, so
+Sign (STATUS.md §1): the framework's port covector is now minus the current, so
 the ``load`` the old tests presented as a cost gradient is negated here; states
 are unchanged.
 """
@@ -169,7 +169,7 @@ def test_input_current_is_purely_capacitive():
 def test_drain_swing_does_not_move_a_pinned_gate_state():
     """Claim 3: N2's gate-source is pinned to (b, ground); its drain V_mid is not.
 
-    The loads are the book's covectors, minus CDLM's currents (DESIGN.md §3).
+    The loads are the book's covectors, minus CDLM's currents (STATUS.md §1).
     """
     g, states = nand_gate(), []
     for load in (0.0, -0.5, -2.0):
@@ -395,7 +395,7 @@ def test_trick_and_direct_agree_step_for_step():
 
 
 def test_regression_matches_cdlm():
-    """The CDLM runs (``regress/logic.npz``) are reproduced to rtol 1e-10 (DESIGN.md §3).
+    """The CDLM runs (``regress/logic.npz``) are reproduced to rtol 1e-10 (STATUS.md §1).
 
     Covers both dynamics the old tests run: the configuration parameter
     (device, NAND, drain swing, latch, inverter chain, one plain tick) and the

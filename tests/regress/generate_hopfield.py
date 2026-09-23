@@ -1,4 +1,4 @@
-"""Record CDLM (``dap-core-old``) Hopfield trajectories for the regression test (DESIGN.md §3).
+"""Record CDLM (``dap-core-old``) Hopfield trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 

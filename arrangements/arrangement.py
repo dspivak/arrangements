@@ -12,11 +12,11 @@ input and the output side), the lens morphism consists of smooth maps
 
 the last being the *forcing*, the arrangement's driving datum. It need not be
 exact; when it comes from a potential, ``omega = dU`` (``exact(U)``), and for a
-cost ``k`` one has ``U = -k``, so ``omega = -dk`` (AGENTDOCPLAN.md §4.2; the sign
-translation from CDLM is in DESIGN.md §3).
+cost ``k`` one has ``U = -k``, so ``omega = -dk`` (STATUS.md §1; the sign
+translation from CDLM is in STATUS.md §1).
 
 In v1 the smooth sets are Cartesian spaces ``R^d``, recorded by their
-dimensions -- the admissible subcategory of AGENTDOCPLAN.md §4.8(c), not the whole
+dimensions -- the admissible subcategory of STATUS.md §3.1, not the whole
 of ``SmSet``. A one-form on ``R^a x R^b x R^c`` is represented as a callable
 ``omega(x_a, x_b, x_c) -> (xi_a, xi_b, xi_c)`` returning the covector's components
 on each factor at that point. This is the object the dynamics functor ``Phi``
@@ -65,7 +65,7 @@ def exact(U: Callable[[Array, Array, Array], Array]) -> OneForm:
     """The exact one-form ``omega = dU`` of a potential ``U : Q x M^+ x N^- -> R``.
 
     Every CDLM example, whose ``U_cdlm`` is a cost, becomes
-    ``omega = exact(lambda q, m, n: -U_cdlm(q, m, n))`` (DESIGN.md §3).
+    ``omega = exact(lambda q, m, n: -U_cdlm(q, m, n))`` (STATUS.md §1).
     """
     return jax.grad(U, argnums=(0, 1, 2))
 

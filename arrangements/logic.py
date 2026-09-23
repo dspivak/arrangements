@@ -23,7 +23,7 @@ and the cost
     U(q, eG, eD, eS) = (kappa/2) (vgs - q0 - q1)^2 + W(q0, vds),
 
 where ``vgs = eG - eS`` and ``vds = eD - eS``, the forcing is ``omega = -dU``
-(sec.forcing; DESIGN.md §3) and the configuration step *adds* ``sharp(omega)``
+(sec.forcing; STATUS.md §1) and the configuration step *adds* ``sharp(omega)``
 (sec.displacement), so
 
     dq_0 = (sharpR omega)_0 = -dU/dq1 = kappa (vgs - q0 - q1),
@@ -43,7 +43,7 @@ device below does satisfy that too -- but vacuously, because it has no output po
 a transistor.  The kernel condition is input-side, and it is what buys
 non-reciprocity here.
 
-**The DIRECT realization** (``mosfet_direct``; DESIGN.md §6(c)).  CDLM had to
+**The DIRECT realization** (``mosfet_direct``; notes/DESIGN.md §6(c)).  CDLM had to
 route the non-reciprocity through the sharp because its arrangement carried only
 a potential.  The book's arrangement carries a *forcing* that need not be exact
 (sec.forcing), so the same device is written with the plain parameter
@@ -67,12 +67,12 @@ Two further structural facts, neither of them put in by hand:
   zero.  Device KCL is shift-invariance of the potential.
 * Composing devices with a *static* wiring in ``arr`` (compose_seq) adds the
   pulled-back forcings and tensors the parameters (CDLM prop.suboperads,
-  DESIGN.md §2).  Since the devices have no output ports, ``omega_tot|_{Q_j} =
+  notes/DESIGN.md §2).  Since the devices have no output ports, ``omega_tot|_{Q_j} =
   omega_j|_{Q_j}``: each device's kernel condition survives composition
   unchanged, and the node states' updates are the sums of the currents drawn on
   them -- circuit KCL, emergent.
 
-Sign (DESIGN.md §3): CDLM's ``U`` was the cost and its integrator subtracted;
+Sign (STATUS.md §1): CDLM's ``U`` was the cost and its integrator subtracted;
 here the forcing is ``-dU`` and the configuration coalgebra adds.  States are
 therefore identical to CDLM's, while every covector crossing a port -- the
 ``load`` presented at the output ports, and the ``port_currents`` ``run``
@@ -231,7 +231,7 @@ def mosfet_direct(
 ) -> Arrangement:
     """The same MOSFET with the non-reciprocity in the FORCING, not the sharp.
 
-    The DIRECT realization (module header; DESIGN.md §6(c)): parameter
+    The DIRECT realization (module header; notes/DESIGN.md §6(c)): parameter
     ``parameter(Q)`` on the plain Euclidean ``Q = R^2`` and the hand-written,
     *non-exact* one-form
 
@@ -362,7 +362,7 @@ def nand_gate(
     A ``<R^2|R^1>`` system: two input ports (the logic inputs) and one output
     port (the reported output-node voltage).  Its forcing is *not* written by
     hand -- ``compose_seq`` pulls back and sums the four device forcings at the
-    port voltages the wiring delivers (DESIGN.md §2).  ``device`` selects the
+    port voltages the wiring delivers (notes/DESIGN.md §2).  ``device`` selects the
     realization (``mosfet``, the trick, or ``mosfet_direct``).
     """
     boxes = [
@@ -514,7 +514,7 @@ def stepper(arr: Arrangement) -> Callable:
     One application of the ``Phi(arr)`` coalgebra (sec.dynamics_functor) at
     ``state``: the readout's position ``out_n``, the readout's covector field
     ``omega_N`` *evaluated at the driven inputs* -- i.e. minus the currents the
-    circuit draws on its input ports (the book's sign, DESIGN.md §3), computed
+    circuit draws on its input ports (the book's sign, STATUS.md §1), computed
     by the framework rather than by hand -- and the updated state.  States are
     the flat coordinates of ``flat_of``/``state_of``.
     """

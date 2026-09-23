@@ -31,7 +31,7 @@ realizes the same chain-rule pullbacks that ``cot`` encodes -- an AD-equivalence
 for genuine multi-stage *integrators* like leapfrog/RK4; the training rollout is not
 one.)
 
-Two realizations of the same dynamics live here (DESIGN.md §6(c)):
+Two realizations of the same dynamics live here (notes/DESIGN.md §6(c)):
 
 * ``gyro_arrangement`` -- the TRICK: the forcing is exact, ``omega = -dU`` on ``Q``, and
   the velocity-dependent damping, gyroscopic and drag 1-forms are smuggled into the
@@ -250,7 +250,7 @@ def gyro_arrangement(
     drive`` (``gyro_potential``); its value (computed by the framework's backward pass)
     is the force the coalgebra's step integrates.
 
-    This is the TRICK realization (DESIGN.md §6(c)): the forcing is exact on ``Q`` and
+    This is the TRICK realization (notes/DESIGN.md §6(c)): the forcing is exact on ``Q`` and
     the velocity-dependent damping, gyroscopic and drag 1-forms live inside the
     parameter's step (``coalgebra.gyro``). See ``gyro_arrangement_on_cotangent`` for
     the direct one.
@@ -280,7 +280,7 @@ def gyro_arrangement_on_cotangent(
 ) -> Arrangement:
     """The same gyro network with its gyroscopic and drag terms written as a forcing.
 
-    This is the DIRECT realization (DESIGN.md §6(c)): the base is ``T^*Q = R^{4V}``,
+    This is the DIRECT realization (notes/DESIGN.md §6(c)): the base is ``T^*Q = R^{4V}``,
     the parameter ``parameter(Q)`` presents ``(q~, xi)`` (``coalgebra.phase_on_cotangent``,
     which keeps the paper's damping ``c*zeta`` in its step), and the forcing on
     ``T^*Q x M^+ x N^-`` is

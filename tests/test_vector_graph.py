@@ -12,9 +12,9 @@ built by the graph-wiring construction" gap. We check that:
 * the scalar case (vdim=1) is unchanged (backward compatibility).
 
 CDLM's ``compose_seq`` summed potentials, so the old test inspected ``arr.U``; the
-book's composite carries only the forcing ``omega`` (DESIGN.md §2), so here the
+book's composite carries only the forcing ``omega`` (notes/DESIGN.md §2), so here the
 oracle is differentiated and compared with the forcing's ``Q``-component, in the
-book's sign ``omega = -dU`` (DESIGN.md §3).
+book's sign ``omega = -dU`` (STATUS.md §1).
 """
 
 import jax

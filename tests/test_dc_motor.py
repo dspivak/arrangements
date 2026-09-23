@@ -10,7 +10,7 @@ The claims audited here (see dap/dc_motor.py for the full verdict). Everything
 runs through the one dynamics functor ``Phi`` (sec.dynamics_functor) applied to
 arrangements whose parameter is the configuration coalgebra (sec.integrators) --
 CDLM's ``Phiconf`` -- with each cell's cost ``U`` entering as the forcing
-``omega = -dU`` (sec.forcing, DESIGN.md §3):
+``omega = -dU`` (sec.forcing, STATUS.md §1):
 
 1-2.  MONOLITHIC control: one closed box, sharp dt*[[R,K],[-K,b]], cost U = H
       plus the source term c.q with c = -A^{-1}(V,-tau).  One ``Phi`` step is
@@ -472,7 +472,7 @@ def test_back_emf_and_torque_via_framework_covectors():
     i.e. the coupling contributes exactly K*(reported omega) to the electrical
     covector and K*(reported i) to the mechanical one: voltage proportional to
     angular velocity, torque proportional to current, at every visited state.
-    The overall minus is the forcing sign (``omega = -dU``, DESIGN.md §3), which
+    The overall minus is the forcing sign (``omega = -dU``, STATUS.md §1), which
     the coalgebra's ADDING step undoes: the trajectory is CDLM's."""
     dt, V, tau = 0.002, 1.0, 0.05
     R, L, K, J, b = _P["R"], _P["L"], _P["K"], _P["J"], _P["b"]
@@ -534,13 +534,13 @@ def test_flow_variant_one_tick_is_euler_in_i_omega():
 
 
 # ---------------------------------------------------------------------------
-# Regression: the CDLM trajectories, sign-translated (DESIGN.md §3).
+# Regression: the CDLM trajectories, sign-translated (STATUS.md §1).
 # ---------------------------------------------------------------------------
 
 
 def test_regression_matches_cdlm():
     """``regress/dc_motor.npz`` is reproduced to rtol 1e-10: states, sharps and
-    Jacobians identical, the covector ``xi_Q`` negated (DESIGN.md §3)."""
+    Jacobians identical, the covector ``xi_Q`` negated (STATUS.md §1)."""
     Reg = load_regress("dc_motor")
     R, L, K, J, b = Reg["P"]
     Pm = dict(R=R, L=L, K=K, J=J, b=b)

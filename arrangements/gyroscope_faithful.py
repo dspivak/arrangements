@@ -7,7 +7,7 @@ assembled categorically:
 
     spring coupling    -> the prism graph-wiring (``compose_graph``) on a hex lattice,
                           R^2 per gyro: the graph-Laplacian forcing EMERGES from
-                          composition (pullback-and-sum, DESIGN.md §2; it is not a
+                          composition (pullback-and-sum, notes/DESIGN.md §2; it is not a
                           hand-written omega)
     rod gravity        -> a nonlinear on-site potential (``rod_gravity``), the ``onsite``
                           of ``compose_graph``

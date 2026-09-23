@@ -1,4 +1,4 @@
-"""Record CDLM (``dap-core-old``) amplifier trajectories for the regression test (DESIGN.md §3).
+"""Record CDLM (``dap-core-old``) amplifier trajectories for the regression test (STATUS.md §1).
 
 Run from the OLD package so that ``import dap`` is CDLM's:
 
@@ -10,7 +10,7 @@ the old package produces (reported ``v``, the emitted reaction ``react`` on the
 drive port, updated states, settle trajectories), all in the old sign
 convention: ``react`` is CDLM's reaction covector ``omega_N(e_src)`` (published
 fields are ``pullback + dU``), and the load ``xi_N`` is the covector CDLM's
-integrator subtracts.  The new test translates per DESIGN.md §3:
+integrator subtracts.  The new test translates per STATUS.md §1:
 ``react_new = -react_old``, ``xi_N_new = -xi_N_old``, states identical.
 """
 

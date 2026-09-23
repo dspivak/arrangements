@@ -7,7 +7,7 @@ Run from the OLD package so that ``import dap`` is CDLM's:
 Writes ``pinn.npz``: the grid, the exact discrete Poisson solution, the learned
 field and the per-step energy of a short ``solve_deep_ritz`` run (``Phiconf`` on
 the field network, the environment seeding CDLM's ``dE/du = L u - b``). The new
-test seeds the forcing ``b - L u`` instead (DESIGN.md §3); the weights' trajectory,
+test seeds the forcing ``b - L u`` instead (STATUS.md §1); the weights' trajectory,
 hence the field and the energy history, are identical.
 """
 

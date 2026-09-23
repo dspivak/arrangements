@@ -303,7 +303,7 @@ def test_direct_realization_runs_rock_paper_scissors():
 
 
 def test_regression_matches_cdlm():
-    """The CDLM states (``regress/replicator.npz``) are reproduced to rtol 1e-10 (DESIGN.md §3):
+    """The CDLM states (``regress/replicator.npz``) are reproduced to rtol 1e-10 (STATUS.md §1):
     one-step (standard and log charts), the simplex orbit, coordination, Hawk-Dove, and the
     standard/log convergence run. Closed system: no sign translation."""
     R = load_regress("replicator")
