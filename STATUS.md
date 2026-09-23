@@ -1,8 +1,9 @@
 # What this library establishes, and what it does not
 
-This file is the account the code keeps of itself. Every docstring that says a claim is
-open, inherited, or merely illustrated points here. It is meant to be read before the
-tests are taken as evidence of anything.
+This file is the account the code keeps of itself, and its first purpose is practical:
+when the book has to decide something, this says what the library actually shows and what
+it only appears to show. Every docstring that says a claim is open, inherited, or merely
+illustrated points here. Read it before taking any test as evidence of anything.
 
 The mathematics is developed in *Articulating Forms that Matter* (D. I. Spivak, in
 preparation), Chapter 3; its predecessor is *Compositional dynamics in learning and
@@ -47,8 +48,9 @@ forcing component. That is the operad-morphism proposition made executable.
 **Weaker evidence: the regression recordings.** `tests/regress/*.npz` hold trajectories
 produced by the CDLM companion, and the ported examples reproduce them to 1.4e-12 or
 better. This proves the port is *faithful*, which is what it was for. It does not prove
-either implementation is *correct*: the CDLM companion was written by a language model
-and was never independently audited. Agreement with it is consistency, not truth.
+either implementation is *correct*; agreement between two implementations is consistency,
+not truth. Where a claim needs to be true and not merely preserved, look for a closed-form
+test above, or check it by hand.
 
 **Not evidence at all: expressibility.** Any smooth vector field `V` can be written as a
 forcing by taking `omega = V^flat` with a plain sharp, making one step `x + dt V(x)`. So

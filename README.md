@@ -70,10 +70,13 @@ DC motors, molecular dynamics, Kuramoto oscillators, Hopfield networks (whose en
 function *emerges* as the composite potential), replicator dynamics, mass-action reaction
 networks, and an operad of attention arrangements.
 
-## Install
+This is working code for a book in progress, not a release: it is here to say what is
+true while the mathematics is being written. Interfaces will move.
+
+## Run it
 
 ```bash
-git clone https://github.com/dspivak/arrangements.git && cd arrangements
+cd arrangements
 uv run --extra test pytest    # 308 tests; first run installs the test extra
 ```
 
@@ -109,8 +112,9 @@ things from it worth knowing before you trust a number:
   difference is the point: the structured version certifies a Lyapunov function and
   dissipativity inherited under interconnection, and the direct one certifies nothing.
 - **The regression tests prove faithfulness, not correctness.** Ported examples reproduce
-  trajectories from the predecessor implementation to 1.4e-12 or better, but that
-  implementation was never independently audited. Agreement is consistency, not truth.
+  trajectories from the predecessor implementation to 1.4e-12 or better, which shows the
+  port preserved its behavior. Agreement between two implementations is consistency, not
+  truth; for truth, look to the closed-form tests.
 - **Functoriality is tested on instances, not proved.** A passing suite is a warning
   system, not a certificate.
 
