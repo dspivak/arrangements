@@ -153,6 +153,60 @@ That composition agrees with dynamics is checked on instances — chains, graphs
 and a non-exact coupler — not proved here. The proof belongs to the book. A passing test
 suite is a warning system, not a certificate.
 
+### 3.7 Two proposed costs on the reader, and four things they corrected
+
+Neither construction here is in the attention paper. Both put the mean readout inside a
+cost, which leaves the paper's affine-quadratic family, so the Hessian is not constant and
+each run states where its mobility came from. Every docstring says which of three things
+its test does: reproduce a closed form derived in the docstring, check a discrete analogue
+(§3.2), or correct a claim made on paper.
+
+**The member test** (`tests/test_member.py`; construction and numbers in
+`notes/MEMBER-TEST.md`) runs the book plan's proposed definition of *member*. A part's
+residual is its cost minimized over its own configuration, `r(e) = min_q k(q, e)`; it has a
+need iff `r` varies with what it receives, and it is a member at a state iff
+`r(received) < r(0)`. What the three runs support: the residual separates a need from a
+bond-like cost — a self-sufficient part receiving exactly what the needy part receives is
+never a member, and the needy part becomes one once the source's signal has descended — and
+a reader between a source at `0` and one at `nu` moves away from the first and toward the
+second at every step. Two claims made on paper did not survive:
+
+1. **A quadratic outer cost does not outweigh a member of a member out of membership at
+   any finite weight.** With outer weight `lam` the inner residual is
+   `(1/2) nu^2 (lam/(1+lam))^2`, strictly below `r(0)` for every finite `lam`; only the
+   margin `r(0) - r(received)` erodes, to `0.0099` at `lam = 100`. Under the strict
+   inequality loss of membership is a limit, so a definition that wants "outweighed" to end
+   membership needs a threshold or a comparison of margins.
+2. **Under the mean readout the need is a ray, not a point.** `argmin_e r(e)` is
+   `{(nu w, w, p) : w > 0}`, and in the leaving run no configuration realizes it, so the
+   reader passes the second source and keeps going, the force decaying without a settled
+   state. The paper's Example 1 settles because its cost is on the weighted input.
+
+**The curious reader** (`tests/test_curious_reader.py`) adds an information-gain term,
+Lindley's expected gain of a Gaussian channel, to the reader's cost on the three-child
+spatial arrangement of `tests/test_reader.py`, between a weak confirming source and a strong
+disconfirming one. Eight tests in three stages. The crossover `lam*` of the midpoint force at
+a held prediction is reproduced to `1e-15` relative. Two claims made on paper did not
+survive, and one prediction written before its run held:
+
+3. **A free prediction never confirms.** With nothing holding it, the prediction adjusts to
+   what is heard and only precision remains, so the reader ends at the precise source for
+   every `lam > 0`. Confirmation needs the prediction held by a prior term, and the dial is
+   then the prior precision `w_pi`: the crossover becomes `w_pi/(1 + w_pi)` times the
+   held-prediction value, `lam*/2` at `w_pi = 1`, reproduced by bisection to `1e-12`.
+4. **The predicted mobility window up to `lam*` does not exist.** With the prior term the
+   confirming basin closes at `lam_A = 0.807`, below `lam* = 1.19`, so the settled regime is
+   set by the reduced cost's basins and `lam*` governs the transient only. Inside
+   `(lam*/2, lam_A)` the prediction written first held: the ratio of the prediction's
+   mobility to the position's selects the basin, a slow reviser settling in the confirming
+   local minimum and a fast one in the precise global one. Equal mobilities went to the
+   precise source in the two cases run; the boundary was not located.
+
+What neither establishes: whether *member* or the information term belongs in the book is
+not a question the code answers, and the definitions run here are the plan's proposals, not
+the book's. The reruns the member test calls for — the need restated on the weighted input,
+and a non-quadratic outer cost — are listed in the book plan and have not been run.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

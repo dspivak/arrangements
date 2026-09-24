@@ -77,7 +77,7 @@ true while the mathematics is being written. Interfaces will move.
 
 ```bash
 cd arrangements
-uv run --extra test pytest    # 308 tests; first run installs the test extra
+uv run --extra test pytest    # 360 tests; first run installs the test extra
 ```
 
 Python ≥ 3.10, JAX and NumPy. Tests run under `jax_enable_x64`.
