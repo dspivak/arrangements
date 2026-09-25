@@ -163,9 +163,13 @@ its test does: reproduce a closed form derived in the docstring, check a discret
 
 **The member test** (`tests/test_member.py`; construction and numbers in
 `notes/MEMBER-TEST.md`) runs the book plan's proposed definition of *member*. A part's
-residual is its cost minimized over its own configuration, `r(e) = min_q k(q, e)`; it has a
-need iff `r` varies with what it receives, and it is a member at a state iff
-`r(received) < r(0)`. What the three runs support: the residual separates a need from a
+residual is its cost minimized over its own configuration, `r(e) = min_q k(q, e)`; it *wants*
+something of its input iff `r` varies with what it receives, and it is a member at a state iff
+`r(received) < r(0)`. (The book plan called that variation a *need*; since 2026-09-25 it calls
+it a **want** and defines *need* separately, as what a part must receive for its own parts to
+keep returning, which §3.8 below tests. The two are not genus and species: a want is read off
+the part's own cost and exists only where its forcing is exact, a need needs no potential, and
+§3.8's parts have needs and no wants.) What the three runs support: the residual separates a want from a
 bond-like cost — a self-sufficient part receiving exactly what the needy part receives is
 never a member, and the needy part becomes one once the source's signal has descended — and
 a reader between a source at `0` and one at `nu` moves away from the first and toward the
@@ -204,8 +208,61 @@ survive, and one prediction written before its run held:
 
 What neither establishes: whether *member* or the information term belongs in the book is
 not a question the code answers, and the definitions run here are the plan's proposals, not
-the book's. The reruns the member test calls for — the need restated on the weighted input,
+the book's. The reruns the member test calls for — the want restated on the weighted input,
 and a non-quadratic outer cost — are listed in the book plan and have not been run.
+
+### 3.8 Mutual need, and what carries it
+
+`tests/test_mutual_need.py` (8 tests; construction, closed forms and numbers in
+`notes/MUTUAL-NEED-TEST.md`) builds two parts, each a driven steady state in §3.1's sense —
+its configuration the amplitude of its own form, held nonzero while flux passes — each of
+whose held form is supplied by the other, with one supply entering the pair from outside as a
+zero-response box. Four predictions were fixed before the run: both forms held while the
+supply runs; cutting the supply ends both; cutting either internal link ends both; neither
+part holds its form alone. A supply wired straight to one part fails the last two. A supply
+**gated** by the parts' activity, `intake = s q_A q_B/(K + q_A q_B)`, holds all four.
+
+1. **The gated forcing is genuinely non-exact.** `(d omega)_AB = alpha(gamma - beta) - alpha s
+   q_A K/(K + u)^2` with `u = q_A q_B`, reproduced to `1e-10`, equal to `-0.1141566` at the
+   settled state. It does not involve the covector returned at the supply's port, whose
+   response is zero, so no bookkeeping there removes it, and it varies with the state, so no
+   constant `beta - gamma` does. The construction therefore sits inside the book's category,
+   whose forcing need not be exact (§1), and outside the attention operad, whose forcing is
+   the full differential of a nonnegative cost.
+2. **One-way supply is not what costs exactness; a non-reciprocal response is.** The *linear*
+   loop is exact to `1e-12`, with potential `alpha(q_A s + beta q_A q_B)`, even though its
+   supply is one-way — because the supply's response is zero. This is §3.5 item 1 one case
+   over, and the second time the same belief has been corrected here, so the rule is the thing
+   to carry: unilaterality in the wiring does not make a forcing non-exact.
+3. **Which verdicts the parameters decide.** Prediction 1 needs the supply above a threshold
+   `s_*` set by the gate's half-saturation, and prediction 2 needs the internal loop gain below
+   the dissipation, `alpha^2 beta gamma < b^2` — at `beta gamma = 1` the unsupplied pair holds
+   its form for nothing, and above it the pair diverges. The formalism does not enforce that
+   inequality. Near its boundary the run *length* decides what a run sees: at `0.9801`, two
+   hundred time units report the form held at `0.500` while it is still decaying, so a
+   persistence claim needs a rate, not a final reading.
+4. **What the wiring decides, and it is not a parameter.** Predictions 3 and 4 hold for every
+   parameter setting swept (eighteen cases, `beta gamma` from `0.04` to `1.1025`, `s` in
+   `{2.2, 4, 40}`, both cuts killing both parts in all of them), provided the wiring has no
+   ungated path from the supply to either part: cutting the partner's wire makes the gate read
+   zero, so the part has no drive at all. Any ungated leak, however small, breaks them
+   strictly. And **autocatalysis is not mutuality**: a gate reading a part's *own* activity
+   leaves that part held alone at `2 + sqrt 3`. What the predictions need is that every path
+   from the supply to each part pass through the other part's signal.
+5. **A restart threshold, structural.** The forcing vanishes identically at the origin and the
+   origin is stable, eigenvalues `-b ± alpha sqrt(beta gamma)`, so a pair started too low never
+   gets going — the fixed point with vanishing gradient that §3.5 also found. The threshold is
+   the lower root's stable manifold, a curve and not a number: on the ray through the saddle it
+   is the saddle at every mobility, and off it moves with the step to first order.
+
+**What this does not establish.** That arrangements tend to fall in the region where the four
+predictions hold; §2's warning applies in full, since exhibiting one loop that behaves as
+wanted proves nothing about the class of loops that do. What the runs deliver is the boundary
+of that region. The gate's Michaelis–Menten shape is a **model** of metabolism, not a
+derivation. The supply is a zero-response box, so nothing depletes and the finite-reservoir
+lifetime bound is a separate matter. And the decay of an unsupplied amplitude is this
+library's deterministic descent, not an entropic force: nothing here is random, and the
+scattering of an unkept form is supplied by an environment the model does not draw.
 
 ## 4. Where the mathematics is written down
 
