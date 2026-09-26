@@ -427,6 +427,75 @@ redundancy makes the resting place a manifold, so its transient moves along it: 
 failure the outgoing message is identical with and without it, while the live pair rests
 `0.0109` apart. §2's warning applies throughout.
 
+### 3.11 The fire and the insurance agency: saying what no part says, and being charged for a past
+
+Two tests with their predictions fixed first: `tests/test_fire.py` (5) and
+`tests/test_insurance.py` (5). The first asks whether a collective can report something none of
+its parts reports; the second, whether a forecast can be held and charged when it is checked.
+
+**The fire.** Two scouts, one reporting where a fire is and one how hard the wind blows; the
+parent is charged the square of the distance from its report -- the mean readout of the message it
+sends onward -- to where the fire will be.
+
+1. **A collective that only weights and adds can only average.** With the value maps at the
+   identity the report is `sum_j kappa_j w_j hbar_j / sum_j kappa_j w_j`, every coefficient
+   positive: a convex combination, so it stays between the scouts' reports whatever the placements
+   do, and its distance from the truth has a floor. Descent approaches that floor (`2.00024`
+   against a floor of `2` after 20 000 steps) from five different starting placements and never
+   crosses it. One clause of the prediction was too strong: the *ratio* of the two attentions
+   reaches `1.03e4`, but the favoured scout's own `kappa` stops at `0.959`, because a cost on the
+   mean readout is blind to the total weight. Both placements are still moving at the budget, so
+   this is a rate.
+2. **One scene is a line of value maps, not a rule.** With the maps free the report does leave the
+   hull and reach the truth, geometrically at the exact rate `1 - mu|a|^2`. But the solution set is
+   a line, and descent lands on the projection of wherever the parent started; the ratio of the
+   settled maps is `0.4348`, not the elapsed time `4`, and a different start settles elsewhere on
+   the same line. Charged on three scenes with **one pair of maps shared by every scout of a
+   kind**, the quadratic is positive definite and descent settles at the unique solution: the map
+   ratio *is* the elapsed time, and the parent is right about a fourth scene it was never charged
+   for (`3.6e-15` against a truth of `0`). Two independent scenes already suffice.
+
+**What the fire run does not establish.** There is no time in it: where the fire turns out to be
+enters the cost as a constant target, exactly as `nu` does in §3.9, so nothing here holds a report
+and is charged for it later. The sharing of one map across scenes is a constraint imposed on the
+transfers, not a discovery -- in the spatial family each child has its own value map. And the
+scouts are frozen and cost-free, so nothing here is about how a scout comes to report what it
+reports. §2's warning applies: what the run shows is whether descent finds the rule and how many
+scenes pin it down, not that the world contains collectives of this shape.
+
+**The insurance agency.** A premium rate held as state, a fund accumulating premiums in minus
+claims out, and a gain `g` with which the fund pushes the premium.
+
+3. **A record is one-way, and the one response that repairs that is an amplifier.** On
+   `(p, f)` the composite's `d omega` is `1 - g`, the only nonzero entry: no correcting response
+   (`g < 0`) is exact, and the unique exact completion `g = +1` raises the premium when the fund
+   is full. It runs away as `(1 + mu)^n` -- the premium at `-605` after 200 steps, the insurer
+   paying people to insure them. This is §3.10 item 3 from the other side: there the exact
+   completion billed the puller and cost it its reach; here it reverses the control.
+4. **A pay the forecaster reads does not move the forecaster.** Give the insurer the cost
+   `(c/2) f^2` on the fund arriving at its port and its premium does not move, bit for bit, over
+   2000 steps: the forcing on a coordinate is the cost's derivative in *that* coordinate, and this
+   cost does not mention the premium. What it charges is the fund. This is the `notes` design
+   taken literally, and it is the same lesson as §3.9 item 1 -- ask what the cost is a function of
+   before predicting what it will move.
+5. **Charged on its record, a forecaster cycles and lags it by a quarter turn.** With a correcting
+   response the loop is a rotation: `E = (p - lam)^2 + c f^2` is multiplied by exactly
+   `1 + mu^2 c` each step, so it does not settle -- the cycle is the arrangement's and the slow
+   growth is the integrator's, two explicit steps reading each other's old position. Started
+   holding exactly the right rate with a fund in deficit, the premium rises at once, and its local
+   maxima fall at steps `315`, `1571`, `2828`, exactly the steps at which the fund crosses zero.
+   The debt is paid precisely when the over-charging is worst.
+6. **A view of its own settles the loop at a balance it never clears.** An exact cost
+   `(alpha/2)(p - pbar)^2` makes the rotation an inward spiral to `p = lam` with a permanent
+   balance `alpha(pbar - lam)/c`, zero only if the view was right.
+
+**What the insurance run does not establish.** There is no risk in it: the dynamics is
+deterministic and the claim rate is a constant, so "bearing risk" is not modelled. There is no
+pooling and there are no customers, so nothing makes over-charging costly; the forecaster is
+charged for being wrong in either direction, not for being unprofitable. And the claim rate is
+exogenous by construction -- which is the honest version of the one-wayness, since an insurer does
+not cause fires.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
