@@ -8,7 +8,7 @@ particle's cost:
 
 The discrete recurrence is
 
-    m (q_i(t+2) - 2 q_i(t+1) + q_i(t)) = kappa (q_{i-1} - 2 q_i + q_{i+1})(t) - m_0^2 q_i(t),
+    m (q_i(t+2) - 2 q_i(t+1) + q_i(t)) = kappa (q_{i-1} - 2 q_i + q_{i+1})(t+1) - m_0^2 q_i(t+1),
 
 and for a pinned chain of length K the Dirichlet eigenmodes are
 ``q_j^{(n)} = sin(j n pi / (K+1))`` with

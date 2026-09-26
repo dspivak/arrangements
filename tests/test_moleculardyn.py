@@ -139,7 +139,8 @@ def test_force_vanishes_at_lj_minimum():
     F_out = np.asarray(md_force(arr, jnp.array([0.0, 1.01 * R0])))
     assert F_out[0] > 1e-2 and F_out[1] < -1e-2
 
-    # Newton's third law comes with the construction: the forcing is exact
+    # Newton's third law comes with the construction: U_LJ depends only on r - r'
+    # (translation invariance). Exactness gives reciprocity, not this.
     np.testing.assert_allclose(F_in[0] + F_in[1], 0.0, atol=1e-12)
 
 
