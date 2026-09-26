@@ -539,6 +539,72 @@ yet uses the asymmetry; any result that changes under the swap will show it here
 are analytic theorems about these chains, not consequences of the construction. The
 symmetry-restoring quotient of `rand` is not implemented.
 
+### 3.16 A passing note and a sustained note
+
+`tests/test_sustained_note.py` (7 tests). The book's claim (plan §4.1 step 11, David's "i love
+it!", 2026-09-26): *a passing note moves a reader; a sustained note moves where it comes to
+rest.* One reader component `I -> <R | R>` with the Euclidean response `eta = 0.05`, its note
+supplied as the exterior input (the source left out of the picture), and two costs linear in the
+note `u`: uncommitted `(1/2) q^2 - u q`, and committed `(1/4)(q^2 - 1)^2 - u q`, wells at `+-1`,
+barrier `1/4`, one well gone for `|u| > 2/(3 sqrt 3)`. Noise is `euler_maruyama`; the statistics
+use a vectorized copy of the step, checked pathwise against `Phi` of the seeded arrangement to
+1e-12. Predictions were written in the file's docstring before anything ran.
+
+**What could not have come out otherwise.** The uncommitted reader goes to `u/a` under a held
+note and back to 0 after a passing one, at rate `1 - eta a` (closed form). The quiet committed
+reader: a held 0.6 moves its rest to 1.2212, beyond the old well; a passing 0.6 must stay on 64
+steps to leave it in the other well for good, and one step fewer leaves it where it was; a held
+0.1 only shifts its well to -0.9456 and it never crosses.
+
+**What could have, and how it came out.** (3) Noise `T = 0.1`, the weak held note 0.1: the
+fraction of readers in the right well goes from 0 to 0.853, the two-well Gibbs value 0.855. A
+note too weak to move a quiet reader sets where a noisy one rests. (4) Released after settling,
+the fraction relaxes to 1/2 at 0.91 of Kramers's rate. (5) After a passing note that flips every
+reader, the mark fades at a rate whose logarithm against `1/T` has slope -0.2766 against the
+barrier's -0.25 (within the predicted 20%), prefactors 0.82--1.02 of Kramers's over `T` from 1/16
+to 1/8: what a passing note leaves lasts as long as the reader's own commitment holds it against
+wear, a time exponential in the commitment's depth over the noise. (6) Observed, not predicted,
+because the first run's passing note was four steps too short: a note held 60 steps moves no
+quiet reader and 60--65% of noisy ones, so "held long enough" is relative to the reader's noise
+as well as to its settling time. Prediction 5's premise took two reruns to meet (60 and 100
+steps too short at `T = 1/16`); both are recorded in its docstring.
+
+**What it is not.** A one-dimensional reader. That the note is copied into the reader is the
+book's model, not something this run tests; a phase reader under a held oscillating note, and a
+reader with a slow coordinate that could keep the note after it goes, are not run.
+
+### 3.17 Spells and timescales
+
+`tests/test_spells.py` (10 tests, two of them strict xfails that keep refuted predictions on the
+record). David, 2026-09-26: a spell may put a reader "into a new equilibrium that's less aligned
+with your surroundings … that could change things at another time scale, or you might settle
+back down … but still you can be a part of some longer-time-scale note that's playing to inchant
+something else." The surrounds are a weak note 0.1 held on every committed reader, `T = 0.1`;
+predictions in the docstring before any of it ran.
+
+**(1) Held.** A spell of -0.6 against the surrounds puts 96% of settled readers in the higher
+well; they return to the Gibbs value (0.849 against 0.855) at 0.96 of Kramers's rate. A reader
+stays 600 steps in the higher well and 3524 in the lower, ratio 5.87 against Kramers's 6.32: a
+spell into accordance lasts about six times longer than one against it.
+
+**(3) Refuted twice, direction held.** A slow habit `w` paying `(beta/2)(q - w)^2`. Predicted:
+a fast habit keeps a spell, a slow one loses it. At `T = 0.1` every habit speed kept about half
+(0.51 … 0.36): the 3000-step horizon was longer than the reader-and-habit pair's own
+re-randomizing time (e-fold 623 steps, checked afterwards as a prediction), so it measured
+equilibrium, not the race. At `T = 0.05` the direction showed, 0.84 kept with the fastest habit
+and 0.51 with the slowest, but the predicted numbers failed (slowest under 0.2). Not tuned a
+third time.
+
+**(4) Held, one number refuted.** 2000 members each flip 9.4 times on average during a
+6000-step note, while their mean holds at 0.703 +- 0.011: a held note no member holds. A slower
+committed reader receiving that mean crosses and is still across 6000 steps after the surrounds
+go and the mean has returned to 0.011. Driven by one member instead, it switches 5 times; driven
+by the mean, once, never back. The predicted threshold (1000 steps too short) was wrong: the
+threshold is between 800 and 1000.
+
+**What it is not.** The members and the slower reader are not composed in the library; the
+slower reader reads the members' mean as its exterior input. One-dimensional readers throughout.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
