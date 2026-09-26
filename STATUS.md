@@ -60,6 +60,20 @@ the difference is the point: the structured realization certifies something — 
 function, monotone descent, dissipativity inherited under interconnection — and the
 direct one certifies nothing. Admissibility as a forcing is cheap; structure is not.
 
+**Not evidence: what the construction was built to have.** This is the expressibility warning's
+near neighbour, and it is easier to miss because the run looks like a test. If the question is
+"can a collective's form survive its parts turning over," and the construction is a parent over
+contributors that are interchangeable by design, the answer is in the wiring diagram before
+anything runs. What such a run *can* establish is the mechanism and its numbers — how the
+collective degrades, how a replacement arrives, what stops it, what the cost can and cannot see —
+and what it cannot establish is that the world contains collectives of that shape. The test that
+separates the two: **ask which predictions could have come out otherwise.** In the turnover run,
+predictions 2 and 3 could have gone either way and both went the other way; those are results.
+Prediction 1, degrade and restore, was guaranteed by the construction up to the level-set
+argument, and reading it as "a collective's form survives turnover" imported a premise the run
+did not have (David, 2026-09-26: "you can't just go to a town and swap someone out!"). State what
+a run shows about the machinery; let the claim about the world be argued separately, or not made.
+
 ## 3. Open questions the code depends on
 
 ### 3.1 The domain of `cot`
@@ -263,6 +277,155 @@ derivation. The supply is a zero-response box, so nothing depletes and the finit
 lifetime bound is a separate matter. And the decay of an unsupplied amplitude is this
 library's deterministic descent, not an entropic force: nothing here is random, and the
 scattering of an unkept form is supplied by an environment the model does not draw.
+
+### 3.9 Turnover, and two beliefs it corrected
+
+`tests/test_turnover.py` (6 tests; construction and numbers in `notes/TURNOVER-TEST.md`) asks
+whether a collective's form survives swapping a part. A spatial-attention parent holds a cost
+`(1/2)(nu - h~)^2` on the weighted signal its redundant contributors send, each contributor
+gating what it sends by a health configuration; one health is driven to zero and a spare sits
+off to the side. Four predictions were fixed in the module docstring before the construction
+existed. The collective degrades to `2 + (nu-2)/(1+lam)` with no spare and returns to `2.5`
+exactly with one, the spare moving only as far as it had to — so **failure, forgetting and
+replacement are all in the mathematics**, for this construction and in `2 < nu < 3`. Two of
+the four predictions are refuted, and both refutations are the useful part.
+
+1. **A cost on the weighted signal cannot see weight.** A part reporting zero at full weight
+   and a part gone silent are literally the same input to it — the forces agree to the last
+   bit. So a failed part is pushed out for contributing something *wrong*, never for being
+   *absent*: a corrupting part is pushed at `+0.954051` where both of the others sit at
+   exactly `0.0`. The predicted mechanism, weight-zero versus weight-nonzero, lives entirely in
+   the mean readout, where it holds exactly and where §3.7's finding applies — that cost leaves
+   the affine-quadratic family and its runs do not settle. **The aggregate that makes turnover
+   settle is not the aggregate that makes a failed part get pushed out**, and one cost does not
+   give both.
+2. **The pull region is a budget, not a boundary.** The inward force is strictly nonzero at
+   every finite distance and the deficit multiplying it does not vanish while the spare stays
+   out. A spare at `d = 5` fails to arrive at 8k, 32k, 128k and 512k steps and arrives at 2M;
+   the gradient reaches zero only at floating-point underflow, `d = 33.6665`, which is 37 times
+   the kernel's own scale. **Reach is a rate, not a radius**, and §3.5's "a participant placed
+   far out never arrives" is a statement about a budget. Every reach claim in this library now
+   names its step count.
+
+**What makes a part swappable here, and it is not being part of a collective.** The contributors
+are interchangeable because the parent's cost is on an **aggregate** of what arrives, so only the
+total matters and any sender is as good as another. Swappability is a property of the cost being
+on what arrives rather than on who sent it — not a property of being a part. An organ sits closer
+to that case than a person does, which is why a heart transplants and a best friend does not
+(David, 2026-09-26). So this run models transplant, not friendship: a collective's form survives
+turnover **where its form depends on a total**, and where it depends on which part is where, the
+construction says nothing.
+
+Two things the run settled that no prediction named. **The collective's own deficit props the
+failing part up**: its health settles at `(nu - h~)kappa_F/lam`, so it dies fully only once the
+spare has closed the deficit. And **only the signal returns**: the outgoing message is
+`(h~, w~)`, and where the failed part keeps reporting, `w~` stays raised permanently, so the
+collective is restored in the coordinate its cost is about and marked in the coordinate it is
+blind to. A fully dead part is neither pushed out nor pulled in — contributing nothing, it
+feels no force and its placement freezes where it is.
+
+**What it does not establish.** Failure itself is stipulated: the health cost is a model of
+breaking down, not a derivation. The pre-failure fixed point is not isolated — the whole level
+set `sum kappa_j = nu` is fixed, which is what redundancy is here — so the settled split among
+parts is undetermined. At `nu = 2` exactly the fixed point is degenerate, the force cubic and
+the deficit falling as `1/t`, so a run reporting `2.0000` there would be reporting its own
+budget. §2's warning applies in full.
+
+### 3.10 The monitor: seeing, pulling, and the two put together
+
+Three tests, each with its predictions fixed first: `tests/test_monitor_seeing.py` (5),
+`tests/test_monitor_pulling.py` (6), `tests/test_monitor_composed.py` (6), with
+`notes/MONITOR-SEEING.md`, `notes/MONITOR-PULLING.md`, `notes/MONITOR-COMPOSED.md`. The
+question is whether one part can both see a dead part and pull a replacement in from far off.
+Each builds on §3.9's collective rather than rebuilding it.
+
+**Seeing.** The monitor is one more child of the same parent, frozen at the origin so it hears
+exactly what the collective sends, carrying the curious reader's cost
+`(1/2)(w - pi)^2 + (w_pi/2)(pi - nu)^2` on the total arriving weight. Settled surprise is
+`s* = -(w_pi/(1+w_pi))Delta`, matching to `1e-13` in all 48 cells, so a drop registers iff
+`Delta >= theta(1+w_pi)/w_pi`, and since the largest available drop is one part's share there
+is a floor under a useful precision, `w_pi = theta/(kappa - theta)`. A free prediction *is*
+surprised, for five steps, `s_t = -Delta·2^-t`; what it cannot do is stay surprised. The
+prediction that motivated the construction is **refuted under the cost the collective
+requires**: a silent failure is already visible to listening alone there (force `-0.4688` on
+each live part), and is invisible only under the mean readout. Two results beyond detection:
+
+1. **There is no passive observer.** A held expectation is a cost and a cost is a force. The
+   monitor's contribution to the forcing is exactly `-s·grad(w~)`, inert to the last bit iff
+   the surprise is zero, and at the silent failed state it *doubles* both the parent's prop-up
+   of the failing part and its inward pull. A monitor that ends up detecting nothing has
+   already moved what it was watching.
+2. **The monitor repairs.** Against the reporting failure — the case §3.9 found the required
+   cost cannot push out — a monitor at `w_pi = 1` drives the dead part's kernel from `0.8333`
+   to `0.5000`, exactly until the weight it expects arrives. It supplies the sense the parent's
+   cost lacks, and the collective uses it. So the gap §3.9 opened closes at a price: what buys
+   both a settling turnover and a failed part moved out is a part holding an expectation of
+   what should be arriving.
+
+**Pulling.** Two routes. Nesting (a parent one level up with its own larger `tau`) stays exact
+and trades reach against selectivity strictly: at a budget of 8000 steps reach grows as
+`sqrt(tau)` and residual attention to a bad contributor grows at the same rate, and two levels
+have both in one run where neither single level does. The doodad — a monitor whose own state
+sets `F_p = -alpha·a·tanh(p/wid)` on the spare's placement with nothing returning — is an
+ordinary non-exact arrangement and recruits in exactly `100d - 245` steps at any distance,
+against two million steps for the exact route at `d = 5`. So nesting is *forced* only if the
+forcing must stay exact. The unpredicted finding is the price:
+
+3. **Making the pull exact bills the puller.** The exact completion is unique up to a function
+   of the alarm alone, `U = -alpha·a·wid·log cosh(p/wid)`, so the placement must act back on the
+   monitor — exactly what "nothing returns to it" forbids — and that back-action is the
+   outstanding work of bringing the spare in. Billed, the alarm crosses zero at `p = 50.173`
+   and the pull reverses beyond it: at 40 000 steps the billed monitor arrives from `d = 40`
+   and not from `d = 60`, while the unbilled arrives from 60. **The exact pull has a boundary;
+   the non-exact one has none.** This is §3.5 item 1 and §3.8 item 2 from the other side: the
+   rule there was that a non-reciprocal *response* is what costs exactness, and here restoring
+   exactness is exactly restoring the reciprocity. The boundary belongs to this completion,
+   whose restoring cost lets the alarm go negative; one confining it to positive values would
+   slow rather than reverse, and that is untested.
+
+**Composed.** The two wired into one closed arrangement, the single new thing being that the
+alarm is the surprise, `a = pi - w~`, rather than a held constant.
+
+4. **Seeing and pulling are one quantity, not two composed capacities.** Delivery rate is
+   `1/(mu·alpha·a*)` with `a* = (w_pi/(1+w_pi))Delta`, matched at `atol = 0` across
+   `w_pi = 0.25, 0.5, 1, 2, 4`; at `w_pi = 0` the settled surprise is exactly zero and the
+   spare never arrives at any budget. **The dial that sets how small a drop a monitor can see
+   is the dial that sets how fast it can fetch.** The two thresholds differ, though: seeing has
+   a floor at `w_pi > 0.0638` and delivery needs only `w_pi > 0`, so a monitor too coarse to
+   report a drop still delivers against it.
+5. **Delivery stops itself**, because the expression that pulls is the one that vanishes: every
+   distance comes to rest with alarm `0.0` and pull `-0.0` to the last bit, with no stopping
+   rule added, and the pre-failure state has composite forcing exactly `0.0`. Wire in a *held*
+   alarm instead and it never rests: it holds the collective past what it asked for and, from
+   nearby, drags the spare all the way in while the live pair pays.
+6. **Which failure sounds the call is not the construction's to choose.** A silent failure
+   sounds it at once; a reporting failure leaves `w~ = nu` exactly at the failed state, so
+   nothing is called and the doodad never goes. The monitor *repairs* the failure that never
+   calls and *delivers* against the failure it cannot repair. A failure that would call both
+   halves at once is untested and is the obvious next question.
+
+Where the composition earns its keep is one cell: a part gone silent with the spare beyond the
+parent's own reach (`d = 20`, the parent's force on the spare about `4e-108`). There the bare
+collective sits at the degraded value forever, the monitor alone sits with its surprise open,
+and the loop restores the whole outgoing message exactly. With a reporting failure the loop
+restores the *weight* and not the signal — the exact reverse of §3.9 — because
+`w~ - h~ = kappa_F` identically.
+
+**What the three do not establish.** The supply that a non-exact coupler needs by the physical
+reading is **stipulated away** in both the pulling and the composed runs, and their notes say
+so: over a trip the monitor delivers finite work and its own state ends where it began, bit
+for bit. So "a collective that can replace its parts must pay for a monitor" is *not* shown —
+§3.9 replaces a part with no monitor whenever the spare is already within reach. What is shown
+is the conditional: a collective whose spare lies beyond its own attention cannot recover
+without one, and that monitor's coupler is measurably not a descent of energy
+(`max|d omega| = alpha` exactly). Whether such a collective is the normal case, this code does
+not answer. Running a plan is not built: call, basin and delivery compose with nothing added
+because there was nothing to plan, the spare's route being a straight descent along one
+coordinate with no obstacles. The reach/selectivity trade-off is a measurement on one kernel
+family, one cost and one budget, not a theorem. And the monitor was free only because
+redundancy makes the resting place a manifold, so its transient moves along it: with a silent
+failure the outgoing message is identical with and without it, while the live pair rests
+`0.0109` apart. §2's warning applies throughout.
 
 ## 4. Where the mathematics is written down
 
