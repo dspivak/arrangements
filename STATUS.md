@@ -605,6 +605,62 @@ threshold is between 800 and 1000.
 **What it is not.** The members and the slower reader are not composed in the library; the
 slower reader reads the members' mean as its exterior input. One-dimensional readers throughout.
 
+### 3.15 A candidate beginning of a reader, as a composite
+
+`tests/test_reader_origin.py` (stage A: 9 tests). The candidate and its one-box ODE are
+Codex's (book repository, `notes/reader-origin-model.md`): a catalytic apparatus `q_1` whose
+activity on held fuel rebuilds it and makes a boundary `q_2` that cuts its leak; a pore lets it
+establish, the boundary lets it persist after. The design is `notes/reader-origin-arr.md` there.
+Predictions were written in the docstring before any construction; all held.
+
+**Reproductions.** The composite (species boxes, held supplies, one stateless transition box per
+term, a routing wire) ticks as Codex's Euler step to 1e-14 and recovers his table. `d omega` equals
+his formula and comes from exactly two children, boundary production and the protected leak.
+Release works as a substitution of the pore child.
+
+**(T1b) The field is a descent after all.** Derived by hand, then checked: on the open quadrant
+the field is `-G grad U`, with the diagonal response `G = h diag(q_1, (k_b kappa F / l)(1+q_2)^2)`
+and an explicit `U`. The structured composite (exact children, those responses) ticks with the
+direct one to 1e-13, and `U` falls at every tick of the release run. The two curl sources are one
+exact child, the cost `l q_1/(1+q_2)`. The price: the response ratio is forced up to a constant,
+so the fuel, the match and the leakage sit in the boundary's response (its matter), not in a child.
+
+**(T2b) Protection by mass-action binding** `A + B <-> C`, the complex not leaking. The other
+terms are apportioned so that the totals obey Codex's equations with the true free amount.
+- At fast binding (`k_on = 20`, `K = 1`) the candidate establishes and persists, at
+  `q_1 = 1.717` against Codex's 1.788.
+- Release fails below `K_* = 0.323`.
+- At slow binding (`k_on = 0.1`) it establishes in the pore (1.863) and is lost on release.
+- The `(A, C)` separability ratio moves from 0.823 to 3.354 as `B` goes from 1 to 4, so this
+  chemistry has no species-box potential. T1b's potential belongs to the two-coordinate
+  reduction.
+
+**Stage B** (the same file, now 14 tests, one of them a strict xfail that keeps a refuted
+prediction on the record; predictions fixed before the construction).
+
+(T3) The match is a distance: the substrate drifts at 0.005 per unit time, and the match is the
+kernel between placements. The fold's closed form is `d_* = 0.722` (`kappa_* = 0.770`).
+- *Held.* Collapse at 0.812, inside the predicted `[d_*, d_* + 0.1]`.
+- *Refuted.* The prediction that the run tracks the upper branch within 0.02 failed. The run
+  lags above the branch, by 0.042 at `d_* - 0.05`, and the lag grows toward the fold because
+  the relaxation rate vanishes there.
+- *Forced, not a finding.* Drifting back does not restore it.
+
+(T4) Two variants share the boundary, with matches 1 and 0.9.
+- Under crowding loss on held fuel, the worse match is excluded at the closed-form rate:
+  measured slope -0.3005 against -0.3.
+- Under self-limiting loss on held fuel, both coexist, and the better variant ends higher with
+  its partner than alone (1.883 against 1.788).
+- On a fed fuel, the worse match is lost first, below supply 3.587 against the better one's
+  1.666. At supply 7.17, where both persist, the better variant ends lower with its partner
+  than alone (0.468 against 0.639): the competition for fuel outweighs the shared boundary.
+  That last one was a guess, and it held.
+
+Which of these a run shows depends on the saturating loss, a choice the book's chemistry does not
+settle.
+
+**What it is not.** It does not validate any chemistry.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
