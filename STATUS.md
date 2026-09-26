@@ -539,6 +539,110 @@ yet uses the asymmetry; any result that changes under the swap will show it here
 are analytic theorems about these chains, not consequences of the construction. The
 symmetry-restoring quotient of `rand` is not implemented.
 
+### 3.13 The collective, and dispersal
+
+`arrangements/collective.py` builds, once, what four earlier tests each built by hand: many
+parts on one spatial-attention parent, placements moved by the parent's integrator, with the
+kernel weights and the message sent onward as instruments. The choices that decided those
+runs -- total or mean cost, target, kernel scale, the placements' integrator and mobility --
+are required arguments. `tests/test_dispersal.py` (5 tests; predictions fixed first) asks
+whether a part driven out of the collective comes back.
+
+**What held.** (1) The onward message returns to its target whenever the other parts can
+supply it. (2) The configuration does not: a small outward displacement of one of `n` parts
+at a common equilibrium is recovered by that part only in the fraction `1/n` (measured
+0.4927, 0.3267, 0.1951, 0.1215 at `n` = 2, 3, 5, 8), each other part moves `delta/n` inward,
+and nothing further happens in another 20,000 steps. This is a theorem in the linear regime
+and is built into the total cost: its minima form an `(n-1)`-dimensional family, and descent
+removes only the displacement's projection on the one direction the cost sees. The run shows
+the nonlinear kernel and the discrete step keep it. (3) A part displaced to distance 3 is
+called back when the rest cannot cover the target (`n = 2`, target 1.5) and stays at 2.992
+for 100,000 steps when they can (`n = 3`). (4) A collective displaced whole returns, in a time
+set by distance and not by count (2244, 2230, 2232 steps at distance 4 for `n` = 1, 2, 4; the
+lone-part quadrature gives 2215), growing like `exp(d^2 / 2 tau)`.
+
+**With momentum.** `tests/test_dispersal_momentum.py` (4 tests; predictions fixed first) runs
+the same collective under the phase and damped integrators, a part *pushed* by an initial
+momentum. The cost's Hessian at a common equilibrium has rank one, so the push splits into a
+spring (the total) and free directions carrying the fraction `1 - 1/n` of its energy. (5)
+Undamped, each part's momentum averages to its free share (0.6744 of the push for the pushed
+part at `n = 3`, against 2/3): that energy never comes back to the spring. (6) Damped, the
+free share coasts `mu xi_0 / c` and stops, and the configuration lands where predicted to three
+digits with the message at target. (7) Undamped, at target 1.5 and push 0.05, three parts
+lose the pushed one (past distance 5 by step 190, at 109 by step 5000) and two never do (at
+most 1.09 in 100,000 steps): the other part reaches the kernel's peak and turns it back.
+
+**With noise.** `tests/test_scattering.py` (2 tests; predictions fixed first) puts
+`rand.kicked_configuration` on the parent, kicks of `+-0.05` on every placement each step,
+and runs many seeds in one `vmap`. (8) With the need present, 82% of three-part runs lose a
+part in 20,000 steps and no two-part run lets a part past 1.32: noise does what a push does,
+and redundancy decides. (9) With the parent's cost removed, each placement is a simple random
+walk, and the fraction back in reach matches the exact binomial at `t` = 10^2 .. 10^5. The
+prediction that it falls by `sqrt(10)` from `10^3` to `10^4` was refuted (2.15): the walk's
+spread was still inside the reach. From `10^4` to `10^5` it falls by 3.31. A scattered part on
+a line comes back, ever more rarely; nothing here says what happens in more dimensions, where
+the walk is transient.
+
+**What this does not establish.** The Gaussian kernel and the cost on a total are choices, and (2) follows from the second; a cost
+that saw each part separately would call every part back. "Redundancy makes dispersal
+irrecoverable" is what this model shows, not what collectives in general do.
+
+### 3.15 A candidate beginning of a reader, as a composite
+
+`tests/test_reader_origin.py` (stage A: 9 tests). The candidate and its one-box ODE are
+Codex's (book repository, `notes/reader-origin-model.md`): a catalytic apparatus `q_1` whose
+activity on held fuel rebuilds it and makes a boundary `q_2` that cuts its leak; a pore lets it
+establish, the boundary lets it persist after. The design is `notes/reader-origin-arr.md` there.
+Predictions were written in the docstring before any construction; all held.
+
+**Reproductions.** The composite (species boxes, held supplies, one stateless transition box per
+term, a routing wire) ticks as Codex's Euler step to 1e-14 and recovers his table. `d omega` equals
+his formula and comes from exactly two children, boundary production and the protected leak.
+Release works as a substitution of the pore child.
+
+**(T1b) The field is a descent after all.** Derived by hand, then checked: on the open quadrant
+the field is `-G grad U`, with the diagonal response `G = h diag(q_1, (k_b kappa F / l)(1+q_2)^2)`
+and an explicit `U`. The structured composite (exact children, those responses) ticks with the
+direct one to 1e-13, and `U` falls at every tick of the release run. The two curl sources are one
+exact child, the cost `l q_1/(1+q_2)`. The price: the response ratio is forced up to a constant,
+so the fuel, the match and the leakage sit in the boundary's response (its matter), not in a child.
+
+**(T2b) Protection by mass-action binding** `A + B <-> C`, the complex not leaking. The other
+terms are apportioned so that the totals obey Codex's equations with the true free amount.
+- At fast binding (`k_on = 20`, `K = 1`) the candidate establishes and persists, at
+  `q_1 = 1.717` against Codex's 1.788.
+- Release fails below `K_* = 0.323`.
+- At slow binding (`k_on = 0.1`) it establishes in the pore (1.863) and is lost on release.
+- The `(A, C)` separability ratio moves from 0.823 to 3.354 as `B` goes from 1 to 4, so this
+  chemistry has no species-box potential. T1b's potential belongs to the two-coordinate
+  reduction.
+
+**Stage B** (the same file, now 14 tests, one of them a strict xfail that keeps a refuted
+prediction on the record; predictions fixed before the construction).
+
+(T3) The match is a distance: the substrate drifts at 0.005 per unit time, and the match is the
+kernel between placements. The fold's closed form is `d_* = 0.722` (`kappa_* = 0.770`).
+- *Held.* Collapse at 0.812, inside the predicted `[d_*, d_* + 0.1]`.
+- *Refuted.* The prediction that the run tracks the upper branch within 0.02 failed. The run
+  lags above the branch, by 0.042 at `d_* - 0.05`, and the lag grows toward the fold because
+  the relaxation rate vanishes there.
+- *Forced, not a finding.* Drifting back does not restore it.
+
+(T4) Two variants share the boundary, with matches 1 and 0.9.
+- Under crowding loss on held fuel, the worse match is excluded at the closed-form rate:
+  measured slope -0.3005 against -0.3.
+- Under self-limiting loss on held fuel, both coexist, and the better variant ends higher with
+  its partner than alone (1.883 against 1.788).
+- On a fed fuel, the worse match is lost first, below supply 3.587 against the better one's
+  1.666. At supply 7.17, where both persist, the better variant ends lower with its partner
+  than alone (0.468 against 0.639): the competition for fuel outweighs the shared boundary.
+  That last one was a guess, and it held.
+
+Which of these a run shows depends on the saturating loss, a choice the book's chemistry does not
+settle.
+
+**What it is not.** It does not validate any chemistry.
+
 ### 3.16 A passing note and a sustained note
 
 `tests/test_sustained_note.py` (7 tests). The book's claim (plan §4.1 step 11, David's "i love
@@ -605,61 +709,30 @@ threshold is between 800 and 1000.
 **What it is not.** The members and the slower reader are not composed in the library; the
 slower reader reads the members' mean as its exterior input. One-dimensional readers throughout.
 
-### 3.15 A candidate beginning of a reader, as a composite
+### 3.14 The cascade: a fund that pays its parts, and how deep a shock runs
 
-`tests/test_reader_origin.py` (stage A: 9 tests). The candidate and its one-box ODE are
-Codex's (book repository, `notes/reader-origin-model.md`): a catalytic apparatus `q_1` whose
-activity on held fuel rebuilds it and makes a boundary `q_2` that cuts its leak; a pore lets it
-establish, the boundary lets it persist after. The design is `notes/reader-origin-arr.md` there.
-Predictions were written in the docstring before any construction; all held.
+`arrangements/cascade.py` (workers, sources, a fund layer that wraps a collective into a unit,
+a market) and `tests/test_cascade.py` (5 tests; predictions fixed first, results recorded in
+its docstring). Two channels, supply and product; a fund with an overhead and a leak.
 
-**Reproductions.** The composite (species boxes, held supplies, one stateless transition box per
-term, a routing wire) ticks as Codex's Euler step to 1e-14 and recovers his table. `d omega` equals
-his formula and comes from exactly two children, boundary production and the protected leak.
-Release works as a substitution of the pore child.
+**Retroactivity, found in building.** Under exact composition a fund that pays by a gate on
+its balance is not a record: the workers' want is pulled back through the wage wire onto the
+balance, `g'(f)(alpha sum kappa a + beta sum kappa)`, and props it up (the threshold rises from
+20.22 to 21.78). The runs use a one-way wire that cancels that term exactly, read off the
+collective's onward message; the composite is then non-exact. Which one an account is, is a
+modeling choice this construction forces into the open.
 
-**(T1b) The field is a descent after all.** Derived by hand, then checked: on the open quadrant
-the field is `-G grad U`, with the diagonal response `G = h diag(q_1, (k_b kappa F / l)(1+q_2)^2)`
-and an explicit `U`. The structured composite (exact children, those responses) ticks with the
-direct one to 1e-13, and `U` falls at every tick of the release run. The two curl sources are one
-exact child, the cost `l q_1/(1+q_2)`. The price: the response ratio is forced up to a constant,
-so the fuel, the match and the leakage sit in the boundary's response (its matter), not in a child.
+**What held.** One level: a threshold, below which every worker stays and above which the fund
+collapses and the workers leave for the source (all-or-none, but by symmetry, so untested);
+with no source they fade in place. The threshold rises with the number of workers only through
+the balance, not the margin. Nested to depth 4: a permanent cut runs to every depth; a shock
+that stops the top's wage runs to every depth through funds without reserves and is absorbed
+by the first level with them. **Refuted in part:** a moderate shock is attenuated level by level
+even through fast funds, so depth depends on the shock's duration against the funds' response.
 
-**(T2b) Protection by mass-action binding** `A + B <-> C`, the complex not leaking. The other
-terms are apportioned so that the totals obey Codex's equations with the true free amount.
-- At fast binding (`k_on = 20`, `K = 1`) the candidate establishes and persists, at
-  `q_1 = 1.717` against Codex's 1.788.
-- Release fails below `K_* = 0.323`.
-- At slow binding (`k_on = 0.1`) it establishes in the pore (1.863) and is lost on release.
-- The `(A, C)` separability ratio moves from 0.823 to 3.354 as `B` goes from 1 to 4, so this
-  chemistry has no species-box potential. T1b's potential belongs to the two-coordinate
-  reduction.
-
-**Stage B** (the same file, now 14 tests, one of them a strict xfail that keeps a refuted
-prediction on the record; predictions fixed before the construction).
-
-(T3) The match is a distance: the substrate drifts at 0.005 per unit time, and the match is the
-kernel between placements. The fold's closed form is `d_* = 0.722` (`kappa_* = 0.770`).
-- *Held.* Collapse at 0.812, inside the predicted `[d_*, d_* + 0.1]`.
-- *Refuted.* The prediction that the run tracks the upper branch within 0.02 failed. The run
-  lags above the branch, by 0.042 at `d_* - 0.05`, and the lag grows toward the fold because
-  the relaxation rate vanishes there.
-- *Forced, not a finding.* Drifting back does not restore it.
-
-(T4) Two variants share the boundary, with matches 1 and 0.9.
-- Under crowding loss on held fuel, the worse match is excluded at the closed-form rate:
-  measured slope -0.3005 against -0.3.
-- Under self-limiting loss on held fuel, both coexist, and the better variant ends higher with
-  its partner than alone (1.883 against 1.788).
-- On a fed fuel, the worse match is lost first, below supply 3.587 against the better one's
-  1.666. At supply 7.17, where both persist, the better variant ends lower with its partner
-  than alone (0.468 against 0.639): the competition for fuel outweighs the shared boundary.
-  That last one was a guess, and it held.
-
-Which of these a run shows depends on the saturating loss, a choice the book's chemistry does not
-settle.
-
-**What it is not.** It does not validate any chemistry.
+**What this does not establish.** Every threshold here exists because an overhead was put in;
+the gate's shape, the leak, the two channels, and the geometry of the source are choices.
+Workers are identical, so nothing here says how a heterogeneous collective comes apart.
 
 ## 4. Where the mathematics is written down
 
