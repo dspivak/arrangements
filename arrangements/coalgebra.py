@@ -78,8 +78,10 @@ class CotCoalg:
         Base ``Q x Q'``, state ``S x S'`` (a pair), and the product coalgebra
         induced by ``cot(Q x Q') ~= cot(Q) (x) cot(Q')``: the position is the
         concatenation, and a covector on ``Q x Q'`` is split and handed to each
-        factor's ``step``.
+        factor's ``step``. A stochastic ``other`` (rand.py) lifts ``self`` instead.
         """
+        if hasattr(other, "rtensor"):
+            return other.rtensor(self)
         n = self.Q_dim
 
         def position(s):

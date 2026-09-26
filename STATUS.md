@@ -496,6 +496,49 @@ charged for being wrong in either direction, not for being unprofitable. And the
 exogenous by construction -- which is the honest version of the one-wayness, since an insurer does
 not cause fires.
 
+### 3.12 Randomness: two random-variable polynomials and their samplers
+
+`arrangements/rand.py`, `tests/test_rand.py` (7 tests). Before this module nothing in the
+library was random except seeded draws of initial states, weights and data.
+
+**What it builds.** Two polynomials, each a `tri`-monad (`bind`) and a non-commutative
+`(x)`-monoid (`tensor`, independent product): `rand = sum_n Delta_n y^{underline n}`, finite
+random variables (`FiniteRV`), and `rand_G = sum_n y^{R^n}`, random variables on a standard
+normal seed (`GaussianRV`). The second is the reason Gaussian noise needs no separate
+semantics: a polynomial of Gaussian *laws* is not closed under mixture or nonlinear
+pushforward, but random variables on a Gaussian seed are, and concatenation of seeds is their
+monad and their independent product. The measure sits on the directions, not the positions.
+A stochastic parameter `CotCoalgR` returns a random variable over next states; it tensors
+with ordinary parameters by the unit, so `wiring.py` composes stochastic arrangements
+unchanged and `Phi` of one is the stochastic dynamics functor, its state update a random
+variable. A `Sampler` is a `[rand, y]`-coalgebra; `seeded` pairs it with a stochastic
+parameter into an ordinary `CotCoalg` on the product of states. The two kinds do not mix in
+one tensor (the mixed polynomial `sum Delta_n y^{underline n x R^k}` is not built).
+
+**What the tests are evidence of.** Strong, by closed form and by independent computations
+agreeing: the finite law of four kicked steps computed by the monad's `bind` through `Phi`,
+by the seeded arrangement run on all 81 replayed index sequences and weighted, and by the
+closed form, agree to 1e-12, so the pairing is the monad's iteration on this instance; the
+Gaussian law of six Euler--Maruyama steps by `bind` is affine in the seed and its mean and
+covariance equal the closed form to 1e-14; a replayed seed gives the bound random variable's
+value exactly. Statistical: a 40,000-step pseudo-random run has the discrete chain's
+stationary variance `(T/a)/(1 - eta a/2)` within 4%, a third above the Gibbs variance `T/a`,
+so `euler_maruyama` samples the chain, not the Gibbs law; the bias is the step's, exact for a
+quadratic cost. Whether the key sampler's stream is distributed as demanded is JAX's, not
+checked here beyond that run.
+
+**The asymmetry, located.** `A (x) B` and `B (x) A` have the same law (checked exactly on
+three steps). What the order decides is which part of one shared sample each box reads, so on
+one shared seed a box's path depends on its position in the product; seeded box by box it
+does not. How much depends on the sampler: the key sampler inverts one uniform through the
+cumulative product weights, so in the test's pair the order changes A's draw only on a band
+of probability 0.1 per step, and a 12-step run happened to show no difference at all. Nothing
+yet uses the asymmetry; any result that changes under the swap will show it here first.
+
+**Not established.** Langevin stationary laws, escape rates, and the continuous-time limit
+are analytic theorems about these chains, not consequences of the construction. The
+symmetry-restoring quotient of `rand` is not implemented.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

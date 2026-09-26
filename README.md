@@ -123,6 +123,7 @@ things from it worth knowing before you trust a number:
 | module | role |
 |---|---|
 | `coalgebra.py` | `cot(Q)`-coalgebras (parameters, integrators): `CotCoalg`, `configuration`, `phase`, `tensor` |
+| `rand.py` | randomness: finite and Gaussian random variables, stochastic integrators, samplers, `seeded` |
 | `rvect.py` | reactive vector spaces (the response `sharp`), as constructor inputs |
 | `arrangement.py` | an arrangement, plus `exact` and `zero_form` |
 | `polynomial.py`, `pc.py` | polynomials and `[p,q]`-coalgebras (Moore form) |
