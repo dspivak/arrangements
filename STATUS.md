@@ -734,6 +734,120 @@ even through fast funds, so depth depends on the shock's duration against the fu
 the gate's shape, the leak, the two channels, and the geometry of the source are choices.
 Workers are identical, so nothing here says how a heterogeneous collective comes apart.
 
+### 3.18 An account restores the push, as data
+
+`arrangements/account.py` (the cascade's one level with a third channel, a report) and
+`tests/test_account.py` (5 tests; predictions fixed first, results in its docstring). Four workers
+with differing `(alpha_j, beta_j)`, each sending forward `alpha_j a_j + beta_j`, its want per unit
+of supply.
+
+**A one-way wire that knows nothing of its workers.** The cascade's `record` wire subtracted the
+pullback using the workers' constants. `wire="oneway"` instead applies `stop_gradient` to the
+balance in the fund's sending map, so composition (`jax.vjp`) carries nothing back; the two agree
+to 4e-15 on identical workers.
+
+**What held, and why it had to.** A fund that reads the reports and adds `g'(f) sum kappa r` to
+its flow reproduces the exact composite to 4e-15 through a shock. That is the chain rule (a
+pullback is the sender's derivative applied to each receiver's own covector), so it shows only
+that a worker can compute the report alone. Acting on the report so creates money: the exact fund
+survives a drain the one-way fund does not (thresholds 21.77 and 20.22) because its workers' need
+adds about 1.27 to its balance in the twenty steps after the shock; the one-way fund started from
+the exact fund's equilibrium still collapses. One clause of the money prediction was ill-posed
+and is marked so in the test.
+
+**What this does not establish.** Anything about what a fund that conserves money should do with
+a report. And the report's parameter cannot be learned by descent inside the composite: with a
+report `theta (alpha a + beta)`, the composite's forcing on `theta` is exactly 0 under either wire,
+even with a cost on unmet need, because nothing reads the report with a push.
+
+**Stage (b), no report: a want that levels off at a need** (`needful_worker`; tests 23–25). With a
+solvent fund, the workers the wage overpays back away from it, the least needy farthest, and the
+underpaid stand together; nobody leaves at any cap tried. Under a drain the two neediest leave at
+once. Linear workers are not strictly all-or-none: a passing shock catches the one with the largest
+standing want first, since want sets speed. Two of the three predictions were refuted and the third
+was ill-posed (a standing want cannot match balances); its after-the-fact version, matched by wage
+cap, has the needful collective's threshold 4% higher. So placement shows a fund whom it overpays,
+not whom it underpays.
+
+### 3.19 The ratchet: shock, disperse, re-form, shock again
+
+`tests/test_ratchet.py` (6 tests; predictions R1-R7 fixed in its docstring before any construction
+code) on `cascade.py` unchanged -- this one adds no mechanism. A collapsed fund is dead and stays
+dead, so re-forming comes from outside: an injection into the fund, or the source's offer falling
+for a while.
+
+**The placement law, by hand and checked.** A part's placement ascends the supply it receives,
+`h_1(p) = g kappa(p) + s kappa(p - d)`, and its amplitude enters only as a positive rate, so the
+stationary placements are exactly the stationary points of `h_1`, independent of the amplitude and
+of the other parts. With `rho = g/s` the landscape is bistable for `phi_min < rho < phi_max`, whose
+closed forms come from the roots of `p(d - p) = tau`.
+
+**What held.** The two critical wages are `phi_min s` and `phi_max s` to five decimals, in two
+geometries, and are the same for one part and for four: no part calls another back. With the wage
+capped at the outside offer no injection re-forms anything, and the money drains away. When every
+part returns, the re-formed collective *is* the original -- balance, placements, amplitudes and the
+second break threshold all identical. A part left out is not gone: it still sends product in from
+where it stands.
+
+**Refuted.** The critical injection is 89.5% above the quasi-static landscape value, because the
+balance decays while the parts walk: the wage must be high enough *for long enough* (at 2.5 times
+the walking speed it drops from 38.86 to 27.88). And there is no band of injections that re-forms a
+collective short a part, however unequal the walking speeds: at that wage cap a survivor of any size
+pays above `phi_max s`, so the first ones home hold the door open and a part twenty times slower
+still walks in. Where a survivor cannot pay it, a finite window does give the band.
+
+**What it leaves.** Membership, and only where the door closes: the collective re-formed short one
+part breaks at a third of the original shock and has no buffer left -- a scar, never a ratchet.
+
+**Found while building.** At a wage cap of 4 the placement update at the cascade run's mobility 0.1
+is unstable, a 2-cycle -0.361 <-> +0.413 that reads as two equilibria; every equilibrium reported
+here is guarded by `one_step_move`, the largest coordinate change in one further step.
+
+**What this does not establish, and it is what the question was about.** Anything about a
+collective whose parts hold each other: here every part is supplied by the fund and by the
+elsewhere, never by another part, so the parts depend on one another only through the paymaster.
+The same cycle on a collective whose parts supply each other is the book plan's P21 stage (b).
+Nor anything stochastic: this is all deterministic descent, so "the door closes" means a basin
+boundary, not a probability.
+
+### 3.20 Pain: a tracked probability of coming apart, and what it pulls in (stage a)
+
+`arrangements/pain.py` (the cascade's one level on three channels, supply, product and pain) and
+`tests/test_pain.py` (7 tests; predictions a1-a7 fixed in its docstring before any construction
+code, results there). A worker splits its effort between product and learning; its skill multiplies
+its product and decays without upkeep. The fund carries a second coordinate, a lagged fixed reading
+`phi(f)` of its own balance, and sends it down; a worker reads it through `stop_gradient` (the pain
+wire is one-way) and moves its learning share toward `logit(0.3) - Lambda h_3`. Shocks are
+`rand.kicked_configuration` drains of the balance, the same seed giving the same shock times with
+pain and without. A whole has come apart when its workers' mean placement passes 1.25.
+
+**What held.** Pain shortens the window in which a second drain brings a young whole apart, 205
+steps to 36. Under repeated drains set on the pain-free whole alone, pain lowers the fraction coming
+apart from 68% to 38% and nearly doubles the skill still in reach at the end, since a whole that
+comes apart keeps almost none (by the kernel, not by a rule). Where drains cannot bring it apart,
+pain costs 0.1% of growth: a growing whole's balance soon leaves the range where they hurt. A
+permanent cut the pain-free young whole cannot survive (from 24%) it survives with pain (to 40%).
+
+**Two costs of pain.** Cuts of 38-40% leave a young whole together in lasting pain, a
+fixed point with no learning; with pain that pulls in less steeply (`Lambda = 3, 5`) the same cuts
+survive and learning resumes, and the survival edge (41%) is the same. And a grown whole with pain
+comes apart under cuts of 52-54% that the pain-free whole survives, 18,000-31,000 steps later, as
+the stopped learning decays and the income it paid for goes with it; less steep pain (`Lambda = 3`)
+narrows that band to 53-54% but does not remove it.
+
+**Refuted.** Pain buys more of the moment than predicted: the single-drain threshold rises 13%, not
+under 10%, partly because `phi` reads 0.004 at rest and a whole with pain rests at a higher balance.
+The band where pain brings apart a grown whole is 0.03 of cut wide, not 0.05.
+
+**Tracking.** From the same balance, 80% of young wholes come apart within 1,000 steps and 5.5% of
+grown ones; `phi` reads both 0.92. A reading of the balance alone is calibrated for the whole it
+was set for and overstates a grown whole's danger seventeen-fold.
+
+**What this does not establish.** Anything about a reserve or the combination with learning
+(stage b). Any claim that pain's reading is learned: `phi` is fixed, and a whole cannot learn its
+own probability of coming apart from its own life, since it comes apart once. And every number
+rests on chosen rates (learning, forgetting, pain's lag and steepness).
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
