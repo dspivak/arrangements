@@ -909,7 +909,7 @@ supply at a place, which is what makes dispersal possible at all here; the model
 houses and nothing sunk, so its collective is attached to its members and to supply, never to a
 place.
 
-### 3.21 Pain, stage b: a reserve in the fund, and the combination with learning
+### 3.22 Pain, stage b: a reserve in the fund, and the combination with learning
 
 `tests/test_pain_reserve.py` (8 tests; predictions b0-b6 fixed in its docstring before any
 construction code, results there), adding to `arrangements/pain.py` behind defaults that leave stage

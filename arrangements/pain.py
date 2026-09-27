@@ -18,6 +18,19 @@ supply, product, pain. A message is ``(h_1, h_2, h_3, w)``.
   ``shocks = (q, S)`` makes its parameter ``rand.kicked_configuration``: the balance drained by
   ``S`` with probability ``q`` a step.
 * ``market``: closes the whole, paying ``r`` times its product on channel 1.
+
+Stage (b) (``tests/test_pain_reserve.py``) adds, each behind a default that leaves stage (a)
+unchanged:
+
+* ``worker(drive="level")``: the learning share moves toward ``s0 (1 - h_3)``, so the share pain
+  pulls in is its level (David, 2026-09-26: "the level of pain is exactly how distracting … it
+  is"); ``theta* = logit(s0 (1 - h_3))``, ``h_3`` clipped below 1.
+* ``fund_layer(reserve=dict(eps, k, leak, control))``: a third coordinate ``rho``. A share
+  ``eps (1 - pi)`` of income goes to the reserve instead of the balance; the reserve is drawn into
+  the balance at ``k pi rho`` (``control``: ``k rho sigmoid(-f / 0.25)``, only once the balance is
+  gone) and leaks at ``leak rho``.
+* ``fund_layer(floor=f0)``: pain reads ``max(0, phi(f) - phi(f0)) / (1 - phi(f0))``, zero on a good
+  day (David, 2026-09-27: "no pain in the distracting sense").
 """
 
 from __future__ import annotations
@@ -50,14 +63,19 @@ def logit(p: float) -> float:
 
 def worker(*, alpha: float, b: float, beta: float, mu_a: float, mu_theta: float, eta: float,
            delta: float, s0: float, Lam: float, a0: float = 0.8, sigma0: float = 0.0,
-           label: str = "w") -> Part:
+           drive: str = "steep", label: str = "w") -> Part:
     """A worker that learns with share ``sigmoid(theta)`` and reads pain (module docstring)."""
     theta0 = logit(s0)
 
     def cost(q, e):
         a, th = q[0], q[1]
         h3 = jax.lax.stop_gradient(e[PAIN])
-        return 0.5 * b * a ** 2 - (alpha * a + beta) * e[SUPPLY] + 0.5 * (th - theta0 + Lam * h3) ** 2
+        if drive == "level":
+            p = s0 * (1.0 - jnp.clip(h3, 0.0, 1.0 - 1e-4))
+            target = jnp.log(p) - jnp.log1p(-p)
+        else:
+            target = theta0 - Lam * h3
+        return 0.5 * b * a ** 2 - (alpha * a + beta) * e[SUPPLY] + 0.5 * (th - target) ** 2
 
     dk = exact(lambda q, m, n: -cost(q, n))
 
@@ -91,22 +109,38 @@ def phi(f, f_half: float, width: float):
 
 def fund_layer(f0: float, *, mu: float, wmax: float, K: float, c0: float, leak: float,
                k_pi: float, f_half: float, width: float, shocks: Optional[tuple] = None,
+               reserve: Optional[dict] = None, floor: Optional[float] = None,
                label: str = "fund") -> Arrangement:
-    """The fund box ``B -> B`` with its pain coordinate (module docstring)."""
+    """The fund box ``B -> B`` with its pain coordinate, and with ``reserve`` its reserve
+    (module docstring)."""
 
     def xi(q, m_C, e_out):
         f, pi = q[0], q[1]
-        flow_f = e_out[SUPPLY] - gate(f, wmax, K) * m_C[WEIGHT] - c0 - leak * f
-        flow_pi = k_pi * (phi(f, f_half, width) - pi)
-        return (jnp.array([flow_f, flow_pi]), jnp.zeros(MDIM3), jnp.zeros(EDIM3))
+        income = e_out[SUPPLY]
+        flow_f = income - gate(f, wmax, K) * m_C[WEIGHT] - c0 - leak * f
+        reading = phi(f, f_half, width)
+        if floor is not None:
+            p0 = phi(floor, f_half, width)
+            reading = jnp.maximum(0.0, reading - p0) / (1.0 - p0)
+        flow_pi = k_pi * (reading - pi)
+        if reserve is None:
+            return (jnp.array([flow_f, flow_pi]), jnp.zeros(MDIM3), jnp.zeros(EDIM3))
+        rho = q[2]
+        put = reserve["eps"] * (1.0 - pi) * income
+        when = jax.nn.sigmoid(-f / 0.25) if reserve.get("control", False) else pi
+        draw = reserve["k"] * when * rho
+        flow_rho = put - draw - reserve["leak"] * rho
+        return (jnp.array([flow_f - put + draw, flow_pi, flow_rho]), jnp.zeros(MDIM3),
+                jnp.zeros(EDIM3))
 
-    Q = constant(jnp.diag(jnp.array([mu, 1.0])))
-    init = jnp.array([float(f0), 0.0])
+    d = 2 if reserve is None else 3
+    Q = constant(jnp.diag(jnp.array([mu, 1.0, mu][:d])))
+    init = jnp.array([float(f0), 0.0, 0.0][:d])
     if shocks is None:
         P = configuration(Q, init=init)
     else:
         q, S = shocks
-        P = kicked_configuration(Q, [1.0 - q, q], [[0.0, 0.0], [-S, 0.0]], init=init)
+        P = kicked_configuration(Q, [1.0 - q, q], [[0.0] * d, [-S] + [0.0] * (d - 1)], init=init)
     return Arrangement(
         P=P, in_dim_M=EDIM3, out_dim_M=MDIM3, in_dim_N=EDIM3, out_dim_N=MDIM3,
         out_f=lambda q, m_C: message(jnp.array([0.0, m_C[PRODUCT], 0.0]), 1.0),
@@ -136,19 +170,25 @@ class Whole:
     arr: Arrangement
     n: int              # workers
     unit: Arrangement = None
+    fund_dim: int = 2   # (f, pi), or (f, pi, rho) with a reserve
 
     def closed(self, r) -> Arrangement:
         return compose_seq(self.unit, market(r))
 
     def read(self, q) -> dict:
-        """``{'a', 'theta', 'sigma', 'placements', 'kappa', 'f', 'pi'}`` at ``q``. Layout: the
-        workers' ``(a, theta, sigma)``, then the parent's placements (workers, then the source)
-        and value maps, then the fund's ``(f, pi)``."""
+        """``{'a', 'theta', 'sigma', 'placements', 'kappa', 'f', 'pi'}`` at ``q``, and
+        ``'rho'`` with a reserve. Layout: the workers' ``(a, theta, sigma)``, then the parent's
+        placements (workers, then the source) and value maps, then the fund's ``(f, pi)`` or
+        ``(f, pi, rho)``."""
         q = jnp.asarray(q)
         W = q[:3 * self.n].reshape(self.n, 3)
         pos = q[3 * self.n:3 * self.n + self.n]
-        return {"a": W[:, 0], "theta": W[:, 1], "sigma": W[:, 2], "placements": pos,
-                "kappa": jnp.exp(-pos ** 2 / (2 * TAU)), "f": q[-2], "pi": q[-1]}
+        fd = q[len(q) - self.fund_dim:]
+        out = {"a": W[:, 0], "theta": W[:, 1], "sigma": W[:, 2], "placements": pos,
+               "kappa": jnp.exp(-pos ** 2 / (2 * TAU)), "f": fd[0], "pi": fd[1]}
+        if self.fund_dim == 3:
+            out["rho"] = fd[2]
+        return out
 
 
 TAU = 0.8
@@ -164,7 +204,7 @@ def whole(workers, *, fund: dict, r: float, src: Part, src_position: float = 2.5
                    integrator=lambda Q, init: configuration(Q, init=init),
                    mobility=[mobility] * n + [0.0], value_mobility=0.0, dim_H=DH3, label="whole")
     u = compose_seq(C.arr, fund_layer(**fund))
-    return Whole(compose_seq(u, market(r)), n, u)
+    return Whole(compose_seq(u, market(r)), n, u, 2 if fund.get("reserve") is None else 3)
 
 
 def closed_step(arr: Arrangement):
