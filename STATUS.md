@@ -820,7 +820,7 @@ boundary, not a probability.
 ### 3.20 Pain: a tracked probability of coming apart, and what it pulls in (stage a)
 
 `arrangements/pain.py` (the cascade's one level on three channels, supply, product and pain) and
-`tests/test_pain.py` (7 tests; predictions a1-a7 fixed in its docstring before any construction
+`tests/test_pain.py` (8 tests; predictions a1-a7 fixed in its docstring before any construction
 code, results there). A worker splits its effort between product and learning; its skill multiplies
 its product and decays without upkeep. The fund carries a second coordinate, a lagged fixed reading
 `phi(f)` of its own balance, and sends it down; a worker reads it through `stop_gradient` (the pain
@@ -854,6 +854,91 @@ was set for and overstates a grown whole's danger seventeen-fold.
 (stage b). Any claim that pain's reading is learned: `phi` is fixed, and a whole cannot learn its
 own probability of coming apart from its own life, since it comes apart once. And every number
 rests on chosen rates (learning, forgetting, pain's lag and steepness).
+
+### 3.21 A collective whose parts supply each other, and what a shock can do to it
+
+`arrangements/mutual_supply.py` and `tests/test_mutual_ratchet.py` (12 tests; predictions B1-B8
+fixed in its docstring before any construction code, results there). The book plan's P21 stage
+(b): §3.13's collective and §3.14's cascade have placements and an elsewhere but no part feeds
+another, and `test_mutual_need.py` (§3.8) has mutual need but no placements. One part, `supplier`,
+puts them together -- it passes a share `sigma` of its activity on as supply and gates what it can
+do with what arrives, `I(r) = A r/(K_s + r)` -- and the spatial parent's transfers deliver it,
+since each box already receives the kernel-weighted sum of every *other* box's message. The fund is
+the cascade's, and removable.
+
+**Two things the construction taught before any prediction was tested.** Composition pulls each
+part's cost back onto what its neighbours send, so a part is driven by *their* need for its supply;
+that term is a tenth of the settled amplitude and the hand-derived law in the docstring is wrong by
+it. And because the kernel is symmetric, the whole arrangement is exact: amplitudes and placements
+ascend one potential `U = sum_j [(alpha a_j + beta) I(r_j) - (b/2) a_j^2]`, checked against the
+library's forcing at a scrambled state to 1e-9. (The cascade is not a gradient system, and §3.8's
+gated pair is not either; the symmetry of the kernel is what puts it back.)
+
+**A line between passing on and making.** A fragment of `m` parts holds a form with nothing arriving
+iff `2 A sigma (m - 1) > K_s` (critical share measured 0.06252 at `m = 3` against 0.06250). Below
+it parts can only relay what something outside supplies; above it a pair lights itself from a seed
+of 1e-12. A super-critical loop is a free lunch standing for an ambient gradient the model does not
+draw -- the same move as the cascade's market paying twice the product. Everything below is above
+the line.
+
+**What mutual supply changes is not where a collective goes but whether it can be taken apart.**
+The offer that moves the *body* is the cascade's, `g/phi_min`, measured 2.7161 against 2.7177 and
+the same for one part and for four, because what the parts pass each other travels with them. But
+one part cannot be bought out of four at any price: at offers of 10, 20, 40 and 1000 it settles at
+0.1085, 0.1835, 1.1061, 1.2951, each at the peak of `U` along its placement, relaying rather than
+leaving. Moving a group of four home costs a wage of 2.72; taking one part out of it costs 39.07.
+One part at home calls a stray back at the wage that could call nobody in §3.19.
+
+**So a shock moves this collective and does not break it.** Booms of 200 to 20,000 steps with the
+mobilities spread eightfold leave 0 or 4 at the elsewhere and never spread the four by more than
+0.024 (the control at `sigma = 0`: 2.172); when the boom ends the collective returns to its first
+equilibrium to six decimals. A split is stable only once the pieces are out of each other's reach
+(merging at `kappa = 2.0e-2`, holding at `kappa = 4.5e-5`), and nothing here produces one. The scar
+§3.19 measured is the fund's, not the collective's: the bare threshold does not depend on size,
+while the drain that kills the fund falls 32.8% when a part is missing.
+
+**What decides is a total.** Every quantity here depends on `sigma (m - 1)` and on nothing else:
+the critical share is 0.06251, 0.03127, 0.01562 at `m = 3, 5, 9`, and collectives of 3, 5 and 9
+parts passing the same total hold the identical amplitude 3.464102. Many small passes and few large
+ones are indistinguishable, which is §3.9's swappability one level up.
+
+**What this does not establish.** Anything about a collective *below* the line, where the parts
+relay rather than make (not run). Anything about needs of different kinds, or about needing a
+particular other part: `sigma` is one number (the plan's stage (c)). And the elsewhere is an ungated
+supply at a place, which is what makes dispersal possible at all here; the model has no land, no
+houses and nothing sunk, so its collective is attached to its members and to supply, never to a
+place.
+
+### 3.21 Pain, stage b: a reserve in the fund, and the combination with learning
+
+`tests/test_pain_reserve.py` (8 tests; predictions b0-b6 fixed in its docstring before any
+construction code, results there), adding to `arrangements/pain.py` behind defaults that leave stage
+a unchanged. Pain now pulls in the share of growth equal to its level (`worker(drive="level")`:
+learning share `s0 (1 - h_3)`). The fund's reserve (`fund_layer(reserve=...)`): a share
+`0.05 (1 - pi)` of income set aside, drawn into the balance at `2 pi rho`, leaking at `0.01 rho`; the
+control draws only once the balance is gone.
+
+**What held.** With the level drive, learning resumes after every permanent cut a young whole
+survives (to 41%): no trap. A stock does not answer a lasting loss: grown survival edges are 39% with
+no growth and with the reserve, 53% with learning; the reserve buys about 100 steps. Both kinds
+together share no budget and do better against drains than either (44.5% coming apart against 53.5%).
+
+**Refuted.** At stage a's drain rate every whole that does not learn comes apart; the reserve
+answers slower drains (45% against 68% at one per 1,000 steps) and raises the largest single drain
+survived from 21.5 to 30.8, but learning is ahead at every time measured (34.1 against 26.9 after
+1,000 steps). The reserve drawn only by the event beats the one drawn by pain (3% against 45%): the
+pain reading is never zero, so a proportional draw spends the reserve at rest (11.6 held against
+37.8). The combination does not remove the grown whole's cost at a 54% cut.
+
+**Pain zero on a good day** (`fund_layer(floor=15)`, after David: "no pain in the distracting
+sense" on a good day; b6). Nothing is spent at rest (both reserves hold 38.35), and the pain-drawn
+reserve beats none against slower drains (40% against 78%), but the event-drawn control still does
+better (10%): a drain brings pain near full, the proportional draw pours half the jar into a balance
+that would have recovered alone, and there it leaks ten times faster.
+
+**What this does not establish.** Which mix of the two kinds is right: they share no budget here,
+so there is no mix to choose, and with one the answer would be the rates'. Anything about a draw on a
+threshold of pain.
 
 ## 4. Where the mathematics is written down
 
