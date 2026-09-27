@@ -124,6 +124,7 @@ things from it worth knowing before you trust a number:
 |---|---|
 | `coalgebra.py` | `cot(Q)`-coalgebras (parameters, integrators): `CotCoalg`, `configuration`, `phase`, `tensor` |
 | `cascade.py` | a fund that pays its parts by a gate, nested to any depth; workers, sources, a market |
+| `account.py` | the cascade's one level with a report channel: workers who say what they want, a fund that reads it, three wires |
 | `collective.py` | many parts on one spatial-attention parent, with kernel weights and the onward message as instruments |
 | `rand.py` | randomness: finite and Gaussian random variables, stochastic integrators, samplers, `seeded` |
 | `rvect.py` | reactive vector spaces (the response `sharp`), as constructor inputs |

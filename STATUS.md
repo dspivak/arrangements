@@ -737,7 +737,7 @@ Workers are identical, so nothing here says how a heterogeneous collective comes
 ### 3.18 An account restores the push, as data
 
 `arrangements/account.py` (the cascade's one level with a third channel, a report) and
-`tests/test_account.py` (5 tests; predictions fixed first, results in its docstring). Four workers
+`tests/test_account.py` (7 tests; predictions fixed first, results in its docstring). Four workers
 with differing `(alpha_j, beta_j)`, each sending forward `alpha_j a_j + beta_j`, its want per unit
 of supply.
 
@@ -766,8 +766,15 @@ underpaid stand together; nobody leaves at any cap tried. Under a drain the two 
 once. Linear workers are not strictly all-or-none: a passing shock catches the one with the largest
 standing want first, since want sets speed. Two of the three predictions were refuted and the third
 was ill-posed (a standing want cannot match balances); its after-the-fact version, matched by wage
-cap, has the needful collective's threshold 4% higher. So placement shows a fund whom it overpays,
-not whom it underpays.
+cap, has the needful collective's threshold 4% higher. That result leaned on a mistake: the cost
+made need a target, so excess supply cost as much as shortage.
+
+**Rerun with need as a floor and the elsewhere felt** (`floor_worker`, tests 26–28). No one backs
+away; the four stand together at every cap, since a want that always rises with pay leaves every
+worker the same landscape: need sets how fast a worker moves, never where it settles. With the
+elsewhere at 1.5 the two supplies overlap into one hill and the workers drift rather than leave;
+released, the neediest reach the elsewhere first. No drain ruins the fund, because it is paid for
+product the elsewhere's supply bought, a flaw shared with `cascade.py` (book plan P24).
 
 ### 3.19 The ratchet: shock, disperse, re-form, shock again
 
