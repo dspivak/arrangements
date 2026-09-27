@@ -1,42 +1,63 @@
 #!/bin/bash
-# Run the test suite one file at a time, printing a line per file as it lands.
-#
-# The whole suite in one command takes about an hour under load, so any timeout on it is a
-# silent cut-off partway through (the book repo's AGENTS.md, "The limit is the threat, never
-# the schedule"). One file at a time finishes, and is read, well inside a limit.
-#
-#   scripts/run_tests.sh                 # every tests/test_*.py
-#   scripts/run_tests.sh 300             # with a 300s limit per file (default 540)
-#   scripts/run_tests.sh 540 tests/test_cascade.py tests/test_ratchet.py
-#
-# Prints "file  seconds  verdict" per file and a summary; exits nonzero if any file failed or
-# was cut off, and names which.
+# Run an explicitly selected batch; return to the caller between batches.
+# Inspect progress and split a slow file by pytest node ID before its limit is near.
+#   scripts/run_tests.sh --list
+#   scripts/run_tests.sh 120 tests/test_polynomial.py
+#   scripts/run_tests.sh 120 tests/test_file.py::test_name
+# Full output is streamed and saved; the exit status records any failure or cutoff.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 PY=.venv/bin/python
-LIMIT=${1:-540}
-shift || true
-FILES=("$@")
-[ ${#FILES[@]} -eq 0 ] && FILES=(tests/test_*.py)
+if [ "${1:-}" = "--list" ] && [ "$#" -eq 1 ]; then
+  printf '%s\n' tests/test_*.py
+  exit 0
+fi
+if [ "$#" -lt 2 ] || ! [[ "$1" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Usage: scripts/run_tests.sh LIMIT_SECONDS TEST_FILE_OR_NODE_ID [...]" >&2
+  echo "Use --list to choose a small batch; estimate its duration before running." >&2
+  exit 64
+fi
+LIMIT=$1
+shift
+if [ ! -x "$PY" ]; then
+  echo "Missing $PY; install the test environment first (README.md)." >&2
+  exit 1
+fi
+if ! command -v timeout >/dev/null 2>&1; then
+  echo "The timeout command is required." >&2
+  exit 1
+fi
+LOGDIR=$(mktemp -d "${TMPDIR:-/tmp}/arrangements-tests.XXXXXX") || exit 1
+printf 'Full logs: %s\n' "$LOGDIR"
 bad=()
-for f in "${FILES[@]}"; do
+index=0
+for selection in "$@"; do
+  index=$((index + 1))
+  logfile="$LOGDIR/$index.log"
   start=$(date +%s)
-  out=$(timeout "$LIMIT" $PY -m pytest "$f" -q 2>&1 | tail -3 | tr '\n' ' ')
-  code=$?
+  printf '\nSTART %s (limit %ss)\n' "$selection" "$LIMIT"
+  timeout "$LIMIT" "$PY" -u -m pytest "$selection" -v 2>&1 | tee "$logfile"
+  statuses=("${PIPESTATUS[@]}")
+  code=${statuses[0]}
   secs=$(( $(date +%s) - start ))
-  if [ $code -eq 124 ]; then
-    verdict="CUT OFF at ${LIMIT}s -- split this file with -k, or raise the limit"
-    bad+=("$f (cut off)")
-  elif [ $code -ne 0 ]; then
-    verdict="FAILED :: $out"
-    bad+=("$f (failed)")
+  if [ "${statuses[1]}" -ne 0 ]; then
+    verdict="LOG WRITE FAILED"
+    bad+=("$selection (log failure)")
+  elif [ "$code" -eq 124 ]; then
+    verdict="CUT OFF at ${LIMIT}s; split this selection before retrying"
+    bad+=("$selection (cut off)")
+  elif [ "$code" -ne 0 ]; then
+    verdict="FAILED (exit $code)"
+    bad+=("$selection (failed)")
   else
-    verdict="$(echo "$out" | grep -oE '[0-9]+ passed[^|]*' | head -1)"
+    verdict="PASSED"
   fi
-  printf '%-44s %5ds  %s\n' "$f" "$secs" "$verdict"
+  printf '%s  %ss  %s  log=%s\n' "$selection" "$secs" "$verdict" "$logfile"
+  # A failure or cutoff needs inspection before starting another selected piece.
+  [ ${#bad[@]} -ne 0 ] && break
 done
 if [ ${#bad[@]} -eq 0 ]; then
-  echo "all ${#FILES[@]} files passed"
+  printf 'All %s selected pieces passed.\n' "$index"
 else
   printf 'NOT CLEAN: %s\n' "${bad[*]}"
   exit 1

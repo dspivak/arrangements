@@ -33,6 +33,15 @@ checks the discrete analogue separately (§3.2).
 
 ## 2. What the tests are evidence of
 
+**Running and extending tests.** Follow `README.md`, “Run it”: use
+`scripts/run_tests.sh LIMIT_SECONDS TEST_FILE_OR_NODE_ID [...]` for an explicitly selected
+small batch, and read its full output before choosing the next. Use `--list` to find files.
+The runner streams progress, preserves logs, and reports a failed or cut-off piece as a failure.
+Estimate the duration first; if progress projects near the limit, stop and split the selection
+by pytest node ID. A limit is protection, not a target running time.
+`tests` is a package: import another test's helpers as `from tests import test_pain as a`
+(the pattern in `tests/test_pain_reserve.py`), not `import test_pain`.
+
 **Strong evidence: closed forms.** Where a source states a formula, a limit, or an exact
 value, the test computes it independently and compares. These are the tests to trust:
 the reciprocity lemma on the three couplers, the two-tank composite, the attention
