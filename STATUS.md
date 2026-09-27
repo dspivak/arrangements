@@ -949,6 +949,64 @@ that would have recovered alone, and there it leaks ten times faster.
 so there is no mix to choose, and with one the answer would be the rates'. Anything about a draw on a
 threshold of pain.
 
+### 3.23 Bayes' rule is a different integrator and nothing else
+
+`tests/test_bayes_integrator.py` (20 tests; the derivation and five predictions fixed in writing in
+`notes/BAYES-INTEGRATOR.md` §§1–3 and quoted in the module docstring before any construction code).
+The book plan's P25 stage (a), from David's question: is Bayesian update "the same sort of thing,
+just a different integrator?"
+
+For a likelihood in an exponential family and a belief in the conjugate family with natural
+parameter `lam` and log-partition `AA`, one observation translates the belief,
+`lam -> lam + t(x)` with `t(x) = (T(x), 1)`. The cost `k_x(lam) = E_{q_lam}[-log p(x|theta)]` is
+affine in the expectation parameter, so the **forcing** is the exact `-d k_x`, components
+`G(lam) t(x)` with `G = grad^2 AA` the Fisher information; the **response** is
+`sharp_lam = G(lam)^{-1}`, the raised inverse Fisher metric. In the library this is
+`coalgebra.configuration` on `rvect.ReactiveVectorSpace(2, lam -> inv(fisher(lam)))` with
+`arrangement.exact(-k_x)` — `learning.py`'s two constructors with one argument changed.
+
+**What held**, all five predictions. Conjugate Gaussian, unknown mean, known variance; prior
+`N(2.0, 1.5)`, `sig^2 = 0.7`, seven data. Posterior mean 0.74107142857142949 against the closed
+form's 0.7410714285714286 and variance 0.09374999999999982 against 0.09375: relative errors 1.20e-15
+and 1.92e-15, so Bayes exactly and not to first order. Batch equals sequential to 4.2e-14. Duration
+is likelihood tempering (`sharp = tau G^{-1}`, the fixed-duration specialization): one step at `tau`
+lands on `lam + tau t(x)`, and two half-steps equal one whole step. `Phi` of a composite moves the
+belief identically, to 0.
+
+**The response is what does the work.** The Euclidean response at `eta = 0.01 … 2.0` descends the
+same cost (28.03 to between 13.7 and 18.6) and lands on the wrong belief every time, and fails the
+batch-equals-sequential test. The Newton response is a different matrix
+(`[[3.214, -8.679], [-8.679, 26.679]]` against the Fisher `[[1.5, -3.0], [-3.0, 7.125]]`) and its
+step `(1.330, 0.838)` is nowhere near Bayes' `(3.190, 2.095)`.
+
+**Three findings not predicted.** (a) Bayes fits the *learner's* slot as well as Newton's: the belief
+box can report its expectation parameters `mu = grad AA(lam)` forward and force nothing, with a
+downstream likelihood box carrying the cost and pushing `t(x)` back; the pullback along the Legendre
+map is `G(lam) t(x)`, so backpropagation supplies the parameter covector, exactly as for a network.
+(b) Khan and Rue's objective (`E[lbar] - H(q)`, prior inside `lbar`) needs its entropy term to make
+the step a *replacement* of `lam`; in `arr` the prior is the integrator's initial state and the
+increment is `configuration`'s `s + sharp(xi)`, so the forcing carries only the datum's loss and no
+entropy term appears. Both give `lam^(0) + sum_i t(x_i)`; checked against their Eq. (54). (c) A Bayes
+arrangement never settles: `t(x)` is never zero and `G` is positive definite, so the forcing vanishes
+nowhere; the cost's infimum is on the boundary of `Lam`, infinite precision with the mean at the
+datum, and the orbit on a repeated datum runs to it as `1/n` without arriving.
+
+**Reasonable or weird** (the agent's judgment, not evidence). Reasonable for a cell: a log-odds
+accumulator is the standard reading of chemotactic adaptation, and its want of a set point is what a
+leak supplies — a second forcing, not another integrator. Weird for a person at long horizons: a
+thousand sightings of the same thing should not multiply precision by a thousand, and the model has
+nowhere to say the data are not independent, which is the *wiring's* fault and not the integrator's.
+Weird and informative for a market: batch equals sequential says news order does not matter, right
+for Bayes and wrong for markets, so path dependence there must come from the wiring, a non-exact
+forcing, or a state carrying more than a belief.
+
+**What this does not establish.** Nothing about non-conjugate Bayes, where the mirror-descent step
+is an approximation. Nothing about a belief over a general distribution: that is an
+infinite-dimensional configuration and needs a `cot` there (§3.1's admissible subcategory does not
+reach it). Nothing relating this to the Bayesian lens of Braithwaite–Hedges–St Clere Smithe, which is
+a lens on Markov kernels rather than on `omegalens`. Sources and locators are in
+`notes/BAYES-INTEGRATOR.md` §5.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
