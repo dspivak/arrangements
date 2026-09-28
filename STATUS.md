@@ -1007,6 +1007,197 @@ reach it). Nothing relating this to the Bayesian lens of Braithwaite–Hedges–
 a lens on Markov kernels rather than on `omegalens`. Sources and locators are in
 `notes/BAYES-INTEGRATOR.md` §5.
 
+### 3.24 Discrete choice is the same integrator, and the response supplies the normalization
+
+`tests/test_discrete_choice.py`, 28 tests, `arrangements/choice.py`; derivation, predictions fixed
+before any construction code, and verdicts in `notes/DISCRETE-CHOICE.md`. Book plan P25 stage (b),
+from David's question: does discrete choice come in "through softmax / stochasticity"?
+
+For `n` options with values `v_i` at temperature `T`, the **chooser** is the configuration
+coalgebra on the simplex with the Shahshahani response `sharp_p = dt (diag(p) - p p^T)`
+(`replicator.py`) and the **exact** forcing `d(<v,p> + T H(p))`. Its rest point is the logit
+`softmax(v/T)`, to relative error 1.5e-16 in two options and 2.7e-16 in three, and the rest point
+does not depend on the duration. At `T = 0` the step *is* the forward-Euler replicator step for the
+linear fitness `v`, agreeing with `replicator_dynamics` step for step to 5.4e-20: **choice and
+selection are the same descent at two temperatures.** So softmax is not a fourth integrator.
+
+**The normalization is the response's contribution, not the cost's.** `1^T sharp_p = dt (1 - sum p)
+p^T` is zero exactly on the simplex, which annihilates the constant part of the forcing and the
+Lagrange multiplier normalization would have introduced. The negative control shows it: the same
+cost, forcing, wiring and interface with `rvect.euclidean` settle on the *unnormalized* Gibbs
+weights `exp(v_i/T - 1)`, summing to 1.368 and 7.245 in the two examples, more than 0.5 from the
+logit.
+
+**The same distribution is one Bayes step in the Legendre-dual chart** (§3.23 on the categorical
+family). Gauge-fixed natural parameters, inverse-Fisher response, affine forcing: one step at
+duration 1 from the uniform belief lands on the logit to 8.6e-16. The gauge is needed — on all of
+`R^n` the Fisher information is singular along `1` — and that is a wrinkle the continuous conjugate
+families of §3.23 did not have. The two responses agree under the Legendre map to 2.8e-17, but the
+arrangements differ: the mean-chart jump on the affine cost linearizes softmax, missing by order
+`|t|^2` (errors 0.104, 0.030, 0.0078 at `eps = 0.5, 0.25, 0.125`), so **which chart the state lives
+in is part of the arrangement.**
+
+**A made choice is a sample, and it needs no extension of the framework.** The collapsing chooser is
+a `(cot(Q) tri rand)`-coalgebra whose branches are the constant maps onto the vertices, so it is
+inside `poly(SmSet)`; `key_sampler` gives frequencies within 0.0066 of `p` over 20000 draws
+(bound 0.0283), `FiniteRV.bind` gives the exact two-step law with no sampler, and that law equals
+the one-step law, so it is **absorbing** — a chooser that stores its choice cannot reconsider, while
+one that records it without feeding it back can. What is outside the smooth setting is `argmax`: its
+derivative in the utility gap falls 0.196612, 0.000453958, 0.0 at `T = 1, 0.1, 0.01` while the choice
+at a tie stays 0.5, so the limit is locally constant with no smooth extension across the tie.
+**The jump is not the obstruction** -- nor, it turned out, is
+determinism; see the basin half below, which withdraws that.
+
+**Two duration bounds, and the stability one is the looser.** The multiplier at the rest point is
+exactly `1 - dt*T`, so stability wants `dt*T < 2`. But what binds first is positivity of the
+transient, `dt * max_i(xibar - xi_i) < 1` at the state the jump leaves; below zero the entropy's
+`log` gives `nan`. From the uniform start at `v = (2, 0.5, -1)`, `T = 0.7` that is `dt < 2/3`,
+measured between 0.66 and 0.67, where the stability bound would have allowed `dt` up to 2.857.
+
+**The simplex is exactly invariant but not attracting** (not predicted, and the caution to carry
+away). The Jacobian's second eigenvalue, transverse to the simplex, is `1 + dt*T*(1 - log Z)` for
+`Z = sum_j exp(v_j/T)`, above 1 whenever `Z < e`. Then rounding-level sum error grows
+geometrically — 8.4e-15 at step 100 to 7.0e-5 at step 600, then `nan` — so exactness of
+`sum p = 1` holds per jump and fails over a run. Adding a constant to every `v_i` changes no choice
+and multiplies `Z`, so a model-irrelevant shift decides whether the run survives, and the shift
+repairs it. `replicator.py`'s "self-correcting" drift assumes `x^T A x > 0`; the entropy-regularized
+forcing is not of that form.
+
+**What this does not establish.** Nothing about where `v` comes from, so no reading of `v` as a
+preference. Nothing about heredity, which is P25 stage (c): the `T = 0` case is differential
+persistence under a shared supply, which §3.13 and the book's *select* already have. Nothing about a
+changing option set, `n` being fixed in `rand`'s positions and in `Q`. Nothing empirical about real
+choosers. Nothing about choice over an uncountable option set (§3.1). And nothing about a chooser
+*coupled* to what it chooses among: every arrangement here is a closed scalar with `v` fixed from
+outside.
+
+### 3.25 Choosing by basin: the same arrangement, coupled, commits with no coin
+
+Same file and note as §3.24 (52 tests together); the Part-two predictions were fixed in writing
+before any new construction code. David, 2026-09-27, on §3.24's report: "can you think of another
+way? how does nature do it? it's not basins or something?" It is, and this is the better half.
+
+§3.24 fed a **fixed** value for each option in from outside. One fixed value vector gives one rest
+point, so the only route to a discrete outcome was the external coin of `collapsing_chooser`. Let an
+option's value depend on the shares already committed -- a symmetric payoff `A` in place of the
+linear `<v,p>`, so `U(p) = (1/2) p^T A p + T H(p)` -- and the same arrangement, same Shahshahani
+response, same exact forcing, has **several stable rest points, each with a basin**, and chooses
+with no coin and no temperature. One family, two knobs: the coupling `A` and the temperature `T`.
+`A = uncoupled_payoff(v)` gives §3.24's chooser, `T = 0` gives `replicator_arrangement`, and a
+coordination `A` with small `T` gives commitment.
+
+**The basin boundary is an unstable rest point.** For two options, `A = diag(a_1, a_2)`, `T = 0`:
+`p_1* = a_2/(a_1+a_2)` with `g'(p_1*) = p_1*(1-p_1*)(a_1+a_2) > 0`. Located by bisecting the
+starting share, the outcome flips at `0.6666666667` for `a = (1,2)` and `0.8000000000` for
+`a = (1,4)`, matching to 1e-6; the rate matches to 1e-12 and each vertex is an exact fixed point.
+
+**This chooser is not an optimizer.** With payoffs 1 and 2, every start above 2/3 commits to the
+option paying **1** (564, 493, 444, 395 steps from 0.67, 0.70, 0.80, 0.95); 0.66 commits to the
+option paying 2. What decides is where it started.
+
+**Near a tie it slows; it does not jump.** The jump multiplier at the boundary is
+`1 + dt g'(p_1*) > 1`, so steps to decide is linear in `-log` of the distance from the boundary with
+slope `1/log(1 + dt g'(p_1*))`: measured 30.478 against 30.497 at `dt = 0.05` and 15.4950 against
+15.4946 at `dt = 0.1`, over distances 1e-2 to 1e-8. **This withdraws §3.24's "determinism is the
+obstruction, not the jump."** A deterministic chooser is available and is inside the framework;
+what has no smooth extension is `argmax` **as a function of the option values**, and a basin chooser
+spends that discontinuity on time instead.
+
+**Temperature dissolves the basins at `T_c = a/2`.** Rest points solve
+`(Ap)_1 - (Ap)_2 = T log(p_1/p_2)`, so at any `T > 0` no vertex is a rest point -- the entropy's
+logarithm diverges at a corner while the payoff stays bounded, and a hedging chooser settles on a
+committed *share*, never on one option. For `A = diag(a,a)`, writing `p = ((1+m)/2,(1-m)/2)`, the
+condition is `m = tanh(am/2T)`, with a nonzero root iff `a > 2T`: a pitchfork at `T_c = a/2`. This
+is **mean-field Ising at coupling `a/2`** -- a two-option coordination game with an entropy term *is*
+the bistable switch, which is why this is a mechanism and not an analogy. Measured `T_c = 0.49999996`
+against 0.5 (grid-limited, low by construction), three interior rest points below and one above,
+the outer pair matching the closed form to 1e-4, and the exponent of `m` in `T_c - T` equal to 0.4984
+against 1/2. Above `T_c` every interior start hedges at `(1/2,1/2)` to 1e-9.
+
+**No coupling, no basins.** With `A = v 1^T + 1 v^T` there is exactly one interior rest point, §3.24's
+logit, and the constructor agrees with `logit_arrangement` step for step to 2.8e-17 and, at `T = 0`,
+with `replicator_dynamics` to exactly 0. So what §3.24 lacked was not a construction but the
+dependence of an option's value on its own share.
+
+**Reasonable or weird.** Reasonable at every scale, and the payoff: a chooser that commits is one
+whose options' values depend on how many already chose them -- a cell committing to a type, a
+convention locking in, nucleation, a gene switch. Reasonable and uncomfortable: the worse option can
+win, which is path dependence for a society, habit for a person, commitment for a cell. Reasonable:
+deciding takes the logarithm of how close the call was. Weird for a person, right for a population or
+a material: above a critical temperature no start can decide. Weird as a limit: `T_c = a/2`, the
+boundary and the slowing rate are all two-option results, so no book sentence names a critical
+temperature without saying "two options."
+
+**What this does not establish.** Nothing about where `A` comes from: that an option's value rises
+with its share is the assumption doing all the work. Nothing for a non-symmetric payoff (the
+potential-game scope limit of `replicator.py`). Nothing for more than two options at positive
+temperature. Nothing about a chooser wired to another box whose state feeds its values -- the
+coupling here is a frequency dependence inside one closed scalar, and that is the honest remaining
+gap. Nothing about heredity, which is P25 stage (c).
+
+### 3.26 A choice composed: what pushes it moves it, what reads it tilts it
+
+Same file and note as §§3.24-3.25 (63 tests together, 389s -- select node IDs, not the whole file);
+the Part-three predictions were fixed in writing before any composition code. David, 2026-09-27, on
+§3.25's report that a wired chooser was untested: "you're saying that we can't tell if discrete
+choice can actually affect other things? that is not useful." The sentence was worse than the truth
+and is withdrawn.
+
+**What was and was not open.** That these arrangements compose is not in question: `arr` is a
+category, `Phi` a functor, and §2's `test_composition.py` checks both operad legs including a forcing
+from no potential. Composition is **pullback-and-sum on the forcing** and leaves the integrator --
+response, state, readout -- alone. So the only open question for a closed-scalar result is whether
+its conclusion survives an **added forcing term**. That is what was untested.
+
+**A box whose forcing is EXACT cannot read a choice without tilting it.** This refuted Part three's
+own first prediction, and not by a bug. Comparing a three-box composite (`pusher -> chooser -> follower`) against a hand-sum containing
+only the upstream push deviates by 3.2e-2 and moves the boundary to 0.3876 from the predicted 0.4,
+because the downstream box that merely *reads* the chooser's share contributes `(y - q_1)` to the
+chooser's forcing. That is **retroactivity**, §4's Chapter 2 subject, arriving unasked. Compare the
+right things and composition is exact: the two-box composite (nothing reading) equals the hand-summed
+push to **0.0**, and the three-box composite equals a hand-sum including the follower's pullback to
+**1.1e-16**.
+
+**An outside push moves the boundary linearly, and above a threshold replaces the choice.** For
+`A = diag(a,a)`, `T = 0`, a push `b` entering as `b(q_1 - q_2)` gives `p_1* = 1/2 - b/a`: located at
+0.39999994, 0.70000001 and 0.50000012 for `b = 0.1, -0.2, 0` against 0.4, 0.7, 0.5. Bistability needs
+`p_1*` inside `(0,1)`, so `|b| < a/2`: at `b = 0.6` every start (0.02, 0.2, 0.49) commits to option 1,
+while at `b = 0.4` the start still decides, with the boundary at 0.1.
+
+**And it is hysteresis.** From `p_1 = 0.2` a push of 0.6 commits the chooser to option 1 in 59 steps;
+release the push and it stays, drift below 1e-12 over 2000 steps, where unpushed from the same start
+it would have gone to option 2. A vertex is an exact fixed point and the response vanishes there, so
+**no finite push returns it**. Downstream, two runs differing only in the chooser's start leave the
+follower at exactly 0.0 and 1.0.
+
+**Reasonable or weird.** Reasonable at every scale, and the result to keep: influence has a threshold
+and its effect is permanent -- a convention, a habit, a differentiated cell, a standardised market.
+Reasonable and important: being read changes the thing read, which is loading in a circuit,
+measurement changing behaviour in a society, and retroactivity here -- not an extra assumption but
+what pullback-and-sum already says. Weird for a person: nothing here can be persuaded back, because
+there is no noise at the committed state; `rand.py` has it and this construction did not use it.
+Weird as a limit: the threshold `a/2` is two options with a symmetric coupling, so no sentence should
+give a number for how much influence flips a choice.
+
+**A unilateral reader is a non-exact forcing** (David, 2026-09-27: "couldn't we just make it be
+unilateral?"; checked after the predictions, so reported as an addendum). The tilt is entirely
+`omega_g`'s component on its incoming value `m`, which the composite pulls back onto the upstream
+configuration. An exact `omega_g = dU_g` that depends on `m` has `dU_g/dm != 0` and must tilt; a
+non-exact forcing with the same `Q`-component and a ZERO `m`-component reads and loads nothing.
+Measured: unilateral reader against no reader at all, chooser deviation **0.0** over 200 steps,
+against 3.2e-2 for the exact reader, while the unilateral reader still tracks to 1e-15. Its
+antisymmetric Jacobian part is 1.0, so it is genuinely not closed. This is the ideal-voltmeter
+idealization and should be said as one; it does NOT make non-exact forcings idealizations in general
+(the attention cue and `replicator.py`'s direct realization are neither).
+
+**What this does not establish.** Whether exactness is what forces reciprocity throughout the
+library, or only here -- the commons run's "a fixed-rule external enforcer is exact rather than
+unilateral" points the same way by a different mechanism, state-dependence, and joining them is
+P26's business. Nothing about noise at a
+committed state, so nothing about a revisable commitment. Nothing for `n > 2`, a non-symmetric payoff,
+or a positive temperature under a push. Nothing about a **cycle**: pusher and chooser form a chain,
+not a loop, so a chooser whose own choice changes the push it receives is untested.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
