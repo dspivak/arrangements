@@ -1248,6 +1248,29 @@ lifetime under wear is unmeasured (§3.17's Kramers rate is the tool). Nothing c
 carving on what the first outputs is untested, and so is a cycle. Nothing about *where* the supply for
 the carving comes from: the cost here is nobody's.
 
+### 3.28 The town's mathematician: an earlier account changes a priced decision
+
+**P29, run 2026-09-28**, Codex (GPT-6), session `0c750220`. Proposed model, checked by
+11 tests in `tests/test_town_{smoke,law,insurance,account}.py`; construction `arrangements/town.py`.
+Predictions fixed before code; all four held in their stated scope. Results and limitations:
+`notes/P29-TOWN-RESULTS.md`; reproducible numbers: `notes/P29-TOWN-MEASUREMENTS.json`.
+
+The plant ascends its current expected profit. Her estimate of harm, learned from recent
+health observations and sent to the insurer, changes its quoted premium schedule before
+claims settle. Cumulative harm over 30 units falls from 8.68145 to 3.88223 (55.28%); half
+step gives 55.17%. Disconnecting her report reproduces the historical-insurance town.
+An informed plant acts before equally delayed payments: **delay alone does not force late
+action**. Observation registers carry no future data; actual payment transfers balance.
+Non-exactness excludes a potential for this forcing, not all Lyapunov functions.
+
+Reasonable (agent judgment): earlier evidence can affect a priced decision. Artificial:
+noiseless health data, known recovery, one coefficient, automatic uptake, all harm covered,
+and unlimited credit. Her insurer's final cash .143891 is less than unpaid claims .672598;
+no solvency or risk-bearing result. Lower harm also lowers operating surplus. No model of
+understanding a book or discovering the institutional wiring, no general welfare theorem,
+and no biological interpretation of courts or money. Placement approved by David, 2026-09-28:
+Ch 1's town story and Ch 5's construction.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
