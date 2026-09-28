@@ -1198,6 +1198,56 @@ committed state, so nothing about a revisable commitment. Nothing for `n > 2`, a
 or a positive temperature under a push. Nothing about a **cycle**: pusher and chooser form a chain,
 not a loop, so a chooser whose own choice changes the push it receives is untested.
 
+### 3.27 A form played long enough carves a rest that was not there
+
+`tests/test_carving.py`, 6 tests, 4s; predictions fixed first in
+`notes/CARVING-PREDICTIONS-2026-09-28.md`. The claim is David's (2026-09-28: "i think a new form can
+start to carve out a new capacity. is that not something we've imagined yet? this is how memory works,
+and how river beds work"), against §3.16's sustained note, which held the reader's wells fixed. One
+reader, a fast coordinate `q` and a slow one `w`, one cost both descend, `w` being the curvature of
+`q`'s landscape at the origin.
+
+**A carved memory needs the deepening to saturate.** With a quadratic deepening against a linear decay
+there is no stable memory at any `gamma`: above 1/2 the only rest is the blank one, below it the carved
+rest exists and is unstable, `d/dw [q^2/2 - gamma(w - w0)] = 1/2 - gamma > 0` on the slaved branch, and
+`w` ran away to overflow. The quartic term is the least that holds it. This was found in construction,
+before any prediction was tested, and it is the file's first result.
+
+**Held.** The hold threshold is 1337 steps, sharp to one: 1336 leaves the reader blank, 1337 leaves it
+at the carved rest `(0.7051, 0.4972)` for good. Below the threshold the tuning keeps a **fading trace**,
+`w = -0.402` from `-0.5`, going back on its own decay time `1/(eta_w gamma) = 10^4` steps -- so a note
+too short to carve still leaves a mark to wear off, and the threshold decides whether the mark holds
+itself up. The fast landscape's curvature at `q = 0` flips sign, so the reader ends with a rest it did
+not have, and a kick that does not cross zero falls back into it. The joint cost never rises, note on or
+off, so dissipation stays non-negative while the tuning itself moves.
+
+**Nothing new in the joint state space** (closed form). The carved rest solves both fixed-point equations
+at `u = 0` and was a rest before any note played. Carving is basin selection at the joint level; what is
+new is the *fast* landscape at the slow coordinate's new value. The book says it that way.
+
+**The warning.** A tuning driven by `q` rather than `q^2/2` is non-reciprocal, no single cost has both
+rules as its gradient, and then the joint cost rises on 2915 of 8000 steps, by up to 0.80, ending at no
+rest of the exact model. A tuning that carves is accountable only while it descends the same cost its
+fast coordinate does.
+
+**Rain, at David's ask** (2026-09-28: "should have been something like a weekly rainfall … if you get to
+a certain amount, then something happens"; predictions 6 and 7 fixed before that code). With the note
+arriving on a cycle, what decides the outcome is the percentage of the time it rains, not the elapsed
+time: 9% carves and 8% does not, at periods 100 and 200 alike. **Prediction 7 was refuted in both
+halves.** I predicted bursts beat drizzle at short periods, the deepening being convex, and drizzle beats
+bursts at long ones, the tuning decaying between. At a fixed 9%: drizzle carves at periods 100 and 200,
+the same water every 2000 steps does not, and every 20000 steps it carves again -- because one 1800-step
+burst exceeds the 1337-step held threshold and carves by itself. So spacing is not monotone, and the
+long-period win is the held note, not burstiness. Reading: regular light rain keeps a channel that the
+same water in occasional storms does not, unless one storm is big enough to cut it alone. A rounding bug
+caught here is worth naming: with `round(duty * period)` a short period delivers more water than its
+percentage says, which made drizzle look better than it was; the on-time is now exact by construction.
+
+**Not done.** No noise, so the sharp threshold is a one-dimensional artifact and the carved rest's
+lifetime under wear is unmeasured (§3.17's Kramers rate is the tool). Nothing composed: a second reader
+carving on what the first outputs is untested, and so is a cycle. Nothing about *where* the supply for
+the carving comes from: the cost here is nobody's.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
