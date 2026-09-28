@@ -1,20 +1,30 @@
 #!/bin/bash
 # Run an explicitly selected batch; return to the caller between batches.
 # Inspect progress and split a slow file by pytest node ID before its limit is near.
-#   scripts/run_tests.sh --list
+#   scripts/run_tests.sh --list        (each file with its last clean time, to size a batch)
 #   scripts/run_tests.sh 120 tests/test_polynomial.py
 #   scripts/run_tests.sh 120 tests/test_file.py::test_name
 # Full output is streamed and saved; the exit status records any failure or cutoff.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 PY=.venv/bin/python
+# One line per whole-file run: file, seconds, UTC date, PASSED or CUTOFF. Local, gitignored.
+DURATIONS=tests/durations.tsv
 if [ "${1:-}" = "--list" ] && [ "$#" -eq 1 ]; then
-  printf '%s\n' tests/test_*.py
+  for f in tests/test_*.py; do
+    t='?'
+    [ -f "$DURATIONS" ] && t=$(awk -F'\t' -v f="$f" '
+      $1 == f && $4 == "PASSED" { t = $2 "s" }
+      $1 == f && $4 == "CUTOFF" { t = ">" $2 "s" }
+      END { print (t == "" ? "?" : t) }' "$DURATIONS")
+    printf '%-44s %s\n' "$f" "$t"
+  done
+  echo "Last clean whole-file run in seconds; >N was cut off at N; ? never timed on this machine."
   exit 0
 fi
 if [ "$#" -lt 2 ] || ! [[ "$1" =~ ^[1-9][0-9]*$ ]]; then
   echo "Usage: scripts/run_tests.sh LIMIT_SECONDS TEST_FILE_OR_NODE_ID [...]" >&2
-  echo "Use --list to choose a small batch; estimate its duration before running." >&2
+  echo "Use --list to see each file's last clean time; size the batch from it." >&2
   exit 64
 fi
 LIMIT=$1
@@ -53,6 +63,13 @@ for selection in "$@"; do
     verdict="PASSED"
   fi
   printf '%s  %ss  %s  log=%s\n' "$selection" "$secs" "$verdict" "$logfile"
+  # Record whole-file times for --list; a node ID times only part of its file.
+  if [[ "$selection" =~ ^tests/test_[A-Za-z0-9_]+\.py$ ]]; then
+    case "$verdict" in
+      PASSED) printf '%s\t%s\t%s\tPASSED\n' "$selection" "$secs" "$(date -u +%F)" ;;
+      CUT*) printf '%s\t%s\t%s\tCUTOFF\n' "$selection" "$LIMIT" "$(date -u +%F)" ;;
+    esac 2>/dev/null >> "$DURATIONS"
+  fi
   # A failure or cutoff needs inspection before starting another selected piece.
   [ ${#bad[@]} -ne 0 ] && break
 done

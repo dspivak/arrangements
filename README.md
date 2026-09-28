@@ -84,6 +84,8 @@ scripts/run_tests.sh 120 tests/test_polynomial.py
 
 Python ≥ 3.10, JAX and NumPy. Tests run under `jax_enable_x64`; the runner also needs
 `timeout`. Select a small batch, estimate its duration, and give it a limit with ample margin.
+`--list` prints each file's last clean whole-file time on this machine, which the runner records
+in `tests/durations.tsv` (gitignored); a `?` file has never been timed, so start it alone.
 The runner streams all output and saves full logs. Read and report each batch before starting
 another; split a slow file by pytest node ID (`tests/test_file.py::test_name`) before its
 projected completion approaches the limit. With no selections the runner prints usage and exits.
