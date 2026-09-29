@@ -54,12 +54,12 @@ def test_learner_receives_no_secret_coefficient_and_no_exposure_freezes_wrong_fi
     other = build(4, replace(town.settings, beta=19))
     q = town.initial().at[town.slots['estimate']].set(.5)
     q = q.at[town.slots['memory']].set(jnp.array([.8, .2, 1.]))
-    q = q.at[town.slots['health']].set(.2+town.settings.dt*(2*.8**2/2-.2))
+    q = q.at[town.slots['coughing']].set(.2+town.settings.dt*(2*.8**2/2-.2))
     assert float(town.field(q)[town.slots['estimate']][0]) > .1
     # Same observed state, different hidden beta: learning sees no difference.
     np.testing.assert_allclose(town.field(q)[town.slots['estimate']],
                                other.field(q)[other.slots['estimate']], atol=0)
-    q = q.at[town.slots['output']].set(0).at[town.slots['health']].set(0)
+    q = q.at[town.slots['output']].set(0).at[town.slots['coughing']].set(0)
     q = q.at[town.slots['memory']].set(jnp.array([0., 0., 1.]))
     np.testing.assert_allclose(town.field(q)[town.slots['estimate']], 0, atol=0)
 

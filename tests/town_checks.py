@@ -16,4 +16,4 @@ def check_money(town, trajectory):
                                    atol=2e-12, rtol=2e-10)
     assert np.all(np.isfinite(trajectory))
     assert np.min(x) > 0
-    assert np.min(town.value(trajectory, 'health')) >= -1e-12
+    assert np.min(town.value(trajectory, 'coughing')) >= -1e-12

@@ -1,4 +1,23 @@
-"""P29's town, composed from systems with one-way observation and payment records.
+"""The town of *Articulating Forms that Matter*, §1.6 ("Can we articulate forms that matter?").
+
+For a reader of the book. `eve_town()` builds Eve's model from §1.6.1: a plant (liability in;
+power and smoke out) and the townspeople (power and smoke in; coughing out), wired into a town.
+The plant runs for profit: each watt is worth `benefit` to the townspeople who draw it, making
+more watts costs more (x^2/2), and filtering the smoke costs money (clean_cost*c^2/2) and earns
+nothing. Smoke s = (1-c)x starts people coughing (beta*s^2/2 a day); coughs pass at the rate
+`recovery`, so the more people cough, the more stop each day, and the coughing settles where
+starts equal stops. The knobs are the fields of `Settings`: `beta` is how harsh the smoke is,
+`liability` what comes in on the plant's liability wire (nothing, in the story). Her run:
+
+    from arrangements.town import eve_town, run, summary, Settings
+    for beta in (.5, 2, 8):
+        town = eve_town(settings=Settings(beta=beta))
+        print(beta, summary(town, run(town)))
+
+Whatever beta is, the plant keeps making the same power and never filters its smoke.
+`tests/test_town_story.py` checks each sentence of §1.6.1 that this code stands behind.
+
+For agents (P29): composed from systems with one-way observation and payment records.
 
 Model choices and predictions: notes/P29-TOWN-PREDICTIONS-2026-09-28.md.
 A profit maximizer uses a quadratic expected-liability/premium schedule. A court
@@ -6,6 +25,21 @@ learns its coefficient from delayed health observations; an insurer reads that
 estimate or the mathematician's earlier estimate. Forecasts never create money.
 This is a new composite using the same Arrangement/CotCoalg primitives as
 system_id, insurance, and account; it does not reuse their example-specific boxes.
+
+Stage (d), `clean=True` (notes/P29-D-PREDICTIONS-2026-09-28.md): the plant has two dials,
+output x and cleanliness c, descended together in its own coordinates. Power x is published
+(in (d) no box consumes it; (e) sends it to the residents); smoke s = (1-c)x reaches the residents and is what the records observe. The plant
+publishes power and smoke itself, so its interface is liability in, power and smoke out, as
+the book draws it (§1.6.1); its state (x, c) stays inside. Its cost adds the priced liability
+on smoke and a cleaning cost clean_cost*c^2/2. With clean=False every stage is exactly the
+one-dial town above.
+
+Stage (e), `power_to_town=True` with `clean=True` (notes/P29-E-PREDICTIONS-2026-09-29.md):
+the residents take power as well as smoke. They draw each watt and it is worth `benefit` to
+them, so their one-form on the power input is the constant `benefit`: that wire pushes back
+(retroactivity), while their one-form on smoke stays zero (an insulator). The plant's cost
+loses its revenue term, which now reaches it as that push, pulled back through its power
+output. Every trajectory is (d)'s.
 """
 from dataclasses import dataclass
 
@@ -28,30 +62,40 @@ class Settings:
     recovery: float = 1.0
     dt: float = .02
     output0: float = .1
-    health0: float = 0.0
+    coughing0: float = 0.0
     learn_rate: float = 40.0
     quote_rate: float = 2.0
     delay_steps: int = 300
+    clean_cost: float = 0.1
+    clean0: float = 0.0
+    liability: float = 0.0   # the value on the liability wire at stage 1 (nothing, in the story)
 
 
-def own_cost(label, initial, inputs, cost, mobility):
+def own_cost(label, initial, inputs, cost, mobility, publish=None, push=None):
     """Conditional cost differentiated only on the box's configuration.
 
     Zero input covector is the declared one-way boundary. The smooth input map
     retains its genuine derivative: no stop_gradient or custom derivative.
     """
     gradient = jax.grad(cost, argnums=0)
-    return node(label, initial, inputs, lambda q, e: -gradient(q, e), mobility)
+    return node(label, initial, inputs, lambda q, e: -gradient(q, e), mobility, publish, push)
 
 
-def node(label, initial, inputs, force, mobility):
+def node(label, initial, inputs, force, mobility, publish=None, push=None):
+    """A system: `inputs` values in, `publish(q)` out (its configuration by default).
+
+    `push(q, e)` is its one-form on its inputs, the push it returns up each input wire;
+    zero by default, the one-way boundary.
+    """
     initial = jnp.atleast_1d(jnp.asarray(initial, dtype=float))
+    publish = publish or (lambda q: q)
+    push = push or (lambda q, e: jnp.zeros_like(e))
     return Arrangement(
         P=configuration(euclidean(len(initial), mobility), init=initial),
-        in_dim_M=0, out_dim_M=0, in_dim_N=inputs, out_dim_N=len(initial),
-        out_f=lambda q, m: q,
+        in_dim_M=0, out_dim_M=0, in_dim_N=inputs, out_dim_N=len(publish(initial)),
+        out_f=lambda q, m: publish(q),
         in_f=lambda q, m, e: EMPTY,
-        omega=lambda q, m, e: (force(q, e), EMPTY, jnp.zeros_like(e)),
+        omega=lambda q, m, e: (force(q, e), EMPTY, push(q, e)),
         label=label)
 
 
@@ -61,6 +105,7 @@ class Town:
     slots: dict
     settings: Settings
     stage: int
+    clean: bool = False
 
     def field(self, q):
         return self.arr.omega(q, EMPTY, EMPTY)[0]
@@ -72,46 +117,86 @@ class Town:
         return np.asarray(trajectory)[..., self.slots[name]]
 
 
-def build(stage, settings=Settings(), *, connect_report=True, informed=False):
+def build(stage, settings=Settings(), *, connect_report=True, informed=False, clean=False,
+          power_to_town=False):
     """Stages 1=no return, 2=law, 3=historical insurance, 4=her account.
 
     Informed control starts the liability estimator at the true coefficient.
     It uses the same delayed payouts. It is an explicit information advantage.
+    clean=True gives the plant its second dial (stage (d)); slots 'output' and
+    'cleanliness' then index the two coordinates of the one box 'plant'.
+    power_to_town=True (stage (e), needs clean=True) sends the power to the residents,
+    who push back on it at `benefit` per watt; the plant's revenue arrives that way.
     """
     if stage not in (1, 2, 3, 4) or settings.delay_steps < 0:
         raise ValueError('stage must be 1..4 and delay_steps nonnegative')
+    if power_to_town and not clean:
+        raise ValueError('power_to_town needs the two-dial plant (clean=True)')
+    revenue = 0.0 if power_to_town else settings.benefit
     c = settings
-    boxes, slots, sources = [], {}, []
-    offset = 0
+    boxes, slots, outs, sources = [], {}, {}, []
+    offset = sent = 0
 
+    # slots index the configurations (what Town.value reads); outs index what each box
+    # publishes (what the wiring reads). They differ only for the two-dial plant.
     def add(box, source):
-        nonlocal offset
+        nonlocal offset, sent
         slots[box.label] = slice(offset, offset + box.P.Q_dim)
+        outs[box.label] = slice(sent, sent + box.out_dim_N)
         offset += box.P.Q_dim
+        sent += box.out_dim_N
         boxes.append(box)
         sources.append(source)
 
-    def at(q, name):
-        return q[slots[name]]
+    def at(m, name):
+        return m[outs[name]]
 
     def price(q):
         if stage == 1:
-            return jnp.array([0.0])
+            return jnp.array([c.liability])
         return at(q, 'premium' if stage >= 3 else 'assessed')
 
-    add(own_cost('output', [c.output0], 1,
-                 lambda q, e: .5 * (1 + e[0]) * q[0]**2 - c.benefit * q[0], c.dt), price)
-    add(own_cost('health', [c.health0], 1,
-                 lambda q, e: .5*c.recovery*q[0]**2 - q[0]*c.beta*e[0]**2/2, c.dt),
-        lambda q: at(q, 'output'))
+    if clean:
+        add(own_cost('plant', [c.output0, c.clean0], 1,
+                     lambda q, e: .5*(1 + e[0]*(1-q[1])**2)*q[0]**2 - revenue*q[0]
+                     + .5*c.clean_cost*q[1]**2, c.dt,
+                     publish=lambda q: jnp.array([q[0], (1-q[1])*q[0]])), price)
+        slots['output'], slots['cleanliness'] = slice(0, 1), slice(1, 2)
+        outs['output'], outs['smoke'] = slice(0, 1), slice(1, 2)
+        outs['power'] = outs['output']
+
+        def smoke(m):
+            return at(m, 'smoke')
+
+        def cleanliness(m):
+            # the ledger reads smoke per watt, s/x = 1-c; output stays positive in every run
+            x = at(m, 'output')
+            return 1 - at(m, 'smoke')/jnp.where(x > 0, x, 1.0)
+    else:
+        add(own_cost('output', [c.output0], 1,
+                     lambda q, e: .5 * (1 + e[0]) * q[0]**2 - c.benefit * q[0], c.dt), price)
+
+        def smoke(m):
+            return at(m, 'output')
+    if power_to_town:
+        # inputs (power, smoke): each watt drawn is worth `benefit`, pushed back up the power
+        # wire; smoke returns nothing
+        add(own_cost('coughing', [c.coughing0], 2,
+                     lambda q, e: .5*c.recovery*q[0]**2 - q[0]*c.beta*e[1]**2/2, c.dt,
+                     push=lambda q, e: jnp.array([c.benefit, 0.0])),
+            lambda m: jnp.concatenate([at(m, 'power'), smoke(m)]))
+    else:
+        add(own_cost('coughing', [c.coughing0], 1,
+                     lambda q, e: .5*c.recovery*q[0]**2 - q[0]*c.beta*e[0]**2/2, c.dt),
+            smoke)
 
     if stage >= 2:
-        add(node('memory', [c.output0, c.health0, 0.0], 3, lambda q, e: e-q, 1.0),
-            lambda q: jnp.concatenate([at(q, 'output'), at(q, 'health'), jnp.ones(1)]))
+        add(node('memory', [c.output0, c.coughing0, 0.0], 3, lambda q, e: e-q, 1.0),
+            lambda q: jnp.concatenate([smoke(q), at(q, 'coughing'), jnp.ones(1)]))
 
         def observed(q):
             old = at(q, 'memory')
-            incident = (at(q, 'health')[0]-old[1])/c.dt + c.recovery*old[1]
+            incident = (at(q, 'coughing')[0]-old[1])/c.dt + c.recovery*old[1]
             return old[2]*jnp.array([old[0]**2/2, incident])
 
         if c.delay_steps:
@@ -136,9 +221,11 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False):
         def payments(q):
             output = at(q, 'output')[0]
             operating = c.benefit*output-output**2/2
+            if clean:
+                operating = operating - c.clean_cost*cleanliness(q)[0]**2/2
             claims = settled(q)[1]
             if stage >= 3:
-                premium = at(q, 'premium')[0]*output**2/2
+                premium = at(q, 'premium')[0]*smoke(q)[0]**2/2
                 return jnp.array([operating-premium, premium-claims, claims])
             return jnp.array([operating-claims, 0.0, claims])
 
@@ -147,11 +234,20 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False):
     inner = tensor_arrangements(boxes)
     outer = Arrangement(
         P=trivial_parameter(), in_dim_M=sum(b.in_dim_N for b in boxes),
-        out_dim_M=offset, in_dim_N=0, out_dim_N=0,
+        out_dim_M=sent, in_dim_N=0, out_dim_N=0,
         out_f=lambda q, m: EMPTY,
         in_f=lambda q, m, e: jnp.concatenate([source(m) for source in sources]),
         omega=zero_form, label='town wiring')
-    return Town(compose_seq(inner, outer), slots, c, stage)
+    return Town(compose_seq(inner, outer), slots, c, stage, clean)
+
+
+def eve_town(stage=1, settings=Settings(), **options):
+    """Eve's town from the book's §1.6.1: the two-dial plant and townspeople who draw its power.
+
+    Stage 1 is her first model, with nothing on the liability wire; stages 2-4 add the court,
+    the insurer and her account, as the book's later subsections do.
+    """
+    return build(stage, settings, clean=True, power_to_town=True, **options)
 
 
 def run(town, duration=30.0):
@@ -171,11 +267,25 @@ def run(town, duration=30.0):
     return np.asarray(scan(arr.P.init))
 
 
+def smoke(town, trajectory):
+    """Smoke reaching the residents: output, or (1-c)*output with the second dial."""
+    output = town.value(trajectory, 'output')[..., 0]
+    if town.clean:
+        return (1-town.value(trajectory, 'cleanliness')[..., 0])*output
+    return output
+
+
 def summary(town, trajectory):
     c = town.settings
     output = town.value(trajectory, 'output')[:, 0]
-    result = {'harm': float(c.dt*np.sum(c.beta*output[:-1]**2/2)),
+    s = smoke(town, trajectory)
+    result = {'harm': float(c.dt*np.sum(c.beta*s[:-1]**2/2)),
               'peak_output': float(np.max(output)), 'final_output': float(output[-1])}
+    if town.clean:
+        result['final_cleanliness'] = float(town.value(trajectory, 'cleanliness')[-1, 0])
+        result['final_smoke'] = float(s[-1])
+        result['final_coughing'] = float(town.value(trajectory, 'coughing')[-1, 0])
+        result['power'] = float(c.dt*np.sum(output[:-1]))
     for name in ('assessed', 'premium', 'estimate'):
         if name in town.slots:
             values = town.value(trajectory, name)[:, 0]

@@ -23,7 +23,7 @@ def test_court_receives_the_exact_dated_observation_and_nothing_early():
     town = build(2, c)
     trajectory = run(town, 1)
     delay = town.value(trajectory, 'delay')
-    health = town.value(trajectory, 'health')[:, 0]
+    health = town.value(trajectory, 'coughing')[:, 0]
     memory = town.value(trajectory, 'memory')
     observed = np.column_stack([memory[:, 0]**2/2,
                                (health-memory[:, 1])/c.dt+c.recovery*memory[:, 1]])*memory[:, 2:3]

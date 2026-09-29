@@ -28,7 +28,7 @@ def test_smoke_does_not_return_a_push_and_production_matches_closed_form():
     other = build(1, replace(c, beta=7.0))
     np.testing.assert_allclose(town.value(trajectory, 'output'),
                                other.value(run(other, 5), 'output'), atol=1e-13)
-    assert other.value(run(other, 1), 'health')[-1, 0] > 0
+    assert other.value(run(other, 1), 'coughing')[-1, 0] > 0
 
 
 def test_actual_composite_has_the_predicted_cross_partial_mismatch():

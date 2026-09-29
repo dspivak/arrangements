@@ -1271,6 +1271,34 @@ understanding a book or discovering the institutional wiring, no general welfare
 and no biological interpretation of courts or money. Placement approved by David, 2026-09-28:
 Ch 1's town story and Ch 5's construction.
 
+**Stage (d), smoke per watt, run 2026-09-28** (Claude Opus 5.5 subagent of session `8f53ae48`;
+proposed model, checked by 5 tests in `tests/test_town_clean.py`; `build(..., clean=True)` in
+`arrangements/town.py`; predictions `notes/P29-D-PREDICTIONS-2026-09-28.md` fixed before code,
+results `notes/P29-D-RESULTS.md`). The plant gets a second dial, cleanliness $c$, and smoke
+$s=(1-c)x$ goes to the townspeople; power is published and no box consumes it; plant cost
+$(1+p(1-c)^2)x^2/2-\text{benefit}\,x+k\,c^2/2$. All four predictions held in their stated scope:
+unpriced, the plant never cleans at any $\beta$; priced, it cleans, and **whether it cleans or
+shrinks turns on one ratio**, the cleaning cost $k$ against production's, with the split exactly
+even at $k=1$ at every price (the cost is symmetric in $x$ and $1-c$ there); with her account it
+starts cleaning before the first claim is paid; at $k=.1$ power over 30 units falls 3.4% against
+63.5% with one dial, and harm falls 79.5% below the one-dial account town. Not predicted: from
+$k\approx 8/9$ harm is slightly *higher* than with one dial (the plant spends cleaning on keeping
+its power), though net surplus is higher at every $k$; cleaning starves her fit, which freezes at
+1.674 against $\beta=2$; at $\beta=8$, $k=.8$ a plant priced in full from the start is trapped small
+and dirty, which the town's gradually rising price avoids. Artificial (agent judgment): no one
+consumes the power, quadratic cleaning cost, cleaning cost not scaling with output, noiseless
+instant smoke-to-illness. Not established: what a real plant's $k$ is.
+The two-dial plant publishes power and smoke, matching the book's §1.6.1 sketches (2026-09-29,
+session `8f53ae48`; every number unchanged); the townspeople's slot, formerly `'health'`, is `'coughing'` (2026-09-29: the story's townspeople cough now, the illness it warns of coming later).
+**Stage (e)**, `power_to_town=True` (2026-09-29, `8f53ae48`; `tests/test_town_power.py`, 9 passed;
+`notes/P29-E-RESULTS.md`): the residents take the power and push back on it at a fixed price per
+watt, the plant's revenue arriving as that push; every trajectory is (d)'s to 1e-12; the power
+port returns the price, the smoke port zero. No new finding; the book's sketches now match.
+**The book's town** (2026-09-29, `8f53ae48`): `eve_town()` is Eve's model from §1.6.1 (the two-dial plant,
+power to the townspeople), with a reader-facing module docstring; `Settings.liability` is the value on the
+liability wire at stage 1; `tests/test_town_story.py` checks each sentence of §1.6.1 the code stands behind
+(7 passed; 32 town tests in all).
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
