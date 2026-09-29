@@ -1009,6 +1009,11 @@ a lens on Markov kernels rather than on `omegalens`. Sources and locators are in
 
 ### 3.24 Discrete choice is the same integrator, and the response supplies the normalization
 
+*Note 2026-09-29 (§3.29)*: built with its state in `R^n`, the simplex is invariant but attracts
+round-off only while `0 < dt T (log Z - 1) < 2`; with every value a cost (`log Z < 1`) the same
+chooser drifts off it to the unnormalized Gibbs weights. On the simplex, or in exact arithmetic,
+the rest point is the logit as stated.
+
 `tests/test_discrete_choice.py`, 28 tests, `arrangements/choice.py`; derivation, predictions fixed
 before any construction code, and verdicts in `notes/DISCRETE-CHOICE.md`. Book plan P25 stage (b),
 from David's question: does discrete choice come in "through softmax / stochasticity"?
@@ -1298,6 +1303,118 @@ port returns the price, the smoke port zero. No new finding; the book's sketches
 power to the townspeople), with a reader-facing module docstring; `Settings.liability` is the value on the
 liability wire at stage 1; `tests/test_town_story.py` checks each sentence of §1.6.1 the code stands behind
 (7 passed; 32 town tests in all).
+
+### 3.29 Active inference in three tests: precision by descent, policy choice, expected free energy
+
+**P5 (b), run 2026-09-29**, Claude Opus 5.5, session `9b16a421`. `tests/test_active_inference.py`,
+17 passed and 6 strict xfails (the refuted predictions, kept unrepaired); construction
+`arrangements/active_inference.py`; predictions fixed before code, verdicts, weirdness and limits in
+`notes/ACTIVE-INFERENCE-TESTS.md`. **(i) Held**: with `-1/2 log det Pi` in the cost, descent in
+`(mu, log Pi)` settles at the inverse ML variance (4.073150457190358, 1e-10), and in 2-D at the
+inverse sample covariance; without it `Pi` collapses harmonically; with two sources the learned
+precisions are the weights on the mean. **(ii)** The chooser's cost is the policy free energy
+(held), but with values `-G` it does not settle on the policy posterior (**refuted**): the simplex
+is invariant, not attracting, when `log Z < 1`; `1 - sum p` grows by `1 - dt T (log Z - 1)` per step
+and the state goes to `exp(v/T - 1)`. The drift is transverse to the simplex, so it belongs to the
+state in `R^n` and float round-off; on the simplex, or exactly, the logit is reached (§3.24's note). A constant shift of the values
+restores it (Addendum A, predicted after the failure). **(iii) Held** for the rollout (`Phi` of a
+world arrangement and its Jacobian equal the closed form, 1e-12) and for the information gain
+`1/2 log(1 + w_obs/w_pred)`; the choices are refuted unshifted by the same drift and hold shifted:
+the switch from looking to pushing sits where the closed form puts it, and **exact wiring bends the
+planner's belief 0.384 toward its preferred outcome** (item 30's retroactivity), while unilateral,
+non-exact wiring leaves it on the evidence. Not established: a closed loop acting on a world with
+sampled observations.
+**Addenda B and C** (same session, at David's questions; predictions §9 of the note, all held):
+the chooser in the natural chart (every state a distribution) reaches the policy posterior with no
+shift, so (ii)'s refutation belonged to the chart; and David's picture nested — hand, a level
+predicting it, a level predicting that level and wanting a goal — moves the hand toward the goal
+by pullback alone, a chain of springs whose rest is `h* = g k_s/(kappa + k_s)`, with the offset of a
+proportional controller.
+
+### 3.30 Many parts that keep one another whole: a ring and an all-to-all of parts in mutual need
+
+`tests/test_many_parts.py` (5 tests; predictions fixed in `notes/MANY-PARTS-PREDICTIONS-2026-09-29.md`
+before any construction code, results in `notes/MANY-PARTS-RESULTS.md`; the book plan's P30 (e)).
+`n` parts of §3.8's kind, each with its own gated supply `s g(r_i, q_i)`, `g = rq/(K + rq)`, where
+`r_i` is what the parts it needs send — the neighbour behind it (ring) or the others' mean
+(all-to-all) — and `beta r_i` an ungated internal path, run at `0` and `0.5`.
+
+**One supply condition for every size and both wirings.** The threshold is
+`s_* = 2 (b - alpha beta) sqrt K / alpha`, the pair's, at `n = 2, 3, 5, 8`, and the settled
+amplitude is the symmetric root `q+` to 1e-6. The mechanism: the Jacobian at `q+` is circulant, its
+eigenvalues reproduced to 1e-6, and the least stable mode is the symmetric one, which does not see
+`n` or the wiring. The restart threshold of §3.8 survives (origin stable, the saddle the threshold).
+
+**A cut ends a strict ring and grades a slack one.** With no ungated path (`beta = 0`) cutting one
+part's supply kills every part in turn; with `beta = 0.5` the cut part settles at
+`alpha beta q_{i-1}/b` and the ring holds, degraded in the direction of need (at `n = 8`, `s = 4`:
+`3.92, 5.79, 6.80, 7.32, 7.59, 7.73, 7.80, 7.83` going round, the intact `7.87`). So "one loss ends
+the ring" is §3.8's wiring condition — no ungated path to a part — one level up, and one ungated
+fraction turns collapse into a graded loss. All-to-all loses the cut part and the survivors hold iff
+`s > s_*' = 2 sqrt(K (n-1)/(n-2))` (a closed form, reproduced): at `s = 2.5` three parts collapse
+(`s_*' = 2.828`) while five and eight hold, so **a larger all-to-all collective survives a loss that
+a smaller one does not**, at a supply where every intact collective held.
+
+**The collapse is a front.** At `n = 8`, `s = 4`, `beta = 0` the deaths go round in order with a
+constant delay, `3.07` h-units (spread under 2%); it doubles when `b` is halved with `s/b` fixed and
+grows with `s` (`2.43, 3.07, 3.91` at `s = 3, 4, 6`); the guess `(1/b) log(q+^2/K)` tracks the
+`s`-dependence and is low by a constant `0.45`. Cutting a part's outgoing wire starts the same front
+one part on. The ring's coupler is non-exact (`|d omega| = 0.069` at the symmetric state); the
+all-to-all's is exact at the symmetric state and non-exact off it.
+
+**What this does not establish.** That collectives fall where the pair's threshold holds (§2). The
+gate is a model. Every part here has its own gated supply, which is why a symmetric state exists; a
+chain relaying one supply from one end was not run and would attenuate (§3.21, below the line). No
+placements, so nothing disperses; no needs of different kinds.
+
+### 3.31 Word of mouth: the recruiting channel dies with the leaver
+
+`tests/test_word_of_mouth.py` (6 tests; predictions fixed in
+`notes/WORD-OF-MOUTH-PREDICTIONS-2026-09-29.md` before any construction code, results in
+`notes/WORD-OF-MOUTH-TEST.md`; the book plan's §5.9 item 38, P30 (d)). §3.9's turnover collective
+with one change: the forcing that places the spare is multiplied by the **word**, the share of the
+recruiting channel still carried by parts still claiming weight (`rho_j` a wiring datum; silent
+mode). With the word intact the trajectories are §3.9's to 1e-12. The wrapped parent is inside
+`arr` and outside the attention operad, `d omega` between the leaver's health and the spare's
+placement measured against its closed form to 1e-12.
+
+**Slower, not lower.** The return to `nu` is exact for every nonzero word and its time scales as
+`1/g`: `40, 60, 120, 380` steps at word `1, 2/3, 1/3, 0.1`. The deficit has no floor; the word sets
+the rate, §3.9's "reach is a rate" in the recruiting channel. Only a leaver dead, frozen at zero
+health, who carried the whole channel leaves the spare unmoved (`h~ = 2 + kappa(d)` forever) — and
+a leaver merely *failing* is propped by the collective's deficit at `2e-5` health (§3.9), which is
+`2e-5` of word, and the spare creeps in over 238,000 steps. **A faint part and an absent one are
+told apart only by freezing the one at zero**, §3.9's blindness to absence, now in the word.
+
+**Compounding is the channel thinning, with a cliff at the last carrier.** Three failures in turn,
+recruits carrying no word: `60, 120, never` steps (word `2/3, 1/3, 0`); at 8,000 steps
+`h~ = 2.5, 2.5, 2.370`. Monotone, and the jump is a wiring event, the last share being the last of
+the word — not accumulation reaching a threshold, which this library has no mathematics for.
+Recruits that take over the leaver's share once in: `60, 60, 60`.
+
+**The dependent falls by its wiring; the collective's shortfall props everyone, the leaver
+included.** Part 0 fed `0.6` through the leaver settles at `0.4395`, part 1 fed from outside at
+`1.0202`, by `c_j = t_j + (nu - h~) kappa_j / lam_h` to 1e-9, the propping equal for both; the
+leaver at `0.0323`, propped by the deficit and by its dependent's need (composition pulls the
+dependent's cost back onto it, §3.21's mechanism). The starved part is not pushed out: low, not
+wrong (§3.9).
+
+**Effort aimed by the joint's account closes the whole; aimed by the whole's felt shortfall it
+leaves both short.** A doodad (§3.10 route (b)) whose alarm reads part 0's own account `1 - c_0`
+and adds `gain * alarm` to its supply returns the collective to `nu` in 60 steps at every gain,
+leaving the joint a residual `(1 - t_0 - pi)/(1 + gain)`: `0.30, 0.12, 0.035` at gain `1, 4, 16`,
+the proportional-control offset. With its reading wire cut (an insulator) nothing moves and the
+collective keeps a deficit of `0.092`. Reading the collective's felt deficit `nu - h~` instead, it
+cannot tell the joint from the leaver's loss and leaves both short (`0.02`, self-consistently). Its
+coupling is non-exact, `lam_h gain + lam_a gain_r`, to 1e-9: it acts and nothing returns to it.
+
+**Found while running.** The joint-and-alarm loop is a linear map per step; at a half step each its
+eigenvalue modulus is `(1/2) sqrt(1 + gain)`, and at gain 4 it rang itself to `nan` after passing
+through `nu`. The continuous loop is stable at every gain; the alarm now moves a twentieth per step.
+
+**What this does not establish.** A floor: scaling the recruit's *contribution* by the word would
+build one in, and was not run for that reason (§2). "Wears out" is stipulated (§3.9), "leaves" is
+not a movement, the word is one number per part, the doodad's supply is stipulated.
 
 ## 4. Where the mathematics is written down
 

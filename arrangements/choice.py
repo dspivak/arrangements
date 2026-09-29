@@ -34,6 +34,15 @@ control that shows it: the same cost, forcing, wiring and interface with
 ``rvect.euclidean`` settle instead on the UNNORMALIZED Gibbs weights
 ``p_i = exp(v_i/T - 1)``.
 
+CONDITION (``notes/ACTIVE-INFERENCE-TESTS.md`` §4, 2026-09-29). The simplex is invariant, not
+always attracting: ``1 - sum p`` is multiplied by ``1 - dt T (log Z - 1)`` per step near the logit,
+``Z = sum exp(v/T)``. With ``log Z < 1`` -- every value a cost, as in active inference's ``-G`` --
+round-off grows and the SAME Shahshahani chooser settles on ``exp(v/T - 1)``, the Euclidean
+control's answer. The drift is transverse to the simplex, so it belongs to the state living in
+``R^n`` in floating point: on the simplex, or in exact arithmetic, the rest point is the logit. With
+the state in ``R^n``, the normalization survives round-off only while ``0 < dt T (log Z - 1) < 2``;
+adding one constant to every value, which leaves the logit alone, can always restore it.
+
 THE SAME DISTRIBUTION AS ONE BAYES STEP (``belief_arrangement``), in the dual
 chart. Stage (a)'s construction applies to the categorical family itself, once the
 gauge is fixed by ``lambda_n = 0`` (on all of ``R^n`` the Fisher information is
