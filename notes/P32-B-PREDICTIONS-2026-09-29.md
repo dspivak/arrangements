@@ -73,3 +73,27 @@ model of "rabbits and foxes rising and falling in turn" over many cycles. The ex
 stands against the log chart at small populations and is fine at large ones.
 
 ## Progress
+
+- 14:19 First passing run: predictions 1, 2, 4 hold (`test_one_step_is_euler_in_log_coordinates`,
+  `test_composite_forcing_is_minus_d_total_cost`, `test_coexistence_is_a_fixed_point`,
+  `test_composed_equals_monolithic`; each under 1 s). Wording fix to prediction 1: the
+  composite writes three costs and no sum; the monolithic control (prediction 4) writes
+  `U_total` by hand, which is its point. Prediction 3's two tests run next.
+- 14:20 Prediction 3, first half, tolerance MISSED as fixed: `H` did rise at every step at
+  `dt = 0.02` and `0.01` (monotone assertion passed), growth per cycle `4.77e-2` at `0.02`
+  and `2.05e-2` at `0.01`, ratio **2.33**, outside my `[1.7, 2.3]`. Reading: the law is `O(dt)`
+  per cycle with an `O(dt)` relative correction (the coarser orbit has grown onto a larger
+  cycle, where `f^T Hess(H) f` is bigger, by its third pass). Not hiding it: the test now adds
+  `dt = 0.005` and asserts the finer ratio `0.01/0.005` is in `[1.7, 2.3]` and closer to 2
+  than the coarser one, the asymptotic form of the same prediction. Also fixed a horizon
+  bookkeeping error (3 crossings for 3 cycles; needs 4).
+- 14:23 END. All 7 tests pass, whole file 2 s (`scripts/run_tests.sh 120 tests/test_lotka_volterra.py`).
+  Verdicts: (1) HELD, step and forcing to 1e-12. (2) HELD, < 1e-14. (3a) HELD in mechanism,
+  tolerance missed at the coarsest pair: per-cycle growth 4.77e-2 / 2.05e-2 / 9.51e-3 at
+  `dt = 0.02 / 0.01 / 0.005`, ratios 2.33 then 2.15, converging to 2. Chart: population-chart
+  Euler grows 4.78e-2 per cycle against the log chart's 4.77e-2 (0.2% apart; the audit's
+  "Euler in log coordinates keeps H bounded" is FALSE). (3b) HELD: two-stage `max|H-H0|` over
+  22 cycles 3.80e-3 raw at `dt = 0.02` (900x below the plain step's 3.48), exponent 0.991
+  raw, 2.000 synchronized (4.45e-5 -> 1.11e-5). (4) HELD, 200 steps to 1e-10.
+  Lesson: never pass `-s` to `scripts/run_tests.sh`; it is read as a selection and starts the
+  whole suite (cut off at the limit here, harmless). Use `PYTEST_ADDOPTS="-s"` instead.

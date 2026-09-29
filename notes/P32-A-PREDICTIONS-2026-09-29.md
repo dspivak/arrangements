@@ -84,3 +84,42 @@ say it only of those. Stability at dt = 0.5 also needs the CFL bound (dt < 1/sqr
 model meets; the FDTD person would ask that it be stated.
 
 ## Progress
+
+- 14:17. `arrangements/light_lattice.py` written (edge box, face box, copy wire, composite,
+  state helpers). Probe in the scratchpad: build 0.05 s, jitted forcing 0.8 s, jitted step
+  1.2 s to compile then 100 steps in 0.03 s; the composite forcing at random A differs from
+  the script's `gradU` by 0.0. Writing `tests/test_light_lattice.py` next.
+- 14:19. First run through `scripts/run_tests.sh 120`: 8 s, predictions 1-4 PASS (five tests),
+  prediction 5 FAILS: naive energy deviation 33 percent for the Gaussian case at dt = 0.5.
+- 14:20. Plain-numpy check (scratchpad `energy_probe.py`, the script's own loop, no library):
+  the same 33 percent (Gaussian w = 1.5), 45 percent (w = 3), 119 percent (random), 24 percent
+  for the single longest mode; it scales about linearly with dt (0.33, 0.135, 0.050 at dt = 0.5,
+  0.25, 0.1) and has no secular drift (first-half and second-half maxima agree). The staggered
+  energy 1/2 sum x_n^2 + 1/2 <B_n, B_{n+1}> is conserved to 3e-16 .. 3e-14 in every case.
+  Mechanism: x_n is the half-step velocity and B_n the integer-step field, so the naive sum
+  mixes time levels and oscillates with amplitude about Omega dt / 2 per mode (Omega up to
+  2 sqrt 2 on this lattice). **Prediction 5 is refuted as written**; the test now records that
+  and checks the staggered conservation, the boundedness, and the dt-scaling.
+  **Weirdness found in the oracle's docstring**: `scripts/maxwell2d.py` reports "energy drift
+  2.0 percent" at N = 200, which is the END-POINT value after 120 steps; the maximum over that
+  run is 14.7 percent (this probe). The number is a sample of the oscillation, not a drift. Not
+  fixed here (no existing file may be edited by this run); the caller should.
+- 14:22. `scripts/run_tests.sh 120 tests/test_light_lattice.py`: 6 passed, 16 s. Run total
+  11 minutes of wall time, about 140k tokens.
+
+## Results
+
+| # | prediction | outcome |
+|---|---|---|
+| 1 | forcing = -d(total face energy), emerges from the copy wire | HELD, 0.0 against the script's `gradU`, < 1e-10 against autodiff of my own 1/2 sum B^2 |
+| 2 | one Phi step = one script step at dt = 0.5 | HELD to 1e-12 in A and x |
+| 3 | Gauss: div of momenta conserved from nonzero divergence | HELD, < 1e-12 over 60 steps while the field moved O(1) |
+| 4 | omega^2 = 4 sin^2(kx/2) + 4 sin^2(ky/2); short waves slow | HELD: discrete relation (2/dt)^2 sin^2(theta/2) = Omega^2 to 1e-9; closed form to 1e-3 at dt = 0.05 (measured omega above Omega, as the relation says); phase speed 1 -> 2/pi from k = 2 pi/8 to k = pi |
+| 5 | naive energy within 3 percent at dt = 0.5 | REFUTED: 33 percent (Gaussian), 119 percent (random), bounded oscillation, no secular drift; staggered energy conserved to 1e-12; deviation about linear in dt |
+
+Guaranteed by construction: 1 (given `compose_seq`), 3 (given 1). Could have gone otherwise:
+2, 4, 5; 5 did.
+
+Files: `arrangements/light_lattice.py` (new), `tests/test_light_lattice.py` (new), this note.
+No existing file edited. `_tensor_balanced` is imported from `hopfield.py`; it belongs in
+`wiring.py` (a later run's edit). The book repo was not touched.

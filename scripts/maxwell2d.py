@@ -8,7 +8,11 @@ arrangements; the library test with predictions fixed first is the book plan's P
 
 Written by Claude Opus 5.5 (1M), session c306598e, 2026-09-28, in a scratchpad; kept here by
 Claude Fable 5.1, ec5ece87, 2026-09-29, after a rerun reproduced the recorded numbers (peak
-radius of B^2 at 60 after time 60, energy drift 2.0%, Gauss change 4e-17). Runs in seconds:
+radius of B^2 at 60 after time 60, Gauss change 4e-17). The "energy drift" this script prints is the
+END-POINT sample of a bounded oscillation of the plain energy 1/2 sum xi^2 + 1/2 sum B^2, whose maximum
+over this run is about 15% (33% and 119% on the 8x8 grid of tests/test_light_lattice.py); the
+staggered energy 1/2 sum xi_n^2 + 1/2 <B_n, B_{n+1}> is what the phase step conserves, to 1e-12
+(P32 (a), 2026-09-29; the 2.0% first recorded here as the drift was that end-point sample). Runs in seconds:
 ``python3 scripts/maxwell2d.py``.
 """
 # Lattice Maxwell in 2D (TE-like: A on edges, B on faces), stepped by the phase rule

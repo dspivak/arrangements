@@ -1416,6 +1416,71 @@ through `nu`. The continuous loop is stable at every gain; the alarm now moves a
 build one in, and was not run for that reason (§2). "Wears out" is stipulated (§3.9), "leaves" is
 not a movement, the word is one number per part, the doodad's supply is stipulated.
 
+### 3.32 Swing locking: inertia with damping keeps two oscillators in step; inertia alone does not
+
+`tests/test_swing_locking.py` (4 passed); predictions fixed first and verdicts in
+`notes/P32-C-PREDICTIONS-2026-09-29.md` (book plan P32 (c), §5.9 item 45). The Kuramoto boxes with
+`coalgebra.damped(Q, c)`: the locked difference is Kuramoto's `arcsin(dw/2K)`, an exact fixed point of
+the discrete map, the common advance `mean(omega)/(c m)` per step, and the approach overshoots iff
+`c + a/m < 2 sqrt(a/m)` with `a = 2K cos(delta*)`. At `c = 0` nothing settles. Closed forms of the
+discrete map, so the run checks the derivation; the undamped case could have settled numerically and did
+not. Weird: undamped, the natural frequencies are constant torques on unloaded rotors, and the mean angle
+runs to 1e5 rad.
+
+### 3.33 A Kirchhoff node: the current law is the transpose of copying, at three branches
+
+`tests/test_kirchhoff_node.py` (6 passed); predictions and verdicts in
+`notes/P32-E-PREDICTIONS-2026-09-29.md` (book plan P32 (e), §5.9 item 46). A capacitor box copied to
+three resistor couplers to three ideal sources steps by `-dt * sum_j I_j` to 1e-15 with no sum written
+anywhere; a triangle of capacitors conserves charge to 1e-15 and settles at the capacitance-weighted
+mean; two conductances rest at the conductance-weighted mean of their sources. The first three checks
+are the mechanism (the vjp of a gather is a scatter-add) and could fail only by a sign slip. Limit found:
+a nodal-analysis node holds no charge, and its algebraic constraint is not what a state-holding box
+expresses; §4's "nodal equations as the composite ODE" holds for networks with a capacitor at every node.
+
+### 3.34 Light in the library: the lattice Maxwell model as a composed arrangement
+
+`arrangements/light_lattice.py`, `tests/test_light_lattice.py` (6 passed); predictions fixed first and
+verdicts in `notes/P32-A-PREDICTIONS-2026-09-29.md` (book plan P32 (a), §5.9 item 47). An 8×8 periodic
+grid of phase edge boxes and stateless face boxes with cost (kappa/2) B^2, wired by copy: the forcing
+emerges from `compose_seq` and equals -d of the total face energy; one step equals `scripts/maxwell2d.py`'s
+(kappa = dt^2, momenta dt·xdot) to 1e-12; the vertex divergence of the momenta is conserved to 1e-12;
+the lattice dispersion holds to 1e-9. Refuted as written: the plain energy is not within a few percent
+at step 0.5 (it swings 33% and 119%, bounded, no drift, linear in the step); the staggered energy
+1/2 sum xi_n^2 + 1/2 <B_n, B_{n+1}> is conserved to 1e-12. Yee's TE scheme in the temporal gauge
+(Stern, Tong, Desbrun and Marsden, arXiv:0707.4470, Thm. 5.1, §4.1). "Short waves run slow" is the
+lattice's numerical dispersion, not a property of light. Hygiene: `_tensor_balanced` is imported from
+`hopfield.py` and belongs in `wiring.py`.
+
+### 3.35 Lotka–Volterra as the book's step: the plain step spirals out, the two-stage step cycles
+
+`arrangements/lotka_volterra.py`, `tests/test_lotka_volterra.py` (7 passed); predictions fixed first and
+verdicts in `notes/P32-B-PREDICTIONS-2026-09-29.md` (book plan P32 (b), §5.9 item 48). Prey and
+predator boxes with log state and opposite-signed responses, a stateless hunt box with potential beta·x·y,
+wired as CDLM `ex.lotka_volterra`: one step of the composite is forward Euler on CDLM's field to 1e-12,
+the coexistence point is fixed, composite equals monolithic. The plain configuration step raises the
+Lotka–Volterra invariant at every step (4.8e-2 per cycle at dt 0.02, halving with dt), in the log chart
+and the population chart alike; the two-stage `CotCoalg2` step (predator first, prey second, `pc2.Phi2`)
+bounds it (max |H − H0| 3.8e-3 over 22 cycles, second order). So "rabbits and foxes rise and fall in
+turn" is true of the two-stage arrangement and false of the plain one over many cycles. Runner note:
+`-s` passed to `scripts/run_tests.sh` is read as a selection and starts the whole suite; use
+`PYTEST_ADDOPTS="-s"`.
+
+### 3.36 The genetic code, sourced and as an arrangement
+
+`notes/P32-D-SOURCES-2026-09-29.md`, `scripts/genetic_code_stability_sourced.py`, `arrangements/genetic_code.py`,
+`tests/test_genetic_code.py` (9 passed, 72 s); predictions in `notes/P32-D-PREDICTIONS-2026-09-29.md` (book
+plan P32 (d), §5.9 item 49). The from-memory inputs of `scripts/genetic_code_stability.py` were checked
+against readable reproductions with locators (polar requirements: arXiv:0909.1442v2 Table I p. 3, after
+Woese 1966; slip weights: arXiv:1309.4589v1 §2 p. 8, quoting Freeland and Hurst 1998; the primaries were not
+readable and are not cited as read): every value matched, so the earlier table is a reproduction. On the
+2008 recomputed polar-requirement scale the ordering survives but the threshold drops to β 1.0–1.5 and the
+hard-code result weakens to 2–10 of 2000: the numbers are scale-dependent and are not to be quoted bare. The
+arrangement has 386 boxes (61 codon boxes on the simplex in the log chart, 263 slip-cost edges, 61
+definiteness, 1 repertoire); its full-code step equals the script's to 7e-16 and the slip cost emerges from
+the wiring. The biologist's objection stands: polar requirement is a poor proxy for damage, so the model is a
+descent, not a claim about which amino acid a cell can least afford. One step takes 30–45 s.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
