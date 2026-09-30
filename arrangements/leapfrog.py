@@ -14,6 +14,11 @@ covector is *added*, STATUS.md §1):
     finish        : ξ' = ξ½ + ½ ξ_Q(q')                            (new = (q', ξ'))
 
 so the two force evaluations ξ_Q(q) and ξ_Q(q') are the two ``pc^(2)`` rounds.
+Inside one closed box the second round buys nothing: the one-stage phase step
+(CDLM ``eqn.closed_update``), started a half-kick ahead, is the Störmer recurrence
+and gives velocity Verlet's positions with one force evaluation per step (book
+plan AGENTDOCPLAN.md §5.9 item 6 (b)). Two rounds earn their place when the order
+of updates crosses a wire (``lotka_volterra.py``).
 Constant (mass-like) ``sharp`` — the physics case. Whether ``arr → pc^(2)`` is
 lax monoidal is open (pc2.py).
 """

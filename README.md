@@ -89,6 +89,9 @@ in `tests/durations.tsv` (gitignored); a `?` file has never been timed, so start
 The runner streams all output and saves full logs. Read and report each batch before starting
 another; split a slow file by pytest node ID (`tests/test_file.py::test_name`) before its
 projected completion approaches the limit. With no selections the runner prints usage and exits.
+A pytest option such as `-s` goes in the environment, `PYTEST_ADDOPTS="-s" scripts/run_tests.sh 120
+tests/test_file.py`; given as an argument it is refused, since pytest would read it as no selection and run
+the whole suite.
 See `STATUS.md` §2 for what a passing test establishes and how tests share helpers.
 
 ## The two ideas

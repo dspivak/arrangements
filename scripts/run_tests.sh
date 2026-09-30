@@ -4,6 +4,7 @@
 #   scripts/run_tests.sh --list        (each file with its last clean time, to size a batch)
 #   scripts/run_tests.sh 120 tests/test_polynomial.py
 #   scripts/run_tests.sh 120 tests/test_file.py::test_name
+#   PYTEST_ADDOPTS="-s" scripts/run_tests.sh 120 tests/test_file.py   (pytest options, e.g. -s, go here)
 # Full output is streamed and saved; the exit status records any failure or cutoff.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -25,10 +26,19 @@ fi
 if [ "$#" -lt 2 ] || ! [[ "$1" =~ ^[1-9][0-9]*$ ]]; then
   echo "Usage: scripts/run_tests.sh LIMIT_SECONDS TEST_FILE_OR_NODE_ID [...]" >&2
   echo "Use --list to see each file's last clean time; size the batch from it." >&2
+  echo "Pytest options (e.g. -s) go in PYTEST_ADDOPTS, never as arguments." >&2
   exit 64
 fi
 LIMIT=$1
 shift
+# A pytest option given as a selection (say -s) would run the whole suite; options go in PYTEST_ADDOPTS.
+for selection in "$@"; do
+  if [[ "$selection" == -* ]]; then
+    echo "Not a test selection: $selection. Pass pytest options through the environment:" >&2
+    echo "  PYTEST_ADDOPTS=\"$selection\" scripts/run_tests.sh $LIMIT TEST_FILE_OR_NODE_ID" >&2
+    exit 64
+  fi
+done
 if [ ! -x "$PY" ]; then
   echo "Missing $PY; install the test environment first (README.md)." >&2
   exit 1
