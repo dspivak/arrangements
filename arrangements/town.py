@@ -40,6 +40,15 @@ them, so their one-form on the power input is the constant `benefit`: that wire 
 (retroactivity), while their one-form on smoke stays zero (an insulator). The plant's cost
 loses its revenue term, which now reaches it as that push, pulled back through its power
 output. Every trajectory is (d)'s.
+
+Stage (f), `diligence=True` at stage 3 or 4 (notes/P29-F-PREDICTIONS-2026-09-29.md): the insurer
+does its own due diligence. A record node 'books' keeps three running sums: S_uy = sum u*y and
+C = sum u^2 over the claims it has paid (the delayed records, u = s^2/2, y = incidence), and
+E = sum u^2 over the exposure it has written (known at once). Its own fit is least squares over
+every claim so far, own = S_uy/C, and its rate descends (rate - target)^2/2 with
+target = est + (C/E)*(own - est): its own fit carries the share of the exposure's evidence whose
+claims have arrived, her estimate (or the court's fit, report disconnected) the rest. With
+diligence=False every stage is unchanged.
 """
 from dataclasses import dataclass
 
@@ -118,7 +127,7 @@ class Town:
 
 
 def build(stage, settings=Settings(), *, connect_report=True, informed=False, clean=False,
-          power_to_town=False):
+          power_to_town=False, diligence=False):
     """Stages 1=no return, 2=law, 3=historical insurance, 4=her account.
 
     Informed control starts the liability estimator at the true coefficient.
@@ -127,11 +136,14 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
     'cleanliness' then index the two coordinates of the one box 'plant'.
     power_to_town=True (stage (e), needs clean=True) sends the power to the residents,
     who push back on it at `benefit` per watt; the plant's revenue arrives that way.
+    diligence=True (stage (f), stage 3 or 4) gives the insurer its books and its own claims fit.
     """
     if stage not in (1, 2, 3, 4) or settings.delay_steps < 0:
         raise ValueError('stage must be 1..4 and delay_steps nonnegative')
     if power_to_town and not clean:
         raise ValueError('power_to_town needs the two-dial plant (clean=True)')
+    if diligence and stage < 3:
+        raise ValueError('diligence needs an insurer (stage 3 or 4)')
     revenue = 0.0 if power_to_town else settings.benefit
     c = settings
     boxes, slots, outs, sources = [], {}, {}, []
@@ -212,11 +224,30 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
                      fit_cost, c.dt*c.learn_rate), settled)
 
         if stage >= 3:
-            add(own_cost('premium', [0.0], 1,
-                         lambda q, e: .5*(q[0]-e[0])**2, c.dt*c.quote_rate),
-                lambda q: at(q, 'estimate' if stage == 4 and connect_report else 'assessed'))
+            prior = 'estimate' if stage == 4 and connect_report else 'assessed'
+            if diligence:
+                def target(e):
+                    # e = (prior, S_uy, C, E): own least-squares fit on paid claims, weighted by
+                    # the share C/E of the exposure's evidence whose claims have arrived
+                    guess, s_uy, paid, written = e
+                    own = s_uy/jnp.where(paid > 0, paid, 1.0)
+                    share = paid/jnp.where(written > 0, written, 1.0)
+                    return guess + share*(own - guess)
+                add(own_cost('premium', [0.0], 4,
+                             lambda q, e: .5*(q[0]-target(e))**2, c.dt*c.quote_rate),
+                    lambda q: jnp.concatenate([at(q, prior), at(q, 'books')]))
+            else:
+                add(own_cost('premium', [0.0], 1,
+                             lambda q, e: .5*(q[0]-e[0])**2, c.dt*c.quote_rate),
+                    lambda q: at(q, prior))
         if stage == 4:
             add(own_cost('estimate', [0.0], 2, fit_cost, c.dt*c.learn_rate), observed)
+        if diligence:
+            # inputs (u, y) of the claim settled now and u of the exposure written, a step back
+            # so that its claim settles exactly one delay later
+            add(node('books', [0., 0., 0.], 3,
+                     lambda q, e: jnp.array([e[0]*e[1], e[0]**2, e[2]**2]), c.dt),
+                lambda q: jnp.concatenate([settled(q), observed(q)[:1]]))
 
         def payments(q):
             output = at(q, 'output')[0]
@@ -286,6 +317,11 @@ def summary(town, trajectory):
         result['final_smoke'] = float(s[-1])
         result['final_coughing'] = float(town.value(trajectory, 'coughing')[-1, 0])
         result['power'] = float(c.dt*np.sum(output[:-1]))
+    if 'books' in town.slots:
+        books = town.value(trajectory, 'books')
+        paid = np.flatnonzero(books[:, 1] > 0)
+        result['first_claim_time'] = float(paid[0]*c.dt) if len(paid) else None
+        result['final_own_fit'] = float(books[-1, 0]/books[-1, 1]) if len(paid) else None
     for name in ('assessed', 'premium', 'estimate'):
         if name in town.slots:
             values = town.value(trajectory, name)[:, 0]
