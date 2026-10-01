@@ -1,0 +1,750 @@
+"""An arrangement that runs arrangements: the kit, its terms, and the runner (book plan P34).
+
+The question (D. Spivak, 2026-10-01): "something like a universal Turing machine, except a
+universal arrangement runner", for the *constructible* arrangements, those built from a finite
+kit by composition and tensor. Statement aimed at: there is a finite kit and one closed
+arrangement built from that kit which, handed the description of any closed term over the kit,
+runs it, taking many of its own steps for each step of the term.
+
+THE KIT (each a library `Arrangement`; `KIT` below).
+
+* `const(c)`    -- presents the number c. No state.
+* `register(x)` -- one real, unit response: x' = x + (covector received).
+* `drum(cells)` -- presents its front cell; the covector received is added to the front cell and
+                   then the cells rotate one place, front to back. Nothing received can change its
+                   length.
+* `add`, `mul`  -- stateless, hear two values, present their sum / product; no forcing.
+* `cost`        -- stateless, hears v; forcing -dv (the potential -v).
+* `push`        -- stateless, hears (d, r); returns the covector d on r's wire and ZERO on d's:
+                   a one-way, non-exact forcing.
+* `fan(n, idx)` -- a wiring: hears n values, presents the listed ones (copy, permute, drop).
+
+A NET is a closed term over the kit written as a netlist (`Net`): leaves, then boxes each
+reading two earlier wires, then sinks. `to_term` writes it with 'seq' and 'tensor'; `denote`
+turns the term into the library's arrangement. `ref_step` is the same semantics in plain
+Python arithmetic (it runs on `fractions.Fraction`), sharing no code with the library.
+
+THE RUNNER is one net, `machine_net`: four flag drums (load, store, add, multiply), one data
+drum, one register `a` (the accumulator), the constant -1, twelve boxes and two pushes. Each of
+its steps, with `cell` the data drum's front,
+
+    a'    = a + L (cell - a) + A cell + M (a cell - a)
+    cell' = cell + S (a - cell)                 (L and S together exchange a and cell)
+
+then every drum rotates. `compile_net` translates any net into flag-drum contents and a data
+layout: the net's forward values, its backward pass (the backward pass of add is a copy, of
+mul two muls, so the kit can do its own), the updates of its registers and drums. A drum of
+the net is rotated by one pass of exchanges. One pass of the flag drums is one step of the net.
+
+`machine_run` is the runner's step in plain Python, skipping the steps whose flags are all zero
+(they only rotate). The test checks it against the library's arrangement of `machine_net`.
+
+WITH PORTS (`port_runner_net`, `asker_net`, `couple`): the runner as one part among others. An
+asker sends a translated description over seven wires, one piece a step; the runner loads it,
+runs it, and presents its data cells, which the asker samples into registers. `inbox`, a
+register that becomes what arrives at its port, is the one part added to the kit for this.
+
+WHAT THE DESCRIPTION IS: the compiled flags and layout, not the raw term. The translation
+(`compile_net`) is done outside the runner. See STATUS.md for what this does and does not show.
+"""
+from __future__ import annotations
+
+from fractions import Fraction
+from typing import List, Sequence
+
+# ---------------------------------------------------------------------------
+# Nets: closed terms over the kit, as netlists.
+# ---------------------------------------------------------------------------
+
+LEAF_KINDS = ("const", "register", "drum", "inbox")
+BOX_KINDS = ("add", "mul")
+
+
+class Net:
+    """A closed term over the kit as a netlist. A node's wire id is its index in `nodes`."""
+
+    def __init__(self):
+        self.nodes: list = []
+        self.sinks: list = []
+        self.outputs: list = []   # wires presented at the net's outer port, in order
+
+    def inbox(self, x0=0):
+        """A register that becomes what arrives at its own input port (one step late)."""
+        return self._node("inbox", x0)
+
+    def out(self, w):
+        self.outputs.append(w)
+
+    def inboxes(self):
+        return [w for w, nd in enumerate(self.nodes) if nd[0] == "inbox"]
+
+    def _node(self, *node):
+        self.nodes.append(tuple(node))
+        return len(self.nodes) - 1
+
+    def const(self, c):
+        return self._node("const", c)
+
+    def register(self, x0):
+        return self._node("register", x0)
+
+    def drum(self, cells):
+        return self._node("drum", list(cells))
+
+    def add(self, i, j):
+        return self._node("add", i, j)
+
+    def mul(self, i, j):
+        return self._node("mul", i, j)
+
+    def cost(self, w):
+        self.sinks.append(("cost", w))
+
+    def push(self, d, r):
+        self.sinks.append(("push", d, r))
+
+    def leaves(self):
+        return [w for w, nd in enumerate(self.nodes) if nd[0] in LEAF_KINDS]
+
+    def init_state(self):
+        st = {}
+        for w, nd in enumerate(self.nodes):
+            if nd[0] in ("register", "inbox"):
+                st[w] = nd[1]
+            elif nd[0] == "drum":
+                st[w] = list(nd[1])
+        return st
+
+
+def _forward(net: Net, state: dict) -> list:
+    val = [None] * len(net.nodes)
+    for w, nd in enumerate(net.nodes):
+        k = nd[0]
+        if k == "const":
+            val[w] = nd[1]
+        elif k in ("register", "inbox"):
+            val[w] = state[w]
+        elif k == "drum":
+            val[w] = state[w][0]
+        elif k == "add":
+            val[w] = val[nd[1]] + val[nd[2]]
+        else:
+            val[w] = val[nd[1]] * val[nd[2]]
+    return val
+
+
+def present(net: Net, state: dict) -> list:
+    """What the net presents at its outer port in this state."""
+    val = _forward(net, state)
+    return [val[w] for w in net.outputs]
+
+
+def ref_step(net: Net, state: dict, inputs: Sequence = ()) -> dict:
+    """One step of the net's dynamics, by hand: forward values, backward covectors, updates.
+
+    `inputs` are the values arriving at the net's inboxes, in order.
+    """
+    n = len(net.nodes)
+    val = _forward(net, state)
+    xi = [0] * n
+    for w, v in zip(net.inboxes(), inputs):
+        xi[w] = xi[w] + (v - state[w])
+    for s in net.sinks:
+        if s[0] == "cost":
+            xi[s[1]] = xi[s[1]] + (-1)
+        else:
+            xi[s[2]] = xi[s[2]] + val[s[1]]
+    for w in range(n - 1, -1, -1):
+        nd = net.nodes[w]
+        if nd[0] == "add":
+            xi[nd[1]] = xi[nd[1]] + xi[w]
+            xi[nd[2]] = xi[nd[2]] + xi[w]
+        elif nd[0] == "mul":
+            i, j = nd[1], nd[2]
+            gi, gj = xi[w] * val[j], xi[w] * val[i]
+            xi[i] = xi[i] + gi
+            xi[j] = xi[j] + gj
+    new = {}
+    for w, nd in enumerate(net.nodes):
+        if nd[0] in ("register", "inbox"):
+            new[w] = state[w] + xi[w]
+        elif nd[0] == "drum":
+            cells = list(state[w])
+            cells[0] = cells[0] + xi[w]
+            new[w] = cells[1:] + cells[:1]
+    return new
+
+
+def to_term(net: Net):
+    """The net as a term: nested tuples over the kit with 'seq' and 'tensor'.
+
+    A net with inboxes carries their k input wires down through every layer ('inwire', k);
+    its outputs are presented at the end.
+    """
+    leaves = net.leaves()
+    k = len(net.inboxes())
+    thread = (("inwire", k),) if k else ()
+    pos = {w: p for p, w in enumerate(leaves)}
+    term = ("tensor",) + tuple(net.nodes[w] for w in leaves)
+    n = len(leaves)
+    for w, nd in enumerate(net.nodes):
+        if nd[0] in BOX_KINDS:
+            ident = list(range(n))
+            route = ("tensor", ("fan", n, ident + [pos[nd[1]], pos[nd[2]]])) + thread
+            layer = ("tensor", ("fan", n, ident), (nd[0],)) + thread
+            term = ("seq", term, ("seq", route, layer))
+            pos[w] = n
+            n += 1
+    idx, parts = [], []
+    for s in net.sinks:
+        idx += [pos[x] for x in s[1:]]
+        parts.append((s[0],))
+    j = len(net.outputs)
+    idx += [pos[w] for w in net.outputs]
+    if j:
+        parts.append(("fan", j, list(range(j))))
+    if parts:
+        term = ("seq", term, ("seq", ("tensor", ("fan", n, idx)) + thread, ("tensor",) + tuple(parts) + thread))
+    else:
+        term = ("seq", term, ("tensor", ("fan", n, [])) + thread)
+    return term
+
+
+# ---------------------------------------------------------------------------
+# The kit as library arrangements, and the denotation of a term.
+# ---------------------------------------------------------------------------
+
+
+def _kit():
+    import jax.numpy as jnp
+
+    from .arrangement import Arrangement, exact, zero_form
+    from .coalgebra import CotCoalg, configuration
+    from .rvect import ReactiveVectorSpace
+    from .wiring import trivial_parameter
+
+    Z = lambda: jnp.zeros(0)
+
+    def const(c):
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+                           out_f=lambda q, m: jnp.array([float(c)]), in_f=lambda q, m, n: Z(),
+                           omega=zero_form, label="const")
+
+    def register(x0):
+        Q = ReactiveVectorSpace(dim=1, sharp_fn=lambda q: jnp.eye(1))
+        return Arrangement(P=configuration(Q, init=jnp.array([float(x0)])), in_dim_M=0, out_dim_M=0,
+                           in_dim_N=0, out_dim_N=1, out_f=lambda q, m: q, in_f=lambda q, m, n: Z(),
+                           omega=zero_form, label="register")
+
+    def drum(cells):
+        cells = jnp.asarray([float(c) for c in cells])
+        P = CotCoalg(Q_dim=int(cells.size), init=cells, position=lambda s: s,
+                     step=lambda s, xi: jnp.roll(s + xi, -1), label="drum")
+        return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+                           out_f=lambda q, m: q[:1], in_f=lambda q, m, n: Z(), omega=zero_form, label="drum")
+
+    def add():
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=1,
+                           out_f=lambda q, m: m[:1] + m[1:], in_f=lambda q, m, n: Z(),
+                           omega=zero_form, label="add")
+
+    def mul():
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=1,
+                           out_f=lambda q, m: m[:1] * m[1:], in_f=lambda q, m, n: Z(),
+                           omega=zero_form, label="mul")
+
+    def cost():
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=1, in_dim_N=0, out_dim_N=0,
+                           out_f=lambda q, m: Z(), in_f=lambda q, m, n: Z(),
+                           omega=exact(lambda q, m, n: -m[0]), label="cost")
+
+    def push():
+        def omega(q, m, n):
+            return Z(), jnp.stack([jnp.zeros(()), m[0]]), Z()
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=0,
+                           out_f=lambda q, m: Z(), in_f=lambda q, m, n: Z(), omega=omega, label="push")
+
+    def inbox(x0):
+        Q = ReactiveVectorSpace(dim=1, sharp_fn=lambda q: jnp.eye(1))
+
+        def omega(q, m, n):
+            return n - q, Z(), jnp.zeros(1)
+        return Arrangement(P=configuration(Q, init=jnp.array([float(x0)])), in_dim_M=0, out_dim_M=0,
+                           in_dim_N=1, out_dim_N=1, out_f=lambda q, m: q, in_f=lambda q, m, n: Z(),
+                           omega=omega, label="inbox")
+
+    def inwire(k):
+        return Arrangement(P=trivial_parameter(), in_dim_M=int(k), out_dim_M=0, in_dim_N=int(k), out_dim_N=0,
+                           out_f=lambda q, m: Z(), in_f=lambda q, m, n: n, omega=zero_form, label="inwire")
+
+    def fan(n, idx):
+        ix = jnp.asarray(list(idx), dtype=int)
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=int(n), in_dim_N=0,
+                           out_dim_N=len(idx), out_f=lambda q, m: m[ix], in_f=lambda q, m, n_: Z(),
+                           omega=zero_form, label="fan")
+
+    return dict(const=const, register=register, drum=drum, add=add, mul=mul, cost=cost, push=push, fan=fan,
+                inbox=inbox, inwire=inwire)
+
+
+def denote(term):
+    """The arrangement a term denotes: one clause per kit part, one for 'seq', one for 'tensor'."""
+    from .wiring import compose_seq, tensor_arrangements
+
+    kit = _kit()
+
+    def go(t):
+        head, rest = t[0], t[1:]
+        if head == "seq":
+            return compose_seq(go(rest[0]), go(rest[1]))
+        if head == "tensor":
+            parts = [go(x) for x in rest]
+            return parts[0] if len(parts) == 1 else tensor_arrangements(parts)
+        return kit[head](*rest)
+
+    return go(term)
+
+
+def flat_state(state) -> list:
+    """A library state (nested pairs of arrays) as a flat list: the leaves' states in order."""
+    import numpy as np
+
+    out = []
+
+    def rec(x):
+        if isinstance(x, (tuple, list)):
+            for y in x:
+                rec(y)
+        else:
+            out.extend(np.asarray(x).ravel().tolist())
+
+    rec(state)
+    return out
+
+
+def library_run(net: Net, steps: int) -> List[list]:
+    """Run the net through the library (`denote`, `Phi`); the flat state after each step."""
+    import jax.numpy as jnp
+
+    from .functors import Phi
+    from .interpretation import trivial_omega
+
+    O = Phi(denote(to_term(net)))
+    state, IN = O.state, (jnp.zeros(0), trivial_omega(0))
+    out = []
+    for _ in range(steps):
+        _, _, state = O.with_state(state).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+        out.append(flat_state(state))
+    return out
+
+
+def library_run_jit(net: Net, steps: int, check: int = 2, every: int = 1) -> List[list]:
+    """As `library_run`, with the step compiled by JAX; the first `check` steps are also taken
+    through `Phi` and compared, so the compiled step is the library's own. Only every
+    `every`-th state is kept (and the first `check`).
+
+    For a closed arrangement `Phi`'s step is: present q, take the forcing's component on Q at
+    q, hand it to the integrator. That is what is compiled here.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    from .functors import Phi
+
+    A = denote(to_term(net))
+    z = jnp.zeros(0)
+    step = jax.jit(lambda s: A.P.step(s, A.omega(A.P.position(s), z, z)[0]))
+    state, out, head = A.P.init, [], []
+    for k in range(1, steps + 1):
+        state = step(state)
+        if k <= check:
+            head.append(flat_state(state))
+        if k % every == 0:
+            out.append(flat_state(state))
+    if check:
+        assert library_run(net, check) == head, "compiled step differs from Phi's"
+    return out
+
+
+def couple(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int]):
+    """Two nets with ports, wired to each other: b's i-th inbox hears a's output a_to_b[i], and
+    a's i-th inbox hears b's output b_to_a[i]. Returns the closed library arrangement."""
+    import jax.numpy as jnp
+
+    from .arrangement import Arrangement, zero_form
+    from .wiring import compose_seq, tensor_arrangements, trivial_parameter
+
+    A, B = denote(to_term(net_a)), denote(to_term(net_b))
+    ja = len(net_a.outputs)
+    route = jnp.asarray([ja + i for i in b_to_a] + list(a_to_b), dtype=int)
+    W = Arrangement(P=trivial_parameter(), in_dim_M=A.in_dim_N + B.in_dim_N, out_dim_M=A.out_dim_N + B.out_dim_N,
+                    in_dim_N=0, out_dim_N=0, out_f=lambda q, m: jnp.zeros(0),
+                    in_f=lambda q, m, n: m[route], omega=zero_form, label="wires")
+    return compose_seq(tensor_arrangements([A, B]), W)
+
+
+def arrangement_run_jit(A, steps: int, check: int = 2, every: int = 1) -> List[list]:
+    """Run a closed library arrangement with its step compiled, as `library_run_jit` does for a net."""
+    import jax
+    import jax.numpy as jnp
+
+    from .functors import Phi
+    from .interpretation import trivial_omega
+
+    z = jnp.zeros(0)
+    step = jax.jit(lambda s: A.P.step(s, A.omega(A.P.position(s), z, z)[0]))
+    state, out, head = A.P.init, [], []
+    for k in range(1, steps + 1):
+        state = step(state)
+        if k <= check:
+            head.append(flat_state(state))
+        if k % every == 0:
+            out.append(flat_state(state))
+    if check:
+        O = Phi(A)
+        slow, IN = O.state, (z, trivial_omega(0))
+        for k in range(check):
+            _, _, slow = O.with_state(slow).run_one(IN, lambda _o: (z, z))
+            assert flat_state(slow) == head[k], "compiled step differs from Phi's"
+    return out
+
+
+def couple_by_hand(net_a: Net, net_b: Net, a_to_b, b_to_a, sa: dict, sb: dict):
+    """One step of the two coupled nets, by hand: each presents, then each steps on what it hears."""
+    oa, ob = present(net_a, sa), present(net_b, sb)
+    return ref_step(net_a, sa, [ob[i] for i in b_to_a]), ref_step(net_b, sb, [oa[i] for i in a_to_b])
+
+
+def flat_ref(net: Net, state: dict) -> list:
+    out = []
+    for w in net.leaves():
+        if w in state:
+            out.extend(state[w] if isinstance(state[w], list) else [state[w]])
+    return out
+
+
+# ---------------------------------------------------------------------------
+# The translation: a net to the runner's flags and data layout.
+# ---------------------------------------------------------------------------
+
+NOP, LOAD, STORE, ADD, MUL, XCHG = 0, 1, 2, 3, 4, 5
+
+
+class Program:
+    """Flag-drum contents and data layout for one net. `ops[tau]` is the step's instruction."""
+
+    def __init__(self, net, L, Lp, events, data0, reg_addr, drum_base, n_slp):
+        self.net, self.L, self.Lp, self.events = net, L, Lp, events
+        self.data0, self.reg_addr, self.drum_base, self.n_slp = data0, reg_addr, drum_base, n_slp
+
+    def flags(self):
+        """The four flag drums (load, store, add, multiply), each of length Lp."""
+        FL, FS, FA, FM = ([0] * self.Lp for _ in range(4))
+        for tau, op, _addr in self.events:
+            if op in (LOAD, XCHG):
+                FL[tau] = 1
+            if op in (STORE, XCHG):
+                FS[tau] = 1
+            if op == ADD:
+                FA[tau] = 1
+            if op == MUL:
+                FM[tau] = 1
+        return FL, FS, FA, FM
+
+    def encode(self, state: dict, zero=0) -> list:
+        """The data drum holding a state of the net (work cells as in `data0`)."""
+        data = list(self.data0)
+        for w, a in self.reg_addr.items():
+            data[a] = state[w]
+        for w, base in self.drum_base.items():
+            n = len(state[w])
+            for g in range(n):
+                data[base + n - 1 - g] = state[w][g]
+        return data
+
+    def decode(self, data: Sequence) -> dict:
+        state = {}
+        for w, a in self.reg_addr.items():
+            state[w] = data[a]
+        for w, base in self.drum_base.items():
+            n = len(self.net.nodes[w][1])
+            state[w] = [data[base + n - 1 - g] for g in range(n)]
+        return state
+
+
+def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) -> Program:
+    """Translate a net into the runner's instructions. `zero`, `one` fix the number type.
+
+    `cells` and `length` fit the translation to a runner whose data drum has `cells` cells and
+    whose flag drums have `length` (a multiple of `cells`): spare cells and idle steps pad it.
+    """
+    nodes = net.nodes
+    data0: list = []
+
+    def alloc(v=zero):
+        data0.append(v)
+        return len(data0) - 1
+
+    val, reg_addr, drum_base, state_cells = {}, {}, {}, set()
+    for w, nd in enumerate(nodes):
+        if nd[0] == "const":
+            val[w] = alloc(nd[1])
+        elif nd[0] == "register":
+            val[w] = reg_addr[w] = alloc(nd[1])
+            state_cells.add(val[w])
+        elif nd[0] == "drum":
+            n = len(nd[1])
+            base = len(data0)
+            for p in range(n):
+                alloc(nd[1][n - 1 - p])
+            drum_base[w] = base
+            val[w] = base + n - 1  # the front cell
+            state_cells.update(range(base, base + n))
+    neg1 = alloc(-one) if any(s[0] == "cost" for s in net.sinks) else None
+
+    stateful = [False] * len(nodes)  # does the wire have a register or drum behind it?
+    for w, nd in enumerate(nodes):
+        stateful[w] = nd[0] in ("register", "drum") or (
+            nd[0] in BOX_KINDS and (stateful[nd[1]] or stateful[nd[2]]))
+
+    slp = []
+    for w, nd in enumerate(nodes):  # forward values
+        if nd[0] in BOX_KINDS:
+            val[w] = alloc()
+            slp.append((nd[0], val[w], val[nd[1]], val[nd[2]]))
+
+    xi = {}
+
+    def acc(w, c):  # add the covector held in cell c to wire w's total
+        if not stateful[w]:
+            return
+        if w not in xi:
+            xi[w] = c
+        else:
+            z = alloc()
+            slp.append(("add", z, xi[w], c))
+            xi[w] = z
+
+    for s in net.sinks:
+        if s[0] == "cost":
+            acc(s[1], neg1)
+        else:
+            acc(s[2], val[s[1]])
+    for w in range(len(nodes) - 1, -1, -1):  # backward pass
+        nd = nodes[w]
+        if w not in xi or nd[0] not in BOX_KINDS:
+            continue
+        i, j = nd[1], nd[2]
+        if nd[0] == "add":
+            acc(i, xi[w])
+            acc(j, xi[w])
+        else:
+            if stateful[i]:
+                z = alloc()
+                slp.append(("mul", z, xi[w], val[j]))
+                acc(i, z)
+            if stateful[j]:
+                z = alloc()
+                slp.append(("mul", z, xi[w], val[i]))
+                acc(j, z)
+
+    updates = [(val[w], xi[w]) for w, nd in enumerate(nodes) if nd[0] in ("register", "drum") and w in xi]
+    safe = []
+    for target, c in updates:  # a covector that is another part's state is copied before any update
+        if c in state_cells:
+            z = alloc()
+            slp.append(("copy", z, c))
+            c = z
+        safe.append((target, c))
+    for target, c in safe:
+        slp.append(("add", target, target, c))
+    for w, base in drum_base.items():
+        n = len(nodes[w][1])
+        if n > 1:
+            slp.append(("rot", base, n))
+
+    if cells is not None:
+        if len(data0) > cells:
+            raise ValueError(f"the net needs {len(data0)} cells; the runner has {cells}")
+        data0.extend([zero] * (cells - len(data0)))
+    L = max(len(data0), 1)
+    if not data0:
+        data0.append(zero)
+    events, tau = [], -1
+
+    def at(op, addr):
+        nonlocal tau
+        tau = tau + 1 + ((addr - (tau + 1)) % L)
+        events.append((tau, op, addr))
+
+    for ins in slp:
+        if ins[0] in BOX_KINDS:
+            _, z, x, y = ins
+            first = (tau + 1) % L  # read first the operand that comes round sooner
+            if ((y - first) % L) < ((x - first) % L):
+                x, y = y, x
+            at(LOAD, x)
+            at(ADD if ins[0] == "add" else MUL, y)
+            at(STORE, z)
+        elif ins[0] == "copy":
+            at(LOAD, ins[2])
+            at(STORE, ins[1])
+        else:
+            _, base, n = ins
+            at(LOAD, base + n - 1)
+            for p in range(n):
+                at(XCHG, base + p)
+    Lp = L * max(1, -(-(tau + 1) // L))
+    if length is not None:
+        if Lp > length or length % L:
+            raise ValueError(f"the net needs {Lp} steps a pass; the runner's flag drums hold {length}")
+        Lp = length
+    return Program(net, L, Lp, events, data0, reg_addr, drum_base, len(slp))
+
+
+# ---------------------------------------------------------------------------
+# The runner: one net over the kit, and its step in plain Python.
+# ---------------------------------------------------------------------------
+
+
+def machine_net(flags, data, a0=0, minus_one=-1) -> Net:
+    """The runner as a net: five drums, one register, one constant, twelve boxes, two pushes."""
+    FL, FS, FA, FM = flags
+    m = Net()
+    L, S, A, M = m.drum(FL), m.drum(FS), m.drum(FA), m.drum(FM)
+    cell = m.drum(data)
+    a = m.register(a0)
+    neg = m.const(minus_one)
+    na = m.mul(neg, a)
+    ncell = m.mul(neg, cell)
+    t1 = m.add(cell, na)          # cell - a
+    u1 = m.mul(L, t1)
+    u2 = m.mul(A, cell)
+    ac = m.mul(a, cell)
+    t2 = m.add(ac, na)            # a cell - a
+    u3 = m.mul(M, t2)
+    da = m.add(m.add(u1, u2), u3)
+    t3 = m.add(a, ncell)          # a - cell
+    dc = m.mul(S, t3)
+    m.push(da, a)
+    m.push(dc, cell)
+    return m
+
+
+def machine_run(prog: Program, data: list, a, passes: int = 1):
+    """`passes` passes of the flag drums over `data` (changed in place); returns the accumulator.
+
+    Steps whose flags are all zero only rotate the drums and are skipped; the arithmetic of a
+    step with a flag set is the runner's own (the formulas in the module docstring).
+    """
+    for _ in range(passes):
+        for _tau, op, i in prog.events:
+            cell = data[i]
+            if op == LOAD:
+                a = a + (cell - a)
+            elif op == STORE:
+                data[i] = cell + (a - cell)
+            elif op == ADD:
+                a = a + cell
+            elif op == MUL:
+                a = a + (a * cell - a)
+            else:  # XCHG: load and store together
+                a, data[i] = a + (cell - a), cell + (a - cell)
+    return a
+
+
+# ---------------------------------------------------------------------------
+# Three small nets used by the test and the notes.
+# ---------------------------------------------------------------------------
+
+
+def two_tanks(v1=3, v2=1, kappa=Fraction(1, 20)) -> Net:
+    """Two registers joined by the cost (kappa/2)(v1 - v2)^2: two tanks and a pipe, in the units
+    where a tank's response is one. Closed form: v1, v2 = 2 +- (1 - 2 kappa)^k from 3, 1."""
+    n = Net()
+    x, y = n.register(v1), n.register(v2)
+    neg, hk = n.const(-1), n.const(kappa / 2)
+    d = n.add(x, n.mul(neg, y))
+    n.cost(n.mul(hk, n.mul(d, d)))
+    return n
+
+
+def turner(x0=1, y0=0, eps=Fraction(1, 8)) -> Net:
+    """x' = x + eps y, y' = y - eps x: two pushes, a forcing with no potential."""
+    n = Net()
+    x, y = n.register(x0), n.register(y0)
+    e, ne = n.const(eps), n.const(-eps)
+    n.push(n.mul(e, y), x)
+    n.push(n.mul(ne, x), y)
+    return n
+
+
+def crossed(x0=1, y0=2) -> Net:
+    """x' = x + y, y' = y + x, each pushed by the other's state itself."""
+    n = Net()
+    x, y = n.register(x0), n.register(y0)
+    n.push(y, x)
+    n.push(x, y)
+    return n
+
+
+# ---------------------------------------------------------------------------
+# The runner as a part with ports, and a part that asks it.
+# ---------------------------------------------------------------------------
+
+
+def port_runner_net(cells: int, length: int, zero=0, minus_one=-1) -> Net:
+    """The runner with an outer port. It hears seven values a step: a load gate, a run gate, four
+    flags and a number. While the load gate is 1 the front cell of each of its drums becomes
+    what arrived; while the run gate is 1 it runs what its drums hold; it always presents the
+    front cell of its data drum. Its drums' sizes are fixed: nothing it hears can change them.
+    """
+    m = Net()
+    g, e = m.inbox(zero), m.inbox(zero)
+    vL, vS, vA, vM, vd = (m.inbox(zero) for _ in range(5))
+    L, S, A, M = (m.drum([zero] * length) for _ in range(4))
+    cell = m.drum([zero] * cells)
+    a = m.register(zero)
+    neg = m.const(minus_one)
+    for F, v in ((L, vL), (S, vS), (A, vA), (M, vM)):       # loading a flag drum
+        m.push(m.mul(g, m.add(v, m.mul(neg, F))), F)
+    na, ncell = m.mul(neg, a), m.mul(neg, cell)
+    u1 = m.mul(L, m.add(cell, na))
+    u2 = m.mul(A, cell)
+    u3 = m.mul(M, m.add(m.mul(a, cell), na))
+    m.push(m.mul(e, m.add(m.add(u1, u2), u3)), a)
+    run_c = m.mul(e, m.mul(S, m.add(a, ncell)))
+    load_c = m.mul(g, m.add(vd, ncell))
+    m.push(m.add(run_c, load_c), cell)
+    m.out(cell)
+    return m
+
+
+def asker_net(prog: Program, passes: int, addresses: Sequence[int], zero=0, one=1, minus_one=-1):
+    """A part that sends `prog` to a port runner, has it run `passes` passes, and keeps the answer.
+
+    It is seven drums it sends from (load gate, run gate, four flags, the numbers), one inbox for
+    what comes back, and for each wanted cell a sampling drum and a register `ans`. Returns the
+    net, the number of steps the exchange takes, and the wires of the answer registers.
+    """
+    Lp, L = prog.Lp, prog.L
+    start_read = Lp + passes * Lp + 1
+    times = [start_read + ((a + 1 - start_read) % L) for a in addresses]   # runner step showing cell a
+    T = max(times) + 3
+    FL, FS, FA, FM = prog.flags()
+    n = Net()
+    G = n.drum([one if t < Lp else zero for t in range(T)])
+    E = n.drum([one if Lp <= t < Lp + passes * Lp else zero for t in range(T)])
+    fl, fs, fa, fm = (n.drum([one if x else zero for x in F]) for F in (FL, FS, FA, FM))
+    d = n.drum(list(prog.data0))
+    heard = n.inbox(zero)
+    neg = n.const(minus_one)
+    answers = []
+    for t in times:
+        samp = n.drum([one if k == t + 1 else zero for k in range(T)])
+        ans = n.register(zero)
+        n.push(n.mul(samp, n.add(heard, n.mul(neg, ans))), ans)
+        answers.append(ans)
+    for w in (G, E, fl, fs, fa, fm, d):
+        n.out(w)
+    return n, T, answers

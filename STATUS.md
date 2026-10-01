@@ -1035,7 +1035,9 @@ logit.
 
 **The same distribution is one Bayes step in the Legendre-dual chart** (§3.23 on the categorical
 family). Gauge-fixed natural parameters, inverse-Fisher response, affine forcing: one step at
-duration 1 from the uniform belief lands on the logit to 8.6e-16. The gauge is needed — on all of
+duration 1 from the uniform belief lands on the logit to 8.6e-16. *Scope (2026-10-01):* exact in
+the mathematics, but the library's dense-inverse step loses it once some hypothesis's weight falls
+below about 1e-5 (`cond(G) ~ 1/min q`; `notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md` §5.1). The gauge is needed — on all of
 `R^n` the Fisher information is singular along `1` — and that is a wrinkle the continuous conjugate
 families of §3.23 did not have. The two responses agree under the Legendre map to 2.8e-17, but the
 arrangements differ: the mean-chart jump on the affine cost linearizes softmax, missing by order
@@ -1480,6 +1482,45 @@ arrangement has 386 boxes (61 codon boxes on the simplex in the log chart, 263 s
 definiteness, 1 repertoire); its full-code step equals the script's to 7e-16 and the slip cost emerges from
 the wiring. The biologist's objection stands: polar requirement is a poor proxy for damage, so the model is a
 descent, not a claim about which amino acid a cell can least afford. One step takes 30–45 s.
+
+### 3.37 An arrangement that runs arrangements: a runner built from a kit, handed its own description
+
+`arrangements/runner.py`, `tests/test_runner.py` (21 passed, about 80 s in five pieces); book plan P34, §5.9
+item 56; the question and the design are in the book repo's `notes/self-hosted-arr-2026-10-01.md`. The kit is
+`const`, `register` (unit response), `drum` (adds what it receives to its front cell, then rotates), `add`,
+`mul`, `cost`, `push` (a one-way forcing) and the wiring `fan`. A *net* is a closed term over the kit. The
+runner is one net: four flag drums, a data drum, a register, the constant -1, twelve boxes, two pushes.
+
+**Strong evidence here.** (i) Two implementations sharing no code: three nets, and ten random ones, through
+`denote` and `Phi` agree with the by-hand stepper `ref_step`; the two-tank net equals its closed form
+`2 +- (9/10)^k` exactly in fractions. (ii) The translation `compile_net` is exact in fractions against
+`ref_step` on those three nets and on 300 random nets using every kit part. (iii) The runner, taken through
+the library's own composition, decodes after one pass of its flag drums to the net's own step (two tanks to
+7e-16, the other two exactly); its compiled step equals `Phi`'s on the first two steps. (iv) Handed the
+translation of its own net, the runner runs each of the three nets exactly in fractions, and after every
+guest step the host's decoded state equals the runner's net stepped by hand; with the host as a library
+arrangement the tower was run for the two smallest nets. Slowdown: 182 runner steps per two-tank step;
+2,889,432 host steps per two-tank step when the runner runs its own description.
+
+**The runner as a part with ports.** `port_runner_net(cells, length)` is the runner with seven inboxes (a
+load gate, a run gate, four flags, a number) and one output (its data drum's front cell); `asker_net` is a
+part that sends a translated description from its own drums, one piece a step, has the runner run it, and
+samples the returning cells into answer registers. Asker and runner are each a term over the kit plus
+`inbox` (a register that becomes what arrives at its port); `couple` wires them into one closed arrangement.
+One runner (16 cells, flag drums of 208; 43 nodes), three askers: after 837 steps each asker's registers hold
+its net's state after three steps, exactly in fractions by hand, and through the library's composition
+(state dimension 5055) to 7e-16. A description needing more cells or steps than the runner has is refused by
+the translator: nothing the runner hears can change its drums' sizes. No covector crosses between asker and
+runner; only values do. The asker must know where and when the answer appears, since it did the translating.
+
+**What this does not show.** The description the runner is handed is the translated flags and layout; the
+translation, which lays out the net's backward pass as adds and multiplies and schedules it, is done outside
+the runner. Only closed nets: no outer ports. There is no written proof that the translation is right for
+every net; the random nets are evidence, not proof. That every closed term over the kit is a net is by
+inspection. The runner has no cost and no two-way coupling: it computes a net's covectors as numbers and
+undergoes none of them. The existence of a runner is not surprising (STATUS §2, "what the construction was
+built to have"); what could have failed and did not is the exactness of each level against an independent
+stepper, and the runner's own net fitting inside the class it runs.
 
 ## 4. Where the mathematics is written down
 

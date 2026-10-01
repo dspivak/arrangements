@@ -1,3 +1,79 @@
+- 2026-10-01 — **Science at two scales, native round, stage 2: (n3)-(n5)** (Claude (subagent of Claude
+  Opus 5.5, 0fe746c1)). Stage-2 numbers and an analysis fixed in the predictions note §8 before code
+  (eps 0.05, alpha 0.5, tau 0.05, dt 1/160 from the largest per-draw fitness gap 73.8, each draw held 160
+  steps, 150 draws, 20 seeds). `science_native.conclusion_holder` / `conclusions_native` /
+  `conclusions_native_run`; 9 stage-2 tests, file 23 passed + 2 strict xfail, 40 s. Run 1 (Shahshahani,
+  as designed): seed arm NaN in 20 of 20 (infinite differential on the face). Run 2 (disclosed before
+  code: Euclidean response, replicator field as non-exact data forcing, exact seed): never left the
+  simplex. (n5) refuted: planting needs a non-exact piece (or an infinite one). (n3) refuted on the ring
+  (19 of 20; 10.0 draws per hop against [12, 48]), held all-to-all and with the truth in no slice (7.5,
+  20 of 20). (n4) held only trivially (evidence 20/0: it cannot create support); plant-and-count 7/6
+  ring, 13/13 all-to-all against seed 0/0. One assertion failed on the first full run; the case was
+  marked strict xfail and the file re-run unchanged. Results in §5.7.
+- 2026-10-01 — **Science at two scales, native round, stage 1: (n1), (n2)** (Claude (subagent of Claude
+  Opus 5.5, 0fe746c1)). Stage-1 numbers fixed in the predictions note §8 before code (numpy, no
+  arrangement). New `arrangements/science_native.py`: `port_wire` (R^- of a function on port
+  coordinates; `graph_wire` needs one port dimension), `wire_boxes`, `draw_source` (clock world, table
+  lookup), readers whose forcing is zero on their in-ports, `community_native`, `summaries_native`; 16
+  tests in `tests/test_science_native.py`, 16 passed, 10 s, one run, no re-run. (n1) held: the wired
+  world + 10 holders equals round two's monolithic box, bit-identical in 322 of 400 runs, worst 4.1e-15
+  relative, all classifications reproduced. (n2) held: no provenance equals round two to 7.1e-12 in
+  weights, 7/20 (5.0) and 9/20 (5.2) locked in both wirings; journal reader equals the pooled closed form
+  to 4.5e-13. Gaps: a readout cannot depend on the current input (a one-step register bridges it, shift
+  of 2-3 steps); no smooth source of a fixed sequence (clock + lookup). Results in §5.7.
+- 2026-10-01 — **Science at two scales, second round, test (f)** (Claude (subagent of Claude Opus 5.5,
+  0fe746c1)). m=8, n=20, K=2 disjoint slices, r=5, c=0.1, T=60(+4)/150, 20 seeds, ring and
+  all-to-all, definitions fixed in the predictions note §7 before code. `science.run_summaries`,
+  `run_conclusions`, `run_bounded_mind` (bookkeeping in plain code; beliefs moved by the jitted
+  translation arrangement `translate_beliefs`). No construction failure, no re-run. (f1) held (2.3e-13);
+  (f2) refuted on the ring (early steps less confident), its lock count held (7 of 20 wrong vs 0);
+  (f3) refuted as written (all holders > 0.99 in 18 of 20; conclusion = truth 20 of 20; 7.1 steps per
+  hop; never found outside every slice; bounded mind only with the truth in its K); (f4) held (11-12 of
+  20 wrong without replication vs 0 with). Results in §5.6. Also moved §5.5 back inside §5 (it had
+  landed after §6/§7 through end-of-file appends).
+- 2026-10-01 — **Science at two scales, second round, test (e)** (Claude (subagent of Claude Opus 5.5,
+  0fe746c1)). n_A=20, d in {3, 2}, 10 seeds, B counts 0-150, closed-form crossings and definitions
+  fixed in the predictions note §6 before code. `science.rival_chooser` (test (b)'s chooser plus trust
+  boxes, totals, one jitted traced build per arm). First run, as fixed: NaN from step-size overshoot
+  (seed 7 at B count 0; fixed arm d=3 after the crossing), so (e1) and (e3) at d=3 and (e4) were not met
+  (strict xfail). Re-run 1 (dt sized from the closed-form jump) failed at the cold start in "both learn";
+  re-run 2 (cold dt from the starting gap) made all 120 crossings equal the closed form, and (e1)-(e4)
+  held. At d=3, fixed / both / incumbent-only, the rival overtook by B count 31 / 31 / 92 in 10 of 10.
+  Unpredicted: a losing hypothesis's trust stops learning (logit off by up to 4.6, no crossing moved).
+  Results in §5.5.
+- 2026-10-01 — **Science at two scales, test (d)** (Claude (subagent of Claude Opus 5.5, 0fe746c1)).
+  Charts, eps {0, 1e-3, 1e-2, 1e-1}, 120 steps, seeds 0-4, definitions and closed-form values fixed in
+  the predictions note §4 before code. `science.mutation_selection` (abundance chart, response diag(l),
+  exact forcing d(1/2 N^T (M - D_l^{-1}) N); exact because M is symmetric, and cheap) and
+  `science.drift_filter` (probability chart, direct non-exact forcing). (d1), (d2) held (3.5 first
+  largest at steps 39/25/20, seed 0; spread 0.22/0.23/0.38; peak reached, not kept); (d3) refuted at
+  the 1e-12 fixed before code (1.1e-11, from the population realization's cancellation; strict xfail).
+  Results in §5.4.
+- 2026-10-01 — **Science at two scales, test (c)** (Claude (subagent of Claude Opus 5.5, 0fe746c1)).
+  Derivation of both account steps under the inverse-Fisher response written into the predictions
+  note §3 before code (both predicted steps right); settings fixed there (m=10, n=5, ring and
+  all-to-all, 20 seeds, T=100, "locked" defined). Realized in the gauge-free log-weight chart
+  (`science.account_community`), not `inverse_fisher`, because of (a1). (c1), (c2), (c4) held; (c3)
+  held at alpha/beta 0, 0.1, 1 and refuted at 10 (synchronous agree step unstable, 0 of 20 both
+  wirings; strict xfail). Evidence arm locked wrong 0, 0, 4, 15 of 20 in both wirings; agree 0
+  throughout. Results in §5.3.
+- 2026-10-01 — **Science at two scales, test (b)** (Claude (subagent of Claude Opus 5.5, 0fe746c1)).
+  Numbers fixed before code in `notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md` §2 (L=10, c=1.6, T=1,
+  n=200, 41-point d grid; (b4) judged untestable as worded, sharpened to (b4') before running).
+  `science.holder_chooser` (Shahshahani simplex chooser, Euclidean `ell` box tensored in the learned
+  arm, constant shift B for choice.py's CONDITION); 6 tests, all passed. (b1)-(b3), (b4') held to
+  1e-15; tally fixed hold 15 / drop 26, learned hold 40 / drop 1. Results and the guaranteed-by-
+  construction caveat in §5.2. Also added a dated scope sentence (exact in the mathematics, lost by
+  the dense inverse below ~1e-5 weight) to `notes/BAYES-INTEGRATOR.md` §1 and `STATUS.md` §3.24.
+- 2026-10-01 — **Science at two scales, test (a)** (Claude (subagent of Claude Opus 5.5, 0fe746c1)).
+  Predictions fixed before code in `notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md` §1 (numbers added
+  there before code); new `arrangements/science.py` (mind = closed `belief_arrangement` rebuilt per
+  datum; population = n holder boxes, log abundance, constant forcing, as a tensor and as one box) and
+  `tests/test_science_scales.py` (3 passed, 3 strict xfail). (a2) held exactly; (a3) held for the
+  population; (a1) and the mind's (a3) refuted: the inverse-Fisher step `G^{-1}(G t)` loses the exact
+  translation once the least-favoured hypothesis's weight falls below ~1e-10 (cond(G) ~ 1/min q),
+  max |dq| 2.2e-4 well specified, NaN from step 110 misspecified. Not repaired; results in §5.1.
+  Library change suggested, not made: a closed-form or better-gauged `G^{-1}` in `choice.py`.
 
 - 2026-09-29 — **P30 (d) word of mouth and (e) many parts** (Claude Fable 5.1, session `47a21ac3`).
   Predictions fixed before code in `notes/WORD-OF-MOUTH-PREDICTIONS-2026-09-29.md` and
@@ -44,3 +120,9 @@
 - 2026-09-29 — **P32 (a) light in the library** (Claude Fable 5.1, ec5ece87, run by a subagent). `arrangements/light_lattice.py`, `tests/test_light_lattice.py`, 6 passed in 16 s; predictions in `notes/P32-A-PREDICTIONS-2026-09-29.md`: four held (forcing emerges; one step equals `scripts/maxwell2d.py`'s to 1e-12; Gauss conserved to 1e-12; lattice dispersion to 1e-9), the energy prediction refuted as written (plain energy swings 33–119% at step 0.5, bounded; staggered energy exact). Corrected `scripts/maxwell2d.py`'s header: its "2.0% drift" was an end-point sample. STATUS §3.34. Hygiene for P31: `_tensor_balanced` belongs in `wiring.py`.
 - 2026-09-29 — **P32 (b) Lotka–Volterra as the book's step** (Claude Fable 5.1, ec5ece87, run by a subagent). `arrangements/lotka_volterra.py`, `tests/test_lotka_volterra.py`, 7 passed in 2 s; predictions in `notes/P32-B-PREDICTIONS-2026-09-29.md`, all four held: the composite's step is CDLM's field by Euler to 1e-12; the plain step raises the invariant every step in either chart (the caller's "log coordinates stay bounded" refuted); the two-stage `CotCoalg2` step bounds it 900×. STATUS §3.35.
 - 2026-09-29 — **P32 (d) the genetic code, sourced and as an arrangement** (Claude Fable 5.1, ec5ece87, run by a subagent). Inputs checked against arXiv:0909.1442v2 Table I and arXiv:1309.4589v1 §2 (`notes/P32-D-SOURCES-2026-09-29.md`): every from-memory value matched; `scripts/genetic_code_stability_sourced.py` reproduces the table; on the 2008 scale the threshold and the "none of 2000" weaken. `arrangements/genetic_code.py`, `tests/test_genetic_code.py`, 9 passed in 72 s, six predictions held; the 386-box step equals the script's to 7e-16. STATUS §3.36. A concurrent session's dump (058d16b) already committed the sourcing files mid-run; nothing lost.
+- **2026-10-01, an arrangement that runs arrangements** (Claude Fable 5.1, dd666e08; book plan P34, §5.9 item
+  56). `arrangements/runner.py`, `tests/test_runner.py` (21 passed, about 80 s in five pieces), STATUS §3.37.
+  A kit (const, register, drum, add, mul, cost, push, fan, inbox); a runner that is one closed term over it;
+  a translator from any closed term to the runner's flag drums. The runner runs three terms exactly, runs
+  them again when handed the translation of its own term, and, given ports, is sent a description over wires
+  by another part and returns the answer. The translation is done outside the runner; no written proof.
