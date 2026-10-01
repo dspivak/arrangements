@@ -164,3 +164,133 @@ a finite hard library and a half-subsidy of drawing cost, they cannot prolong it
 A fund that could buy new figures, or a soft library (which leaks a fixed-ratio discount, (g4)), or a full
 subsidy, or a share that erodes early, could change every verdict. Nothing about rebuilding (i3), `d = 2`,
 or other `pi`, `c`, `f`, `s0`.
+
+## 5. Test (j): paying someone to try to build excuses (predictions, before code, 2026-10-01)
+
+David, on test (i): "paying for someone to try to build excuses. why didn't that work? … can you make a scenario?";
+after the scenario (a firm built on "Bob is reliable"; its money made reaching a shelved excuse cheaper but added
+none; what he means is a fixer paid to come up with new ones): "yes try to build excuses." Design and predictions
+by Claude Opus 5.5, 0fe746c1, before any code. Results to §6.
+
+**Setting.** Test (i)'s contest at its settings, with one new box: a **fixer**, paid from the fund at rate `F` per
+count. Its effort draws candidate excuses: each a new figure with a random footprint on the side channels and a
+random distance (from a seeded sequence, as the world box's draws are). A candidate enters the library (is planted,
+the support-creating push of the native round, disclosed as non-exact) only if it is consistent with every side
+observation made so far; each past check rules a random candidate out with probability `q` (take `q = 1/2`).
+Once planted, a figure is drawn and ruled out exactly as in (g).
+
+**Predictions.**
+- (j1) `F = 0` reproduces (i1)'s overtake counts seed by seed.
+- (j2) The overtake count rises with `F` (monotone over at least four values spanning two orders of magnitude).
+- (j3) *Epicycles.* Surviving `k` past checks has probability `(1 - q)^k`, so the effort per usable new excuse
+  doubles with each check, and each doubling of `F` buys about the same number of extra counts: the delay grows
+  like `log F`, not like `F`. The run derives the closed form before code and fits the slope.
+- (j4) The admitted excuses grow more specific (more side channels they must match) and, if distance is tied to
+  specificity, further away, so their drawing cost rises along the run.
+- (j5) With the fund paid by test (i)'s dependents instead of a fixed `F`, the reign ends when the dependents can
+  no longer pay for the search, and it is longer than (i)'s at the same `D` in at least 8 of 10 seeds.
+**What it cannot show.** That real excuse-making searches at random; a fixer who reasons would search better than
+`(1 - q)^k`, and the run says how that would change the slope (smaller `q` per check), not whether it happens.
+
+**Numbers fixed before code (j)** (the run's, Claude subagent of Claude Opus 5.5, 0fe746c1, 2026-10-01; numpy
+scratch building no arrangement, sized before it ran at about 1e6 operations per seed and arm, 1 s; written
+before any (j) construction code).
+*Kept from (i):* `d = 3`, `n_A = 20`, (g4)'s hard library of 8 mirrored figures, the same draws and seeds 0-9,
+counts 0-60, 400 Phi steps per count, chooser and attachment responses as in (i). No dependents, no fund in
+(j1)-(j4): the fixer is paid `F` from outside. Units: one candidate costs 1, so pay `F` draws `F` candidates per
+count. **`F in {0, 4, 16, 64, 256, 1024, 4096}`** (three orders of magnitude). **`q = 1/2`.**
+*Candidates* (seeded, `default_rng(1000 + seed)`, one stream shared by every `F`: arm `F` takes the first `F` of
+each count's 4096): each has **`G`**, the number of checks it survives, geometric with `P(G >= k) = (1-q)^k`, and
+a **distance `delta ~ U(0.5, 4.0)`, independent of specificity** (the untied law; the tied one is not run). Its
+main-channel footprint is `+d` (it can excuse an anomalous B draw, like (g4)'s `+d` figures). One check is made
+per B draw, so a candidate drawn at count `n` (after `n` checks) is **admitted iff `G >= n`**, and is usable on
+draw `j` iff `j < G` (ruled out per draw, as in (g)): it can excuse every draw already seen. Its specificity is
+`n`, the side observations it had to match.
+*Reduction, disclosed.* Per draw, only figures that are among the **3 cheapest usable ones admitted by some
+count** are given attachments (at most 252 pairs per seed at `F = 4096`). At rest this is exact unless `b > 3d`
+(a third full figure is never needed below that; no draw here exceeds it, to be checked). *Planting:* every
+pair's attachment is held at `a0 = 0.01` from the start, masked out of the cost (zero forcing) until its
+figure is admitted, as (g4) masks ruled-out figures; the mask is a world readout (a seeded lookup). So no
+support-creating push is needed; this replaces the planting push the spec names.
+*Closed forms at rest, `n_B*` per seed 0-9:*
+- `F = 0`: 26, 27, 27, 28, 29, 37, 19, 33, 31, 28 ((i1)'s).
+- `F = 4`: 26, 28, 28, 28, 29, 37, 19, 34, 32, 28. `F = 16`: 27, 28, 28, 28, 32, 37, 20, 34, 32, 28.
+- `F = 64`: 27, 31, 30, 33, 32, 38, 22, 36, 36, 28. `F = 256`: 30, 33, 35, 35, 32, 38, 23, 36, 36, 33.
+- `F = 1024`: 30, 35, 36, 36, 33, 39, 25, 39, 36, 33. `F = 4096`: 31, 37, 36, 37, 39, 39, 28, 39, 39, 36.
+*(j3)'s slope, closed form.* The longest-surviving admitted candidate passes about `log_{1/(1-q)} F` checks, so
+each doubling of `F` (at `q = 1/2`) extends the excusable horizon by one draw. Each newly excusable draw saves
+`s = 1/2 b^2 - (its excused cost)` in `lambda`, against the rival's mean advance `d^2/2 = 4.5` per draw. So
+**`dn*/dlog2 F ~ s/(d^2/2)`**, between `0.56` (one figure at the mean distance 2.25) and `0.89` (one at 0.5); the
+rest computation gives **0.75** (mean over seeds, `F` 4-4096). Linear in `F` would give thousands of counts.
+*Verdict rules.* Construction: native `n_B*` equals the closed form in at least 9 of 10 seeds per `F`. **(j1)**
+`F = 0` equals (i1) in 10 of 10. **(j2)** `n_B*` non-decreasing in `F` in 10 of 10 seeds, and the median at
+4096 above the median at 0. **(j3)** the native mean `n_B*` against `log2 F` (`F >= 4`) has slope in
+`[0.5, 1.0]` and a better least-squares fit (`R^2`) than against `F`. **(j4)** among admitted figures,
+specificity (admission count) is non-decreasing along each draw's admitted sequence (by construction); the
+claim tested is the drawing cost: the attachment-weighted `delta` of the new figures excusing draw `j`, at the
+run's end, rises with `j` (Spearman correlation `> 0` in at least 8 of 10 seeds at `F = 1024`). Predicted held:
+with distance untied, what rises is the cheapest *surviving* distance, because fewer candidates survive to
+later draws. **(j5)** is to be fixed below before its code, if the budget allows.
+
+## 6. Results of (j)
+
+Run 2026-10-01 by Claude (subagent of Claude Opus 5.5, 0fe746c1). Code: `science_incumbent.j_candidates`,
+`j_pairs`, `fixer_reader`, `fixer_run`, `run_fixer_arm`; tests appended to `tests/test_science_incumbent.py`.
+World (draws, seen flags, and the admitted mask of the fixer's candidates) wired to (i)'s reader carrying one
+attachment per (draw, new figure) pair, run by `Phi`, vmapped over seeds; settings as fixed in §5. **Runs, in
+order.** One smoke run (`F = 4096`, seeds 0-1: `n_B*` 31, 37, the closed forms; 2.8 s). **Recorded run 1** of
+the whole file: **21 passed, 2 xfailed ((i2), (i4), as before), 91 s.** No re-run, no NaN.
+**Non-native pieces:** the fixer's search is a seeded candidate sequence computed before the run, and its
+admissions reach the reader as a mask emitted by the world box (a lookup); planting is (g4)'s masking (every
+candidate pair held at `a0 = 0.01`, zero forcing until admitted), not a support-creating push; per draw only the
+3 cheapest usable figures get attachments (exact at rest when `b < 3d`; the largest B draw in any seed is 6.32).
+The fixer is paid from outside: no dependents and no fund in (j1)-(j4).
+
+**Construction.** Native `n_B*` equals the closed form in **10 of 10 seeds at every `F`** (70 of 70).
+
+**(j1) Held.** `F = 0`: 26, 27, 27, 28, 29, 37, 19, 33, 31, 28, (i1)'s in 10 of 10.
+
+**(j2) Held.** `n_B*` is non-decreasing in `F` in **10 of 10 seeds**; median by `F` = 0, 4, 16, 64, 256, 1024, 4096:
+**28, 28, 28, 31.5, 34, 35.5, 37**. At `F = 4096` every seed reigns longer than at `F = 0` (by 2 to 10 counts, 10 of
+10). Unlike (i)'s money (a cheaper shelf), the fixer's money adds excuses, and each one admitted can excuse
+every anomaly already seen, since it was chosen to fit them.
+
+**(j3) Held.** Mean `n_B*` against `log2 F` (`F` 4 to 4096): slope **0.746 counts per doubling**, `R^2 = 0.984`;
+against `F`, `R^2 = 0.656`. The closed form before code gave 0.75, inside its bracket `[0.56, 0.89]`. Gains per
+doubling between arms: 0.25, 0.95, 0.90, 0.55, 0.95. **Mechanism:** a candidate must survive every check made
+so far, `(1 - q)^n`, so a thousandfold budget buys about ten more draws of excusable horizon; each newly
+excusable draw saves about three quarters of the rival's per-draw advance. A thousand times the money bought 9
+more counts of reign (mean 28.9 to 36.1, from `F = 4` to `4096`).
+
+**(j4) Held, for the untied law; the tied law was not run.** Specificity rises by construction (admission
+counts of used pairs run from 0 to 8-12 per seed). Drawing cost: the attachment-weighted distance of the new
+figures excusing draw `j`, at the run's end, rises with `j`: Spearman **0.89 to 0.98, positive in 10 of 10 seeds**
+(`F = 1024`; seed 0: 0.50 at draw 0, 0.66 at draw 9, 1.47 at draw 14, 3.83 at draw 16). Distances are drawn
+independently of specificity, so what rises is the **cheapest surviving** distance: fewer candidates survive to
+cover later draws, so the reader must take what survives.
+
+**(j5) Not run natively; a closed form, computed after (j1)-(j4) and with no numbers fixed before it, so
+weaker evidence.** The fixer paid by (i)'s dependents (`D` per count while they live, counts 0-14, then 0), with
+no half-subsidy. `n_B*` against (i)'s native at the same `D`: longer in **2 of 10 (`D = 2`), 4 of 10 (`D = 5`), 5 of
+10 (`D = 10`)**, never shorter except `D = 10` seed 1 (28 against (i)'s 29, which had the subsidy). Against the
+prediction's 8 of 10: **refuted in closed form.** Reason: the dependents die at count 15, and searching is
+cheap only early, when few checks have been made; ten candidates a count for fifteen counts is about `F = 10`.
+
+**Which results could have come out otherwise.** The verdicts were all fixed by the closed form before code;
+the native run checks the wiring, masking and the reduction, and matched 70 of 70. Open before the closed
+form: everything, and in particular whether retroactive excusing would make the reign unbounded in `F`; it
+does not, because survival falls geometrically with the checks.
+
+**Reasonable or weird** (the run's judgment, not evidence). *A person:* reasonable that a hired apologist finds
+new stories for Bob, each fitting everything known so far, and that each new story is harder to find; weird
+that a story found late explains every earlier lapse at no extra effort beyond its distance. *A scientific
+community:* the closest reading, epicycles: auxiliary hypotheses tailored to all past data, each harder to find
+than the last; reasonable that funding buys time logarithmically; weird that checks arrive one per anomaly at a
+fixed rate, whereas a field under attack makes more checks. *A firm or institution:* reasonable for a PR or legal
+team paid to explain away failures; weird that its budget never runs out (fixed `F`). *A population of
+organisms:* a stretch I would not defend (a search for consistent variants under accumulating constraints has the
+same `(1-q)^k` shape, but nothing here is selected). *A cell:* none.
+
+**What this does not establish.** That excuse-making searches at random: a reasoning fixer has a smaller
+effective `q` per check, which lowers the per-doubling base `1/(1-q)` and raises the slope, roughly as
+`1/log2(1/(1-q))`; nor anything with distance tied to specificity, other `q`, or `d = 2`. (j5) has no native run.

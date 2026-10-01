@@ -197,4 +197,128 @@ def summarize(out, D, s1=0.1, F1=0.5):
     return res
 
 
-__all__ = ["reader", "fund", "dependent", "incumbent_run", "run_arm", "summarize"]
+
+
+# --- test (j): a fixer paid to search for new excuses ------------------------------------------------
+#
+# Numbers and closed forms fixed before this code in the note's §5 ("Numbers fixed before code (j)").
+# NOT NATIVE OR STIPULATED (disclosed): the fixer's search is a SEEDED CANDIDATE SEQUENCE computed before the
+# run (each candidate: checks survived G, geometric; distance U(0.5, 4)); which candidates are admitted, and
+# when, is a lookup the world box emits as a mask, as it emits the draws. PLANTING: every candidate pair's
+# attachment is held at a0 = 0.01 from the start and masked out of the cost until admitted (zero forcing),
+# so the spec's support-creating push is replaced by (g4)'s masking. Per draw, only the 3 cheapest usable
+# figures admitted by some count get attachments (exact at rest unless b > 3d).
+
+J_FS = (0, 4, 16, 64, 256, 1024, 4096)
+J_PMAX = 260
+
+
+def j_candidates(seed, F, q=0.5, counts=61, fmax=4096):
+    """(admission count n, checks survived G, distance) of every admitted candidate of arm ``F``."""
+    r = np.random.default_rng(1000 + seed)
+    G = r.geometric(q, size=(counts, fmax)) - 1
+    dl = r.uniform(0.5, 4.0, size=(counts, fmax))
+    out = []
+    for n in range(counts):
+        for i in np.nonzero(G[n, :F] >= n)[0]:
+            out.append((n, int(G[n, i]), float(dl[n, i])))
+    return out
+
+
+def j_pairs(cands, nB=60, R=3):
+    """Per draw ``j``, the figures among the ``R`` cheapest usable ones admitted by some count:
+    ``(draw, admission count, delta, G)``."""
+    pairs = []
+    for j in range(nB):
+        best = []
+        for c in sorted([c for c in cands if c[1] > j], key=lambda c: c[0]):
+            if len(best) < R or c[2] < max(b[2] for b in best):
+                pairs.append((j, c[0], c[2], c[1]))
+                best = sorted(best + [c], key=lambda b: b[2])[:R]
+    return pairs
+
+
+def fixer_reader(d, nA, nB, delta, pair_draw, pair_delta) -> Arrangement:
+    """(i)'s reader with no fund, plus one attachment per (draw, new figure) pair, masked by the in-port."""
+    delta = jnp.asarray(delta, float)
+    s = jnp.concatenate([jnp.full(K_FIG, d), jnp.full(K_FIG, -d)])
+    dl = jnp.concatenate([delta, delta])
+    allowed = jnp.concatenate([(jnp.arange(K_FIG)[None, :] >= jnp.arange(NX)[:, None])] * 2, 1).astype(float)
+    na, P = NX * 2 * K_FIG, pair_draw.shape[0]
+    onto = jax.nn.one_hot(pair_draw, nB, dtype=float)          # (P, nB): pair -> its draw
+
+    def costs(q, n_in):
+        a = q[1:1 + na].reshape(NX, 2 * K_FIG) * allowed
+        A, B, seen, m = n_in[:nA], n_in[nA:nA + nB], n_in[nA + nB:nA + 2 * nB], n_in[nA + 2 * nB:]
+        e = q[1 + na:] * m
+        shift = (e * d) @ onto + jnp.concatenate([a @ s, jnp.zeros(nB - NX)])
+        draw = (e * pair_delta) @ onto + jnp.concatenate([a @ dl, jnp.zeros(nB - NX)])
+        K0 = jnp.sum(0.5 * A ** 2) + jnp.sum(seen * (0.5 * (B - shift) ** 2 + draw))
+        K1 = jnp.sum(0.5 * (A - d) ** 2) + jnp.sum(seen * 0.5 * (B - d) ** 2)
+        return K0, K1
+
+    dK0 = jax.grad(lambda q, n_in: costs(q, n_in)[0], argnums=0)
+
+    def force(q, n_in):
+        K0, K1 = costs(q, n_in)
+        return jnp.concatenate([(_p0p1(q[0]) * (K1 - K0 - q[0]))[None], -dK0(q, n_in)[1:]])
+
+    dim = 1 + na + P
+    Q = ReactiveVectorSpace(dim=dim, sharp_fn=lambda q: jnp.diag(jnp.concatenate([
+        1.0 / _p0p1(q[:1]), 0.02 * q[1:] * (1.0 - q[1:])])))
+    return Arrangement(
+        P=configuration(Q, init=jnp.concatenate([jnp.zeros(1), jnp.full(na + P, 0.01)])),
+        in_dim_M=0, out_dim_M=0, in_dim_N=nA + 2 * nB + P, out_dim_N=1,
+        out_f=lambda q, m_out: jax.nn.sigmoid(q[:1]),
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=lambda q, m_out, n_in: (force(q, n_in), jnp.zeros_like(m_out), jnp.zeros_like(n_in)),
+        label="incumbent reader with a fixer",
+    )
+
+
+@partial(jax.jit, static_argnames=("hold", "counts"))
+def fixer_run(A, B, pair_draw, pair_adm, pair_delta, d, delta, hold, counts):
+    """World (row ``c``: A, B, seen, admitted mask) wired to the reader, run by ``Phi``; ``lambda`` per count
+    and the new pairs' final attachments."""
+    nA, nB = A.shape[0], B.shape[0]
+    seen = jnp.tril(jnp.ones((nB + 1, nB)), -1)
+    mask = (pair_adm[None, :] <= jnp.arange(nB + 1)[:, None]).astype(float)
+    rows = jnp.concatenate([jnp.tile(A, (nB + 1, 1)), jnp.tile(B, (nB + 1, 1)), seen, mask], axis=1)
+    P = pair_draw.shape[0]
+    arr = wire_boxes([draw_source(rows, hold), fixer_reader(d, nA, nB, delta, pair_draw, pair_delta)],
+                     [[], [(0, k) for k in range(nA + 2 * nB + P)]])
+    O = Phi(arr)
+
+    def one(st, _):
+        _, _, st2 = O.with_state(st).run_one(_IN_POS, lambda _o: _IN_DIR)
+        return st2, None
+
+    def per_count(st, _):
+        st, _ = jax.lax.scan(one, st, None, length=hold)
+        return st, arr.P.position(st)[1]
+
+    st, lam = jax.lax.scan(per_count, arr.P.init, None, length=counts)
+    return lam, arr.P.position(st)[2 + NX * 2 * K_FIG:]
+
+
+def run_fixer_arm(F, seeds=range(10), d=3.0, nA=20, nB=60, hold=400, counts=61):
+    """All seeds of arm ``F`` (vmapped, pairs padded to ``J_PMAX`` with never-admitted dummies)."""
+    As, Bs, PD, PA, PL, pairs_all = [], [], [], [], [], []
+    for sd in seeds:
+        r = np.random.default_rng(sd)
+        As.append(r.normal(0, 1, nA)); Bs.append(r.normal(d, 1, 150)[:nB])
+        pr = j_pairs(j_candidates(sd, F), nB) if F else []
+        if len(pr) > J_PMAX:
+            raise ValueError(f"{len(pr)} pairs > {J_PMAX}")
+        pairs_all.append(pr)
+        pad = J_PMAX - len(pr)
+        PD.append([p[0] for p in pr] + [0] * pad); PA.append([p[1] for p in pr] + [10 ** 6] * pad)
+        PL.append([p[2] for p in pr] + [0.0] * pad)
+    delta = jnp.asarray(0.5 * np.arange(1, K_FIG + 1) * (d * d / 9))
+    g = lambda a, b, pd, pa, pl: fixer_run(a, b, pd, pa, pl, d, delta, hold, counts)
+    lam, att = jax.vmap(g)(*(jnp.asarray(np.array(x)) for x in (As, Bs, PD, PA, PL)))
+    return np.asarray(lam), np.asarray(att), pairs_all
+
+
+__all__ = ["reader", "fund", "dependent", "incumbent_run", "run_arm", "summarize", "j_candidates", "j_pairs",
+           "fixer_reader", "fixer_run", "run_fixer_arm"]

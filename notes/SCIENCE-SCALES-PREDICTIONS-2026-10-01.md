@@ -1374,3 +1374,13 @@ predict it departs from the closed form in the symmetric arm, because at the sta
 losing rival builds no excuses: one builds excuses only for what one believes. The native unilateral run
 must match the soft and hard closed-form `n_B*` in 10 of 10 seeds per arm; the one-potential run is
 reported, with the soft variant at `d = 3` only.
+
+*Correction, 2026-10-01, Claude Opus 5.5, 0fe746c1.* §1 calls "an organism is a hypothesis the world tests" David's
+candidate; it was the agent's, to which he said "sure", offered in place of his "organisms are little experiments"
+on the ground that "an experiment is chosen for what it will tell you; variation is not chosen." That ground is
+withdrawn: David's NITMB talk (book repo `background/20250317-NITMB.tex`, "Bacterial machinery" and "Mate
+selection") argues the search is structured ("blind search doesn't build turbines"; "stress triggers a response that
+rewires future sensitivity"; mate choice: "No longer blind"), and stress-induced mutagenesis (Galhardo, Hastings and
+Rosenberg, *Crit. Rev. Biochem. Mol. Biol.* 42 (2007) 399–435, read in summary) makes the rate and timing of
+variation respond to stress, its direction still disputed (Roth's "selective inbreeding," *Genetics* 214 (2020)).
+His "organisms are little experiments" stands open, not replaced.

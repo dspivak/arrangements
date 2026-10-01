@@ -174,3 +174,33 @@
   `D = 2, 5`: the library bounds the incumbent, dependents only cheapen its excuses); (i5) held as bookkeeping
   to 1.9e-13, literal equality 0 of 10 at `D = 2`; (i4) refuted (dependents die at count 15, overtake 4-22
   counts later, (g4)'s own count); (i3) not run, a deduction recorded instead.
+- **2026-10-01, science test (j): paying a fixer to search for new excuses** (Claude (subagent of Claude Opus
+  5.5, 0fe746c1)). Appended to `arrangements/science_incumbent.py` and `tests/test_science_incumbent.py` (whole
+  file 21 passed, 2 strict xfail, 91 s, one recorded run); numbers and closed forms fixed before code in the
+  incumbent note §5, results in §6. A seeded candidate sequence (checks survived geometric, `q = 1/2`; distance
+  `U(0.5, 4)`), admissions emitted by the world as a mask, planting by (g4)'s masking, 3 cheapest figures per
+  draw (disclosed). Native matched the closed form 70 of 70. (j1) held; (j2) held (medians 28 to 37 over
+  `F = 0` to 4096); (j3) held, slope 0.746 counts per doubling of `F` (closed form 0.75), `R^2` 0.98 in `log F`
+  against 0.66 in `F`; (j4) held for the untied distance law (Spearman positive 10 of 10); (j5) closed form
+  only, computed after, refuted (longer than (i) in 2, 4, 5 of 10 at `D = 2, 5, 10`).
+- **2026-10-01, science test (k): publishing failed replications** (Claude (subagent of Claude Opus 5.5,
+  0fe746c1)). Spec and results: `notes/SCIENCE-FAILURE-REPORTS-PREDICTIONS-2026-10-01.md` (numbers fixed before
+  code under §2; §3). Code `arrangements/science_failure.py` (imports `science_native.py`, unchanged); tests
+  `tests/test_science_failure.py`, 4 passed, 1 skipped, 3 strict xfail, 53 s. Stage 2's seed-arm holder with two
+  more state blocks: `z`, the net weight its own data took off each hypothesis, and a planted-mass register; the
+  failure report `exp(-0.5/z)` goes forward beside the conclusion. Run 1 was NaN on the ring (`0 * inf` in the
+  report's derivative, evaluated by `compose_seq`'s pullback); fixed by cutting the report below `1e-304`,
+  disclosed. Silent arm bit-identical to stage 2. (k1) held (lower-the-seed: 0 wrong, reach 20 and 20, slope 9.90,
+  planted-on-rejected lower in 19 of 20 by about 2%); (k2) refuted (never-reaches counts ring 1/0/0/0, all-to-all
+  0/0/0/0 for silent and `beta` 0.1, 1, 10; reports against wrong neighbours outweigh those against the truth);
+  (k3) untested, post hoc 3 of 3 in the late-loss seeds; (k4) refuted. Post hoc: at `beta = 10` the truth is lost
+  after arrival in 1 (ring) and 2 (all-to-all) of 20 seeds; and a report is a fossil (a holder at 0.99 on the truth
+  still reports it failed), since net weight lost cannot be regained near certainty.
+- **2026-10-01, science test (k), §4 correction: a report says what the holder now finds** (Claude (subagent of
+  Claude Opus 5.5, 0fe746c1)). Results in the failure-reports note §5 (numbers fixed before code at the end of §4).
+  The report now reads the current shortfall `b - p`, `b` the seed's own planted mass (forcing as the seed's);
+  `exp(-0.5/x)` with a custom-JVP derivative, exactly smooth, no cut, no NaN. Silent bit-identical to §3. The fossil
+  reports are gone (0 in every arm). (k5) held on the ring, refuted all-to-all (planted-on-rejected lower 17 of 20
+  against §3's 19); (k6) refuted (truth lost after reach at `beta = 10` in 1 ring and 2 all-to-all, each a whole
+  community collapsing onto 4.5 or 5.5: a lagging shortfall reads "not caught up yet" as failure and the reports
+  feed on each other); (k7) held. File: 9 passed, 1 skipped, 6 strict xfail, 129 s.
