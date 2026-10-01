@@ -163,3 +163,14 @@
   bettors are not heard (Jacobian exactly 0); not uniform within 50 steps (refuted, as predicted). Evidence
   collapses unchanged (17, 18, 17); agree at 10 refuted (12, 18, 17 vs 20). Hub wrong: hub dies after the lock
   in 20 of 20; end-state lock falls to 0 only because the dead dissolve; among the living 20 of 20 lock and die.
+- **2026-10-01, science test (i): what is built on an idea pays for its excuses** (Claude (subagent of Claude
+  Opus 5.5, 0fe746c1)). `arrangements/science_incumbent.py`, `tests/test_science_incumbent.py` (9 passed, 2
+  strict xfail, 10 s, one recorded run); numbers and closed forms fixed before code, results in
+  `notes/SCIENCE-INCUMBENT-PREDICTIONS-2026-10-01.md` §4. World, (g4)'s hard incumbent-only reader (reduced
+  exactly to the 8 excusable draws), an excuse fund and ten dependents, wired by `science_native.wire_boxes`
+  and run by `Phi`; death and insolvency through test (h)'s smooth gate, no floor; the fund pays half of each
+  held excuse's drawing cost per count (stipulated). Native matched the closed form in 39 of 40 seed-arms.
+  (i1) held (10 of 10 equal (g4)); (i2) refuted as predicted (`n_B*` higher at `D = 10` in 2 of 10, flat at
+  `D = 2, 5`: the library bounds the incumbent, dependents only cheapen its excuses); (i5) held as bookkeeping
+  to 1.9e-13, literal equality 0 of 10 at `D = 2`; (i4) refuted (dependents die at count 15, overtake 4-22
+  counts later, (g4)'s own count); (i3) not run, a deduction recorded instead.

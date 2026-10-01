@@ -1496,8 +1496,8 @@ runner is one net: four flag drums, a data drum, a register, the constant -1, tw
 `2 +- (9/10)^k` exactly in fractions. (ii) The translation `compile_net` is exact in fractions against
 `ref_step` on those three nets and on 300 random nets using every kit part. (iii) The runner, taken through
 the library's own composition, decodes after one pass of its flag drums to the net's own step (two tanks to
-7e-16, the other two exactly); its compiled step equals `Phi`'s on the first two steps. (iv) Handed the
-translation of its own net, the runner runs each of the three nets exactly in fractions, and after every
+7e-16, the other two exactly); its compiled step equals `Phi`'s on the first two steps. (iv) A larger runner, handed the
+translation of the runner's own net, runs each of the three nets exactly in fractions, and after every
 guest step the host's decoded state equals the runner's net stepped by hand; with the host as a library
 arrangement the tower was run for the two smallest nets. Slowdown: 182 runner steps per two-tank step;
 2,889,432 host steps per two-tank step when the runner runs its own description.
@@ -1515,9 +1515,10 @@ runner; only values do. The asker must know where and when the answer appears, s
 
 **What this does not show.** The description the runner is handed is the translated flags and layout; the
 translation, which lays out the net's backward pass as adds and multiplies and schedules it, is done outside
-the runner. Only closed nets: no outer ports. There is no written proof that the translation is right for
-every net; the random nets are evidence, not proof. That every closed term over the kit is a net is by
-inspection. The runner has no cost and no two-way coupling: it computes a net's covectors as numbers and
+the runner. Only closed nets: no outer ports. That the translation is right for every closed net
+that fits is proved by hand, not yet reviewed, in the book repo's `notes/self-hosted-arr-2026-10-01.md`,
+"The runner's theorem" (duration one, exact arithmetic; every closed term over the kit is a net, its Lemma 0);
+the random nets are evidence for it. No runner fits its own translation: each is run by a larger one. The runner has no cost and no two-way coupling: it computes a net's covectors as numbers and
 undergoes none of them. The existence of a runner is not surprising (STATUS §2, "what the construction was
 built to have"); what could have failed and did not is the exactness of each level against an independent
 stepper, and the runner's own net fitting inside the class it runs.
