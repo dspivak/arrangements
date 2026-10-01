@@ -1,0 +1,93 @@
+{
+ "plain_fox,plain_fox,None": [
+  {
+   "start": 1.0,
+   "end": 3.0581190912926104e-07,
+   "min": 3.0581190912926104e-07,
+   "max": 1.0,
+   "tail_turns": 0,
+   "tail_range": 4.5085889723850414e-05,
+   "finite": true
+  }
+ ],
+ "foxes,chooser,in_step": [
+  {
+   "start": 1.0,
+   "end": 3.4215529715053705e-12,
+   "min": 3.4215529715053705e-12,
+   "max": 1.0,
+   "tail_turns": 0,
+   "tail_range": 3.409022752975943e-08,
+   "finite": true
+  },
+  {
+   "start": 0.6000000238418579,
+   "end": 0.9999948740005493,
+   "min": 0.6000000238418579,
+   "max": 0.9999948740005493,
+   "tail_turns": 0,
+   "tail_range": 2.1696090698242188e-05,
+   "finite": true
+  }
+ ],
+ "plain_fox,chooser,in_step": [
+  {
+   "start": 1.0,
+   "end": 0.015760282054543495,
+   "min": 0.015760282054543495,
+   "max": 1.0,
+   "tail_turns": 0,
+   "tail_range": 0.021531032398343086,
+   "finite": true
+  },
+  {
+   "start": 0.6000000238418579,
+   "end": 0.9999949336051941,
+   "min": 0.6000000238418579,
+   "max": 0.9999949336051941,
+   "tail_turns": 0,
+   "tail_range": 1.2159347534179688e-05,
+   "finite": true
+  }
+ ],
+ "tank,foxes,eats": [
+  {
+   "start": 0.0,
+   "end": 0.499997079372406,
+   "min": 0.0,
+   "max": 0.5334156155586243,
+   "tail_turns": 0,
+   "tail_range": 3.263354301452637e-05,
+   "finite": true
+  },
+  {
+   "start": 1.0,
+   "end": 0.5000014305114746,
+   "min": 0.44937318563461304,
+   "max": 1.0,
+   "tail_turns": 0,
+   "tail_range": 1.4066696166992188e-05,
+   "finite": true
+  }
+ ],
+ "tank,plain_fox,eats": [
+  {
+   "start": 0.0,
+   "end": 0.9999970197677612,
+   "min": 0.0,
+   "max": 0.9999970197677612,
+   "tail_turns": 0,
+   "tail_range": 0.0,
+   "finite": true
+  },
+  {
+   "start": 1.0,
+   "end": 3.188296068263871e-19,
+   "min": 3.188296068263871e-19,
+   "max": 1.0,
+   "tail_turns": 0,
+   "tail_range": 1.041625227911347e-12,
+   "finite": true
+  }
+ ]
+}

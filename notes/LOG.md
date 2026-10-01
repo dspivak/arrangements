@@ -1,3 +1,22 @@
+- 2026-10-01 — **Test (g4) diagnosis** (Claude (subagent of Claude Opus 5.5, 0fe746c1)). The native
+  (g4) run disagreed with its closed form. Shrunk to one mirrored figure, n_A = 3, B counts 0-8: the two
+  agree. At 8 figures and n_A = 20 they part at count 0 by exactly K_0 = 7.575. Cause: my chooser's
+  dU/dlambda by autodiff through sigmoid, whose derivative sigma(1 - sigma) underflows to 0 for
+  lambda > ~37 and drops K_0's term; the closed form was right. Fixed by writing
+  p0 p1 (K1 - K0 - T lambda) with a stable p0 p1. After the fix, seed 0, d = 3, B counts 0-40: native
+  n_B* equals the closed form in all six unilateral arms (soft 22/23/30, hard 22/23/26). The
+  one-potential arm gives 30 against 23, as predicted. Not rerun at the full settings (dense response,
+  hours). Results in §5.8, "(g4) diagnosis".
+- 2026-10-01 — **Science at two scales, test (g): explaining away by building excuses** (Claude (subagent
+  of Claude Opus 5.5, 0fe746c1)). Numbers and the convexity call fixed in the predictions note §9 before
+  code. `science_native.excuse_world` / `excuse_reader` / `excuses_native_run` (world + reader wired, run
+  by `Phi`; attachments on `choice.py`'s {attached, not} chooser chart); 9 tests, file 30 passed + 3 strict
+  xfail. Native equals the numpy scratch to 1e-16. Convex: (g1), (g2) held, (g3) refuted as called
+  (gradual: threshold move 0.100 < earlier 0.150). Double well (an attachment is made or not): (g1)-(g3)
+  held (jump 0.124 after exact zeros). Found: old excuses are dropped once theta moves; figure 4 lost a
+  rate race. (g4): closed forms only (symmetric 21.5 = (e); incumbent 28 hard / 34.5 soft against (e)'s
+  82.5); the native (g4) smoke run disagreed with the closed form (cause not found) and was slow (dense
+  response matrix); code marked UNVERIFIED. Results in §5.8.
 - 2026-10-01 — **Science at two scales, native round, stage 2: (n3)-(n5)** (Claude (subagent of Claude
   Opus 5.5, 0fe746c1)). Stage-2 numbers and an analysis fixed in the predictions note §8 before code
   (eps 0.05, alpha 0.5, tau 0.05, dt 1/160 from the largest per-draw fitness gap 73.8, each draw held 160
@@ -126,3 +145,21 @@
   a translator from any closed term to the runner's flag drums. The runner runs three terms exactly, runs
   them again when handed the translation of its own term, and, given ports, is sent a description over wires
   by another part and returns the answer. The translation is done outside the runner; no written proof.
+- **2026-10-01, science test (h): bettors paid by being right** (Claude (subagent of Claude Opus 5.5,
+  0fe746c1)). `arrangements/science_payment.py`, `tests/test_science_payment.py` (11 passed, 8 strict xfail,
+  6 s); predictions and numbers fixed before code, results in `notes/SCIENCE-PAYMENT-PREDICTIONS-2026-10-01.md`
+  §6. World plus ten bettor boxes wired by `science_native.wire_boxes`, run by `Phi`; the zero-supply floor is
+  a `max` in the supply forcing (a kink, disclosed). (h1) failed its 1e-12 check against a float64 reference
+  (1.14e-12) and holds to 9e-14 against exact rationals (post hoc); (h2) held, 136 of 136 below the growth
+  threshold dead; (h3) half held, dogmatic 150 against updating 76 of 200 dead, mechanism rule 199 of 200;
+  (h4) evidence held (every locked-wrong community all dead, 18/18, 18/18, 17/17), agree refuted (3-4 of 20
+  collapse; no talk already collapses 3 of 20 from the shared races); (h5) consensus weights held (hub 1/4),
+  hub wrong locks and collapses more than the ring under evidence (20 vs 17, 20 vs 18).
+- **2026-10-01, science test (h), §7 correction: the dead fall apart** (Claude (subagent of Claude Opus 5.5,
+  0fe746c1)). `science_payment.gate`, `bettor_gated`, `market_gated`; tests appended (whole file 30 passed,
+  15 strict xfail, 21 s); numbers fixed before code in the payment note §7, results in §8. A bettor's account
+  is gated by a smooth `g(s)` (`s_1 = c/2`, so no death step changes, checked 200 of 200 in each arm), its
+  belief dissolves at `r = 0.1`, listeners average over the living (a jump when the last dies, disclosed). Dead
+  bettors are not heard (Jacobian exactly 0); not uniform within 50 steps (refuted, as predicted). Evidence
+  collapses unchanged (17, 18, 17); agree at 10 refuted (12, 18, 17 vs 20). Hub wrong: hub dies after the lock
+  in 20 of 20; end-state lock falls to 0 only because the dead dissolve; among the living 20 of 20 lock and die.

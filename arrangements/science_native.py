@@ -420,5 +420,100 @@ def excuses_native_run(T, K, delta, y, ruled, hold, D, theta0, w, v, kappa, eta,
     return traj[:, 0], traj[:, 1:].reshape(T, T, K)
 
 
-__all__ = ["excuse_world", "excuse_reader", "excuses_native_run", "conclusion_holder", "conclusions_native", "conclusions_native_run", "port_wire", "wire_boxes", "draw_source", "run_positions", "neighbours",
+def rival_excuse_reader(d: float, nA: int, nB: int, K: int, delta: Array, v: float, hard: bool, arm: str,
+                        forcing: str, dt_a: float, a0: float, T: float = 1.0) -> Arrangement:
+    """(g4): test (e)'s chooser on ``{h0, h1}`` in the natural chart (``lambda = log p0/p1``, response
+    ``1/(p0 p1)``), with excuse attachments from one mirrored library (footprints ``+d``, ``-d``) on the
+    other source's draws: ``h1`` on the A draws, ``h0`` on the B draws. In-ports ``(A (nA), B (nB), seenB
+    (nB))``. ``arm``: ``"none"``, ``"symmetric"``, ``"incumbent"``. ``forcing="unilateral"``: each side's
+    attachments descend its own total cost (not exact jointly); ``"potential"``: the exact ``dU`` of
+    ``U = -p0 K0 - p1 K1 + T H(p)``.
+
+    DIAGNOSIS (§5.8): the first version took ``dU/dlam`` by autodiff through ``sigmoid``, whose derivative
+    ``sigma (1 - sigma)`` is 0 in floating point once ``lam > ~37``, so ``K0``'s term vanished and the rest
+    was ``lam = K1`` instead of ``K1 - K0``. Now ``dU/dlam = p0 p1 (K1 - K0 - T lam)`` is written out with a
+    stable ``p0 p1``. Slow at full size: ``rvect``'s response is a dense ``(1 + 2 K (nA + nB))^2`` matrix."""
+    from .rvect import ReactiveVectorSpace
+    delta = jnp.asarray(delta, float)
+    s = jnp.concatenate([jnp.full(K, d), jnp.full(K, -d)])
+    dl = jnp.concatenate([delta, delta])
+    rA = jnp.concatenate([(jnp.arange(K)[None, :] < jnp.arange(nA)[:, None])] * 2, axis=1).astype(float)
+    rB = jnp.concatenate([(jnp.arange(K)[None, :] < jnp.arange(nB)[:, None])] * 2, axis=1).astype(float)
+    nAa, nBa = nA * 2 * K, nB * 2 * K
+    exc0 = arm in ("symmetric", "incumbent")
+    exc1 = arm == "symmetric"
+
+    def excused(e, a, R):
+        a = a * (1 - R) if hard else a
+        r = e - a @ s
+        return 0.5 * r ** 2 + a @ dl + (0.0 if hard else 0.5 * v * jnp.sum(R * a ** 2, 1))
+
+    def costs(q, n_in):
+        aA, aB = q[1:1 + nAa].reshape(nA, 2 * K), q[1 + nAa:].reshape(nB, 2 * K)
+        A, B, seen = n_in[:nA], n_in[nA:nA + nB], n_in[nA + nB:]
+        K0 = jnp.sum(0.5 * A ** 2) + jnp.sum(seen * (excused(B, aB, rB) if exc0 else 0.5 * B ** 2))
+        K1 = jnp.sum(excused(A - d, aA, rA) if exc1 else 0.5 * (A - d) ** 2) + jnp.sum(seen * 0.5 * (B - d) ** 2)
+        return K0, K1
+
+    def U(q, n_in):
+        K0, K1 = costs(q, n_in)
+        lam = q[0]
+        p0, p1 = jax.nn.sigmoid(lam), jax.nn.sigmoid(-lam)
+        H = -(p0 * jax.nn.log_sigmoid(lam) + p1 * jax.nn.log_sigmoid(-lam))
+        return -p0 * K0 - p1 * K1 + T * H
+
+    dU = jax.grad(U, argnums=0)
+    dK0 = jax.grad(lambda q, n_in: costs(q, n_in)[0], argnums=0)
+    dK1 = jax.grad(lambda q, n_in: costs(q, n_in)[1], argnums=0)
+
+    def p0p1(lam):
+        """``p0 p1 = sigma(lam) sigma(-lam)`` without the underflow of ``1 - sigma`` (the (g4) diagnosis)."""
+        return jnp.exp(-jax.nn.softplus(lam) - jax.nn.softplus(-lam))
+
+    def force(q, n_in):
+        K0, K1 = costs(q, n_in)
+        g_lam = p0p1(q[0]) * (K1 - K0 - T * q[0])     # dU/dlam, written out: autodiff of sigmoid loses K0
+        if forcing == "potential":
+            g = dU(q, n_in)
+            return jnp.concatenate([g_lam[None], g[1:]])
+        uni = -dK0(q, n_in) - dK1(q, n_in)          # each side descends its own total (disjoint coordinates)
+        return jnp.concatenate([g_lam[None], uni[1:]])
+
+    Q = ReactiveVectorSpace(dim=1 + nAa + nBa, sharp_fn=lambda q: jnp.diag(jnp.concatenate([
+        1.0 / p0p1(q[:1]), dt_a * q[1:] * (1.0 - q[1:])])))
+    return Arrangement(
+        P=configuration(Q, init=jnp.concatenate([jnp.zeros(1), jnp.full(nAa + nBa, a0)])),
+        in_dim_M=0, out_dim_M=0, in_dim_N=nA + 2 * nB, out_dim_N=1,
+        out_f=lambda q, m_out: q[:1],
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=lambda q, m_out, n_in: (force(q, n_in), jnp.zeros_like(m_out), jnp.zeros_like(n_in)),
+        label="rival excuse reader",
+    )
+
+
+@partial(jax.jit, static_argnames=("K", "hard", "arm", "forcing", "hold"))
+def rival_excuses_run(A, B, d, delta, v, K, hard, arm, forcing, hold, dt_a=0.02, a0=0.01):
+    """World (row ``c``: the A draws, the B draws, ``seenB_j = 1`` for ``j < c``; ``c = 0..nB``) plus the
+    reader; ``lambda`` at the end of each B count ``0..nB``."""
+    nA, nB = A.shape[0], B.shape[0]
+    seen = jnp.tril(jnp.ones((nB + 1, nB)), -1)
+    rows = jnp.concatenate([jnp.tile(A, (nB + 1, 1)), jnp.tile(B, (nB + 1, 1)), seen], axis=1)
+    arr = wire_boxes([draw_source(rows, hold),
+                      rival_excuse_reader(d, nA, nB, K, delta, v, hard, arm, forcing, dt_a, a0)],
+                     [[], [(0, c) for c in range(nA + 2 * nB)]])
+    O = Phi(arr)
+
+    def one(s, _):
+        _, _, s2 = O.with_state(s).run_one(_IN_POS, lambda _o: _IN_DIR)
+        return s2, None
+
+    def per_count(s, _):
+        s, _ = jax.lax.scan(one, s, None, length=hold)
+        return s, arr.P.position(s)[1]
+
+    _, lam = jax.lax.scan(per_count, arr.P.init, None, length=nB + 1)
+    return lam
+
+
+__all__ = ["rival_excuse_reader", "rival_excuses_run", "excuse_world", "excuse_reader", "excuses_native_run", "conclusion_holder", "conclusions_native", "conclusions_native_run", "port_wire", "wire_boxes", "draw_source", "run_positions", "neighbours",
            "community_native", "community_native_run", "summaries_native", "summaries_native_run"]

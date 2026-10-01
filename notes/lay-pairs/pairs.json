@@ -1,0 +1,290 @@
+{
+ "1": {
+  "first": "metronome",
+  "second": "tank",
+  "coupler": "eats",
+  "metronome#1": {
+   "start": 0.0,
+   "end": 47642636.0,
+   "min": 0.0,
+   "max": 47642636.0,
+   "tail_turns": 0,
+   "tail_range": 47542136.0,
+   "finite": true
+  },
+  "tank#2": {
+   "start": 0.0,
+   "end": -29444762.0,
+   "min": -29444762.0,
+   "max": 0.35256168246269226,
+   "tail_turns": 0,
+   "tail_range": 29382650.0,
+   "finite": true
+  },
+  "seconds": 0.5
+ },
+ "2": {
+  "first": "rabbits",
+  "second": "needle",
+  "coupler": "eats",
+  "rabbits#1": {
+   "start": 0.09999999403953552,
+   "end": NaN,
+   "min": NaN,
+   "max": NaN,
+   "tail_turns": 0,
+   "tail_range": NaN,
+   "finite": false
+  },
+  "needle#2": {
+   "start": 0.0,
+   "end": NaN,
+   "min": NaN,
+   "max": NaN,
+   "tail_turns": 0,
+   "tail_range": NaN,
+   "finite": false
+  },
+  "seconds": 0.1
+ },
+ "3": {
+  "first": "rabbits",
+  "second": "needle",
+  "coupler": "band",
+  "rabbits#1": {
+   "start": 0.09999999403953552,
+   "end": 0.9999842643737793,
+   "min": 0.09999999403953552,
+   "max": 0.9999842643737793,
+   "tail_turns": 0,
+   "tail_range": 0.0006925463676452637,
+   "finite": true
+  },
+  "needle#2": {
+   "start": 0.0,
+   "end": 0.99997478723526,
+   "min": 0.0,
+   "max": 0.99997478723526,
+   "tail_turns": 0,
+   "tail_range": 0.0011206269264221191,
+   "finite": true
+  },
+  "seconds": 0.0
+ },
+ "4": {
+  "first": "rabbits",
+  "second": "tank",
+  "coupler": "eats",
+  "rabbits#1": {
+   "start": 0.09999999403953552,
+   "end": 0.21847856044769287,
+   "min": 0.09999999403953552,
+   "max": 0.21847856044769287,
+   "tail_turns": 0,
+   "tail_range": 0.0,
+   "finite": true
+  },
+  "tank#2": {
+   "start": 0.0,
+   "end": 0.7815184593200684,
+   "min": 0.0,
+   "max": 0.7815184593200684,
+   "tail_turns": 0,
+   "tail_range": 0.0,
+   "finite": true
+  },
+  "seconds": 0.0
+ },
+ "5": {
+  "first": "weight",
+  "second": "rabbits",
+  "coupler": "band",
+  "weight#1": {
+   "start": 1.0,
+   "end": 0.2941187620162964,
+   "min": -0.6749266386032104,
+   "max": 1.0570307970046997,
+   "tail_turns": 4,
+   "tail_range": 0.24419859051704407,
+   "finite": true
+  },
+  "rabbits#2": {
+   "start": 0.09999999403953552,
+   "end": 0.6671028137207031,
+   "min": 0.09999999403953552,
+   "max": 0.909069299697876,
+   "tail_turns": 4,
+   "tail_range": 0.08446532487869263,
+   "finite": true
+  },
+  "seconds": 0.1
+ },
+ "6": {
+  "first": "tank",
+  "second": "foxes",
+  "coupler": "eats",
+  "tank#1": {
+   "start": 0.0,
+   "end": 0.499997079372406,
+   "min": 0.0,
+   "max": 0.5334156155586243,
+   "tail_turns": 0,
+   "tail_range": 3.263354301452637e-05,
+   "finite": true
+  },
+  "foxes#2": {
+   "start": 1.0,
+   "end": 0.5000014305114746,
+   "min": 0.44937318563461304,
+   "max": 1.0,
+   "tail_turns": 0,
+   "tail_range": 1.4066696166992188e-05,
+   "finite": true
+  },
+  "seconds": 0.0
+ },
+ "7": {
+  "first": "rabbits",
+  "second": "chooser",
+  "coupler": "band",
+  "rabbits#1": {
+   "start": 0.09999999403953552,
+   "end": 0.9999985098838806,
+   "min": 0.09999999403953552,
+   "max": 0.9999985098838806,
+   "tail_turns": 0,
+   "tail_range": 0.0,
+   "finite": true
+  },
+  "chooser#2": {
+   "start": 0.6000000238418579,
+   "end": 0.9999970197677612,
+   "min": 0.5343500971794128,
+   "max": 0.9999970197677612,
+   "tail_turns": 0,
+   "tail_range": 0.0,
+   "finite": true
+  },
+  "seconds": 0.2
+ },
+ "8": {
+  "first": "tank",
+  "second": "weight",
+  "coupler": "watches",
+  "tank#1": {
+   "start": 0.0,
+   "end": 0.3655834496021271,
+   "min": 0.0,
+   "max": 0.9481161236763,
+   "tail_turns": 3,
+   "tail_range": 0.896230936050415,
+   "finite": true
+  },
+  "weight#2": {
+   "start": 1.0,
+   "end": 0.15931519865989685,
+   "min": -1.0000122785568237,
+   "max": 1.000011682510376,
+   "tail_turns": 3,
+   "tail_range": 2.000021457672119,
+   "finite": true
+  },
+  "seconds": 0.0
+ },
+ "9": {
+  "first": "foxes",
+  "second": "chooser",
+  "coupler": "in_step",
+  "foxes#1": {
+   "start": 1.0,
+   "end": 3.4215529715053705e-12,
+   "min": 3.4215529715053705e-12,
+   "max": 1.0,
+   "tail_turns": 0,
+   "tail_range": 3.409022752975943e-08,
+   "finite": true
+  },
+  "chooser#2": {
+   "start": 0.6000000238418579,
+   "end": 0.9999948740005493,
+   "min": 0.6000000238418579,
+   "max": 0.9999948740005493,
+   "tail_turns": 0,
+   "tail_range": 2.1696090698242188e-05,
+   "finite": true
+  },
+  "seconds": 0.1
+ },
+ "10": {
+  "first": "metronome",
+  "second": "rabbits",
+  "coupler": "in_step",
+  "metronome#1": {
+   "start": 0.0,
+   "end": 23.33034896850586,
+   "min": 0.0,
+   "max": 23.33034896850586,
+   "tail_turns": 0,
+   "tail_range": 7.7710418701171875,
+   "finite": true
+  },
+  "rabbits#2": {
+   "start": 0.09999999403953552,
+   "end": 1.2425485849380493,
+   "min": 0.09999999403953552,
+   "max": 1.4770886898040771,
+   "tail_turns": 3,
+   "tail_range": 0.7066799402236938,
+   "finite": true
+  },
+  "seconds": 0.0
+ },
+ "11": {
+  "first": "metronome",
+  "second": "tank",
+  "coupler": "watches",
+  "metronome#1": {
+   "start": 0.0,
+   "end": 1.9999910593032837,
+   "min": 0.0,
+   "max": 1.9999910593032837,
+   "tail_turns": 0,
+   "tail_range": 0.0,
+   "finite": true
+  },
+  "tank#2": {
+   "start": 0.0,
+   "end": 0.9999970197677612,
+   "min": 0.0,
+   "max": 0.9999970197677612,
+   "tail_turns": 0,
+   "tail_range": 0.0,
+   "finite": true
+  },
+  "seconds": 0.0
+ },
+ "12": {
+  "first": "chooser",
+  "second": "rabbits",
+  "coupler": "eats",
+  "chooser#1": {
+   "start": 0.6000000238418579,
+   "end": 0.9999969601631165,
+   "min": 0.6000000238418579,
+   "max": 0.9999969601631165,
+   "tail_turns": 0,
+   "tail_range": 5.960464477539063e-08,
+   "finite": true
+  },
+  "rabbits#2": {
+   "start": 0.09999999403953552,
+   "end": 0.03604305163025856,
+   "min": 0.03604305163025856,
+   "max": 0.20933236181735992,
+   "tail_turns": 0,
+   "tail_range": 0.020317334681749344,
+   "finite": true
+  },
+  "seconds": 0.2
+ }
+}

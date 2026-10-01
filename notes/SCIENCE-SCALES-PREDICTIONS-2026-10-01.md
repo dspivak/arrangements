@@ -813,6 +813,101 @@ boxes, or the natural chart of item 42, not run) might place the non-exact piece
 established: that the counts survive other `eps`, `alpha`, `tau` or `dt` (not run), or anything about
 real science.
 
+### 5.8 Test (g)
+
+Run 2026-10-01 by Claude (subagent of Claude Opus 5.5, 0fe746c1). Code: `science_native.excuse_world`,
+`excuse_reader`, `excuses_native_run`. A world box emits each incident (seen flags, behaviour, which side
+channels came back 0) for 4000 steps. A reader box holds `theta` (Euclidean) and every incident's
+attachments (`choice.py`'s `{attached, not}` chooser on each, response `dt a(1-a)`). Its forcing is the
+exact `-d` of the §9 cost, zero on its in-port. They are wired and run by `Phi`, with nothing in Python
+between steps. 9 tests for (g1)-(g3) in `tests/test_science_native.py`; the file is now 30 passed and 3
+strict xfail, 40 s. One recorded run per version. A first (g)-only run compared against 4-decimal
+scratch values; I then fixed the test to compare against the unrounded numpy scratch at the `1e-6` that
+§9 fixed, and re-ran. No construction choice failed: no NaN, and the attachments stayed in `[0, 1]`
+(minimum `4e-307`, maximum 1.0). The native run equals the numpy scratch to `1.1e-16` (convex) and 0
+(double well).
+
+**Convex version (`a in [0,1]`, linear drawing cost), as called before code.** `theta`: 0.975, 0.925,
+0.85, 0.75, 0.625, 0.504, 0.432, 0.381, 0.343, 0.311. Moves: 0.025, 0.05, 0.075, 0.1, 0.125, 0.121,
+0.072, ... The excuse at incident `i` (figure `i`) is attached at 0.875, 0.724, 0.547, 0.344, 0.115, then
+none. **(g1) held:** at excused incidents 1-3, `theta` moves by exactly `delta_i/(D w)` = 0.025, 0.05,
+0.075, all below the unexcused 0.2. **(g2) held:** explaining cost 0.087, 0.145, 0.165 over the excused
+incidents. **(g3) refuted, as called:** at the threshold incident 4 the move is 0.100, less than the sum
+0.150 of the earlier moves. The cost is convex, so the move grows with the distance of the excuse used
+and saturates; there is no jump. Excuses also decay backwards: by incident 10 the excuses for incidents 1-3
+are attached at only 0.211, 0.110 and 0.010. Once `theta` has moved, the old anomalies are re-explained
+by the update, not by their figures.
+
+**Double-well version (`+ kappa a(1-a)`, `kappa = 0.5`: an attachment is made or not), disclosed as the
+second version.** `theta`: 1, 1, 1, 0.876, 0.778, 0.700, 0.546, 0.5, 0.462, 0.429. Attachments: 1, 1, 1,
+then 0. **(g1) held:** moves of exactly 0 while excused, and explaining costs exactly `delta_i` = 0.1, 0.2,
+0.3. **(g2) held.** **(g3) held:** at incident 4 `theta` jumps 0.124 against 0 before. Figure 4
+(`delta = 0.4`) sits exactly at the global binary threshold `1/2 D^2 w/(w+1) = 0.4`. It loses because
+`theta` responds faster than an attachment grows from 0.01: the outcome depends on the reader's rates,
+not on the costs alone. There is a second avalanche at incident 7 (move 0.155): the excuse for incident 3
+is dropped (final attachments 1, 1, 0 for incidents 1-3), because after `theta` has moved, keeping it
+costs more than it saves.
+
+**(g4) not run natively; its closed forms are in §9.** At `d = 3`, soft: symmetric median 21.5, the same
+as (e)'s fixed arm; incumbent-only 34.5. Hard: incumbent-only 28.0. (e)'s blanket discount gave 82.5.
+**The one native smoke run failed**, and this is recorded before anything else about (g4): seed 0,
+`d = 3`, soft, incumbent-only, unilateral, 100 steps per count. Its `lambda` rose from 108.6 to 180 and
+never crossed 0, against a closed-form crossing at count 30. I did not find the cause within budget. The
+code carries an UNVERIFIED note. The run also took 55 s for 15,000 steps, because `rvect`'s response is
+a dense matrix (`(1 + 2720)^2`): a cost gap for a box with many coordinates and a diagonal response. The
+1000 steps per count I fixed would take about 9 minutes per seed and arm. So (g4)'s verdict rests on
+closed forms only. Read that way: the symmetric arm is held (21.5 against 21.5 and 22.5). The
+incumbent's advantage is **bounded by its library in the hard variant** (delay at most 7 draws in 10 of
+10 seeds, within `K = 8`). In the soft variant it is **not**: a ruled-out figure keeps 8% attachment and
+leaks a small fixed-ratio discount, delay 8 to 14. Both are far below the blanket discount's.
+
+**Which could have come out otherwise.** Little in (g1)-(g3). The numpy scratch fixed every number before
+code, so the native run checks the construction: wiring, chart, and nothing pushed back. The calls that
+could have failed were mine before running: convex is gradual, the double well is abrupt. The two open
+findings, the backwards decay of old excuses and the rate race at figure 4, were seen in the scratch
+before the native code and not predicted.
+
+**Reasonable or weird** (the run's judgment, not evidence). *A person:* reasonable, and close to David's
+Bob. With "an excuse is made or not", trust holds exactly until the excuses run out, then drops at once.
+Once it has dropped, the old excuses are quietly abandoned ("maybe he wasn't in a hurry that day
+either"). The convex reader is the weird one: it half-believes each excuse and lets trust leak a little
+every time, more as the excuse gets further-fetched. *A scientific community:* auxiliary hypotheses
+protect a theory until they are ruled out one by one, then the theory falls. In closed form, a finite
+library protects it for a bounded number of anomalies, unlike a blanket discount. Weird: whether figure
+4 is used is decided by the reader's speed, not by evidence. *A population:* no reading I would defend.
+*A cell:* none.
+
+**What this does not establish.** That excuses are built this way: the library, distances, footprints
+and ruling-out schedule are stipulated, and the figures are not run as arrangements (P34). That (g4)
+holds natively: it was not run. Nor that the double well is the right form of "made or not"; a
+different binary penalty could move the threshold.
+
+**(g4) diagnosis** (the same run's, resumed 2026-10-01 at the coordinator's request; every scratch
+computation was sized before it started).
+1. *Smallest instance* (1 mirrored figure, `n_A = 3`, B counts 0-8, seed 0, `d = 3`, 2000 steps per
+   count). Native and closed form agree at every count to 1e-4, the closed form's grid, in the "none" and
+   "incumbent" arms. Here `|lambda| <= 12`.
+2. *Scaled up* (8 figures, `n_A = 20`, B counts 0-8). They part **at count 0**, before any excuse
+   matters: native 108.566, closed form 100.991. The gap is exactly `K_0 = 1/2 sum a^2 = 7.575`. The native
+   rest was `lambda = K_1`, not `K_1 - K_0`.
+3. *Cause: a floating-point loss in my chooser code, not the closed form, the sign, the gauge, the
+   register, the shift constant or a share-scaled force.* `dU/dlambda` was taken by autodiff through
+   `sigmoid`, whose derivative is computed as `sigma (1 - sigma)`. That is exactly 0 once `lambda > ~37`,
+   so the `-p_0 K_0` term contributed nothing, while `p_1`'s derivative stayed accurate. The smallest
+   instance never reached `|lambda| > 37`, which is why it agreed. **Fix:** the same differential written
+   out, `dU/dlambda = p_0 p_1 (K_1 - K_0 - T lambda)`, with `p_0 p_1 = exp(-softplus(lambda) -
+   softplus(-lambda))`, used both there and in the response.
+4. *After the fix* (seed 0, `d = 3`, 8 figures, `n_A = 20`, B counts 0-40, 300 steps per count, both
+   variants). Native `n_B*` equals the closed form in every unilateral arm: soft none / symmetric /
+   incumbent 22 / 23 / 30; hard 22 / 23 / 26. The largest `|lambda - closed form|` is `7e-14` without
+   excuses and 0.34 with them: at 300 steps per count the attachments have not fully converged. The
+   one-potential forcing gives `n_B*` 30 against 23 in the symmetric arm, as predicted before code: the
+   losing rival, at share about `e^{-100}`, builds no excuses.
+5. *Not rerun at the fixed settings.* 151 counts × 1000 steps with the dense `2721^2` response come to
+   about 5 minutes per seed and arm, so 120 runs would take hours. **So §9's closed forms stand,
+   checked natively on one seed at counts 0-40; they are not the full native run.** The code's
+   UNVERIFIED note is replaced by this diagnosis.
+
 ## 6. Second round, test (e): an idea against a rival (predictions, before code, 2026-10-01)
 
 David, to "shall I run tests (e) and (f)": "Yes, please run those tests." Written by Claude Opus 5.5,
@@ -1240,3 +1335,42 @@ response and the attachment's.
 
 The native run must reproduce these scratch values to `1e-6`, the same arithmetic in a different order.
 **(g4)** is fixed below, before its code, if the budget allows.
+
+**Numbers fixed before code (g4)** (the run's, same signature; numpy closed forms at rest, no
+arrangement, before (g4)'s construction code). *Setting.* Test (e)'s draws, unchanged: `n_A = 20`,
+`d in {3, 2}`, seeds 0-9, `a = rng.normal(0, 1, 20)`, `b = rng.normal(d, 1, 150)`, `T = 1`, every trust
+fixed at 1. In place of the blanket discount there is **one library for both sides**: `K = 8` figures in
+mirrored pairs, footprint `+d` or `-d` on the draw they are attached to, distances `delta_k = 0.5 k
+(d^2/9)` (0.5 to 4.0 at `d = 3`, where an unexcused anomaly costs about `d^2/2 = 4.5`). A hypothesis's
+anomalous draws are the other source's (A draws for the rival, B draws for the incumbent), taken in order.
+At its `j`-th anomalous draw, figures `1..j-1` (both signs) are ruled out. Two variants: **soft**, an
+observed side channel at precision `v = 100` as in (g); **hard**, the ruled-out figures absent from that
+draw's library. Arms: **none** (test (e) fixed), **symmetric** (both may build excuses), **incumbent**
+(only `h0`). `n_B*` = first B count with `K_1 < K_0` at rest.
+*Closed forms* (the "none" arm reproduces §6's fixed values exactly, a check on the script):
+- `d = 3`, soft: none 22, 20, 20, 21, 23, 31, 15, 30, 27, 21 (median 21.5); symmetric 23, 24, 21, 21,
+  22, 29, 14, 29, 17, 21 (21.5); incumbent 30, 34, 34, 34, 36, 41, 23, 41, 38, 35 (34.5).
+- `d = 3`, hard: symmetric median 21.5; incumbent 26, 27, 27, 28, 29, 37, 19, 33, 31, 28 (28.0).
+- `d = 2`, soft: none median 22.5; symmetric 21.5; incumbent 35.0. Hard: symmetric 22.0; incumbent 29.0.
+
+So, before code: the excuse library protects the incumbent by **+6.5 draws (hard) and +13 (soft)** at
+`d = 3`, against (e)'s blanket discount's +61 (82.5 against 21.5). The hard variant's delay over "none"
+is at most 7 in every seed, within `K = 8`. The soft variant leaks: a ruled-out figure is still attached
+at `d^2/(d^2 + v) = 0.08` on every later draw, a small fixed-ratio discount like (e)'s blanket, so its
+delay is not bounded by the library alone.
+**(g4) holds iff**: the symmetric median is within 25% of (e)'s fixed 21.5 (d = 3) and 22.5 (d = 2), and
+the incumbent-only delay over "none" is at most `K = 8` in 10 of 10 seeds (hard), and below (e)'s
+blanket-discount medians (82.5, 54.0). Predicted from the closed forms: held for the hard variant, the
+bound refuted for the soft one.
+*Construction.* One reader box, wired to a world that emits the B draws one count at a time (1000 steps
+per count, 151 counts, count 0 holding only the A draws). The chooser is in the natural chart (library
+item 42): `lambda = log(p_0/p_1)`, inverse-Fisher response, `dt = 1`, so `lambda' = K_1 - K_0 - T lambda +
+lambda`, the rest logit in one step. Attachments are as in (g): `dt a (1-a)` with `dt = 0.02` (stability
+`0.02 x 1/4 x (2 K d^2 + v) = 1.22 < 2`), starting at `a0 = 0.01`. **Two forcings, each disclosed.**
+**Unilateral** (primary): each side's attachments descend its own `K_i`, as if each hypothesis had an
+advocate. This is not exact jointly. **One potential**
+`U = -p_0 K_0 - p_1 K_1 + T H(p)`: exact, but each side's attachments are driven by `p_i dK_i`. I
+predict it departs from the closed form in the symmetric arm, because at the start `p_1 ~ e^{-90}`, so the
+losing rival builds no excuses: one builds excuses only for what one believes. The native unilateral run
+must match the soft and hard closed-form `n_B*` in 10 of 10 seeds per arm; the one-potential run is
+reported, with the soft variant at `d = 3` only.
