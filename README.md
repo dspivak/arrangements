@@ -55,6 +55,10 @@ for _ in range(60):
 print(v1[0], v2[0], v1[0] + v2[0])   # 2.0  2.0  4.0, to the last ulp
 ```
 
+For a long run of a closed arrangement, `functors.closed_step(system)` is the same step
+compiled by JAX and checked against `Phi` on its first steps; a loop of `run_one` on a
+nested composite is retraced every call.
+
 Nobody wrote down that tank 1's outflow depends on tank 2's level. It follows from the
 pipe's potential and the wiring, and total water is conserved, because the two
 covectors the pipe generates are equal and opposite. Change the tank's shape and only its

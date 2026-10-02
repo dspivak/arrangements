@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from arrangements.coalgebra import configuration, phase
-from arrangements.functors import Phi, cot_map
+from arrangements.functors import Phi, closed_step, cot_map
 
 from tests.chain import IN_POS, harmonic_particle, load_regress
 
@@ -79,3 +79,29 @@ def test_regression_matches_cdlm():
     np.testing.assert_allclose(pp[0], R["share_out_n"], rtol=1e-10, atol=1e-12)
     np.testing.assert_allclose(pp[1](jnp.array([0.42])), -R["share_omega_z"], rtol=1e-10, atol=1e-12)
     np.testing.assert_allclose(dp[0], -R["share_xi_M"], rtol=1e-10, atol=1e-12)
+
+
+def test_closed_step_is_Phi_and_refuses_ports():
+    """CHECKS THE IMPLEMENTATION: ``closed_step`` is ``Phi``'s step on a closed arrangement,
+    twenty steps out, and refuses an arrangement with ports."""
+    import pytest
+    from arrangements.arrangement import Arrangement, exact
+    from arrangements.coalgebra import configuration as conf
+    from arrangements.rvect import euclidean
+
+    k = lambda q: 0.5 * (q[0] - 3.0) ** 2 + 0.5 * (q[1] + q[0]) ** 2
+    a = Arrangement(P=conf(euclidean(2), jnp.array([1.0, 0.0])), in_dim_M=0, out_dim_M=0,
+                    in_dim_N=0, out_dim_N=0, out_f=lambda q, m: jnp.zeros(0),
+                    in_f=lambda q, m, n: jnp.zeros(0), omega=exact(lambda q, m, n: -0.1 * k(q)),
+                    label="bowl")
+    O, step = Phi(a), closed_step(a, check=3)
+    s_phi = s_fast = a.P.init
+    for _ in range(20):
+        _, _, s_phi = O.with_state(s_phi).run_one(IN_POS, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+        s_fast = step(s_fast)
+    np.testing.assert_allclose(s_phi, s_fast, rtol=1e-12)
+    open_a = Arrangement(P=a.P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+                         out_f=lambda q, m: q[:1], in_f=lambda q, m, n: jnp.zeros(0),
+                         omega=a.omega, label="open")
+    with pytest.raises(ValueError):
+        closed_step(open_a)

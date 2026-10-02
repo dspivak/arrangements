@@ -128,7 +128,7 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
     )
 
 
-def phase(Q: ReactiveVectorSpace, init=None) -> CotCoalg:
+def phase(Q: ReactiveVectorSpace, init=None, dt: float = 1.0) -> CotCoalg:
     """The phase coalgebra on ``(Q, sharp_Q)``: ``S = T^*Q = Q (+) Q^*`` in coordinates.
 
     The state is ``s = (q, xi)``, position and momentum. The presented position is
@@ -144,15 +144,20 @@ def phase(Q: ReactiveVectorSpace, init=None) -> CotCoalg:
 
     CDLM's phase integrator subtracts its ``xi_Q``; the two agree once
     ``U_cdlm`` becomes ``omega = -dU_cdlm``.
+
+    With a time step ``dt`` both halves are scaled,
+    ``(q, xi) |-> (q + dt sharp_q(xi), xi + dt xi_Q)``, so a phase part can share a
+    coupler with a configuration part whose step is carried by its ``sharp``; the
+    default ``dt = 1`` is the unit step above, with ``dt`` folded into the costs.
     """
 
     s0 = (jnp.zeros(Q.dim), jnp.zeros(Q.dim)) if init is None else init
     return CotCoalg(
         Q_dim=Q.dim,
         init=s0,
-        position=lambda s: s[0] + Q.apply_sharp(s[0], s[1]),
-        step=lambda s, xi_Q: (s[0] + Q.apply_sharp(s[0], s[1]), s[1] + xi_Q),
-        label="phase",
+        position=lambda s: s[0] + dt * Q.apply_sharp(s[0], s[1]),
+        step=lambda s, xi_Q: (s[0] + dt * Q.apply_sharp(s[0], s[1]), s[1] + dt * xi_Q),
+        label="phase" if dt == 1.0 else f"phase(dt={dt})",
     )
 
 

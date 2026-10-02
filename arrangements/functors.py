@@ -152,6 +152,8 @@ def Phi(arr: Arrangement) -> PCMorphism:
     ``arr.P.position(s)`` the coalgebra presents; the state update is
     ``arr.P.step(s, xi_Q)`` on the parameter covector of the covector triple.
     Time is discrete by design: one covector, one step (sec.displacement).
+    For a long run of a closed arrangement use ``closed_step`` below: the same
+    step compiled, checked against this one on its first steps.
     """
 
     P = arr.P
@@ -202,3 +204,41 @@ def Phi(arr: Arrangement) -> PCMorphism:
         state=P.init,
         step=step,
     )
+
+
+def closed_step(arr: Arrangement, check: int = 2):
+    """One step of ``Phi(arr)`` for a closed arrangement, compiled by JAX, checked against ``Phi``.
+
+    For a closed arrangement (all four port dimensions zero) the covector triple collapses
+    to the forcing's own ``Q``-component, so the step is
+    ``s |-> u(s, omega(q(s), (), ())|_Q)``, which is what is compiled. The first ``check``
+    steps from ``arr.P.init`` are also taken through ``Phi(arr).run_one`` and compared, so
+    the compiled step is the library's own, verified rather than assumed.
+
+    Use this, not a loop of ``Phi(arr).run_one``, for a long run: ``run_one`` on a nested
+    ``compose_seq`` is retraced every call (2.5 s a step on the 19-node runner of
+    ``runner.py``). ``commons.closed_step`` and ``cascade.closed_step`` are older copies
+    without the check.
+    """
+    from .interpretation import trivial_omega
+
+    dims = (arr.in_dim_M, arr.out_dim_M, arr.in_dim_N, arr.out_dim_N)
+    if any(dims):
+        raise ValueError(f"closed_step needs a closed arrangement; port dimensions {dims}")
+    P, omega, z = arr.P, arr.omega, jnp.zeros(0)
+
+    @jax.jit
+    def step(s):
+        xi_q, _, _ = omega(P.position(s), z, z)
+        return P.step(s, xi_q)
+
+    if check:
+        O, IN = Phi(arr), (jnp.zeros(0), trivial_omega(0))
+        s_phi = s_fast = P.init
+        for k in range(check):
+            _, _, s_phi = O.with_state(s_phi).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+            s_fast = step(s_fast)
+            for a, b in zip(jax.tree_util.tree_leaves(s_phi), jax.tree_util.tree_leaves(s_fast)):
+                if not jnp.allclose(a, b, rtol=1e-10, atol=1e-12):
+                    raise AssertionError(f"compiled step differs from Phi's at step {k + 1}")
+    return step

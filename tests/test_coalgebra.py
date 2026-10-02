@@ -25,6 +25,15 @@ def test_phase_presents_and_adds():
     np.testing.assert_allclose(xi1, jnp.array([1.5]))
 
 
+def test_phase_with_a_time_step_scales_both_halves():
+    """(q, xi) |-> (q + dt sharp_q xi, xi + dt xi_Q); dt = 1 is the unit step."""
+    P = phase(diagonal(jnp.array([0.5])), dt=0.1)
+    s = (jnp.array([1.0]), jnp.array([2.0]))
+    np.testing.assert_allclose(P.position(s), jnp.array([1.1]))
+    q1, xi1 = P.step(s, jnp.array([-0.5]))
+    np.testing.assert_allclose(q1, jnp.array([1.1]))
+    np.testing.assert_allclose(xi1, jnp.array([1.95]))
+
 def test_tensor_is_the_product_coalgebra():
     """Base Q x Q', state S x S', position concatenated, covector split."""
     P = configuration(diagonal(jnp.array([1.0]))).tensor(phase(diagonal(jnp.array([2.0, 3.0]))))
