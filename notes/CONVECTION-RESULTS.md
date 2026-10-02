@@ -3,7 +3,8 @@
 Book question (David, 2026-10-01): is Ch 2's convection roll (`sec.driven`) worth it, and does it work? It was never
 run (plan §5.6). Model: four heat-holding cells in a loop (bottom, right, top, left), each a tank of heat with
 temperature as output; two zero-response reservoirs (hot under the bottom cell, cold over the top); one stateless
-flow box receiving all six temperatures, flow Q = g (T_right - T_left) set at each moment by the temperature
+flow box receiving all six temperatures (since 2026-10-02, Claude Opus 5.5, 9dd117f1: split into local boxes, Heat's
+joints, ring joints that also carry the flow, a buoyancy box reading left and right; the same equations, tested), flow Q = g (T_right - T_left) set at each moment by the temperature
 difference (no inertia, David's correction), returning conduction D, plate exchange k, and heat carried by the flow.
 Parameters D = 0.1, k = 1, g = 1, step s = 0.05; plates at +-Delta/2.
 
