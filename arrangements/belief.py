@@ -31,6 +31,14 @@ WHERE IT STOPS. A height of exactly zero, in the belief or the likelihood, is ou
 log-height is ``-inf``. In float64 the diagonal response is exact until a height underflows to
 ``0``; the dense ``inv`` of the gauge block loses the cancellation ``G^{-1} G = I`` long before
 (``cond(G) ~ 1 / min q``).
+
+A WHOLE CURVE (P36 stage (b), ``notes/BAYES-WHOLE-CURVE.md``). On a grid over the real line wide
+enough to hold a curve's tails, heights underflow and ``diag(1 / q)`` is ``inf``, although the
+step itself, ``xi - <q, xi>``, is finite. ``belief_coalgebra`` is the same integrator with the
+BELIEF as its configuration and the log-heights as its state (an integrator's state need not be
+its configuration, ``def.duration_integrator``): it presents ``softmax(l)`` and its update is the
+response after the responsibility, ``l |-> l + tau (xi - <softmax(l), xi>)``, with no division.
+``updating_on_beliefs`` wires it into the same likelihood box.
 """
 
 from __future__ import annotations
@@ -41,7 +49,7 @@ import jax
 import jax.numpy as jnp
 
 from .arrangement import Arrangement, exact
-from .coalgebra import configuration
+from .coalgebra import CotCoalg, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
 from .rvect import ReactiveVectorSpace
@@ -162,6 +170,55 @@ def self_forced_belief(
         omega=exact(lambda l, x, n_in: -jnp.dot(readout(l), nll(x))),
         label="belief(self-forced)",
     )
+
+
+# ---------------------------------------------------------------------------
+# The box whose configuration is the belief (stage (b)).
+# ---------------------------------------------------------------------------
+
+
+def belief_coalgebra(n: int, init: Array, tau: float = 1.0) -> CotCoalg:
+    """The belief integrator with ``Q`` the beliefs and ``S`` the log-heights.
+
+    The state ``l in R^n`` presents the belief ``softmax(l)``; on a covector ``xi`` at that
+    belief (a force on the belief, read up to a constant) it moves by the response after the
+    responsibility,
+
+        l |-> l + tau (xi - <softmax(l), xi>),
+
+    which is ``log_height_response`` applied to the pullback of ``xi`` along ``softmax``, written
+    without the division: ``diag(1/q) (diag(q) - q q^T) xi = xi - <q, xi> 1``. Where every height
+    is a positive float the two boxes take the same step; where a height underflows only this one
+    is finite.
+    """
+    return CotCoalg(
+        Q_dim=n,
+        init=jnp.asarray(init, dtype=float),
+        position=belief_of,
+        step=lambda l, xi: l + tau * (xi - jnp.dot(belief_of(l), xi)),
+        label="belief(Q=beliefs)",
+    )
+
+
+def updating_on_beliefs(
+    nll: Callable[[Array], Array],
+    n: int,
+    obs_dim: int,
+    init: Array,
+    tau: float = 1.0,
+) -> Arrangement:
+    """The *updating* picture with ``belief_coalgebra`` as the belief box's parameter: the box
+    sends its configuration, the belief, forward unchanged beside the observation, and the
+    likelihood box closes it. ``<R^0|R^obs_dim> -> <R^0|R^0>``."""
+    box = Arrangement(
+        P=belief_coalgebra(n, init, tau),
+        in_dim_M=0, out_dim_M=obs_dim, in_dim_N=0, out_dim_N=n + obs_dim,
+        out_f=lambda y, x: jnp.concatenate([y, x]),
+        in_f=lambda y, x, n_in: jnp.zeros(0),
+        omega=lambda y, x, n_in: (jnp.zeros(n), jnp.zeros(obs_dim), jnp.zeros(0)),
+        label="belief(Q=beliefs)",
+    )
+    return compose_seq(box, likelihood_box(nll, n, obs_dim))
 
 
 # ---------------------------------------------------------------------------

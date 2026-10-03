@@ -216,3 +216,14 @@
   science-scales (a1) loss; corrected in `notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md` §5.1,
   `notes/BAYES-INTEGRATOR.md`, `STATUS.md` §3.24 (new §3.38), `tests/test_science_scales.py`'s docstring and
   xfail reason, `arrangements/science.py`'s docstring. No existing code changed.
+- **2026-10-03, Bayes' rule for a whole curve** (Claude Fable 5.1, 9948b53c; book plan P36 stage (b)). Added to
+  `arrangements/belief.py`: `belief_coalgebra` (the belief as configuration, the log-heights as state, update the
+  response after the responsibility, no division) and `updating_on_beliefs`. New
+  `tests/test_bayes_whole_curve.py` (25 passed, 32 s, run piece by piece and then whole). Derivation and eight
+  predictions fixed before code in `notes/BAYES-WHOLE-CURVE.md`, a ninth (the book's "heavier" observation)
+  added before its piece; verdicts there; all nine held. One harness
+  error, in piece 6's reference integral (scipy's `quad` with break points and infinite limits), fixed by
+  splitting the integral before any step of that piece had run. Found: restriction to a grid commutes with the
+  step at every size; the box that divides is non-finite on any window holding an underflowed tail and the box
+  on beliefs is exact there; a Cauchy belief with bell-curve noise has a convergent belief and a divergent
+  constant. `STATUS.md` §3.39 added, §3.38's last paragraph pointed at it. No existing code changed.

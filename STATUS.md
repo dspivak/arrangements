@@ -1556,9 +1556,40 @@ all `n` log-heights is exact down to `2.2e-308`, below which jax holds a height 
 On the science-scales stream (§5.1 of that note) it tracks the direct posterior to `1.7e-13` over 200 draws
 where the gauge referenced at a losing hypothesis is off by more than `1` at draw 30.
 
-**What this does not show.** Anything about a belief that is a whole curve (P36 stage (b)): `n` values is a
-family with `n - 1` natural parameters. Anything about a belief or a likelihood with a zero. One refuted
+**What this does not show.** Anything about a belief that is a whole curve, which is §3.39 (P36 stage (b)): `n`
+values is a family with `n - 1` natural parameters. Anything about a belief or a likelihood with a zero. One refuted
 prediction: that a thin height by itself loses the dense inverse.
+
+### 3.39 Bayes' rule for a whole curve: the grid box is the curve's box restricted
+
+`arrangements/belief.py` (`belief_coalgebra`, `updating_on_beliefs`), `tests/test_bayes_whole_curve.py` (25
+passed, 32 s); book plan P36 stage (b); derivation and eight predictions fixed before code, a ninth before its
+piece, verdicts and numbers
+in `notes/BAYES-WHOLE-CURVE.md`; the proof for a curve over the real line, and the smooth set it lives on, in
+Part II of the book repo's `notes/bayes-every-belief.md`. The library holds grids only (v1 is `R^d`).
+
+**Strong evidence here.** On grids of 5 to 1025 values the stage (a) box lands on the closed-form posterior of
+a two-bump belief restricted to the grid, to `4.6e-14`, at every size: restriction to a grid commutes with the
+step. The step's constant, the mean, the variance and the area converge to the curve's faster than any power
+(all four below `5e-9` at spacing `0.5`, at round-off from `0.25`). The area left by one step from a normalized
+log-height is `exp(KL(q || q'))`, to twelve places, and `N` steps of duration `1/N` bring its log down like
+`0.772 / N`.
+
+**A machine holds a curve's step only as the composite.** Every entry of `diag(1 / q)` grows like one over the
+spacing and the responsibility shrinks like the spacing; on a window of half-width 40 a quarter of the heights
+underflow and the box that divides returns `nan` there. `belief_coalgebra` has the belief as its configuration
+and the log-heights as its state, and its update is the response after the responsibility, `l + xi - <q, xi>`;
+it is exact on that window, through a 30-reading stream with log-heights down to `-27771`. It also holds what
+no bell-curve family does: told only "heavier", `N(0, 1)` becomes `2 phi Phi`, mean `1 / sqrt(pi)`, to ten
+places.
+
+**Where it stops.** A Cauchy belief with bell-curve noise: the belief after the step converges as the window
+widens and the step's constant diverges, slope `-gamma / pi` to four places. A force `-log q`: the constant
+converges to the entropy and the belief flattens with no limit.
+
+**What this does not show.** That the space of log-heights is a smooth set and the box an integrator on it:
+that is the hand proof, under a growth bound, unreviewed, and it finds the step is not defined at every
+covector and duration. A response with a floor. More than one dimension of `z`.
 
 ## 4. Where the mathematics is written down
 
