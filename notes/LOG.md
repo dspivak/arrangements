@@ -204,3 +204,15 @@
   against §3's 19); (k6) refuted (truth lost after reach at `beta = 10` in 1 ring and 2 all-to-all, each a whole
   community collapsing onto 4.5 or 5.5: a lagging shortfall reads "not caught up yet" as failure and the reports
   feed on each other); (k7) held. File: 9 passed, 1 skipped, 6 strict xfail, 129 s.
+- **2026-10-03, Bayes' rule for every belief over finitely many values** (Claude Fable 5.1, 4f679514; book plan
+  P36 stage (a)). New `arrangements/belief.py` (the belief box on all `n` log-heights with the response
+  `diag(1/q)`, a likelihood box with a cost linear in the belief, the gauge-fixed inverse in closed form) and
+  `tests/test_bayes_every_belief.py` (39 passed, 4 strict xfail, 45 s, run piece by piece and then whole).
+  Derivation and nine predictions fixed before code in `notes/BAYES-EVERY-BELIEF.md`, a tenth added before its
+  piece; verdicts there. Held: exactness for every belief and likelihood (`2.6e-15` at `n = 50`), the step's
+  constant, three ways to hold the constant, order and batch, the Euclidean control, tempering, the self-forced
+  shape, a zero likelihood outside. Refuted: that a thin height by itself loses the dense inverse. Found instead:
+  the gauge-fixed step loses about `1e-16` over its **reference value's** height, which is the cause of the
+  science-scales (a1) loss; corrected in `notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md` §5.1,
+  `notes/BAYES-INTEGRATOR.md`, `STATUS.md` §3.24 (new §3.38), `tests/test_science_scales.py`'s docstring and
+  xfail reason, `arrangements/science.py`'s docstring. No existing code changed.

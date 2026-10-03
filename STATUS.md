@@ -83,6 +83,16 @@ argument, and reading it as "a collective's form survives turnover" imported a p
 did not have (David, 2026-09-26: "you can't just go to a town and swap someone out!"). State what
 a run shows about the machinery; let the claim about the world be argued separately, or not made.
 
+**Not evidence of a cause: a quantity that rose alongside.** A diagnosis that names what grew with
+the error has found a suspect, not a cause, until a control moves the one without the other. The
+categorical Bayes step's loss of exactness on thin beliefs was put down on 2026-10-01 to the dense
+inverse, `cond(G)` rising with the error; a prediction built on that was refuted on 2026-10-03, and
+the control that would have shown it at once took one run: the same stream with the gauge's
+reference moved to the winner, still through the dense inverse, and the error gone (§3.38;
+`notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md`, its 2026-10-03 correction). Write a cause with its
+control beside it, or call it a suspect (suggestion-box sweep, Claude Opus 5.5 (1M), f0c52066,
+from the mark of Claude Fable 5.1, 4f679514; *proposed*).
+
 ## 3. Open questions the code depends on
 
 ### 3.1 The domain of `cot`
@@ -1035,11 +1045,11 @@ logit.
 
 **The same distribution is one Bayes step in the Legendre-dual chart** (§3.23 on the categorical
 family). Gauge-fixed natural parameters, inverse-Fisher response, affine forcing: one step at
-duration 1 from the uniform belief lands on the logit to 8.6e-16. *Scope (2026-10-01):* exact in
-the mathematics, but the library's dense-inverse step loses it once some hypothesis's weight falls
-below about 1e-5 (`cond(G) ~ 1/min q`; `notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md` §5.1). The gauge is needed — on all of
-`R^n` the Fisher information is singular along `1` — and that is a wrinkle the continuous conjugate
-families of §3.23 did not have. The two responses agree under the Legendre map to 2.8e-17, but the
+duration 1 from the uniform belief lands on the logit to 8.6e-16. *Scope (2026-10-01, cause corrected 2026-10-03):* exact in
+the mathematics, but this gauge-fixed step loses it once the gauge's reference value is thin, by about
+`1e-16` over its height (§3.38; not the dense inverse and not `cond(G)`, as first diagnosed). An inverse
+needs the gauge, since on all of `R^n` the Fisher information is singular along `1`, a wrinkle the continuous
+conjugate families of §3.23 did not have; a response that gives Bayes' rule does not need it (§3.38). The two responses agree under the Legendre map to 2.8e-17, but the
 arrangements differ: the mean-chart jump on the affine cost linearizes softmax, missing by order
 `|t|^2` (errors 0.104, 0.030, 0.0078 at `eps = 0.5, 0.25, 0.125`), so **which chart the state lives
 in is part of the arrangement.**
@@ -1522,6 +1532,33 @@ the random nets are evidence for it. No runner fits its own translation: each is
 undergoes none of them. The existence of a runner is not surprising (STATUS §2, "what the construction was
 built to have"); what could have failed and did not is the exactness of each level against an independent
 stepper, and the runner's own net fitting inside the class it runs.
+
+### 3.38 Bayes' rule for every belief over finitely many values, with no gauge
+
+`arrangements/belief.py`, `tests/test_bayes_every_belief.py` (39 passed, 4 strict xfail, 45 s); book plan P36
+stage (a); derivation and ten predictions fixed before code, verdicts and numbers in
+`notes/BAYES-EVERY-BELIEF.md`; the proof in the book's letters in the book repo's `notes/bayes-every-belief.md`.
+The belief box's state is all `n` log-heights `l`, its readout the belief `softmax(l)`, its forcing zero; a
+downstream likelihood box has the cost `<y, -log Pr(x | .)>`, linear in the belief; the response divides by the
+belief's height, `diag(1 / softmax(l))`. One step is `l + xi - <q, xi> 1` with `xi = log Pr(x | .)`, whose
+belief is the posterior.
+
+**Strong evidence here.** A theorem for every belief with positive heights and every positive likelihood
+(four lines, in the note), checked against the posterior computed directly: worst relative error `2.6e-15`
+over 96 random (belief, likelihood) pairs at `n = 2, 3, 7, 50`; a 30-reading stream on a two-bump prior to
+`3.1e-15` in any order and as one batch; the book's bell-curve step exactly on a grid. The Euclidean response
+is Bayes only at the uniform belief with `eta = n`.
+
+**The gauge is a convenience, and a costly one.** The step's constant is the belief's average of the force;
+nothing has to normalize the stored numbers. The gauge-fixed step (`choice.belief_arrangement`, and its
+closed-form inverse `belief.gauge_response`) loses about `1e-16` over the reference value's height; the box on
+all `n` log-heights is exact down to `2.2e-308`, below which jax holds a height as `0` and the state is `nan`.
+On the science-scales stream (§5.1 of that note) it tracks the direct posterior to `1.7e-13` over 200 draws
+where the gauge referenced at a losing hypothesis is off by more than `1` at draw 30.
+
+**What this does not show.** Anything about a belief that is a whole curve (P36 stage (b)): `n` values is a
+family with `n - 1` natural parameters. Anything about a belief or a likelihood with a zero. One refuted
+prediction: that a thin height by itself loses the dense inverse.
 
 ## 4. Where the mathematics is written down
 

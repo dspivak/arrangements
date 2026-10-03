@@ -50,10 +50,12 @@ receiving a covector `xi` and a duration `tau`
     u_lam(xi, tau) = lam + tau * sharp_lam(xi),   sharp_lam = G(lam)^{-1} = grad^2 AA*(mu(lam)).
 
 **The claim.** `u_lam(omega_x|_lam, 1) = lam + G^{-1} G t(x) = lam + t(x)`: one step of this
-arrangement at duration 1 is Bayes' rule **exactly**, not to first order. *Scope (2026-10-01):* exact in the mathematics; the library computes the step as a dense
-`inv(G)` applied to `G t`, which loses the exact translation once some hypothesis's weight falls
-below about 1e-5 (`cond(G) ~ 1/min q`), shown on the categorical family over 200 draws in
-`notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md` §5.1. In Chapter 3's
+arrangement at duration 1 is Bayes' rule **exactly**, not to first order. *Scope (2026-10-01, cause corrected 2026-10-03):* exact in the mathematics. On the
+categorical family the library's gauge-fixed step (`choice.belief_arrangement`) loses the exact translation once
+the gauge's **reference value** is thin, by about `1e-16` over its height; the 2026-10-01 diagnosis, the dense
+inverse and `cond(G) ~ 1/min q`, was wrong (`notes/BAYES-EVERY-BELIEF.md` §3, verdicts 6 and 10). The box on all
+`n` log-heights, `belief.log_height_response`, has no reference value and is exact down to the smallest height
+float64 holds. In Chapter 3's
 `def:arr` the two objects named are therefore
 
 * the **response** `sharp = grad^2 AA*`, the raised inverse Fisher metric, living inside the

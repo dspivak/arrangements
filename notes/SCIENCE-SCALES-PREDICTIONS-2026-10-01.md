@@ -255,7 +255,8 @@ the **closed** `belief_arrangement` rebuilt per datum with `init` the current `l
 **(a1) Refuted, on both streams.** Misspecified: the mind is NaN from step 110 to 200, so
 `max_t |softmax(lam,0) - softmax(y)|` is NaN. Well specified: `2.2e-4`, and
 `max_t |lam - (y_i - y_n)| = 207`. The first step with a gap above `1e-12` is 13 (misspecified) and 11
-(well specified). **Cause, measured:** starting the library's mind step from the *exact* belief (the
+(well specified). **[The cause given next was corrected 2026-10-03; see the correction after this paragraph.]**
+**Cause, measured:** starting the library's mind step from the *exact* belief (the
 population's `y_i - y_n`), its error against the translation `lam + t` is `2e-16` at step 0, `1.6e-13`
 at step 5, `3e-11` at step 10 and `0.29` at step 20 (misspecified), tracking `cond(G)`: `5`, `4e5`,
 `5e11`, `2e16`. `cond(G)` grows like `1 / min_i q_i`, the weight of the *least* favoured hypothesis
@@ -271,6 +272,20 @@ population exactly. **What holds instead:** the mind realizes the population to 
 every hypothesis keeps weight above about `1e-5` (one-step error `<= 1.6e-13` while `cond(G) < 1e10`
 on the misspecified stream; `6e-6` already at that condition on the well-specified one). A data stream
 long enough to make a hypothesis negligible is exactly what this response cannot carry.
+
+**Correction, 2026-10-03** (Claude Fable 5.1, 4f679514; `notes/BAYES-EVERY-BELIEF.md` §3, verdicts 6 and 10;
+`tests/test_bayes_every_belief.py::test_prediction_10_the_science_scales_stream`). The numbers above stand; the
+cause does not. The loss is the gauge's **reference value** (`mu = 4`) going thin, not the dense inverse, not
+`cond(G)`, and not the response: in the gauge the response adds `(sum_{i<n} eta_i) / q_n` to every coordinate, so
+the round-off of that sum, about `1e-16`, is divided by the reference's height. The one-step errors above,
+`1.6e-13` and `3e-11` at steps 5 and 10, are about `1e-16 / q_n` there, not `1e-16 cond(G)` (`4e-11`, `5e-5`). On
+this same misspecified stream: the gauge box with the winner `mu = 2` as its reference tracks the directly
+accumulated log-posterior to `4.6e-13` over all 200 draws, dense inverse and closed form alike; the box on all
+five log-heights with the response `diag(1/q)` (`belief.log_height_response`) tracks it to `1.7e-13`; and with a
+thick reference the dense inverse is exact with other heights down to `1e-300`. So "a data stream long enough to
+make a hypothesis negligible is exactly what this response cannot carry" is false of the response: it is true of
+a gauge whose reference value is one of the negligible hypotheses. (a1) as run, with `science.mind_step` as built,
+stays refuted; it has not been rerun with the other box.
 
 **(a2) Held.** The tensor of five one-dimensional holder boxes and the single five-dimensional box
 give the same trajectory exactly: `max_t |y_tensor - y_single| = 0.0` on both streams.

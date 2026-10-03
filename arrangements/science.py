@@ -26,8 +26,9 @@ tensored with a Euclidean box on ``ell = log Pi_B``, one closed box with one pot
 simplex) that keeps ``choice.py``'s CONDITION ``0 < dt T (log Z - 1) < 2``.
 
 HOLDERS WHO READ EACH OTHER (``account_community``, test (c)). ``m`` holders, holder ``j``'s belief
-in the gauge-free log-weight chart ``y_j in R^n`` (``q_j = softmax(y_j)``; NOT the inverse-Fisher
-chart, whose dense inverse fails, test (a1)), Euclidean response, so the steps derived on paper under
+in the gauge-free log-weight chart ``y_j in R^n`` (``q_j = softmax(y_j)``; NOT the gauge-fixed
+inverse-Fisher chart, whose step fails once its reference value is thin, test (a1) and
+``notes/BAYES-EVERY-BELIEF.md``), Euclidean response, so the steps derived on paper under
 the inverse-Fisher response (the note's §3) are translations here. Each holder's cost reads its
 neighbours' accounts ``log q_k`` forward as constants (``jax.lax.stop_gradient``: nothing pushed
 back), so the one-form is the block of each holder's own cost differential, a game's unilateral

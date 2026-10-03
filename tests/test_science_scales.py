@@ -99,10 +99,11 @@ xfail, not repaired. (f2) is refuted on the ring and (f3) as written (18 of 20);
 (d3) is refuted at the tolerance fixed before code (1.1e-11 against 1e-12).
 (c3) is refuted at ``alpha/beta = 10`` (both wirings); the rest of (c) held.
 (a1) is REFUTED on both streams and (a3) is refuted for the mind: the
-library's mind step computes ``G^{-1} (G t)`` with a dense inverse, and ``cond(G)`` grows like
-``1 / min_i q_i``, so once the least-favoured hypothesis falls below about ``1e-10`` the step
-loses the exact translation (from draw 9 and 6), the error compounds, and the misspecified run
-is NaN from step 110. (a2) and the population's half of (a3) hold.
+library's mind step is gauge-fixed with its reference value at ``mu = 4``, and once that
+reference's weight is thin the step loses the exact translation (from draw 9 and 6; about
+``1e-16`` over the reference's height), the error compounds, and the misspecified run is NaN
+from step 110. (Cause corrected 2026-10-03, ``notes/BAYES-EVERY-BELIEF.md`` §3: not the dense
+inverse and not ``cond(G)``.) (a2) and the population's half of (a3) hold.
 """
 
 import jax
@@ -127,8 +128,8 @@ def runs():
     return {name: sc.run_two_scales(_stream(m), MUS) for name, m in STREAMS.items()}
 
 
-REFUTED_A1 = ("refuted (notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md §5.1): the dense inverse "
-              "of an ill-conditioned G breaks the mind's exact translation; max |dq| 2.2e-4 "
+REFUTED_A1 = ("refuted (notes/SCIENCE-SCALES-PREDICTIONS-2026-10-01.md §5.1): the gauge's thin "
+              "reference value breaks the mind's exact translation; max |dq| 2.2e-4 "
               "(well-specified), NaN from step 110 (misspecified)")
 
 
