@@ -1,4 +1,4 @@
-"""Gradient descent and backpropagation via ``Phi`` (book sec.two_layer).
+"""Gradient descent and backpropagation via ``Phi`` (book sec.neural_network).
 
 Three checks, plus the CDLM regression:
 * the lens backward pass equals reverse-mode autodiff (backprop = chain rule),
