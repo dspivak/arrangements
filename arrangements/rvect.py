@@ -103,7 +103,7 @@ def euclidean(dim: int, eta: float = 1.0) -> ReactiveVectorSpace:
     """The Euclidean sharp ``eta * I``.
 
     With ``eta = eta_LR`` this is the constant learning-rate response whose
-    configuration dynamics is vanilla gradient descent (book sec.two_layer).
+    configuration dynamics is vanilla gradient descent (book sec.neural_network).
     """
     return constant(eta * jnp.eye(dim))
 

@@ -20,7 +20,7 @@ coalgebra with
 
 i.e. the environment of ex.training_data, driven by the system itself. Closing
 the learner with it displaces the network's weights along the forcing of the
-loss (sec.two_layer) toward predicting ``o.c`` from ``o``: the system's
+loss (sec.neural_network) toward predicting ``o.c`` from ``o``: the system's
 one-step map.
 
 The paper's particles are all quadratic, so that map is linear; in code we put in
@@ -108,7 +108,7 @@ def consecutive_pairs(states: Sequence[Array]) -> List[Tuple[Array, Array]]:
 
 
 # ---------------------------------------------------------------------------
-# The predictor: a small tanh MLP, as a parameterized map (sec.two_layer).
+# The predictor: a small tanh MLP, as a parameterized map (sec.neural_network).
 # ---------------------------------------------------------------------------
 
 

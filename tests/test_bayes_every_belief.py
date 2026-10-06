@@ -1,6 +1,7 @@
 """Bayes' rule for every belief over finitely many values (book ``AGENTDOCPLAN.md`` §8.2 P36 (a)).
 
-David's sentence in the book's Ch 2 ``sec.bayes`` (2026-10-03): "a belief in general is a whole
+David's sentence in the book's Ch 2 ``sec.bayes`` (2026-10-03; the section was cut that day, verbatim in the book repo's
+``notes/ch2-cut-bayes-convection.md``): "a belief in general is a whole
 curve ... So we do not get Bayes' rule for every belief in this chapter." Stage (a) asks for the
 case of finitely many values: is one step of an arrangement Bayes' rule for EVERY belief and EVERY
 likelihood, with no family chosen?

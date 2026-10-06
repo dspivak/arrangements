@@ -17,7 +17,7 @@ discrete *Dirichlet energy* (the variational / deep-Ritz form)
 
 whose unique minimizer is the discrete Poisson solution ``L u = b`` (the
 second-difference of ``-u''=f``). The network outputs the field on a grid; under
-``Phi`` with the configuration parameter (sec.two_layer) its weights are
+``Phi`` with the configuration parameter (sec.neural_network) its weights are
 displaced along the forcing of the energy, ``-dE/du = b - L u`` pulled back
 through the net (sec.displacement), so they descend ``E``. Hard Dirichlet
 boundary conditions are baked in by the ansatz ``u_theta(x) = x(1-x) g_theta(x)``.

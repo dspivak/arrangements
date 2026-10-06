@@ -24,7 +24,7 @@ def test_constant_sharp_ignores_position():
 
 
 def test_euclidean_learning_rate():
-    """sharp_q = eta * I (the learning rate, book sec.two_layer)."""
+    """sharp_q = eta * I (the learning rate, book sec.neural_network)."""
     Q = euclidean(4, eta=0.1)
     np.testing.assert_allclose(Q.sharp_at(jnp.zeros(4)), 0.1 * jnp.eye(4), atol=1e-10)
 

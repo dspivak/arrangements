@@ -1,4 +1,4 @@
-"""Gradient descent and backpropagation via ``Phi`` (book sec.two_layer; CDLM sec.dl_warmup).
+"""Gradient descent and backpropagation via ``Phi`` (book sec.neural_network; CDLM sec.dl_warmup).
 
 A feedforward network is a smooth parameterized map ``F : Q x R^m -> R^n``,
 regarded as an arrangement
