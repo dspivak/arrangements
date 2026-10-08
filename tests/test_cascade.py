@@ -18,6 +18,11 @@ pieces are ``arrangements/cascade.py`` on ``arrangements/collective.py``:
 * at the top, a **market** pays ``r`` times the product (one level), or a fixed supply
   arrives (the nested runs).
 
+A *shock* or *drain* below is the fund's balance reduced by ``S`` by hand, the run from there
+(``shocker``, ``depth_runner``); the top supply is an exterior input (``supplied``), so its cut
+is the environment's schedule; neither is an event in a run (STATUS.md §2, "Not evidence of an
+event").
+
 **Three choices, said as choices, because they decide what can happen.** (i) Supply and
 product travel on two channels (``dim H = 2``), or the workers would supply each other. (ii)
 The fund pays a fixed overhead: without one, income and wages both scale with the wage and

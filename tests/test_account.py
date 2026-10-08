@@ -146,7 +146,7 @@ where it settles.
 Built to hold by the argument above; a check of fix (i).
 
 (27) *They leave together, the neediest first.* As the cap falls, all four are at the fund or all
-four are at the elsewhere at every cap (no cap splits them). Released from the fund's equilibrium
+four are at the elsewhere at every cap (no cap splits them). Run from the fund's equilibrium
 at a cap low enough that they leave, they reach the elsewhere in order of need, neediest first.
 Fails if some cap splits them or the order is not by need.
 

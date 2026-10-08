@@ -210,9 +210,11 @@ for the body. One part out of two needs 12.6243 (the landscape 12.5811) and one 
 needs 39.0706 (39.0850), against the 7.3630 and 18.4882 predicted. **Moving a group of four
 costs 2.72; taking one part out of it costs 39.07, fourteen times as much.**
 
-(B6) **Held, exactly.** A boom to ``s = 12`` takes the collective to the elsewhere; when it
-ends, the same wage brings it home to placements 0.013026 and amplitudes 3.826558, the first
-equilibrium to every digit printed.
+(B6) **Held, exactly.** With the elsewhere's offer set to ``s = 12`` by hand the collective settles
+at the elsewhere; run on from there at the original offer, the same wage brings it home to
+placements 0.013026 and amplitudes 3.826558, the first equilibrium to every digit printed. (A
+"boom" here and below is that schedule on the source box's held value, the experimenter's, not an
+event in any run.)
 
 (B7) **Refuted: there is no band, because there is no split.** With mobilities spread
 eightfold and booms of 200 to 20000 steps, every window gives 0 or 4 at the elsewhere, and the
@@ -725,9 +727,10 @@ def test_B2_the_paymaster_can_leave():
 
 
 def test_B6_a_fixed_point_forgets():
-    """(B6). Held. A boom at the elsewhere takes the collective there; when it ends, the
-    same wage brings it home, and home is where it was: placements, amplitudes and the
-    offer that would take it again all agree with the first equilibrium."""
+    """(B6). Held. With the elsewhere's offer raised by hand the collective settles there;
+    run on at the original offer, the same wage brings it home, and home is where it was:
+    placements, amplitudes and the offer that would take it again all agree with the first
+    equilibrium."""
     C = setup(4, positions=[HOME] * 4)
     first = settle(C, 200_000, 4.0)
     p0, a0, _, _ = look(C, first, 4.0)

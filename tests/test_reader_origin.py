@@ -2,9 +2,13 @@
 
 The candidate is Codex's (the book repository's ``notes/reader-origin-model.md``, checked by its
 ``notes/check-reader-origin.py``): a selective catalytic apparatus ``q_1`` whose activity on fuel
-rebuilds it and makes a protective boundary ``q_2``; a retaining pore lets it establish; the
-boundary lets it persist after the pore is gone. There it is one box whose forcing is the ODE's
-own velocity, which by STATUS.md §2 certifies nothing beyond the ODE. The design here, and why it
+rebuilds it and makes a protective boundary ``q_2``; in a retaining pore it establishes from a
+trace; in the same arrangement with the pore box replaced by one publishing ``0``, started at that
+high state, the boundary keeps the high state up. Two arrangements, each run as itself: the *pore*
+arrangement and the *exposed* one. "Release" and "released" below name the exposed arrangement
+started at the pore arrangement's end state; nothing in any run leaves anything, and the
+replacement is the experimenter's (STATUS.md §2, "Not evidence of an event"). There it is one box
+whose forcing is the ODE's own velocity, which by STATUS.md §2 certifies nothing beyond the ODE. The design here, and why it
 is worth building, is the book repository's ``notes/reader-origin-arr.md`` (proposed; David,
 2026-09-26, "both", i.e. build stages A and B). This module holds both stages.
 
@@ -47,8 +51,9 @@ The response ratio ``g_2 / g_1`` is forced up to a constant (the separability co
 ``reaction_network.py`` item 3), so the fuel, the match and the pore's leakage cannot all be kept
 out of the response. Able to fail: an error in the derivation makes the ticks disagree.
 
-(T2a, reproduction) Release is the pore child substituted by the drive publishing ``0`` -- a
-different inner box, not a changed coefficient -- and gives T0's release outcomes.
+(T2a, reproduction) The exposed arrangement is the pore arrangement with the pore child
+substituted by the drive publishing ``0`` -- a different inner box, not a changed coefficient --
+and, started at the pore arrangement's end state, gives T0's release outcomes.
 
 (T2b, result) Protection by mass-action binding instead of Codex's law: free apparatus ``A``,
 free boundary ``B``, complex ``C = AB`` that does not leak, with ``q_1 = A + C``,
@@ -57,12 +62,12 @@ Codex's, apportioned so that ``q_1`` and ``q_2`` obey his equations with the lea
 place of ``l q_1 / (1 + q_2)``: damage takes ``A`` to nothing and ``C`` to ``B``; the saturating
 loss takes ``A`` and ``C`` in proportion; boundary loss takes ``B`` to nothing and ``C`` to
 ``A``. Predictions:
-  (i) fast binding (``k_on = 20``, ``K = 1``): establishes in the pore and persists after
-      release, its high ``q_1`` within 10% of Codex's 1.788153;
-  (ii) there is a binding constant ``K_*`` below which release fails at fast binding, and
-      ``K_* < 1``: Codex's law is not at the edge;
-  (iii) slow binding (``k_on = 0.1``, ``K = 1``): release fails, because the complex forms
-      slower than the apparatus turns over;
+  (i) fast binding (``k_on = 20``, ``K = 1``): establishes in the pore arrangement, and the
+      exposed arrangement keeps the high state, its ``q_1`` within 10% of Codex's 1.788153;
+  (ii) there is a binding constant ``K_*`` below which the exposed arrangement has no high
+      state at fast binding, and ``K_* < 1``: Codex's law is not at the edge;
+  (iii) slow binding (``k_on = 0.1``, ``K = 1``): the exposed arrangement falls to zero, because
+      the complex forms slower than the apparatus turns over;
   (iv) no species-box structured realization: ``separability_ratio`` for the pair ``(A, C)``
       varies with ``B`` at fixed ``A, C``. T1b's potential then belongs to Codex's
       two-coordinate reduction, not to this chemistry.
@@ -74,8 +79,9 @@ is stiffer. Fixed points of a tick are the zeros of ``V`` and do not depend on `
 
 **Stage B, the predictions, fixed here before its construction** (David, 2026-09-26, "yes").
 
-(T3) *The match as a distance.* The substrate is given a response and a constant forcing, so it
-drifts at speed ``v = 0.005`` away from the site, exposed, from the established state. Exposed,
+(T3) *The match as a distance.* The substrate is a box given a response and a constant forcing
+from one more child, so it drifts at speed ``v = 0.005`` away from the site by the dynamics,
+exposed, from the established state. Exposed,
 ``q_2 = 10 kappa q_1`` and ``10 kappa q_1^2 - (10 kappa r - 1) q_1 + (4 - r) = 0`` with
 ``r = 3 kappa - 1``. The high state folds where the discriminant vanishes:
 ``kappa_* = 0.770433``, ``d_* = sqrt(2 tau log(1/kappa_*)) = 0.722223``, ``q_1 = 0.590750`` at
@@ -84,7 +90,8 @@ the fold.
       It collapses (``q_1 < 0.05``) at a distance in ``[d_*, d_* + 0.1]``; the lag is a
       slow-passage effect of the finite ``v``. Able to fail: the fold could sit elsewhere, or
       the boundary coordinate could lag enough to move it.
-  (b) *Forced, a reproduction.* Drifting back to distance 0 does not restore it. Exposed, the
+  (b) *Forced, a reproduction.* A second run, the drift child's forcing reversed and started at
+      the collapsed state, is still at zero when the substrate is back at distance 0. Exposed, the
       zero state's growth coefficient ``3 kappa - 5`` is negative for every ``kappa``, and with
       no assembly an exact zero stays zero. Said so that it is not read as a finding.
 
@@ -349,9 +356,10 @@ def test_T1a_the_curl_is_codex_and_lives_in_two_children():
 
 
 def test_T2a_release_is_substituting_the_pore_child():
-    """The released composite differs from the established one in one inner box: the pore
+    """The exposed composite differs from the pore composite in one inner box: the pore
     child publishing ``rho = 3.8`` is replaced by one publishing ``0``. Every other child and
-    the wire are the same objects' construction, so the run is T0's release."""
+    the wire are the same objects' construction, so its run from the pore composite's end
+    state is T0's release: two arrangements compared, no event in either."""
     established = run([0.0, 0.0], PORE, 30.0)
     with_pore = direct(established, replace(PORE, assembly=0.0))
     without = direct(established, EXPOSED)
@@ -487,8 +495,9 @@ def totals(x):
 
 
 def released(k_on, K):
-    """Establish in the pore from nothing, then substitute the pore child; return the totals
-    ``(q_1, q_2)`` at the end of each phase."""
+    """Run the pore composite from nothing, then the exposed composite (the pore child
+    substituted by hand) from that end state; return the totals ``(q_1, q_2)`` at the end of
+    each run."""
     est = binding_run([0.0, 0.0, 0.0], PORE, k_on, K, 40.0)
     rel = binding_run(est, EXPOSED, k_on, K, 60.0)
     return totals(est), totals(rel)

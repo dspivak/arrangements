@@ -47,10 +47,12 @@ measured return time agrees with that quadrature within 15% at the largest ``d``
 times for ``n = 1, 2, 4`` agree with each other within 15% there. Fails if the time depends
 on ``n`` at large ``d``, or does not track the quadrature.
 
-If (2)-(4) hold, the answer to P17 in this model is: a part driven out of a collective that
+If (2)-(4) hold, the answer to P17 in this model is: a part started far from a collective that
 can do without it stays out for good, deterministically, and the configuration keeps the
-displacement the cost cannot see; a collective driven out as a whole comes back as long as
-the need persists, at a time exponential in distance squared. Irrecoverable dispersal needs
+displacement the cost cannot see; a collective started far out as a whole comes back as long
+as the need persists, at a time exponential in distance squared. Nothing here drives a part
+out: every run starts from the displaced state (``test_dispersal_momentum.py`` is the run in
+which a pushed part coasts out by the dynamics). Irrecoverable dispersal needs
 redundancy, not noise.
 """
 

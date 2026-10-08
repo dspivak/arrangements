@@ -642,8 +642,8 @@ choosing and below which it does not.
 
 ### Prediction 4 — hysteresis. **Held.**
 
-From `p_1 = 0.2`, a push of 0.6 commits the chooser to option 1 in 59 steps. Release the push and it
-stays: drift below 1e-12 over 2000 steps, the losing share still decaying (1.2e-206). Unpushed from
+From `p_1 = 0.2`, a push of 0.6 commits the chooser to option 1 in 59 steps. Run on from there without
+the push and it stays: drift below 1e-12 over 2000 steps, the losing share still decaying (1.2e-206). Unpushed from
 the same start it goes to option 2 instead. **So a chooser can be moved from outside, only above a
 threshold, and the move does not undo itself.** That is what makes commitment worth the name, and it
 is the one sentence of Part three most worth the book's while.

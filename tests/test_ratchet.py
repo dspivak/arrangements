@@ -10,8 +10,12 @@ this file adds no mechanism to it.
 run (§5.9 item 19) the fund is dead and stays dead: with no worker in reach it earns 0.16
 against an overhead of 2 and sits at -18.4 forever, paying no wage; a worker is drawn to
 supply, so nothing draws the parts back on its own. The pieces do sustain -- they hold
-amplitude 1.0 at the source. So re-forming comes from outside, by (a) an injection into the
-fund, with (b) the source's offer falling for a while as the second route. Parts attracting
+amplitude 1.0 at the source. So re-forming comes from the experimenter, by (a) a sum added to
+the fund's balance by hand (``add_f``), with (b) the source box's offer set lower for a window
+of steps and set back (``window``) as the second route; a "shock" is the balance reduced by
+hand (``collapsed``). Every phase is one run from the previous run's end state with one such
+change; none of these words names an event in a run (STATUS.md §2, "Not evidence of an
+event"). Parts attracting
 *each other* is not this model: supply and product ride separate channels precisely so that
 workers do not feed one another.
 
@@ -256,7 +260,8 @@ def home(u, arr, state):
 
 
 def collapsed(wmax, mu_p, f0, iters=12):
-    """The state after a shock above the threshold: every worker at the source, fund dead.
+    """The end state of a run from the equilibrium with a drain above the threshold taken
+    from the balance by hand: every worker at the source, fund dead.
     Returns ``(u, arr, equilibrium, threshold, collapsed state)``."""
     u, arr = setup(wmax=wmax, mu_p=mu_p, f0=f0)
     eq = runner(arr, PRE)(arr.P.init)

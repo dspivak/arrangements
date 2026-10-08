@@ -1660,9 +1660,9 @@ counts once per step it is on the wire.
 likelihoods, and the losses are stipulated, `ell_2 < ell_3` being the assumption that an account which lines up
 can be planned around. No promise, no composed explanation, no accounting suboperad.
 
-### 3.41 A reader that retunes: the site placement as a slow state
+### 3.41 A reader that retunes: the site placement as a slow state (superseded; file deleted 2026-10-08)
 
-`tests/test_retuning.py` (11 tests and 2 strict xfails kept on the record, 39 s); predictions fixed first in the
+`tests/test_retuning.py`, deleted 2026-10-08 at David's "whatever you think is better" once §3.43 conformed to a source; its 11 tests and 2 strict xfails are recorded in the book repo's `notes/runs/p38-retuning-27dc74fb/RESULTS.md` and `test_retuning.log`, and the file itself in that repo's history is the commit of 2026-10-08. Then (39 s); predictions fixed first in the
 book repo's `notes/runs/p38-retuning-27dc74fb/PREDICTIONS.md`, results in its `RESULTS.md` (book plan P38
 stage 1; Claude Fable 5.1, 27dc74fb, 2026-10-07). §3.15's composite (stage B, T3: the match a kernel between the
 apparatus's site and the substrate's placement, the substrate drifting at `v`, the site held, collapse at distance
@@ -1718,6 +1718,53 @@ keeps the belief true at every step at the lowest total cost; on the exact wire 
 the round's average. Model, run; the loss, the plan cost, the account's contents and the parametrizations supplied;
 the composition a sum, and the kernel discounts additive guesses (`kappa < 1` counts `kappa` of the guess).
 
+
+### 3.43 A population tracking a moving optimum: Bürger and Lynch (1995) as an arrangement
+
+`tests/test_moving_optimum.py` (7 tests, 13 s); predictions and the source's equations fixed first in the book
+repo's `notes/runs/p38-retuning-27dc74fb/PREDICTIONS-moving-optimum.md`, results in its
+`RESULTS-moving-optimum.md` (book plan P38; Claude Fable 5.1, 27dc74fb, 2026-10-08, at David's "find a case in
+the world that yours matches and start using those words and those values for the test, or abandon it"). The
+source's deterministic part (Evolution 49(1):151-163, pp. 152-154, eqs. 1-4, 8a, 9, 10) drawn as boxes: the
+population, the mean phenotype (mobility the additive genetic variance, Lande's equation) and the optimum; viability
+and birth, the carrying capacity, selection on the mean (the gradient of minus log mean fitness, nothing on the
+optimum) and the environmental trend. Values from the paper's figure captions; the genetic variance 0.0703 implied by
+its Fig. 1B through eq. (10), which then predicts its Fig. 3 numbers to three digits.
+
+**Held, all seven**: one generation is the paper's recursion to 1e-12; the lag settles at `k/s` and its 95% time at
+`3/s`; the critical rate is eq. (10) to 0.05%; extinction at twice it at the hand-computed generation; fixed against
+evolving at the same rate, 3 of 3 extinct at the predicted generations against 3 of 3 persisting; the width of the
+fitness function at fixed variance, eight thresholds within 0.2% of eq. (10), maximal at an intermediate width; the
+standing load to four digits; Fig. 3's birth rates within 2% of the paper's captions. One measurement horizon
+lengthened after the data (the settling time scales with `1/s`).
+
+**What it adds.** Only that the paper's model is an arrangement, its mean phenotype a placement descending its own
+cost at a mobility the genetic variance sets. §3.41's first attempt conforms to nothing in the world; its file is deleted and its results stay in the
+book repo's notes.
+
+### 3.44 The coordinator that distributes the mistake: a belief in the external box
+
+`arrangements/coordinator.py`, `tests/test_coordinator.py` (8 tests, 119 s) and `tests/coordinator_closed_form.py` (the
+forces by hand, numpy, run before the module existed); predictions fixed first in the book repo's
+`notes/runs/p37-coordinator-70fcc5f2/PREDICTIONS.md`, results in its `RESULTS.md` (book plan P37 (b)(ii); Claude Fable
+5.1, 70fcc5f2, 2026-10-08). §3.42's figurines (one or two buses sharing the route; a second bus's driver and vehicle at
+slots 3 and 4) on the spatial parent with placements frozen, and above it the DEPOT, `<E | M> -> <E x R^{1+B+6B} | R^0>`:
+state one belief per bus over which of its three figurines was wrong (`belief_coalgebra`, tensored), its backward map
+computing the REPORT, each figurine's share of its bus's mistake by that belief, sent down as the parent's exterior
+message (`blame="belief"`) or the whole mistake to everyone (`blame="chain"`), which the parent delivers and each
+figurine's run pulls back as §3.42's chain rule exactly (reproduced to four places); the depot's cost the belief's
+evidence, unilateral, so each is Bayes: a sighting one-hot from the world, the prior as the initial state, and the other
+bus's mistake under the one-wrong-figurine model. A figurine reads its report as a push on its guess (`k = g h`,
+unilateral) with one of two responses: `told`, `mu_g / g'(theta)^2` (the guess moves by its share), or `slope`, §3.42's
+Euclidean on the parameter. Held: composite = closed form to 4e-14 on 18 arm-scenario pairs over 60 rounds. The finding:
+told, the shares are the belief; by the slope they are the belief times `g'^2`, so a prior of (0.7, 0.1, 0.2) on
+(driver, vehicle, route) comes out (0.40, 0.00, 0.60). A sighting every round gives the driver 0.917 of the four
+minutes, not all (round 1's report precedes round 1's sighting; a look-then-report coordinator would be a `CotCoalg2`);
+a second bus on the route clears the route by round 3 and cannot split driver from vehicle; a wrong prior is unmoved by
+the bus's own data, and comparison clears the route of blame without restoring what it absorbed (0.065 kept, bus 2's
+right figurines drifting to cover it); reuse error = 4 (1 - the driver's share). Model, run; likelihoods, priors, sigma
+and the one-wrong model supplied; no magnitudes, no record of reports. Two predictions failed on their thresholds with
+the mechanism intact (the sighting's 0.95; the kept share's 0.10), recorded in PREDICTIONS.
 
 ## 4. Where the mathematics is written down
 

@@ -2,7 +2,7 @@
 
 **The question.** The book's Ch 1 §1.7 says a form that plays "dissolves when the driving
 stops or the parts stop staying attuned," and its footnote cites ``tests/test_dispersal.py``,
-which shows the collective's message *returning* after a part is driven out, not dissolving
+which shows the collective's message *returning* when a part is started far out, not dissolving
 (book repo ``notes/DOMAIN-CHECK-CH1-2026-09-29.md``, Group B, run 1, objection 3). Here the
 same collective is settled and then its parent's drive ``nu`` is switched off.
 
