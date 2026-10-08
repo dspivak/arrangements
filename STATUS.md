@@ -577,7 +577,8 @@ parts on one spatial-attention parent, placements moved by the parent's integrat
 kernel weights and the message sent onward as instruments. The choices that decided those
 runs -- total or mean cost, target, kernel scale, the placements' integrator and mobility --
 are required arguments. `tests/test_dispersal.py` (5 tests; predictions fixed first) asks
-whether a part driven out of the collective comes back.
+whether a part started far from the collective is called back (nothing drives it out; it is
+started displaced).
 
 **What held.** (1) The onward message returns to its target whenever the other parts can
 supply it. (2) The configuration does not: a small outward displacement of one of `n` parts
@@ -622,28 +623,35 @@ irrecoverable" is what this model shows, not what collectives in general do.
 
 `tests/test_reader_origin.py` (stage A: 9 tests). The candidate and its one-box ODE are
 Codex's (book repository, `notes/reader-origin-model.md`): a catalytic apparatus `q_1` whose
-activity on held fuel rebuilds it and makes a boundary `q_2` that cuts its leak; a pore lets it
-establish, the boundary lets it persist after. The design is `notes/reader-origin-arr.md` there.
+activity on held fuel rebuilds it and makes a boundary `q_2` that cuts its leak. Two arrangements
+are compared throughout, each run as itself: the *pore* arrangement, whose pore box publishes a
+retention of 3.8, in which the candidate establishes from a trace; and the *exposed* arrangement,
+the same with that box replaced by one publishing 0, started at the pore arrangement's high state,
+in which the boundary keeps the high state up. "Release" below names that second arrangement and
+its run; nothing leaves anything, and the replacement is the experimenter's (§2, "Not evidence of
+an event"). The design is `notes/reader-origin-arr.md` there.
 Predictions were written in the docstring before any construction; all held.
 
 **Reproductions.** The composite (species boxes, held supplies, one stateless transition box per
 term, a routing wire) ticks as Codex's Euler step to 1e-14 and recovers his table. `d omega` equals
 his formula and comes from exactly two children, boundary production and the protected leak.
-Release works as a substitution of the pore child.
+The exposed arrangement differs from the pore arrangement in one child, the pore box, and in
+nothing else.
 
 **(T1b) The field is a descent after all.** Derived by hand, then checked: on the open quadrant
 the field is `-G grad U`, with the diagonal response `G = h diag(q_1, (k_b kappa F / l)(1+q_2)^2)`
 and an explicit `U`. The structured composite (exact children, those responses) ticks with the
-direct one to 1e-13, and `U` falls at every tick of the release run. The two curl sources are one
+direct one to 1e-13, and `U` falls at every tick of the exposed arrangement's run. The two curl sources are one
 exact child, the cost `l q_1/(1+q_2)`. The price: the response ratio is forced up to a constant,
 so the fuel, the match and the leakage sit in the boundary's response (its matter), not in a child.
 
 **(T2b) Protection by mass-action binding** `A + B <-> C`, the complex not leaking. The other
 terms are apportioned so that the totals obey Codex's equations with the true free amount.
-- At fast binding (`k_on = 20`, `K = 1`) the candidate establishes and persists, at
-  `q_1 = 1.717` against Codex's 1.788.
-- Release fails below `K_* = 0.323`.
-- At slow binding (`k_on = 0.1`) it establishes in the pore (1.863) and is lost on release.
+- At fast binding (`k_on = 20`, `K = 1`) the candidate establishes in the pore arrangement, and
+  the exposed arrangement keeps the high state, at `q_1 = 1.717` against Codex's 1.788.
+- The exposed arrangement has no high state below `K_* = 0.323`.
+- At slow binding (`k_on = 0.1`) the pore arrangement establishes it (1.863) and the exposed one
+  falls to zero.
 - The `(A, C)` separability ratio moves from 0.823 to 3.354 as `B` goes from 1 to 4, so this
   chemistry has no species-box potential. T1b's potential belongs to the two-coordinate
   reduction.
@@ -651,13 +659,15 @@ terms are apportioned so that the totals obey Codex's equations with the true fr
 **Stage B** (the same file, now 14 tests, one of them a strict xfail that keeps a refuted
 prediction on the record; predictions fixed before the construction).
 
-(T3) The match is a distance: the substrate drifts at 0.005 per unit time, and the match is the
-kernel between placements. The fold's closed form is `d_* = 0.722` (`kappa_* = 0.770`).
+(T3) The match is a distance: the substrate is a box with a response and a constant forcing from
+one more child, so it drifts at 0.005 per unit time by the dynamics, and the match is the kernel
+between placements. The fold's closed form is `d_* = 0.722` (`kappa_* = 0.770`).
 - *Held.* Collapse at 0.812, inside the predicted `[d_*, d_* + 0.1]`.
 - *Refuted.* The prediction that the run tracks the upper branch within 0.02 failed. The run
   lags above the branch, by 0.042 at `d_* - 0.05`, and the lag grows toward the fold because
   the relaxation rate vanishes there.
-- *Forced, not a finding.* Drifting back does not restore it.
+- *Forced, not a finding.* A second run, the drift box's forcing reversed and started at the
+  collapsed state, stays at zero: an exact zero is a fixed point with no assembly.
 
 (T4) Two variants share the boundary, with matches 1 and 0.9.
 - Under crowding loss on held fuel, the worse match is excluded at the closed-form rate:
@@ -744,7 +754,10 @@ slower reader reads the members' mean as its exterior input. One-dimensional rea
 
 `arrangements/cascade.py` (workers, sources, a fund layer that wraps a collective into a unit,
 a market) and `tests/test_cascade.py` (5 tests; predictions fixed first, results recorded in
-its docstring). Two channels, supply and product; a fund with an overhead and a leak.
+its docstring). Two channels, supply and product; a fund with an overhead and a leak. A "shock"
+or "drain" is the fund's balance reduced by hand, the run from there; the top supply is an
+exterior input (`supplied`), so its cut is the environment's schedule; neither is an event in a
+run (§2, "Not evidence of an event").
 
 **Retroactivity, found in building.** Under exact composition a fund that pays by a gate on
 its balance is not a record: the workers' want is pulled back through the wage wire onto the
@@ -804,15 +817,17 @@ made need a target, so excess supply cost as much as shortage.
 away; the four stand together at every cap, since a want that always rises with pay leaves every
 worker the same landscape: need sets how fast a worker moves, never where it settles. With the
 elsewhere at 1.5 the two supplies overlap into one hill and the workers drift rather than leave;
-released, the neediest reach the elsewhere first. No drain ruins the fund, because it is paid for
+run from the cap-1.0 equilibrium at cap 0.2, the neediest reach the elsewhere first. No drain ruins the fund, because it is paid for
 product the elsewhere's supply bought, a flaw shared with `cascade.py` (book plan P24).
 
 ### 3.19 The ratchet: shock, disperse, re-form, shock again
 
 `tests/test_ratchet.py` (6 tests; predictions R1-R7 fixed in its docstring before any construction
 code) on `cascade.py` unchanged -- this one adds no mechanism. A collapsed fund is dead and stays
-dead, so re-forming comes from outside: an injection into the fund, or the source's offer falling
-for a while.
+dead, so re-forming comes from the experimenter: a sum added to the fund's balance by hand, or the
+source box's offer set lower for a window of steps and set back; a "shock" is the balance reduced
+by hand. Every phase is one run from the previous run's end state with one such change, and none
+of these words names an event in a run (§2, "Not evidence of an event").
 
 **The placement law, by hand and checked.** A part's placement ascends the supply it receives,
 `h_1(p) = g kappa(p) + s kappa(p - d)`, and its amplitude enters only as a positive rate, so the
@@ -834,8 +849,9 @@ collective short a part, however unequal the walking speeds: at that wage cap a 
 pays above `phi_max s`, so the first ones home hold the door open and a part twenty times slower
 still walks in. Where a survivor cannot pay it, a finite window does give the band.
 
-**What it leaves.** Membership, and only where the door closes: the collective re-formed short one
-part breaks at a third of the original shock and has no buffer left -- a scar, never a ratchet.
+**What it leaves.** Which parts are in reach, and only where the door closes: the three-part
+arrangement, the one a window leaves, dies from a third of the four-part one's drain and has no
+buffer left -- "a scar, never a ratchet," a comparison of two arrangements and no event in either.
 
 **Found while building.** At a wage cap of 4 the placement update at the cascade run's mobility 0.1
 is unstable, a 2-cycle -0.361 <-> +0.413 that reads as two equilibria; every equilibrium reported
@@ -886,7 +902,7 @@ was set for and overstates a grown whole's danger seventeen-fold.
 own probability of coming apart from its own life, since it comes apart once. And every number
 rests on chosen rates (learning, forgetting, pain's lag and steepness).
 
-### 3.21 A collective whose parts supply each other, and what a shock can do to it
+### 3.21 A collective whose parts supply each other, and what a change of offer does to it
 
 `arrangements/mutual_supply.py` and `tests/test_mutual_ratchet.py` (12 tests; predictions B1-B8
 fixed in its docstring before any construction code, results there). The book plan's P21 stage
@@ -920,10 +936,11 @@ one part cannot be bought out of four at any price: at offers of 10, 20, 40 and 
 leaving. Moving a group of four home costs a wage of 2.72; taking one part out of it costs 39.07.
 One part at home calls a stray back at the wage that could call nobody in §3.19.
 
-**So a shock moves this collective and does not break it.** Booms of 200 to 20,000 steps with the
-mobilities spread eightfold leave 0 or 4 at the elsewhere and never spread the four by more than
-0.024 (the control at `sigma = 0`: 2.172); when the boom ends the collective returns to its first
-equilibrium to six decimals. A split is stable only once the pieces are out of each other's reach
+**A change of offer moves this collective and does not break it.** The elsewhere is a held box;
+its offer set to 12 by hand for a window of 200 to 20,000 steps and set back (the run's "boom"),
+with the mobilities spread eightfold, leaves 0 or 4 at the elsewhere and never spreads the four by
+more than 0.024 (the control at `sigma = 0`: 2.172); run on at the original offer from where that
+leaves it, the collective returns to its first equilibrium to six decimals. A split is stable only once the pieces are out of each other's reach
 (merging at `kappa = 2.0e-2`, holding at `kappa = 4.5e-5`), and nothing here produces one. The scar
 §3.19 measured is the fund's, not the collective's: the bare threshold does not depend on size,
 while the drain that kills the fund falls 32.8% when a part is missing.
@@ -1194,7 +1211,7 @@ push to **0.0**, and the three-box composite equals a hand-sum including the fol
 while at `b = 0.4` the start still decides, with the boundary at 0.1.
 
 **And it is hysteresis.** From `p_1 = 0.2` a push of 0.6 commits the chooser to option 1 in 59 steps;
-release the push and it stays, drift below 1e-12 over 2000 steps, where unpushed from the same start
+run on from there without the push, it stays, drift below 1e-12 over 2000 steps, where unpushed from the same start
 it would have gone to option 2. A vertex is an exact fixed point and the response vanishes there, so
 **no finite push returns it**. Downstream, two runs differing only in the chooser's start leave the
 follower at exactly 0.0 and 1.0.
