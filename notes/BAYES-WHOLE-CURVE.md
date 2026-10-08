@@ -1,9 +1,15 @@
-# Bayes' rule for a whole curve (`tests/test_bayes_whole_curve.py`)
+# Bayes' posterior on grids (`tests/test_bayes_whole_curve.py`)
 
 P36 stage (b) of the book's `AGENTDOCPLAN.md` §8.2 (David, 2026-10-03: Bayes' rule for a belief that is not
 confined to a family with finitely many natural parameters). Claude Fable 5.1, 9948b53c, 2026-10-03. The proof by
 hand, in the book's letters, is Part II of the book repo's `notes/bayes-every-belief.md`; this note holds the
 library's construction, the predictions, and the verdicts. Stage (a) is `notes/BAYES-EVERY-BELIEF.md`.
+
+Current proof scope (Codex, 2026-10-08, P36 (d)): the posterior identity holds under its two integrability
+conditions; the differential derivation holds on the narrower weighted Banach domain, not at every
+finite-variance belief. The historical derivation and predictions in §§1–2 below are retained as written
+before the experiment. The book's `notes/bayes-proof-review-20261008.md` gives the independent review,
+counterexample, corrected covector statements and local-domain composition theorem.
 
 Everything in §§1–2 was written **before any construction code existed** (the closed forms of §2 are arithmetic on
 a mixture of bell curves, not the construction). Verdicts are §3, written piece by piece as each lands.
@@ -227,18 +233,20 @@ above the area is infinite and the belief has no limit although the constant has
   lands on a belief with bell-curve tails. The infinite number is a constant, and a constant does not change a
   belief. Weird the other way in piece 6: a force can have a finite average and still flatten the belief into
   nothing.
-* **The response.** Weird at every scale: on a curve it is unbounded at every belief, not only at thin ones,
-  since every curve of area one is thin in its tails. In matter nothing responds without bound. A box with a
-  floor under the height it divides by was not built or run here.
+* **The response.** The raw multiplier `1/q` is unbounded on a positive curve of finite area. Whether the
+  response is bounded depends on its domain and norm: on the hand proof's chosen covectors `eta = q f`,
+  with norm `||eta/q||`, division is an isometry. The finite-grid underflow measurements stand; they do not
+  establish an unbounded response in every continuum model (Codex correction, 2026-10-08). A response
+  with a floor was not built or run here.
 * **Splitting the duration** (piece 7). Reasonable: taking the evidence in smaller pieces changes only the
   bookkeeping constant, toward the one Bayes' rule is usually written with; the belief is the same at every `N`.
 
 ### What this does not establish
 
-The run is on grids; that the curve's space of log-heights is a smooth set with the readout and the composite
-smooth on it is the hand proof (book repo, `notes/bayes-every-belief.md` II.4), for log-heights and forces under
-a growth bound, not reviewed by anyone else. Nothing here makes the box an integrator in Ch 3's sense of an update
-defined at every covector and duration: for a covector that is not a likelihood's the step can leave the states
-(the hand proof's II.3), as it can for the bell curves' half-plane. Nothing covers a force that is not a curve
-(a point mass), a zero height, or a likelihood in more than one dimension. A response with a floor, the material
-case, is not run.
+The run is on grids. The separate smoothness proof for the exponential-slack Banach domain (book repo,
+`notes/bayes-every-belief.md` II.4) was independently confirmed by Codex, 2026-10-08. A positive continuous
+finite-variance belief can lie outside that domain and fail the proposed measure-space differentiation.
+Nothing here makes the whole-curve box an integrator in Ch 3's total sense, or proves a cotangent functor
+stable under arbitrary smooth pullback. Gaussian forces preserve the proved domain; general likelihoods
+need evidence and domain conditions. The local-composition theorem in the review does not remove those
+limits. No point-mass force, zero height, higher-dimensional likelihood or response with a floor was run.

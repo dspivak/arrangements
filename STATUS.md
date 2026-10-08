@@ -1589,7 +1589,7 @@ where the gauge referenced at a losing hypothesis is off by more than `1` at dra
 values is a family with `n - 1` natural parameters. Anything about a belief or a likelihood with a zero. One refuted
 prediction: that a thin height by itself loses the dense inverse.
 
-### 3.39 Bayes' rule for a whole curve: the grid box is the curve's box restricted
+### 3.39 Bayes' rule on grids; a whole-curve identity and a narrower smooth construction
 
 `arrangements/belief.py` (`belief_coalgebra`, `updating_on_beliefs`), `tests/test_bayes_whole_curve.py` (25
 passed, 32 s); book plan P36 stage (b); derivation and eight predictions fixed before code, a ninth before its
@@ -1616,9 +1616,16 @@ places.
 widens and the step's constant diverges, slope `-gamma / pi` to four places. A force `-log q`: the constant
 converges to the entropy and the belief flattens with no limit.
 
-**What this does not show.** That the space of log-heights is a smooth set and the box an integrator on it:
-that is the hand proof, under a growth bound, unreviewed, and it finds the step is not defined at every
-covector and duration. A response with a floor. More than one dimension of `z`.
+**Independent review, 2026-10-08 (Codex, P36 (d)).** The weighted Banach-domain smoothness proof holds;
+its domain is narrower than the positive continuous finite-variance beliefs covered by the posterior identity.
+A smooth density of variance one makes the proposed Gaussian-update derivative fail in the proof's weighted
+measure space. The posterior identity on a finite grid is not a raw coalgebra restriction or a general
+quadrature-convergence theorem. See the book's `notes/bayes-proof-review-20261008.md`, §§1–3.
+
+**What this does not show.** A whole-curve integrator in Ch 3's total sense, or a cotangent bundle stable
+under arbitrary smooth pullback. The review's §4 proves composition for local updates with their admissible
+domains; it does not repair the missing finite-variance smooth realization. No response with a floor or
+likelihood in more than one dimension was run here.
 
 ### 3.40 A listener who hears accounts and decides whom to count on
 
@@ -1767,6 +1774,34 @@ the bus's own data, and comparison clears the route of blame without restoring w
 right figurines drifting to cover it); reuse error = 4 (1 - the driver's share). Model, run; likelihoods, priors, sigma
 and the one-wrong model supplied; no magnitudes, no record of reports. Two predictions failed on their thresholds with
 the mechanism intact (the sighting's 0.95; the kept share's 0.10), recorded in PREDICTIONS.
+
+### 3.45 The EM coordinator: the chain rule of Q broadcasts, the E-step's lift distributes
+
+`arrangements/em_coordinator.py`, `tests/test_em_coordinator.py` (9 tests, 234 s) and `tests/em_coordinator_closed_form.py`
+(the forces by hand, numpy, run before the module existed); predictions fixed first in the book repo's
+`notes/runs/p37-em-coordinator-1a279037/PREDICTIONS.md`, results in its `RESULTS.md` (book plan P37 (b)(iii); Claude
+Fable 5.1, 1a279037, 2026-10-08). §3.44's figurines and parent, and above them the COORDINATOR, whose model sends the
+figurines into the product of their stories: one latent error per figurine, `eps_j ~ N(0, V s_j)`, the SPLIT `s` a
+belief over the figurines (`belief_coalgebra`, rate 0.05) and the DOUBT `V = e^Lambda` a configuration integrator; a
+bus's total `t* = sum (G_j + eps_j) + N(0, sigma0^2)`, a sighting `o = G_0 + eps_0 + N(0, sigma_s^2)`; `G` the guesses as
+first heard (`memory="record"`, a state with zero response) or the current guesses (`memory="none"`, §3.44's depot).
+The coordinator's own state descends the marginal likelihood of everything seen (exact); its backward map sends each
+figurine the GAP `g_j - G_j - eps_hat_j` to the E-step's lift `eps_hat = diag(v) A^T Sigma^{-1} y`. **The correction
+the build rests on** (test 0): by Fisher's identity the gradient of EM's expected complete-data cost `Q` at the
+current point is the marginal's, one number on every figurine of a bus (the shared route summed over its buses), so
+the chain rule of `Q` broadcasts and the P37 block's "the chain rule of the expected complete-data cost gives each
+figurine its share" was false; the M-step's minimizer, the posterior mean, distributes, and it is `Q`'s gradient in the
+model's latent metric `diag(v)`, a response the coordinator owns and a figurine does not. Held: composite = closed form
+on 32 arm-scenario pairs (states, split, doubt, report to 1e-12; the covector on the split to 2e-10 through a
+log-determinant); memoryless at the same split the report is §3.44's share times `V / (V + sigma0^2)`, the rest the
+accident's; one total is exactly flat across the split (spread 4e-12), so a wrong prior is unmoved by construction;
+a sighting that is a measurement puts the split on the driver (0.904 at round 10), a second bus by a joint posterior
+clears the route (under 0.05 at round 10) and cannot split driver from vehicle; with the record a cleared route is
+restored to 0.000 and the second bus's right figurines stay within 0.001, on told and slope arms alike, and the slope
+figurines reach the told figurines' shares (the matter sets the rate, not the destination; §3.44's override is the
+memoryless coordinator's); the doubt moves toward the squared shortfall but reaches 12.80 of 16 in 60 rounds at rate
+0.05 (prediction 7 failed on its threshold). Model, run; the latent structure, noises, prior split and rates supplied;
+the categorical form checked by hand only (its M-step for the mixing weight is §3.44's Bayes step exactly).
 
 ## 4. Where the mathematics is written down
 
