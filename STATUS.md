@@ -1591,6 +1591,80 @@ converges to the entropy and the belief flattens with no limit.
 that is the hand proof, under a growth bound, unreviewed, and it finds the step is not defined at every
 covector and duration. A response with a floor. More than one dimension of `z`.
 
+### 3.40 A listener who hears accounts and decides whom to count on
+
+`arrangements/listener.py` and `tests/test_listener.py` (7 tests, 3.4 s); predictions fixed first in the book
+repo's `notes/runs/p37-listener-f2836b6c/PREDICTIONS.md`, results in its `RESULTS.md` (book plan P37 (a);
+Claude Fable 5.1, f2836b6c, 2026-10-07). Built from two things this file already has and nothing else: §3.38's
+belief integrator (`belief_coalgebra`) and the spatial attention parent, in the curious reader's shape
+`compose_seq(tensor(listener, source), spatial(2).arr())`. The source is frozen at placement 0 and sends each
+round's outcome one-hot (kept; failed and the account of why lined up with a check; failed and it did not),
+weight 1. The listener is a belief box after a valuation box: the belief box's cost is `<y, N h>` on the
+received message, so its force is Bayes' rule tempered by the kernel weight; the valuation's cost is
+`w <y, ell> + (1 - w) c`, the expected loss of counting on the source times how much it does, plus doing without
+for the rest. Composition gives the placement `xi_p = -kappa'(p) (<y, ell> - c)`.
+
+**Held.** The composite is the closed form to 4e-16. With losses (0.4, 1.4, 8) and doing without at 5, the
+listener ends on the reliable source and on the unreliable-but-accountable one, and leaves the unaccountable one
+to kappa = 0.005, the two unreliable sources failing on the same rounds. **Narrowed** (David, 2026-10-08): that the
+honest late source is kept rests on the stipulation `ell_2 < ell_3`, "one can plan around it," which he does not
+hold (padding "is just a ridiculous spiral"; lateness costs with the stakes), so what holds is that the belief tells
+the two apart by whether their accounts lined up and the placement leaves whichever the losses make dearer than
+doing without; "avoids the unaccountable, not the unreliable" is not established. **A listener whose choices push on its belief comes to believe whatever is cheapest to believe, and the
+more it already counts on the source the harder the push.** With the belief box sending its belief
+forward plainly (`wire="exact"`), the valuation's covector `-w ell` reaches the belief, which goes to "reliable"
+above 0.9999 within ten steps, before any failure, and stays there through four failures whose accounts did not
+line up; on the one-way wire (`stop_gradient`, §3.18's idiom) the belief is Bayes and nothing else, to 4e-16.
+David's internal checker, a part that notices "I would actually prefer the thing that I'm starting to believe" and
+cancels the push (2026-10-07), is §3.18's subtracting wire: `wire="subtract"` has to know the losses and the
+reliance, and then agrees with the one-way wire to 8e-17 on every script (test 8, predicted after his answer and
+before code; 8 tests, 3.9 s). Leaving ends the hearing: the last two outcomes arrive at kappa 0.013 and 0.007, and the final belief is 0.966
+where full evidence gives 0.99998. The exact likelihood forcing pushes the listener away from a rare lined-up
+failure by its surprisal, 0.1329 in placement on the step it arrives, the chain rule through the transfer; the
+unilateral forcing (`science.account_community`'s idiom) does not. A repeated account counts twice: evidence
+counts once per step it is on the wire.
+
+**One clause failed as written**: prediction 3's kernel weights were read off the closed form at the wrong steps
+(test 3's docstring); the claim they were attached to held.
+
+**What this does not show.** Anything about a real account: whether it lined up is a supplied bit with supplied
+likelihoods, and the losses are stipulated, `ell_2 < ell_3` being the assumption that an account which lines up
+can be planned around. No promise, no composed explanation, no accounting suboperad.
+
+### 3.41 A reader that retunes: the site placement as a slow state
+
+`tests/test_retuning.py` (11 tests and 2 strict xfails kept on the record, 39 s); predictions fixed first in the
+book repo's `notes/runs/p38-retuning-27dc74fb/PREDICTIONS.md`, results in its `RESULTS.md` (book plan P38
+stage 1; Claude Fable 5.1, 27dc74fb, 2026-10-07). §3.15's composite (stage B, T3: the match a kernel between the
+apparatus's site and the substrate's placement, the substrate drifting at `v`, the site held, collapse at distance
+0.812) with the site a slow state of mobility `mu` that descends the rebuild's cost `-k_r kappa F q_1`, the one
+term of T1b's potential that goes through the match; its motion charged to the fuel at `-chi mu xi_s^2`; the fuel
+held, or fed by T4c's law at `J = 24.246` so the reader rests at T3's state.
+
+**Held.** With the site held the composite is T3's (collapse at 0.812). Mobile at `mu = 0.01`, the reader tracks a
+drift of 0.005 indefinitely at a steady lag 0.0945, the closed form; the critical speed is `v_c = 1.767 mu`, the
+maximum pull at lag 0.509 inside the fold 0.722 (measured 0.01793 against 0.01767); `v_c(tau) = v_c(1)/sqrt(tau)`,
+so width works against retuning. At the same drift, fixed readers of widths 1, 2, 4, 9 collapse 4 of 4 at
+`0.72 sqrt(tau)` plus the slow-passage lag; mobile ones track 4 of 4. Fed and charged, the tracking reader runs on
+less fuel and is smaller exactly as the stationary balance says (`chi = 4000`: `F = 0.865`, `q_1 = 1.206`), and
+the threshold falls with the charge, below the ceiling `sqrt(mu J / chi)` where tracking would cost the whole feed.
+The exact control (the rebuild's covector on the substrate too) raises `v_c` by `(mu + mu_S)/mu` and moves the
+substrate at `2v/3`: a source with response is moved by its reader.
+
+**Refuted as fixed**: the fed thresholds read off collapse within 600 time units. Above the stationary threshold a
+fed reader declines for hundreds of time units while its fuel pools (a reader losing its match pulls less and is
+charged less), then collapses; the finite-run threshold overshoots `v_c` by 11-14%. A settled-lag criterion was
+introduced after the fact and undershoots; the two bracket `v_c` to 2%, and the code says which is which.
+
+**Pooling.** T4c's supply law (washout 1 against consumption 23 at rest) lets unspent fuel accumulate to `J`: a
+fixed fed reader survives drift to 2.6, three times the held one, and the uncharged mobile fed reader tracks to
+`v = 0.082`, 4.6 times the held value. This is the supply law's, not the retuning's; read every fed number against it.
+
+**What this does not show.** Anything about allostatic load (the book plan's analogy stays an analogy); whether a
+site is matter (its mobility and the exchange rate are choices; that the retune child is the rebuild child's own
+forcing is not, §2's expressibility warning met by piece 0's inertness with the site held); anything about the fed
+law's pooling ratio, which is T4c's.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

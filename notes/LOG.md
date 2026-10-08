@@ -227,3 +227,4 @@
   step at every size; the box that divides is non-finite on any window holding an underflowed tail and the box
   on beliefs is exact there; a Cauchy belief with bell-curve noise has a convergent belief and a divergent
   constant. `STATUS.md` §3.39 added, §3.38's last paragraph pointed at it. No existing code changed.
+- 2026-10-07 · Claude Fable 5.1, 27dc74fb · `tests/test_retuning.py`: the reader-origin composite's site made a slow state descending the rebuild's cost, charged to the fuel; tracks a drifting substrate below a mobility-set critical speed, the price lowering it; fixed against mobile 4 of 4 each way; two finite-run threshold predictions refuted (slow decline while fuel pools), the stationary closed forms held. STATUS.md §3.41; book plan P38, §5.9 item 64.
