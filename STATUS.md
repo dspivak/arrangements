@@ -83,6 +83,18 @@ argument, and reading it as "a collective's form survives turnover" imported a p
 did not have (David, 2026-09-26: "you can't just go to a town and swap someone out!"). State what
 a run shows about the machinery; let the claim about the world be argued separately, or not made.
 
+**Not evidence of an event: an intervention.** A run is one arrangement running. Substituting one of
+its boxes, changing a coefficient, cutting a supply or failing a part by hand between phases is the
+experimenter's act, and the record never tells it as something the model did ("released," "it
+leaves," "the part fails," "the spare arrives"). `test_reader_origin.py`'s T2a, the pore child
+replaced by a zero drive, compares two arrangements started at the same state; it is a fact about
+each one's dynamics and no event in either, and the book repository told it as the reader leaving
+the pore until David cut it (2026-10-08: "there is absolutely nothing in the math about swapping out
+one diagram for another … why not go in between each step of the dynamics and swap out numbers to
+suit some story?"). Two arrangements may be compared, each run as itself; an input may vary in time
+through a port the arrangement has, said as the environment's schedule. What the story needs to
+happen is produced by the dynamics or not claimed (the wording Claude Fable 5.1's, b79de173).
+
 **Not evidence of a cause: a quantity that rose alongside.** A diagnosis that names what grew with
 the error has found a suspect, not a cause, until a control moves the one without the other. The
 categorical Bayes step's loss of exactness on thin beliefs was put down on 2026-10-01 to the dense
@@ -1664,6 +1676,31 @@ fixed fed reader survives drift to 2.6, three times the held one, and the unchar
 site is matter (its mobility and the exchange rate are choices; that the retune child is the rebuild child's own
 forcing is not, §2's expressibility warning met by piece 0's inertness with the site held); anything about the fed
 law's pooling ratio, which is T4c's.
+
+### 3.42 A composed belief paid in arrears: responsibility is not the mistake
+
+`arrangements/figurines.py`, `tests/test_figurines.py` (8 tests, 185 s, nearly all JAX compiling the composite) and
+`tests/figurines_closed_form.py` (the forces by hand, numpy, run before the module existed); predictions fixed first
+in the book repo's `notes/runs/p37-composed-belief-3f16cdb9/PREDICTIONS.md`, results in its `RESULTS.md` (book plan
+P37 (b)(i); Claude Fable 5.1, 3f16cdb9, 2026-10-08). Three FIGURINE boxes `I -> B` (a driver, a vehicle, a route),
+each one real state whose sending map runs a small mechanism (`jax.lax.fori_loop`) and sends its guess in minutes in
+its own slot of `H = R^6`, composed on the spatial attention parent (kernel weight the invitation, value maps
+frozen), then a copy box (the diagonal, with `stop_gradient` on the copies the arm makes one-way) and a bettor with
+a margin state: the plan's inconvenience every step, the realized loss `(t_hat + m - t*)^2 / 2` on each round's last
+step, an observation cost where the arm says; the world is the exterior input, which on an outcome step may carry an
+ACCOUNT `((a f, f), 1)` of what happened by component, delivered to each figurine by the parent tempered by its
+kernel weight and read by the figurine's own cost `w g^2/2 - g h`, unilaterally. Held, all eight: the composite
+equals the closed form to 4e-14 on every arm and scenario; a figurine at `p = 4` gets `e^-10` of the use and of
+the blame. The finding: the chain rule gives each figurine the push times its contribution and not what it was wrong
+about (the driver late by 4, loss alone: the bet right by round 30, the route figurine, right, absorbing 88% of the
+correction; reused with a fresh driver the figurines mispredict by 3.55 minutes; with the account each comes to its
+own truth and the reuse error is 0.02). The push on a placement is the push times the figurine's guess, so the
+biggest contributor is uninvited hardest (5.7x). A belief that is the bet is bent 0.95 late by its plan on the
+exact wire, at a lower total cost; a margin of its own with the belief read one-way and paid by the observation
+keeps the belief true at every step at the lowest total cost; on the exact wire the margin takes the bias only on
+the round's average. Model, run; the loss, the plan cost, the account's contents and the parametrizations supplied;
+the composition a sum, and the kernel discounts additive guesses (`kappa < 1` counts `kappa` of the guess).
+
 
 ## 4. Where the mathematics is written down
 
