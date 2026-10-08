@@ -1803,6 +1803,20 @@ memoryless coordinator's); the doubt moves toward the squared shortfall but reac
 0.05 (prediction 7 failed on its threshold). Model, run; the latent structure, noises, prior split and rates supplied;
 the categorical form checked by hand only (its M-step for the mixing weight is §3.44's Bayes step exactly).
 
+### 3.46 Stock-and-flow diagrams: every one is an arrangement of its stocks, auxiliaries and flows
+
+`arrangements/stock_flow.py`, `tests/test_stock_flow.py` (4 tests, 35 s); book Ch 4 `sec.stock_flow`, `prop.stock_flow`
+(Claude Opus 5.5, d14d8d10, 2026-10-08, at David's "I want some kind of general formula for stock and flow, how to
+convert them into this formalism, not just um, one-off"). `arrangement_of(diagram, dt)` builds, from any diagram with
+smooth rates and acyclic auxiliaries, the closed arrangement whose internal boxes are one per stock (configuration
+coalgebra, sharp `dt`, readout the level, zero forcing), one per auxiliary (a gray box) and one per flow (stateless;
+forcing `-rate` on the stock it drains, `+rate` on the one it fills, `0` on its links); copies are wiring. One step is
+the diagram's forward-Euler step: the epidemic (susceptible, infected, recovered, the infected fraction an auxiliary)
+over 400 steps and 40 random diagrams (up to 5 stocks, 4 auxiliaries, 6 flows, shared auxiliaries, clouds) agree with
+`euler` to 4e-15; the epidemic's total is conserved and its forcing is not exact. What it does not establish: the
+continuous-time statement rests on the book's `prop.duration_tangent` and `prop.internalization_tangent`, which are
+proof sketches; non-smooth rates (lookup tables, MIN, MAX, IF) are outside it.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

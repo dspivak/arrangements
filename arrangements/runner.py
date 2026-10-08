@@ -56,12 +56,31 @@ from typing import List, Sequence
 # Nets: closed terms over the kit, as netlists.
 # ---------------------------------------------------------------------------
 
-LEAF_KINDS = ("const", "register", "drum", "inbox")
-BOX_KINDS = ("add", "mul")
+LEAF_KINDS = ("const", "register", "drum", "inbox", "market", "relay")
+BOX_KINDS = ("add", "mul", "exp", "recip")
+UNARY_KINDS = ("exp", "recip")
+
+
+def leaf_width(nd) -> int:
+    """How many wires a leaf presents: a market one per value, a relay three (value, stored
+    covector, ear), every other leaf one."""
+    if nd[0] == "market":
+        return len(nd[1])
+    if nd[0] == "relay":
+        return 3
+    return 1
 
 
 class Net:
-    """A closed term over the kit as a netlist. A node's wire id is its index in `nodes`."""
+    """A term over the kit as a netlist. A node's wire id is its index in `nodes`.
+
+    Ports: an `inbox` hears one value at the net's outer input and presents it a step late; `out`
+    names the wires presented at the outer output. Both carry a backward direction (2026-10-08,
+    David: "give P34's net ports their backward direction"): a covector arriving at an output wire
+    reaches the parts inside through the chain rule, and an inbox returns the covector it received
+    on its wire to its port, one step late, as it delivered the value. A wide leaf (market, relay)
+    is one node followed by its `slot` nodes, one per wire.
+    """
 
     def __init__(self):
         self.nodes: list = []
@@ -69,7 +88,8 @@ class Net:
         self.outputs: list = []   # wires presented at the net's outer port, in order
 
     def inbox(self, x0=0):
-        """A register that becomes what arrives at its own input port (one step late)."""
+        """A port. Its state is `[x, r]`: `x` becomes what arrives at the port (one step late) and
+        `r` the covector received on its wire, which it publishes on the port the next step."""
         return self._node("inbox", x0)
 
     def out(self, w):
@@ -91,11 +111,39 @@ class Net:
     def drum(self, cells):
         return self._node("drum", list(cells))
 
+    def market(self, cells):
+        """The belief integrator (P36 (b), `belief.belief_coalgebra`): state the log-heights
+        `cells`, presents the belief `softmax(cells)` on one wire per value, and on the covector
+        `xi` it receives on them steps `l <- l + xi - <q, xi> 1`, Bayes' rule. Returns the wires."""
+        w = self._node("market", [c for c in cells])
+        return [self._node("slot", w, i) for i in range(len(cells))]
+
+    def relay(self, x0=0):
+        """An inbox whose port is a wire of the same net: state `[x, r]`, three wires (`x`, `r`,
+        and an ear whose value is 0). `push(src, ear)` makes `x` become `src` next step, and
+        `push(r, src)` returns the covector received on `x`'s wire to `src`. Returns
+        `(x, r, ear)`."""
+        w = self._node("relay", x0)
+        return tuple(self._node("slot", w, i) for i in range(3))
+
+    def hear(self, src, x0=0):
+        """A relay listening to wire `src`: the one-net form of an inbox wired to `src`."""
+        x, r, ear = self.relay(x0)
+        self.push(src, ear)
+        self.push(r, src)
+        return x
+
     def add(self, i, j):
         return self._node("add", i, j)
 
     def mul(self, i, j):
         return self._node("mul", i, j)
+
+    def exp(self, i):
+        return self._node("exp", i)
+
+    def recip(self, i):
+        return self._node("recip", i)
 
     def cost(self, w):
         self.sinks.append(("cost", w))
@@ -109,27 +157,55 @@ class Net:
     def init_state(self):
         st = {}
         for w, nd in enumerate(self.nodes):
-            if nd[0] in ("register", "inbox"):
+            if nd[0] == "register":
                 st[w] = nd[1]
-            elif nd[0] == "drum":
+            elif nd[0] in ("inbox", "relay"):
+                st[w] = [nd[1], 0]
+            elif nd[0] in ("drum", "market"):
                 st[w] = list(nd[1])
         return st
 
 
+def _softmax(l: Sequence) -> list:
+    import math
+    m = max(l)
+    e = [math.exp(x - m) for x in l]
+    s = sum(e)
+    return [x / s for x in e]
+
+
 def _forward(net: Net, state: dict) -> list:
+    import math
     val = [None] * len(net.nodes)
-    for w, nd in enumerate(net.nodes):
+    # leaves and their slots first (their values are state), then the boxes in order: a relay's
+    # value wire may be read by a box that precedes it in the list (`couple_net`)
+    order = [w for w, nd in enumerate(net.nodes) if nd[0] not in BOX_KINDS] + \
+            [w for w, nd in enumerate(net.nodes) if nd[0] in BOX_KINDS]
+    for w in order:
+        nd = net.nodes[w]
         k = nd[0]
         if k == "const":
             val[w] = nd[1]
-        elif k in ("register", "inbox"):
+        elif k == "register":
             val[w] = state[w]
-        elif k == "drum":
+        elif k in ("drum", "inbox", "relay"):
             val[w] = state[w][0]
+        elif k == "market":
+            val[w] = _softmax(state[w])
+        elif k == "slot":
+            src, i = nd[1], nd[2]
+            if net.nodes[src][0] == "market":
+                val[w] = val[src][i]
+            else:   # a relay: x, r, ear
+                val[w] = state[src][i] if i < 2 else 0
         elif k == "add":
             val[w] = val[nd[1]] + val[nd[2]]
-        else:
+        elif k == "mul":
             val[w] = val[nd[1]] * val[nd[2]]
+        elif k == "exp":
+            val[w] = math.exp(val[nd[1]])
+        else:
+            val[w] = 1 / val[nd[1]]
     return val
 
 
@@ -139,21 +215,28 @@ def present(net: Net, state: dict) -> list:
     return [val[w] for w in net.outputs]
 
 
-def ref_step(net: Net, state: dict, inputs: Sequence = ()) -> dict:
+def port_covectors(net: Net, state: dict) -> list:
+    """What the net publishes on its ports this step: each inbox's stored covector `r`."""
+    return [state[w][1] for w in net.inboxes()]
+
+
+def ref_step(net: Net, state: dict, inputs: Sequence = (), pushes: Sequence = ()) -> dict:
     """One step of the net's dynamics, by hand: forward values, backward covectors, updates.
 
-    `inputs` are the values arriving at the net's inboxes, in order.
+    `inputs` are the values arriving at the net's inboxes, in order; `pushes` the covectors
+    arriving at the net's outputs, in order (the backward direction of its ports).
     """
     n = len(net.nodes)
     val = _forward(net, state)
     xi = [0] * n
-    for w, v in zip(net.inboxes(), inputs):
-        xi[w] = xi[w] + (v - state[w])
+    for w, p in zip(net.outputs, pushes):
+        xi[w] = xi[w] + p
     for s in net.sinks:
         if s[0] == "cost":
             xi[s[1]] = xi[s[1]] + (-1)
         else:
             xi[s[2]] = xi[s[2]] + val[s[1]]
+    wide = {}   # a market's or relay's covector, one per slot
     for w in range(n - 1, -1, -1):
         nd = net.nodes[w]
         if nd[0] == "add":
@@ -164,14 +247,31 @@ def ref_step(net: Net, state: dict, inputs: Sequence = ()) -> dict:
             gi, gj = xi[w] * val[j], xi[w] * val[i]
             xi[i] = xi[i] + gi
             xi[j] = xi[j] + gj
+        elif nd[0] == "exp":
+            xi[nd[1]] = xi[nd[1]] + xi[w] * val[w]
+        elif nd[0] == "recip":
+            xi[nd[1]] = xi[nd[1]] - xi[w] * val[w] * val[w]
+        elif nd[0] == "slot":
+            wide.setdefault(nd[1], {})[nd[2]] = xi[w]
     new = {}
+    inputs = list(inputs)
     for w, nd in enumerate(net.nodes):
-        if nd[0] in ("register", "inbox"):
+        if nd[0] == "register":
             new[w] = state[w] + xi[w]
+        elif nd[0] == "inbox":
+            new[w] = [inputs.pop(0), xi[w]]
         elif nd[0] == "drum":
             cells = list(state[w])
             cells[0] = cells[0] + xi[w]
             new[w] = cells[1:] + cells[:1]
+        elif nd[0] == "market":
+            q, l = val[w], state[w]
+            xs = [wide.get(w, {}).get(i, 0) for i in range(len(l))]
+            c = sum(qi * x for qi, x in zip(q, xs))
+            new[w] = [li + x - c for li, x in zip(l, xs)]
+        elif nd[0] == "relay":
+            got = wide.get(w, {})
+            new[w] = [got.get(2, 0), got.get(0, 0)]
     return new
 
 
@@ -184,13 +284,22 @@ def to_term(net: Net):
     leaves = net.leaves()
     k = len(net.inboxes())
     thread = (("inwire", k),) if k else ()
-    pos = {w: p for p, w in enumerate(leaves)}
+    pos, n = {}, 0
+    for w in leaves:
+        nd = net.nodes[w]
+        if leaf_width(nd) == 1:
+            pos[w] = n
+        else:
+            for s, snd in enumerate(net.nodes):
+                if snd[0] == "slot" and snd[1] == w:
+                    pos[s] = n + snd[2]
+        n += leaf_width(nd)
     term = ("tensor",) + tuple(net.nodes[w] for w in leaves)
-    n = len(leaves)
     for w, nd in enumerate(net.nodes):
         if nd[0] in BOX_KINDS:
             ident = list(range(n))
-            route = ("tensor", ("fan", n, ident + [pos[nd[1]], pos[nd[2]]])) + thread
+            operands = [pos[x] for x in nd[1:]]
+            route = ("tensor", ("fan", n, ident + operands)) + thread
             layer = ("tensor", ("fan", n, ident), (nd[0],)) + thread
             term = ("seq", term, ("seq", route, layer))
             pos[w] = n
@@ -264,14 +373,40 @@ def _kit():
         return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=0,
                            out_f=lambda q, m: Z(), in_f=lambda q, m, n: Z(), omega=omega, label="push")
 
-    def inbox(x0):
-        Q = ReactiveVectorSpace(dim=1, sharp_fn=lambda q: jnp.eye(1))
+    def copier(x0):
+        """The integrator of an inbox and a relay: state `[x, r]`, base R^3 presenting
+        `(x, r, 0)`; on the covector `xi` it receives it becomes `[xi_2, xi_0]`: `x` what was
+        delivered to its ear, `r` what landed on its value wire."""
+        return CotCoalg(Q_dim=3, init=jnp.array([float(x0), 0.0]),
+                        position=lambda s: jnp.concatenate([s, jnp.zeros(1)]),
+                        step=lambda s, xi: jnp.stack([xi[2], xi[0]]), label="copier")
 
+    def inbox(x0):
         def omega(q, m, n):
-            return n - q, Z(), jnp.zeros(1)
-        return Arrangement(P=configuration(Q, init=jnp.array([float(x0)])), in_dim_M=0, out_dim_M=0,
-                           in_dim_N=1, out_dim_N=1, out_f=lambda q, m: q, in_f=lambda q, m, n: Z(),
-                           omega=omega, label="inbox")
+            return jnp.stack([jnp.zeros(()), jnp.zeros(()), n[0]]), Z(), q[1:2]
+        return Arrangement(P=copier(x0), in_dim_M=0, out_dim_M=0, in_dim_N=1, out_dim_N=1,
+                           out_f=lambda q, m: q[:1], in_f=lambda q, m, n: Z(), omega=omega, label="inbox")
+
+    def relay(x0):
+        return Arrangement(P=copier(x0), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=3,
+                           out_f=lambda q, m: q, in_f=lambda q, m, n: Z(), omega=zero_form, label="relay")
+
+    def market(cells):
+        from .belief import belief_coalgebra
+        n = len(cells)
+        return Arrangement(P=belief_coalgebra(n, jnp.asarray([float(c) for c in cells])), in_dim_M=0,
+                           out_dim_M=0, in_dim_N=0, out_dim_N=n, out_f=lambda q, m: q,
+                           in_f=lambda q, m, n_: Z(), omega=zero_form, label="market")
+
+    def exp_():
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=1, in_dim_N=0, out_dim_N=1,
+                           out_f=lambda q, m: jnp.exp(m), in_f=lambda q, m, n: Z(),
+                           omega=zero_form, label="exp")
+
+    def recip():
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=1, in_dim_N=0, out_dim_N=1,
+                           out_f=lambda q, m: 1.0 / m, in_f=lambda q, m, n: Z(),
+                           omega=zero_form, label="recip")
 
     def inwire(k):
         return Arrangement(P=trivial_parameter(), in_dim_M=int(k), out_dim_M=0, in_dim_N=int(k), out_dim_N=0,
@@ -284,7 +419,7 @@ def _kit():
                            omega=zero_form, label="fan")
 
     return dict(const=const, register=register, drum=drum, add=add, mul=mul, cost=cost, push=push, fan=fan,
-                inbox=inbox, inwire=inwire)
+                inbox=inbox, inwire=inwire, relay=relay, market=market, exp=exp_, recip=recip)
 
 
 def denote(term):
@@ -322,20 +457,51 @@ def flat_state(state) -> list:
     return out
 
 
-def library_run(net: Net, steps: int) -> List[list]:
-    """Run the net through the library (`denote`, `Phi`); the flat state after each step."""
+def library_run(net: Net, steps: int, inputs=None, pushes=None, covectors: bool = False):
+    """Run the net through the library (`denote`, `Phi`); the flat state after each step.
+
+    `inputs[t]` are the values at the net's ports and `pushes[t]` the covectors at its outputs on
+    step `t` (zeros when omitted). With `covectors`, also return per step what the net published
+    on its ports (its inboxes' stored covectors, read off the state before the step).
+    """
     import jax.numpy as jnp
 
     from .functors import Phi
     from .interpretation import trivial_omega
 
+    k, j = len(net.inboxes()), len(net.outputs)
     O = Phi(denote(to_term(net)))
     state, IN = O.state, (jnp.zeros(0), trivial_omega(0))
-    out = []
-    for _ in range(steps):
-        _, _, state = O.with_state(state).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+    out, pub = [], []
+    for t in range(steps):
+        n_in = jnp.asarray(inputs[t] if inputs is not None else [0.0] * k, dtype=float)
+        xi_N = jnp.asarray(pushes[t] if pushes is not None else [0.0] * j, dtype=float)
+        pub.append([flat_state(state)[p] for p in _inbox_r_positions(net)])
+        _, _, state = O.with_state(state).run_one(IN, lambda _o: (xi_N, n_in))
         out.append(flat_state(state))
-    return out
+    return (out, pub) if covectors else out
+
+
+def _inbox_r_positions(net: Net) -> list:
+    """Where each inbox's stored covector sits in the flat state (leaves in order)."""
+    off, where = 0, []
+    for w in net.leaves():
+        nd = net.nodes[w]
+        if nd[0] == "inbox":
+            where.append(off + 1)
+        off += _leaf_cells(nd)
+    return where
+
+
+def _leaf_cells(nd) -> int:
+    """How many cells of state a leaf holds."""
+    if nd[0] == "const":
+        return 0
+    if nd[0] in ("drum", "market"):
+        return len(nd[1])
+    if nd[0] in ("inbox", "relay"):
+        return 2
+    return 1
 
 
 def library_run_jit(net: Net, steps: int, check: int = 2, every: int = 1) -> List[list]:
@@ -410,9 +576,56 @@ def arrangement_run_jit(A, steps: int, check: int = 2, every: int = 1) -> List[l
 
 
 def couple_by_hand(net_a: Net, net_b: Net, a_to_b, b_to_a, sa: dict, sb: dict):
-    """One step of the two coupled nets, by hand: each presents, then each steps on what it hears."""
+    """One step of the two coupled nets, by hand: each presents, and publishes on its ports the
+    covectors its inboxes stored; then each steps on what it hears, values at its inboxes and
+    covectors at its outputs."""
     oa, ob = present(net_a, sa), present(net_b, sb)
-    return ref_step(net_a, sa, [ob[i] for i in b_to_a]), ref_step(net_b, sb, [oa[i] for i in a_to_b])
+    ca, cb = port_covectors(net_a, sa), port_covectors(net_b, sb)
+    pa, pb = [0] * len(net_a.outputs), [0] * len(net_b.outputs)
+    for i, j in enumerate(a_to_b):   # b's inbox i hears a's output j, and returns its covector there
+        pa[j] = pa[j] + cb[i]
+    for i, j in enumerate(b_to_a):
+        pb[j] = pb[j] + ca[i]
+    return (ref_step(net_a, sa, [ob[i] for i in b_to_a], pa),
+            ref_step(net_b, sb, [oa[i] for i in a_to_b], pb))
+
+
+def couple_net(net_a: Net, net_b: Net, a_to_b, b_to_a) -> Net:
+    """The two coupled nets as one net wired by hand: b's nodes after a's, and each inbox made a
+    relay listening to the output wire it was coupled to (`Net.hear`). Closed: no ports, no outputs.
+    An inbox's node is left in place as the constant 0, so every other index is unchanged."""
+    c = Net()
+    off = len(net_a.nodes)
+    for shift, net in ((0, net_a), (off, net_b)):
+        for nd in net.nodes:
+            if nd[0] == "inbox":
+                c.nodes.append(("const", 0))
+            elif nd[0] in BOX_KINDS:
+                c.nodes.append((nd[0],) + tuple(x + shift for x in nd[1:]))
+            elif nd[0] == "slot":
+                c.nodes.append(("slot", nd[1] + shift, nd[2]))
+            else:
+                c.nodes.append(nd)
+    rename, relays = {}, []
+    for i, w in enumerate(net_a.inboxes()):
+        x, r, ear = c.relay(net_a.nodes[w][1])
+        rename[w] = x
+        relays.append((r, ear, net_b.outputs[b_to_a[i]] + off))
+    for i, w in enumerate(net_b.inboxes()):
+        x, r, ear = c.relay(net_b.nodes[w][1])
+        rename[w + off] = x
+        relays.append((r, ear, net_a.outputs[a_to_b[i]]))
+    for k_, nd in enumerate(c.nodes):   # readers of an inbox read its relay's value wire
+        if nd[0] in BOX_KINDS:
+            c.nodes[k_] = (nd[0],) + tuple(rename.get(x, x) for x in nd[1:])
+    for shift, net in ((0, net_a), (off, net_b)):
+        for s in net.sinks:
+            c.sinks.append((s[0],) + tuple(rename.get(x + shift, x + shift) for x in s[1:]))
+    for r, ear, src in relays:
+        src = rename.get(src, src)
+        c.push(src, ear)
+        c.push(r, src)
+    return c
 
 
 def flat_ref(net: Net, state: dict) -> list:
@@ -427,19 +640,31 @@ def flat_ref(net: Net, state: dict) -> list:
 # The translation: a net to the runner's flags and data layout.
 # ---------------------------------------------------------------------------
 
-NOP, LOAD, STORE, ADD, MUL, XCHG = 0, 1, 2, 3, 4, 5
+NOP, LOAD, STORE, ADD, MUL, XCHG, EXP, RECIP = 0, 1, 2, 3, 4, 5, 6, 7
 
 
 class Program:
-    """Flag-drum contents and data layout for one net. `ops[tau]` is the step's instruction."""
+    """Flag-drum contents and data layout for one net. `events` are `(step, op, address)`."""
 
-    def __init__(self, net, L, Lp, events, data0, reg_addr, drum_base, n_slp):
+    def __init__(self, net, L, Lp, events, data0, reg_addr, drum_base, n_slp, market_base=None,
+                 relay_addr=None):
         self.net, self.L, self.Lp, self.events = net, L, Lp, events
         self.data0, self.reg_addr, self.drum_base, self.n_slp = data0, reg_addr, drum_base, n_slp
+        self.market_base = market_base or {}
+        self.relay_addr = relay_addr or {}
 
-    def flags(self):
-        """The four flag drums (load, store, add, multiply), each of length Lp."""
-        FL, FS, FA, FM = ([0] * self.Lp for _ in range(4))
+    def unary(self) -> bool:
+        """Does the program use the exponential or the reciprocal?"""
+        return any(op in (EXP, RECIP) for _t, op, _a in self.events)
+
+    def flags(self, full: bool = None):
+        """The flag drums (load, store, add, multiply; with `full`, also exp and reciprocal), each
+        of length Lp. Four drums are P34's runner; a program using a unary instruction needs six."""
+        if full is None:
+            full = self.unary()
+        if not full and self.unary():
+            raise ValueError("the net uses exp or recip; its runner needs the six flag drums")
+        FL, FS, FA, FM, FX, FR = ([0] * self.Lp for _ in range(6))
         for tau, op, _addr in self.events:
             if op in (LOAD, XCHG):
                 FL[tau] = 1
@@ -449,7 +674,11 @@ class Program:
                 FA[tau] = 1
             if op == MUL:
                 FM[tau] = 1
-        return FL, FS, FA, FM
+            if op == EXP:
+                FX[tau] = 1
+            if op == RECIP:
+                FR[tau] = 1
+        return (FL, FS, FA, FM, FX, FR) if full else (FL, FS, FA, FM)
 
     def encode(self, state: dict, zero=0) -> list:
         """The data drum holding a state of the net (work cells as in `data0`)."""
@@ -460,6 +689,11 @@ class Program:
             n = len(state[w])
             for g in range(n):
                 data[base + n - 1 - g] = state[w][g]
+        for w, base in self.market_base.items():
+            for i, v in enumerate(state[w]):
+                data[base + i] = v
+        for w, (ax, ar) in self.relay_addr.items():
+            data[ax], data[ar] = state[w][0], state[w][1]
         return data
 
     def decode(self, data: Sequence) -> dict:
@@ -469,6 +703,10 @@ class Program:
         for w, base in self.drum_base.items():
             n = len(self.net.nodes[w][1])
             state[w] = [data[base + n - 1 - g] for g in range(n)]
+        for w, base in self.market_base.items():
+            state[w] = [data[base + i] for i in range(len(self.net.nodes[w][1]))]
+        for w, (ax, ar) in self.relay_addr.items():
+            state[w] = [data[ax], data[ar]]
         return state
 
 
@@ -477,6 +715,12 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
 
     `cells` and `length` fit the translation to a runner whose data drum has `cells` cells and
     whose flag drums have `length` (a multiple of `cells`): spare cells and idle steps pad it.
+
+    Beyond P34's kit: a market's position is computed each pass (exp of each height, their sum,
+    its reciprocal, the products) and its update `l += xi - <q, xi>` laid out as multiplies and
+    adds; a relay's update is two copies (its value becomes what its ear received, its stored
+    covector what its value wire received); the unary boxes' backward passes are multiplies by
+    their derivatives, `e^v` and `-1/v^2`.
     """
     nodes = net.nodes
     data0: list = []
@@ -485,7 +729,7 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
         data0.append(v)
         return len(data0) - 1
 
-    val, reg_addr, drum_base, state_cells = {}, {}, {}, set()
+    val, reg_addr, drum_base, market_base, relay_addr, state_cells = {}, {}, {}, {}, {}, set()
     for w, nd in enumerate(nodes):
         if nd[0] == "const":
             val[w] = alloc(nd[1])
@@ -500,18 +744,64 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
             drum_base[w] = base
             val[w] = base + n - 1  # the front cell
             state_cells.update(range(base, base + n))
-    neg1 = alloc(-one) if any(s[0] == "cost" for s in net.sinks) else None
+        elif nd[0] == "market":
+            base = len(data0)
+            for c in nd[1]:
+                alloc(c)
+            market_base[w] = base
+            state_cells.update(range(base, base + len(nd[1])))
+        elif nd[0] == "relay":
+            ax, ar = alloc(nd[1]), alloc()
+            relay_addr[w] = (ax, ar)
+            state_cells.update((ax, ar))
+    zero_cell = None
+    for w, nd in enumerate(nodes):   # the slots of markets and relays
+        if nd[0] == "slot":
+            src, i = nd[1], nd[2]
+            if nodes[src][0] == "relay":
+                if i < 2:
+                    val[w] = relay_addr[src][i]
+                else:
+                    if zero_cell is None:
+                        zero_cell = alloc(zero)
+                    val[w] = zero_cell
+            else:
+                val[w] = alloc()   # the belief's height, computed each pass
+    needs_neg = any(s[0] == "cost" for s in net.sinks) or any(nd[0] in ("recip", "market") for nd in nodes)
+    neg1 = alloc(-one) if needs_neg else None
 
-    stateful = [False] * len(nodes)  # does the wire have a register or drum behind it?
+    stateful = [False] * len(nodes)  # does the wire have a register, drum, market or relay behind it?
     for w, nd in enumerate(nodes):
-        stateful[w] = nd[0] in ("register", "drum") or (
-            nd[0] in BOX_KINDS and (stateful[nd[1]] or stateful[nd[2]]))
+        if nd[0] in ("register", "drum", "slot"):
+            stateful[w] = True
+        elif nd[0] in BOX_KINDS:
+            stateful[w] = any(stateful[x] for x in nd[1:])
 
     slp = []
+    for w, nd in enumerate(nodes):  # the markets' positions
+        if nd[0] == "market":
+            slots = [s for s, snd in enumerate(nodes) if snd[0] == "slot" and snd[1] == w]
+            es = []
+            for i, s in enumerate(slots):
+                z = alloc()
+                slp.append(("exp", z, market_base[w] + i))
+                es.append(z)
+            tot = es[0]
+            for z in es[1:]:
+                t = alloc()
+                slp.append(("add", t, tot, z))
+                tot = t
+            rho = alloc()
+            slp.append(("recip", rho, tot))
+            for s, e in zip(slots, es):
+                slp.append(("mul", val[s], e, rho))
     for w, nd in enumerate(nodes):  # forward values
-        if nd[0] in BOX_KINDS:
+        if nd[0] in ("add", "mul"):
             val[w] = alloc()
             slp.append((nd[0], val[w], val[nd[1]], val[nd[2]]))
+        elif nd[0] in UNARY_KINDS:
+            val[w] = alloc()
+            slp.append((nd[0], val[w], val[nd[1]]))
 
     xi = {}
 
@@ -534,11 +824,11 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
         nd = nodes[w]
         if w not in xi or nd[0] not in BOX_KINDS:
             continue
-        i, j = nd[1], nd[2]
         if nd[0] == "add":
-            acc(i, xi[w])
-            acc(j, xi[w])
-        else:
+            acc(nd[1], xi[w])
+            acc(nd[2], xi[w])
+        elif nd[0] == "mul":
+            i, j = nd[1], nd[2]
             if stateful[i]:
                 z = alloc()
                 slp.append(("mul", z, xi[w], val[j]))
@@ -547,17 +837,70 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
                 z = alloc()
                 slp.append(("mul", z, xi[w], val[i]))
                 acc(j, z)
+        elif nd[0] == "exp":
+            if stateful[nd[1]]:
+                z = alloc()
+                slp.append(("mul", z, xi[w], val[w]))
+                acc(nd[1], z)
+        else:  # recip: xi_in = -xi v^2, v the reciprocal presented
+            if stateful[nd[1]]:
+                t, u, z = alloc(), alloc(), alloc()
+                slp.append(("mul", t, val[w], val[w]))
+                slp.append(("mul", u, neg1, t))
+                slp.append(("mul", z, xi[w], u))
+                acc(nd[1], z)
 
-    updates = [(val[w], xi[w]) for w, nd in enumerate(nodes) if nd[0] in ("register", "drum") and w in xi]
+    # the updates: first every covector that is another part's state is copied, then applied
+    updates = []   # (kind, target, cell)
+    for w, nd in enumerate(nodes):
+        if nd[0] in ("register", "drum") and w in xi:
+            updates.append(("add", val[w], xi[w]))
+        elif nd[0] == "relay":
+            slots = [s for s, snd in enumerate(nodes) if snd[0] == "slot" and snd[1] == w]
+            ax, ar = relay_addr[w]
+            updates.append(("set", ax, xi.get(slots[2], zero_cell if zero_cell is not None else None)))
+            updates.append(("set", ar, xi.get(slots[0], None)))
+        elif nd[0] == "market":
+            slots = [s for s, snd in enumerate(nodes) if snd[0] == "slot" and snd[1] == w]
+            xs = [xi.get(s) for s in slots]
+            if all(x is None for x in xs):
+                continue
+            prods = []
+            for s, x in zip(slots, xs):
+                if x is not None:
+                    z = alloc()
+                    slp.append(("mul", z, val[s], x))
+                    prods.append(z)
+            tot = prods[0]
+            for z in prods[1:]:
+                t = alloc()
+                slp.append(("add", t, tot, z))
+                tot = t
+            nc = alloc()
+            slp.append(("mul", nc, neg1, tot))
+            for i, x in enumerate(xs):
+                if x is None:
+                    updates.append(("add", market_base[w] + i, nc))
+                else:
+                    d = alloc()
+                    slp.append(("add", d, x, nc))
+                    updates.append(("add", market_base[w] + i, d))
     safe = []
-    for target, c in updates:  # a covector that is another part's state is copied before any update
+    for kind, target, c in updates:
+        if c is None:   # a relay cell receiving nothing becomes 0
+            if zero_cell is None:
+                zero_cell = alloc(zero)
+            c = zero_cell
         if c in state_cells:
             z = alloc()
             slp.append(("copy", z, c))
             c = z
-        safe.append((target, c))
-    for target, c in safe:
-        slp.append(("add", target, target, c))
+        safe.append((kind, target, c))
+    for kind, target, c in safe:
+        if kind == "add":
+            slp.append(("add", target, target, c))
+        else:
+            slp.append(("copy", target, c))
     for w, base in drum_base.items():
         n = len(nodes[w][1])
         if n > 1:
@@ -577,14 +920,24 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
         tau = tau + 1 + ((addr - (tau + 1)) % L)
         events.append((tau, op, addr))
 
+    def now(op):   # a unary instruction on the accumulator: the next step, whatever cell shows
+        nonlocal tau
+        tau = tau + 1
+        events.append((tau, op, tau % L))
+
     for ins in slp:
-        if ins[0] in BOX_KINDS:
+        if ins[0] in ("add", "mul"):
             _, z, x, y = ins
             first = (tau + 1) % L  # read first the operand that comes round sooner
             if ((y - first) % L) < ((x - first) % L):
                 x, y = y, x
             at(LOAD, x)
             at(ADD if ins[0] == "add" else MUL, y)
+            at(STORE, z)
+        elif ins[0] in UNARY_KINDS:
+            _, z, x = ins
+            at(LOAD, x)
+            now(EXP if ins[0] == "exp" else RECIP)
             at(STORE, z)
         elif ins[0] == "copy":
             at(LOAD, ins[2])
@@ -599,7 +952,7 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
         if Lp > length or length % L:
             raise ValueError(f"the net needs {Lp} steps a pass; the runner's flag drums hold {length}")
         Lp = length
-    return Program(net, L, Lp, events, data0, reg_addr, drum_base, len(slp))
+    return Program(net, L, Lp, events, data0, reg_addr, drum_base, len(slp), market_base, relay_addr)
 
 
 # ---------------------------------------------------------------------------
@@ -608,10 +961,18 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
 
 
 def machine_net(flags, data, a0=0, minus_one=-1) -> Net:
-    """The runner as a net: five drums, one register, one constant, twelve boxes, two pushes."""
-    FL, FS, FA, FM = flags
+    """The runner as a net. With four flag drums it is P34's: five drums, one register, one
+    constant, twelve boxes, two pushes. With six (exp and reciprocal added), two more terms move
+    the accumulator, each gated so that a flag of 0 computes `exp(0)` and `1/1` and adds nothing:
+
+        a' = a + ... + X (exp(X a) - a) + R (recip(1 + R (a - 1)) - a).
+    """
+    full = len(flags) == 6
+    FL, FS, FA, FM = flags[:4]
     m = Net()
     L, S, A, M = m.drum(FL), m.drum(FS), m.drum(FA), m.drum(FM)
+    if full:
+        X, Rc = m.drum(flags[4]), m.drum(flags[5])
     cell = m.drum(data)
     a = m.register(a0)
     neg = m.const(minus_one)
@@ -624,6 +985,13 @@ def machine_net(flags, data, a0=0, minus_one=-1) -> Net:
     t2 = m.add(ac, na)            # a cell - a
     u3 = m.mul(M, t2)
     da = m.add(m.add(u1, u2), u3)
+    if full:
+        one = m.const(-minus_one)
+        ex = m.exp(m.mul(X, a))                                   # exp(X a)
+        u4 = m.mul(X, m.add(ex, na))                              # X (exp(X a) - a)
+        arg = m.add(one, m.mul(Rc, m.add(a, neg)))                # 1 + R (a - 1)
+        u5 = m.mul(Rc, m.add(m.recip(arg), na))                   # R (1/arg - a)
+        da = m.add(da, m.add(u4, u5))
     t3 = m.add(a, ncell)          # a - cell
     dc = m.mul(S, t3)
     m.push(da, a)
@@ -637,6 +1005,7 @@ def machine_run(prog: Program, data: list, a, passes: int = 1):
     Steps whose flags are all zero only rotate the drums and are skipped; the arithmetic of a
     step with a flag set is the runner's own (the formulas in the module docstring).
     """
+    import math
     for _ in range(passes):
         for _tau, op, i in prog.events:
             cell = data[i]
@@ -648,6 +1017,10 @@ def machine_run(prog: Program, data: list, a, passes: int = 1):
                 a = a + cell
             elif op == MUL:
                 a = a + (a * cell - a)
+            elif op == EXP:
+                a = a + (math.exp(a) - a)
+            elif op == RECIP:
+                a = a + (1 / a - a)
             else:  # XCHG: load and store together
                 a, data[i] = a + (cell - a), cell + (a - cell)
     return a
