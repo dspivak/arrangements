@@ -1712,10 +1712,12 @@ the blame. The finding: the chain rule gives each figurine the push times its co
 about (the driver late by 4, loss alone: the bet right by round 30, the route figurine, right, absorbing 88% of the
 correction; reused with a fresh driver the figurines mispredict by 3.55 minutes; with the account each comes to its
 own truth and the reuse error is 0.02). The push on a placement is the push times the figurine's guess, so the
-biggest contributor is uninvited hardest (5.7x). A belief that is the bet is bent 0.95 late by its plan on the
-exact wire, at a lower total cost; a margin of its own with the belief read one-way and paid by the observation
-keeps the belief true at every step at the lowest total cost; on the exact wire the margin takes the bias only on
-the round's average. Model, run; the loss, the plan cost, the account's contents and the parametrizations supplied;
+biggest contributor is uninvited hardest (5.7x). A belief that is the bet is bent by its plan on the exact
+wire: 0.95 late at a lower total cost under the squared loss, which charges a minute late as a minute early; 0.5 early
+at a higher total cost under a bus loss (`cliff`, a minute late is the bus; the check of 2026-10-08, 70fcc5f2, the
+arms `*-cliff`, `test_figurines.py` test 9); a margin of its own with the belief read one-way and paid by the observation keeps the belief true at
+every step at the lowest total cost under either loss; on the exact wire the margin takes the bias only on the round's
+average. Model, run; the loss, the plan cost, the account's contents and the parametrizations supplied;
 the composition a sum, and the kernel discounts additive guesses (`kappa < 1` counts `kappa` of the guess).
 
 

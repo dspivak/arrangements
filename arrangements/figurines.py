@@ -83,6 +83,14 @@ class Arm(NamedTuple):
     observe: bool
     mu_m: float
     name: str = ""
+    loss: str = "squared"     # "squared": e^2/2; "cliff": a minute late is the bus, early costs nothing here
+
+
+def cliff(e, c_late: float = 5.0, w: float = 0.1):
+    """A bus loss: ``c_late w softplus(e / w)``, about ``c_late`` per minute late and about ``0`` early (the
+    waiting is the plan's inconvenience); smoothed over ``w`` minutes so it has a slope (P37 (b)(ii), 70fcc5f2,
+    at David's "the opposite makes no sense. what's happening to cause it?")."""
+    return c_late * w * jax.nn.softplus(e / w)
 
 
 ARMS = {
@@ -90,6 +98,10 @@ ARMS = {
     "B": Arm(True, True, False, 0.0, "B, exact"),
     "C": Arm(False, False, True, 0.1, "C, a margin of its own"),
     "D": Arm(True, True, True, 0.1, "D, a margin, exact"),
+    "A-cliff": Arm(False, True, False, 0.0, "A, one-way, cliff loss", "cliff"),
+    "B-cliff": Arm(True, True, False, 0.0, "B, exact, cliff loss", "cliff"),
+    "C-cliff": Arm(False, False, True, 0.1, "C, a margin of its own, cliff loss", "cliff"),
+    "D-cliff": Arm(True, True, True, 0.1, "D, a margin, exact, cliff loss", "cliff"),
 }
 
 
@@ -194,7 +206,8 @@ def bettor(arm: Arm) -> Arrangement:
         t_plan, t_bet, t_obs = (prediction_of(m3[i * MDIM:(i + 1) * MDIM]) for i in range(3))
         flag, t_star = n_in[EDIM], n_in[EDIM + 1]
         plan = C_INC * jax.nn.softplus(T_PREF - t_plan - mrg[0])
-        loss = 0.5 * (t_bet + mrg[0] - t_star) ** 2
+        e_bet = t_bet + mrg[0] - t_star
+        loss = cliff(e_bet) if arm.loss == "cliff" else 0.5 * e_bet ** 2
         obs = 0.5 * A_OBS * (t_obs - t_star) ** 2 if arm.observe else 0.0
         return plan + flag * (loss + obs)
 

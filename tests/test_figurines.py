@@ -19,6 +19,8 @@ numbers from ``figurines_closed_form.py`` run before ``figurines.py`` existed; r
 7. S0: arm A nothing moves; arm B the belief 0.955 late at the round's end, total cost 7.323 < 7.501.
 8. S0: arm C the belief true to 1e-12 throughout, margin 0.945, total cost 7.048; arm D the belief runs
    from -0.301 to +0.208 within a round, margin 0.661.
+9. The cliff check (added 2026-10-08, 70fcc5f2): under a bus loss arm B's belief settles 0.49 early at a higher
+   total cost than the truth; arm C keeps it true with a margin 0.14 early at the lowest cost.
 """
 
 import jax
@@ -250,3 +252,44 @@ def test_8_a_choice_with_matter_of_its_own(runs):
     assert e_d[ends].mean() == pytest.approx(0.2077, abs=5e-4)
     assert d["m"][ends].mean() == pytest.approx(0.6614, abs=5e-4)
     assert abs(e_d[starts].mean() + e_d[ends].mean()) < 0.1
+
+
+def test_9_under_a_bus_loss_the_bent_belief_is_early_and_dearer():
+    """The cliff check (P37 (b)(ii), 70fcc5f2, 2026-10-08, at David's "the opposite makes no sense"): under
+    ``figurines.cliff`` (a minute late is the bus, early costs only the plan's waiting) arm B's belief settles
+    early, your watch set fast, at a *higher* total cost than the true belief; arm C keeps the belief true and
+    carries a small early margin at the lowest cost. No closed form: the numbers are the composite's own, recorded
+    in the book repo's ``notes/runs/p37-coordinator-70fcc5f2/cliff_check.log``; the signs and the cost order are
+    what the test checks. David: "yes that's right. the cliff is the right idea."
+    """
+    sc = CF.SCENARIOS["S0"]
+    th = tuple(float(x) for x in CF.initial_thetas(sc))
+    ends, starts = CF.outcome_steps()[25:], CF.outcome_steps()[25:] - 9
+
+    def cliff_np(e):
+        return 5.0 * 0.1 * np.logaddexp(0.0, e / 0.1)
+
+    def total(got, loss):
+        tot = 0.0
+        for r in range(25, 30):
+            sl, end = slice(10 * r, 10 * (r + 1)), 10 * (r + 1) - 1
+            inc = CF.C_INC * CF.softplus(CF.T_PREF - got["t_hat"][sl] - got["m"][sl])
+            e = got["t_hat"][end] + got["m"][end] - 22.5
+            tot += inc.sum() + (cliff_np(e) if loss == "cliff" else 0.5 * e ** 2)
+        return tot / 5
+
+    true_cost = 10 * CF.C_INC * CF.softplus(CF.T_PREF - 22.5) + cliff_np(0.0)
+    out = {}
+    for key in ("B-cliff", "C-cliff"):
+        arr = F.belief_system(F.Model(theta0=th, p0=(0.0, 0.0, 0.0)), F.ARMS[key])
+        got, _ = F.run_rounds(arr, sc.truth, 30)
+        e = got["t_hat"] - 22.5
+        out[key] = (e[starts].mean(), e[ends].mean(), got["m"][ends].mean(), total(got, "cliff"))
+        print(f"{F.ARMS[key].name}: belief {out[key][0]:+.4f} at the round's start, {out[key][1]:+.4f} at its end; "
+              f"margin {out[key][2]:+.4f}; total cost per round {out[key][3]:.4f} against {true_cost:.4f} for the "
+              f"true belief")
+    b, c = out["B-cliff"], out["C-cliff"]
+    assert b[1] < -0.3 and b[0] < -0.5 and b[3] > true_cost        # bent early, dearer than the truth
+    assert abs(c[0]) < 1e-3 and abs(c[1]) < 1e-3                    # the belief true
+    assert -0.3 < c[2] < 0 and c[3] < true_cost and c[3] < b[3]     # a small early margin, the cheapest
+    np.testing.assert_allclose([b[0], b[1], c[2]], [-0.8911, -0.4884, -0.1387], atol=2e-3)
