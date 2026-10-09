@@ -1,7 +1,7 @@
 # Principles for a page that shows a run
 
 Drawn from David's reactions to the two pages built so far, the listener (`live.html`; Claude Opus 5.5, 9effcd80,
-2026-10-09) and the two tanks (`tanks.html`; Claude Opus 5.5, 322cc59f, 2026-10-09). Each line names the page and his
+2026-10-09) and the two tanks (`tanks.html`; Claude Opus 5.5, 322cc59f, 2026-10-09), read through his message of the listener run's commit. Each line names the page and his
 words behind it. These are the agents' wording, *proposed*. David on the two-tanks page built on them: "This is really
 great." A page that departs from one says why in its own header comment.
 
@@ -30,31 +30,38 @@ great." A page that departs from one says why in its own header comment.
    different: on the tanks, inputs are blue with a dashed underline, outputs are grey.
 7. **Grab the thing.** Set a part's state by dragging the part itself, whether that is the listener or the water
    in a tank.
-8. **An input is drawn as well as numbered.** On the tanks, the pipe's thickness follows its conductance, scaled
+8. **A setting at which nothing can ever change is left out, or the page says so.** At 100% the listener never moves
+   ("if the user ever selects 100%, then they should be told like, this is never going to change … I don't think we
+   need 100%"). A number shown and the range it may take agree everywhere on the page.
+9. **An input is drawn as well as numbered.** On the tanks, the pipe's thickness follows its conductance, scaled
    honestly: for slow flow through a narrow pipe the conductance goes as the radius to the fourth power, so the
    drawn radius goes as its fourth root.
 
 ## Layout
 
-9. **Controls go where the eye already is.** Play sits beside the picture ("where is Play?? … way down at the
+10. **Controls go where the eye already is.** Play sits beside the picture ("where is Play?? … way down at the
    bottom"). The time track sits under the record of steps, on the same scale ("have it match them"). Start over
    is on the picture and keeps what the viewer set.
-10. **The page never grows.** Its width stays fixed and long histories shrink. A body never leaves the screen; the
+11. **The page never grows.** Its width stays fixed and long histories shrink. A body never leaves the screen; the
     axis compresses, with an end at infinity ("I shouldn't have to lose my guy").
-11. **Text that changes while playing holds still.** Use a fixed number of decimals and a fixed width, so a
+12. **Text that changes while playing holds still.** Use a fixed number of decimals and a fixed width, so a
     sentence never shifts sideways ("when it moves to five, it doesn't say 5.00, and so the entire text moves left").
-12. **Built for a glance, not for reading top to bottom.** Whatever the eye lands on says what it is. A thing is
+13. **Built for a glance, not for reading top to bottom.** Whatever the eye lands on says what it is. A thing is
     named by its role every time, "the speaker," never "them" ("they're going to glance around and they're going
     to need to know what they're seeing right when they see it"). Keep few words on the page and put the rest
-    behind "explain" buttons. Use plain words: "ten things happen in a row" needs no special term.
+    behind "explain" buttons. Use plain words: "ten things happen in a row" needs no special term. A quantity is named
+    by whose it is and what it is about: "the listener's belief about how often the speaker breaks a promise."
 
 ## Mechanics
 
-13. **A moving mark that shows a rate adds up that rate frame by frame, with its sign.** The tanks' first version
+14. **A moving mark that shows a rate adds up that rate frame by frame, with its sign.** The tanks' first version
     moved the pipe's dashes by "time since the page loaded × the current flow." That runs backward as the flow
     falls, and David saw water going from the lower tank to the higher one.
-14. **The page's model is checked against the library.** Run the same arrangement in the library and compare
+15. **The page's model is checked against the library.** Run the same arrangement in the library and compare
     numbers, then say on the page what was checked. The listener's test compares the page with
     `listener.run_script`. The tanks were checked against `tests/test_two_tanks.py`'s tanks with the book's linear
     spout, for one-second steps.
-15. **When the page changes, give one instruction** for seeing it, such as "reload" ("don't tell me five things to do").
+16. **The numbers behind the picture can be seen.** When a motion surprises, the viewer can open the run's numbers
+    step by step ("I don't know if you can grab the data from the website. That'd be a cool feature, like a debug
+    button"; asked on the listener, not yet built on either page).
+17. **When the page changes, give one instruction** for seeing it, such as "reload" ("don't tell me five things to do").
