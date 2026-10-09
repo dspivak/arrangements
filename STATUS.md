@@ -1889,6 +1889,17 @@ one. The world is a drum: a figurine that could be pushed on is not what the bel
 results stand as results about a port read through a register (a step's worth in flight); stage (B)'s recording
 enters the imagined scenes as values, which an inbox must carry.
 
+### 3.48 Same form for a learner: a line-learner holding one dataset is not moved by another with the same line
+
+Book P41 (b) (Claude Opus 5.5, 5f5f4248, 2026-10-09; `tests/test_same_form_learner.py`, 4 passed; predictions and
+verdicts in `notes/SAME-FORM-LEARNER-PREDICTIONS-2026-10-09.md`). `learning.parameterized_map` of a line stepped by
+`Phi`, fed one datum per step through its port, the environment's schedule D1 then Dk. At the line D1 taught it, the
+summed pulled-back forcing of a dataset with the same least-squares line is 0 to 1e-15, including a parabola; another
+line's is order 1. After the switch the held centre moves by an amount that vanishes with the step size for the same
+line, and by the gap between the lines for another. **What this does not show**: a reader that tells forms apart by
+more than a line; a stream rather than a cycled set; anything about the reader registering the pull other than by
+moving.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
