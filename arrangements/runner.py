@@ -44,6 +44,37 @@ asker sends a translated description over seven wires, one piece a step; the run
 runs it, and presents its data cells, which the asker samples into registers. `inbox`, a
 register that becomes what arrives at its port, is the one part added to the kit for this.
 
+THE PORTS' BACKWARD DIRECTION (book plan P37 (b)(iii′) stage (A); David, 2026-10-08: "give P34's
+net ports their backward direction, so a push arriving at a net's output reaches the parts
+inside and an inbox returns the covector it receives on its port, with couple then composing
+forces as well as values"). A covector arriving at an output wire goes back through the chain
+rule to the parts (`ref_step`'s `pushes`; the library does it by pullback-and-sum). An inbox's
+state is `[x, r]`: `x` becomes what arrived at the port and `r` the covector that landed on its
+wire, which it publishes on the port the next step (`port_covectors`). A box presents, then
+hears, so a port's value and its covector each cross one step late. `couple` composes forces as
+well as values; `couple_net` is the same pair as one net wired by hand, with a `relay` (an inbox
+whose port is a wire of the same net, via two pushes) where each port was.
+
+THE KIT, ENLARGED (the same stage):
+
+* `exp`, `recip`     -- stateless unary boxes, e^v and 1/v; the Euler term (1 + v/N)^N and
+                        Newton's iteration y <- y (2 - v y) over the old kit approach them.
+* `market(cells)`    -- the belief integrator of P36 (b) (`belief.belief_coalgebra`): state the
+                        log-heights, presents the belief on one wire per value, steps by Bayes'
+                        rule on the covector it receives.
+* `relay(x0)`        -- see above; three wires: the value, the stored covector, and an ear.
+* `pcost(d)`         -- a sink whose forcing reads a port THE SAME STEP (David, 2026-10-09: "build the same
+                        step kind"): hears d coefficient wires from inside and the port's value n, cost
+                        sum_j c_j n^j, returns -n^j on wire j and -sum_j j c_j n^(j-1) on the port. In arr a
+                        box's output is Moore (it cannot read its input the same step) but its forcing is
+                        not: the 1-form it publishes on its input side is a function of the input it will
+                        receive. `portsplit` in the term copies each port's value to the sinks that read it.
+
+A runner over the enlarged kit has six flag drums (exp and reciprocal added), each new term gated
+so a zero flag computes exp(0) and 1/1 and adds nothing; `compile_net` lays out a market's
+position and update, a relay's two copies, and the unary boxes' backward passes. P34's four-drum
+runner is unchanged and still exact in fractions; the six-drum one is checked in floats.
+
 WHAT THE DESCRIPTION IS: the compiled flags and layout, not the raw term. The translation
 (`compile_net`) is done outside the runner. See STATUS.md for what this does and does not show.
 """
@@ -151,6 +182,13 @@ class Net:
     def push(self, d, r):
         self.sinks.append(("push", d, r))
 
+    def pcost(self, coeffs, port):
+        """A cost polynomial in the value at port `port` (the net's `port`-th inbox's port), with the
+        coefficients `coeffs` wires from inside: `sum_j c_j n^j`. Its forcing reads the port the same
+        step and returns `-sum_j j c_j n^(j-1)` on it, and `-n^j` on coefficient wire `j` (David,
+        2026-10-09: "build the same step kind"). The port's inbox may be left unread."""
+        self.sinks.append(("pcost", int(port)) + tuple(coeffs))
+
     def leaves(self):
         return [w for w, nd in enumerate(self.nodes) if nd[0] in LEAF_KINDS]
 
@@ -215,9 +253,20 @@ def present(net: Net, state: dict) -> list:
     return [val[w] for w in net.outputs]
 
 
-def port_covectors(net: Net, state: dict) -> list:
-    """What the net publishes on its ports this step: each inbox's stored covector `r`."""
-    return [state[w][1] for w in net.inboxes()]
+def port_covectors(net: Net, state: dict, inputs: Sequence = None) -> list:
+    """What the net publishes on its ports this step: each inbox's stored covector `r`, plus, given the
+    values `inputs` arriving at the ports this step, what each `pcost` returns on its port."""
+    out = [state[w][1] for w in net.inboxes()]
+    if inputs is not None:
+        val = None
+        for sk in net.sinks:
+            if sk[0] == "pcost":
+                if val is None:
+                    val = _forward(net, state)
+                port, coeffs = sk[1], sk[2:]
+                n_ = inputs[port]
+                out[port] = out[port] - sum(j * val[c] * n_ ** (j - 1) for j, c in enumerate(coeffs) if j > 0)
+    return out
 
 
 def ref_step(net: Net, state: dict, inputs: Sequence = (), pushes: Sequence = ()) -> dict:
@@ -234,6 +283,10 @@ def ref_step(net: Net, state: dict, inputs: Sequence = (), pushes: Sequence = ()
     for s in net.sinks:
         if s[0] == "cost":
             xi[s[1]] = xi[s[1]] + (-1)
+        elif s[0] == "pcost":
+            n_ = inputs[s[1]]
+            for j, c in enumerate(s[2:]):
+                xi[c] = xi[c] - n_ ** j
         else:
             xi[s[2]] = xi[s[2]] + val[s[1]]
     wide = {}   # a market's or relay's covector, one per slot
@@ -251,7 +304,8 @@ def ref_step(net: Net, state: dict, inputs: Sequence = (), pushes: Sequence = ()
             xi[nd[1]] = xi[nd[1]] + xi[w] * val[w]
         elif nd[0] == "recip":
             xi[nd[1]] = xi[nd[1]] - xi[w] * val[w] * val[w]
-        elif nd[0] == "slot":
+    for w, nd in enumerate(net.nodes):   # a wide leaf's covectors, once every reader has pushed back
+        if nd[0] == "slot":
             wide.setdefault(nd[1], {})[nd[2]] = xi[w]
     new = {}
     inputs = list(inputs)
@@ -304,10 +358,15 @@ def to_term(net: Net):
             term = ("seq", term, ("seq", route, layer))
             pos[w] = n
             n += 1
-    idx, parts = [], []
+    idx, parts, ports = [], [], []
     for s in net.sinks:
-        idx += [pos[x] for x in s[1:]]
-        parts.append((s[0],))
+        if s[0] == "pcost":
+            idx += [pos[x] for x in s[2:]]
+            parts.append(("pcost", len(s) - 2))
+            ports.append(s[1])
+        else:
+            idx += [pos[x] for x in s[1:]]
+            parts.append((s[0],))
     j = len(net.outputs)
     idx += [pos[w] for w in net.outputs]
     if j:
@@ -316,6 +375,8 @@ def to_term(net: Net):
         term = ("seq", term, ("seq", ("tensor", ("fan", n, idx)) + thread, ("tensor",) + tuple(parts) + thread))
     else:
         term = ("seq", term, ("tensor", ("fan", n, [])) + thread)
+    if ports:   # each port's value copied to the sinks that read it, and down to the inboxes
+        term = ("seq", term, ("portsplit", k, ports + list(range(k)), j))
     return term
 
 
@@ -418,8 +479,24 @@ def _kit():
                            out_dim_N=len(idx), out_f=lambda q, m: m[ix], in_f=lambda q, m, n_: Z(),
                            omega=zero_form, label="fan")
 
+    def pcost(d):
+        """A cost polynomial in the port's value, `sum_j m_j n^j`, exact; its forcing reads N^- the same step."""
+        def U(q, m, n):
+            return -sum(m[j] * n[0] ** j for j in range(int(d)))
+        return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=int(d), in_dim_N=1, out_dim_N=0,
+                           out_f=lambda q, m: Z(), in_f=lambda q, m, n: Z(), omega=exact(U), label="pcost")
+
+    def portsplit(k, idx, j):
+        """A wiring on the input side: the net's `k` port values copied to the slots `idx` below (the sinks
+        that read ports, then the inboxes' thread); the `j` output wires pass through."""
+        ix = jnp.asarray(list(idx), dtype=int)
+        return Arrangement(P=trivial_parameter(), in_dim_M=len(idx), out_dim_M=int(j), in_dim_N=int(k),
+                           out_dim_N=int(j), out_f=lambda q, m: m, in_f=lambda q, m, n: n[ix],
+                           omega=zero_form, label="portsplit")
+
     return dict(const=const, register=register, drum=drum, add=add, mul=mul, cost=cost, push=push, fan=fan,
-                inbox=inbox, inwire=inwire, relay=relay, market=market, exp=exp_, recip=recip)
+                inbox=inbox, inwire=inwire, relay=relay, market=market, exp=exp_, recip=recip, pcost=pcost,
+                portsplit=portsplit)
 
 
 def denote(term):
@@ -489,11 +566,11 @@ def _inbox_r_positions(net: Net) -> list:
         nd = net.nodes[w]
         if nd[0] == "inbox":
             where.append(off + 1)
-        off += _leaf_cells(nd)
+        off += leaf_cells(nd)
     return where
 
 
-def _leaf_cells(nd) -> int:
+def leaf_cells(nd) -> int:
     """How many cells of state a leaf holds."""
     if nd[0] == "const":
         return 0
@@ -580,7 +657,8 @@ def couple_by_hand(net_a: Net, net_b: Net, a_to_b, b_to_a, sa: dict, sb: dict):
     covectors its inboxes stored; then each steps on what it hears, values at its inboxes and
     covectors at its outputs."""
     oa, ob = present(net_a, sa), present(net_b, sb)
-    ca, cb = port_covectors(net_a, sa), port_covectors(net_b, sb)
+    in_a, in_b = [ob[i] for i in b_to_a], [oa[i] for i in a_to_b]
+    ca, cb = port_covectors(net_a, sa, in_a), port_covectors(net_b, sb, in_b)
     pa, pb = [0] * len(net_a.outputs), [0] * len(net_b.outputs)
     for i, j in enumerate(a_to_b):   # b's inbox i hears a's output j, and returns its covector there
         pa[j] = pa[j] + cb[i]
@@ -618,9 +696,21 @@ def couple_net(net_a: Net, net_b: Net, a_to_b, b_to_a) -> Net:
     for k_, nd in enumerate(c.nodes):   # readers of an inbox read its relay's value wire
         if nd[0] in BOX_KINDS:
             c.nodes[k_] = (nd[0],) + tuple(rename.get(x, x) for x in nd[1:])
-    for shift, net in ((0, net_a), (off, net_b)):
+    src_a = [net_b.outputs[i] + off for i in b_to_a]      # what a's port p hears
+    src_b = [net_a.outputs[i] for i in a_to_b]
+    for shift, net, srcs in ((0, net_a, src_a), (off, net_b, src_b)):
         for s in net.sinks:
-            c.sinks.append((s[0],) + tuple(rename.get(x + shift, x + shift) for x in s[1:]))
+            if s[0] == "pcost":   # the same polynomial, of the wire the port hears, under a cost
+                w = rename.get(srcs[s[1]], srcs[s[1]])
+                tot, pw = None, None
+                for j, cw in enumerate(s[2:]):
+                    cw = rename.get(cw + shift, cw + shift)
+                    pw = w if j == 1 else (c.mul(pw, w) if j > 1 else None)
+                    term = cw if j == 0 else c.mul(cw, pw)
+                    tot = term if tot is None else c.add(tot, term)
+                c.cost(tot)
+            else:
+                c.sinks.append((s[0],) + tuple(rename.get(x + shift, x + shift) for x in s[1:]))
     for r, ear, src in relays:
         src = rename.get(src, src)
         c.push(src, ear)
@@ -770,11 +860,9 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
     needs_neg = any(s[0] == "cost" for s in net.sinks) or any(nd[0] in ("recip", "market") for nd in nodes)
     neg1 = alloc(-one) if needs_neg else None
 
-    stateful = [False] * len(nodes)  # does the wire have a register, drum, market or relay behind it?
-    for w, nd in enumerate(nodes):
-        if nd[0] in ("register", "drum", "slot"):
-            stateful[w] = True
-        elif nd[0] in BOX_KINDS:
+    stateful = [nd[0] in ("register", "drum", "slot") for nd in nodes]  # a register, drum, market or relay behind it?
+    for w, nd in enumerate(nodes):   # boxes in order; a box may read a relay's slot that comes later in the list
+        if nd[0] in BOX_KINDS:
             stateful[w] = any(stateful[x] for x in nd[1:])
 
     slp = []
@@ -818,6 +906,8 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
     for s in net.sinks:
         if s[0] == "cost":
             acc(s[1], neg1)
+        elif s[0] == "pcost":
+            raise ValueError("a net with a pcost has a port; the runner runs closed nets (couple it first)")
         else:
             acc(s[2], val[s[1]])
     for w in range(len(nodes) - 1, -1, -1):  # backward pass

@@ -20,8 +20,9 @@ the conjugate family, whose sufficient statistic is `Psi(theta) = (theta, -A(the
 
     q_lam(theta) = exp( <lam, Psi(theta)> - AA(lam) ),   lam in Lam subset R^{p+1},
 
-with `AA` the conjugate family's log-partition, finite on the open convex `Lam`. There `AA`
-is smooth and strictly convex, so the Legendre map `grad AA : Lam -> M` onto expectation
+with `AA` the conjugate family's log-partition, finite on the open convex `Lam`. Assume the
+conjugate family is minimal (no affine redundancy in `Psi`), so its Fisher matrix is positive
+definite. There `AA` is smooth and strictly convex, so the Legendre map `grad AA : Lam -> M` onto expectation
 parameters `mu = E_{q_lam}[Psi]` is a diffeomorphism with inverse `grad AA*`.
 
 **Bayes is a translation.** `q_lam(theta) p(x | theta)` is proportional to
@@ -44,10 +45,16 @@ is the *exact* one-form on `Lam`
 where `G := grad^2 AA` is the Fisher information of the belief family in natural
 coordinates.
 
-**The integrator.** Configuration `Q = Lam`, state `S = Lam`, readout the identity, and on
+**The local update.** Configuration `Q = Lam`, state `S = Lam`, readout the identity, and on
 receiving a covector `xi` and a duration `tau`
 
     u_lam(xi, tau) = lam + tau * sharp_lam(xi),   sharp_lam = G(lam)^{-1} = grad^2 AA*(mu(lam)).
+
+Its domain consists of inputs for which the endpoint is in `Lam`; the posterior claim below
+assumes `lam + t(x)` is in this open normalizable domain. This need not be a total update on
+all covectors and durations, as Chapter 3 currently requires of an integrator. This domain
+qualification and the explicit minimality assumption were added by Codex, 2026-10-09; they
+preserve the exact conjugate Bayesian steps. No sub-Gaussian tail assumption is needed.
 
 **The claim.** `u_lam(omega_x|_lam, 1) = lam + G^{-1} G t(x) = lam + t(x)`: one step of this
 arrangement at duration 1 is Bayes' rule **exactly**, not to first order. *Scope (2026-10-01, cause corrected 2026-10-03):* exact in the mathematics. On the
@@ -64,7 +71,8 @@ float64 holds. In Chapter 3's
 * the **forcing one-form** `omega_x = -d k_x` on `Q = Lam`, `k_x` the expected negative
   log-likelihood of the datum — the slot the learner fills with `-d(loss)`.
 
-The interface, the forcing lens, the wiring and the dynamics functor are untouched. In the
+The interface, forcing lens and pullback calculation are unchanged. Compatibility with the
+current total-coalgebra dynamics functor requires resolving the update domain above. In the
 library this is `coalgebra.configuration` on `rvect.ReactiveVectorSpace(dim, sharp_fn)` with
 `sharp_fn = lam |-> inv(hessian(AA)(lam))`, plus `arrangement.exact(-k_x)`: the same two
 constructors as `learning.py`, with one argument changed.
@@ -154,11 +162,13 @@ matrix at `lam^(0)` is `[[3.214, -8.679], [-8.679, 26.679]]` against the Fisher
 `[[1.5, -3.0], [-3.0, 7.125]]`, and its step `(1.330, 0.838)` is nowhere near Bayes'
 `(3.190, 2.095)`. (5) `Phi(reporter . belief)` moves the belief identically, to 0.
 
-**So the answer to David's question is yes**, for a conjugate exponential family: Bayes' rule
-is the same arrangement with a different integrator, and the integrator differs only in its
-response, which is the raised inverse Fisher metric `grad^2 AA*` instead of a learning rate or
-an inverse mass. The wiring, the interface, the forcing lens, the shape of the forcing
-(`-dk` for a cost) and the dynamics functor are the same objects doing the same work.
+**The exact-update answer is yes**, for a regular minimal conjugate exponential family on
+admissible steps: the raised inverse Fisher response `grad^2 AA*` turns the expected-loss
+forcing into the exact posterior translation. The wiring, interface, forcing lens and shape
+of the forcing (`-dk` for a cost) are unchanged. Calling the local rule an integrator in
+Chapter 3's current total sense still requires resolving its domain for arbitrary forces.
+This qualification (Codex, 2026-10-09) does not narrow the exact conjugate-family result to
+Gaussian or sub-Gaussian beliefs.
 
 ### Three things the run found that were not predicted
 

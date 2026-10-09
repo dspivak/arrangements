@@ -1817,6 +1817,78 @@ over 400 steps and 40 random diagrams (up to 5 stocks, 4 auxiliaries, 6 flows, s
 continuous-time statement rests on the book's `prop.duration_tangent` and `prop.internalization_tangent`, which are
 proof sketches; non-smooth rates (lookup tables, MIN, MAX, IF) are outside it.
 
+### 3.47 A figurine as a net with ports that carry forces, its belief a market; a scene of two, the coordinator a market over the one-part-altered scenes; the runner runs both
+
+`arrangements/runner.py` (the kit, nets and runner enlarged), `arrangements/market_scene.py`,
+`tests/test_market_runner.py` (stage (A), 10 tests, about 6 min, the library's trace of the 141-node coupled figurine
+taking most of it) and `tests/test_scene_market.py` (stage (B), 7 tests, about 80 s); predictions fixed first in the
+book repo's `notes/runs/p37-market-of-scenes-3819a169/PREDICTIONS.md`, results in its `RESULTS.md` (book plan P37
+(b)(iii′); Claude Fable 5.1, 3819a169, 2026-10-08). David's words for the stage: "give P34's net ports their backward
+direction, so a push arriving at a net's output reaches the parts inside and an inbox returns the covector it receives
+on its port, with couple then composing forces as well as values ... enlarge the kit by a reciprocal and an
+exponential as kit boxes, each checked against its Newton or Euler term; write one figurine as such a net, its belief
+a market over its parameter values by the belief integrator; run it through the runner, paid by the outcome's
+likelihood, against P36's direct Bayes."
+
+**The ports' backward direction.** `ref_step` takes the covectors arriving at a net's outputs; an inbox's state is
+`[x, r]`, `x` what arrived and `r` the covector that landed on its wire, published on the port the next step
+(`port_covectors`); its integrator permutes the covector into the state (`copier`, base `R^3`). A box presents, then
+hears, so a port's value and its covector each cross ONE STEP LATE; a same-step return would need a cost reading its
+port inside its own forcing, not built. `couple` composes forces as well as values; `couple_net` is the pair as one
+net with a `relay` (an inbox whose port is a wire of the same net: a wide leaf with three wires, value, stored
+covector, ear, and two pushes) where each port was. **Held**: `couple` through the library, `couple_by_hand` and
+`couple_net` by hand and through the library agree to 1e-13 in every state cell, the stored covectors included, on
+the two-tank pair for 200 steps, eight random pairs and the figurine with its world; the pair split with a port keeps a
+step's worth of water in flight (`v1 + v2 + r = 4` exactly) and is a different arrangement from the direct wire.
+
+**The kit, enlarged.** `exp`, `recip` (the Euler term `(1 + v/N)^N` falls short of `exp` by `e^v v^2 / 2N`; Newton's
+`y <- y (2 - v y)` reaches `recip` in five steps), `market(cells)` (the belief integrator of §3.39, presenting the
+belief on one wire per value), `relay`. The six-drum runner adds two gated unary terms, `X (exp(X a) - a)` and
+`R (1/(1 + R (a - 1)) - a)`; `compile_net` lays out a market's position and update and a relay's copies. P34's four-drum
+runner and its 21 tests are unchanged and still exact in fractions; the six-drum one is checked in floats: 100 random
+closed nets over the enlarged kit decode to `ref_step` to 1e-12, and on a 34-node net using every new kind the runner
+taken through the library decodes two passes to the net's steps to 9e-16.
+
+**Stage (A), the figurine.** Item 65's driver as a net (its guess the closed form `(1 - (1 - lam/2)^40) / lam` through
+`exp` and `recip`), a market over five rates, the mixture guess presented, the outcome and a flag heard, the likelihood
+its cost. **Held**: the belief equals P36's direct posterior to 2e-16 by hand and 3e-16 through the library's `couple`,
+every round; the covector returned on the outcome's port is `G - x`, P36's pushback, landing on the world's drum cell
+after it is presented; the runner runs it, decoding to `ref_step` to 4e-14, at 49,946 runner steps a round (the
+prediction's 500–5,000 FAILED: the schedule waits about half a drum per event).
+
+**Stage (B), the scene.** The snake moves toward the cat with aggressiveness `a`, the cat keeps a distance `d = 3`
+with wariness `b`, five inner steps UNROLLED INSIDE ONE STEP OF THE NET (the scene is imagined); the world is a
+recording. The family: the snake altered over three values with the cat at its base, the cat altered over three with
+the snake at its base; one `market` over the six, paid by the recording's likelihood under each (outcome; with a
+sighting of the snake's final position; with comparison, the same snake with a second cat). **Held**: (B1) the
+nested form, three belief integrators in the library with the outer paid by each family's aggregate likelihood (the
+inner read one-way), equals the flat market to 2e-16, the prediction market dynamic operad's compositor equation;
+(B2) the cat's family (the wrong part) rises to 0.695 (outcome alone), 1.000 (sighting), 0.979 (comparison) in six
+rounds, sighting > comparison > outcome, with nothing supplied but the family; (B3) the base scene's two copies keep
+their prior ratio exactly, the flat direction; (B4) the loss on the base scene's outcome pulled back by the chain rule
+through the imagined run moves the right, sensitive snake by -0.2325 in its log-parameter (65% of the correction,
+item 65's pattern) and the wrong cat by +0.1258; routed by the trust in each part's family, read through relays, by
+-0.1359 and +0.0955: tempered, not reversed; (B5) the runner runs the scene at 507,150 steps a round, decoding to
+`ref_step` to 4e-14; the library's composition agrees on a reduced instance (`T = 2`, 165 nodes) to 9e-16, the full
+scene (about 400 nodes) being too deep to trace in reasonable time (80 s for 141 nodes).
+
+**The same-step port** (stage (A′), at David's "build the same step kind", 2026-10-09; `tests/test_same_step_ports.py`,
+5 tests). In `arr` a box's output is Moore but its forcing is not: the 1-form it publishes on its input side is a
+function of the input it will receive. `pcost(d)` is a sink whose forcing reads a port: `d` coefficient wires from
+inside and the port's value `n`, cost `sum_j c_j n^j`; `portsplit` copies a port's value to the sinks that read it.
+**Held**: the two-tank pair with the pipe's cost as a `pcost` equals P34's direct `two_tanks` exactly in fractions
+(nothing in flight; the inbox stores no covector); `couple`, the pair by hand and the one net wired by hand agree to
+1e-13 on it and on eight random pairs with `pcost` sinks; the figurine with its likelihood as a `pcost` needs no flag
+and no lag, its belief after step `t` the direct posterior after `t` outcomes (2e-15), the covector returned at step
+`t` being `G(t) - x_t` and the drum cell rotating away holding `G(t)`; the runner runs the one net wired by hand
+unchanged. A same-step port VALUE in a box's output would need the Mealy interface `[Ay, By]`, not built.
+
+**What this does not show.** No promise, no "lined up", no learner composing figurines, no suboperad stated as a
+theorem (the nesting is checked numerically). The family is fixed at the starting base and does not follow a moving
+one. The world is a drum: a figurine that could be pushed on is not what the belief observes. Stage (A)'s inbox
+results stand as results about a port read through a register (a step's worth in flight); stage (B)'s recording
+enters the imagined scenes as values, which an inbox must carry.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

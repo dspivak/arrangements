@@ -212,9 +212,8 @@ def test_exchange_through_library():
     flat = R.arrangement_run_jit(A, T, check=1, every=T)[-1]
     off, where = 0, {}
     for w in asker.leaves():
-        nd = asker.nodes[w]
         where[w] = off
-        off += len(nd[1]) if nd[0] == "drum" else (0 if nd[0] == "const" else 1)
+        off += R.leaf_cells(asker.nodes[w])
     assert [flat[where[w]] for w in ans] == want
 
 
