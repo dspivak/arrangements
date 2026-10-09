@@ -1900,6 +1900,19 @@ line, and by the gap between the lines for another. **What this does not show**:
 more than a line; a stream rather than a cycled set; anything about the reader registering the pull other than by
 moving.
 
+### 3.49 Watching a run: the viewer, and the listener as a page
+
+Book P42 (a) (Claude Opus 5.5, 9effcd80, 2026-10-09; `tests/test_animate.py`, 6 passed). `animate.py` writes one
+self-contained HTML page for a scene: a recording of a run (`viewer/player.html` plays it; `scenes.listener_scene`
+records `listener.run_script`) or a live model the page runs itself (`viewer/live.html`, the model in
+`viewer/models/<name>.js`, the drawing shared in `viewer/stage.js`). `uv run python scripts/animate.py listener
+OUT.html` writes the listener page. The page's listener is not an arrangement: it is `test_listener.py`'s closed form
+rewritten for the browser, checked against `listener.run_script` to 1e-12 on all three scripts and both wires at the
+library's settings (expected losses 0.4, 1.4, 8; hearing scaled by the kernel weight; the bell). Its own defaults
+differ on all three, at David's word or finding (book plan §5.9 item 63, P42): one cost of a broken
+promise for every kind, full hearing, and a peaked kernel with the placement a distance, none yet built here.
+**What this does not show**: that the page's defaults are right, which is P42 (b).
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

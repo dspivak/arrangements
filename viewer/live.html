@@ -1,0 +1,527 @@
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one question at the top (who is the listener talking to), the rounds that question produced, the
+   picture, then three buttons that open the explanation, the math, and the settings. Nothing else in view. */
+:root {
+  --ground: #eef1f3;
+  --panel: #ffffff;
+  --ink: #1b232c;
+  --muted: #5a6672;
+  --rule: #d3dae0;
+  --accent: #2b4c8c;
+  --accent-ink: #ffffff;
+  --faint: rgba(43, 76, 140, 0.10);
+  --display: "Spectral", "Iowan Old Style", Georgia, serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+    --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+  --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+  color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: var(--s4); padding-block: var(--s5) var(--s6); display: grid; gap: var(--s4); }
+h1 { margin: 0; font: 600 30px/1.15 var(--display); letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 64ch; }
+
+.ask { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 8px; padding: var(--s3) var(--s4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
+.ask label { font-size: 16px; }
+select, button { font: 500 15px/1.2 var(--body); color: var(--ink); background: var(--ground); border: 1px solid var(--rule);
+  border-radius: 6px; padding: var(--s2) var(--s3); min-height: 38px; cursor: pointer; }
+select { font-weight: 600; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ask .spacer { flex: 1 1 auto; }
+
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: var(--s4); }
+.rounds-head { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s2); }
+.rounds-head h2 { margin: 0; font: 600 12px/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.rounds-head span { font-size: 13px; color: var(--muted); margin-right: auto; }
+button.small { font-size: 13px; min-height: 30px; padding: 4px var(--s3); }
+.stage-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s2); }
+.drag-hint { font-size: 13px; color: var(--muted); }
+.track { position: relative; height: 18px; margin-top: 6px; cursor: pointer; touch-action: none; }
+.track::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 4px; border-radius: 2px; background: var(--rule); }
+.track .fill { position: absolute; left: 0; top: 7px; height: 4px; border-radius: 2px; background: var(--accent); }
+.track .head { position: absolute; top: 1px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--accent);
+  border: 2px solid var(--panel); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
+.track:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stage canvas { touch-action: none; }
+.stage canvas.grab { cursor: grab; }
+.stage canvas.grabbing { cursor: grabbing; }
+.wrap > * { min-width: 0; }
+.rows { display: grid; gap: var(--s2); }
+.strip { display: flex; gap: 3px; min-height: 34px; }
+.round { flex: 0 0 34px; height: 34px; border: 0; border-radius: 5px; padding: 0; min-height: 0; color: #fff;
+  font: 500 12px/1 var(--data); opacity: 0.5; }
+.round.done { opacity: 1; }
+.round.plus { background: var(--ground); color: var(--ink); border: 1px dashed var(--muted); opacity: 1; font-size: 18px; cursor: pointer; }
+.rounds-head button + button { margin-left: 0; }
+.round.now { outline: 2px solid var(--ink); outline-offset: 1px; opacity: 1; }
+.empty { margin: 0; color: var(--muted); font-size: 14px; align-self: center; }
+
+.stage canvas { width: 100%; height: 200px; display: block; }
+.axis-note { margin: var(--s1) 0 0; font-size: 13px; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s2); margin-top: var(--s3); }
+.facts > div { border: 1px solid var(--rule); border-radius: 6px; padding: var(--s2) var(--s3); display: grid; gap: 2px; }
+.facts span { font-size: 12px; color: var(--muted); }
+.facts small { font-size: 12px; color: var(--muted); }
+.facts > div { align-content: start; }
+.facts label { font-size: 12px; color: var(--muted); }
+.facts .input { border-color: var(--accent); }
+.facts .input input { width: 100%; accent-color: var(--accent); margin: 2px 0; }
+.status { margin: var(--s3) 0 0; font-size: 16px; line-height: 1.5; max-width: 72ch; }
+.status b { font-weight: 600; }
+.facts b { font: 500 18px/1.2 var(--data); font-variant-numeric: tabular-nums; }
+.key { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); margin-top: var(--s2); color: var(--muted); font-size: 13px; }
+.key span { display: inline-flex; align-items: center; gap: var(--s2); }
+.key i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+.more { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.more button[aria-expanded="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.panel { display: grid; gap: var(--s3); }
+.panel h2 { margin: 0; font: 600 18px/1.2 var(--display); }
+.panel p, .panel li { max-width: 70ch; }
+.panel p { margin: 0; }
+.panel ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s1); }
+.panel .src { color: var(--muted); font-size: 13px; }
+.panel code { font: 13px var(--data); }
+.caption { font-size: 16px; line-height: 1.6; padding: var(--s3) var(--s4); background: var(--faint); border-radius: 6px; }
+.nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--s1) var(--s5); font-size: 14px; }
+.nums div { display: flex; justify-content: space-between; gap: var(--s3); }
+.nums b { font: 500 14px var(--data); font-variant-numeric: tabular-nums; }
+
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s3); }
+.group { display: grid; gap: var(--s3); align-content: start; padding: var(--s3); border: 1px solid var(--rule); border-radius: 6px; }
+.group h3 { margin: 0; display: flex; align-items: center; gap: var(--s2); font: 600 12px/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.group h3 i { width: 10px; height: 10px; border-radius: 2px; }
+.slider { display: grid; gap: var(--s1); }
+.slider label { display: flex; justify-content: space-between; gap: var(--s3); font-size: 13px; }
+.slider output { font: 500 13px var(--data); font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.warning { margin: 0; padding: var(--s2) var(--s3); border-radius: 6px; border: 1px solid #d39b2a; background: rgba(211, 155, 42, 0.12); }
+
+.menu { position: absolute; z-index: 5; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: var(--s1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); display: grid; min-width: 260px; }
+.menu p { margin: var(--s1) var(--s2); font-size: 12px; color: var(--muted); }
+.menu button { border: 0; background: transparent; text-align: left; display: flex; align-items: center; gap: var(--s2); font-size: 14px; }
+.menu button:hover, .menu button[aria-checked="true"] { background: var(--faint); }
+.menu i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+
+@media (max-width: 600px) { h1 { font-size: 24px; } .stage canvas { height: 180px; } }
+</style>
+
+<div class="wrap">
+  <h1 id="title"></h1>
+  <p class="lede">Choose what kind of speaker the listener is talking to and press Play. Each round the speaker keeps a promise or breaks one; watch what the listener comes to believe about the speaker, and how much it counts on the speaker.</p>
+
+  <section class="ask" aria-label="Choose and play">
+    <label for="kind">The listener is talking to a speaker who is</label>
+    <select id="kind"></select>
+    <button id="play" class="primary" type="button">Play</button>
+    <button id="replay" type="button" title="Back to round 1, keeping every round">&#8634; Start over, same rounds</button>
+  </section>
+
+  <section class="card" aria-label="Rounds">
+    <div class="rounds-head"><h2>Rounds</h2><span id="rounds-hint"></span><button id="add" type="button" class="small">Add 5 rounds</button><button id="over" type="button" class="small">Clear all rounds</button></div>
+    <div id="rows" class="rows"></div>
+  </section>
+
+  <section class="card stage" aria-label="Picture">
+    <canvas id="canvas" role="img" aria-label="The listener and the speaker it is talking to"></canvas>
+    <p class="axis-note">The line shows how much the listener counts on the speaker from each spot: fully right beside the speaker, not at all far away.</p>
+    <p class="status" id="status"></p>
+    <div class="facts" id="facts">
+      <div class="reading"><span>Listener counts on the speaker</span><b id="f-k"></b><small>Drag the listener to change where it starts.</small></div>
+      <div class="reading"><span>Listener's belief about how often the speaker breaks a promise</span><b id="f-p"></b><small>From the listener's belief, the pie.</small></div>
+      <div class="input"><label for="ctl-fail">Cost of a broken promise</label><b id="f-fail"></b><input type="range" id="ctl-fail"><small>You set this.</small></div>
+      <div class="input"><label for="ctl-c">Cost of doing without the speaker</label><b id="f-c"></b><input type="range" id="ctl-c"><small>You set this.</small></div>
+    </div>
+    <div class="key" id="key"></div>
+  </section>
+
+  <div class="more">
+    <button id="b-what" type="button" aria-expanded="false" aria-controls="what">Explain what's going on</button>
+    <button id="b-math" type="button" aria-expanded="false" aria-controls="math">Explain the math</button>
+    <button id="b-set" type="button" aria-expanded="false" aria-controls="settings">Change the settings</button>
+  </div>
+
+  <section class="card panel" id="what" hidden>
+    <p class="caption" id="caption" aria-live="polite"></p>
+    <div class="nums" id="nums"></div>
+  </section>
+  <section class="card panel" id="math" hidden></section>
+  <section class="card panel" id="settings" hidden>
+    <p class="warning" id="warning" role="status" hidden></p>
+    <div class="sliders" id="sliders"></div>
+    <div><button id="reset" type="button">Reset the settings</button></div>
+  </section>
+</div>
+
+<script id="scene" type="application/json">/*SCENE*/null</script>
+<script>/*STAGE*/</script>
+<script>/*MODELS*/</script>
+<script>
+(function () {
+  const scene = JSON.parse(document.getElementById("scene").textContent);
+  const $ = (id) => document.getElementById(id);
+  const model = window.ARR_MODELS[scene.live.model];
+  const wire = model.wires[0];                     // the one-way listener only, for now
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const hot = window.claude && window.claude.hot;
+  const saved = (hot && hot.data) || {};
+
+  let params = { ...clone(model.defaults), script: "", ...(saved.params || {}) };
+  let kinds = saved.kinds || [];                   // which kind each round was drawn from, for the round's tooltip
+  let t = saved.t || 0, playing = false, held = 0, last = 0, cur = null;
+  if (hot && hot.snapshot) hot.snapshot(() => ({ params, kinds, t }));
+  const FPS = scene.fps || 5, HOLD = scene.hold || 0.8, per = model.stepsPerRound;
+
+  $("title").textContent = scene.title;
+  model.kindOptions.forEach((k, i) => { const o = document.createElement("option"); o.value = i; o.textContent = k.label; $("kind").append(o); });
+  $("kind").value = String(saved.kind || 0);
+
+  $("key").innerHTML = `<span>The pie is what the listener believes the speaker is:</span>` +
+    model.kindOptions.map(k => `<span><i style="background:${k.color}"></i>${k.label}</span>`).join("") +
+    `<span>The line from the listener to the speaker is darker the more the listener counts on the speaker.</span>`;
+
+  // ---------- theme
+  let tok = {};
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ["panel", "ink", "muted", "rule", "accent", "faint"]) tok[k] = cs.getPropertyValue("--" + k).trim();
+    tok.data = cs.getPropertyValue("--data").trim(); tok.body = cs.getPropertyValue("--body").trim();
+  }
+  readTokens();
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTokens(); draw(); });
+  new MutationObserver(() => { readTokens(); draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------- the run on the current inputs
+  function recompute() {
+    const b = model.build(params);
+    cur = { T: b.steps, lane: b.lanes.find(l => l.name === wire.name) || b.lanes[0], warning: b.warning };
+    t = Math.min(t, cur.T - 1);
+    buildStrip(); buildMath();
+    $("warning").textContent = cur.warning || ""; $("warning").hidden = !cur.warning;
+    draw();
+  }
+
+  // ---------- rounds, in rows that fit the page, each round editable; under each row a track lined up with
+  // its rounds: a round's 34 px square is also its ten steps on the track.
+  const SQ = 34, GAP = 3, MAX_ROUNDS = 100;
+  let perRow = 1;
+  function buildStrip() {
+    const box = $("rows"); box.innerHTML = "";
+    const n = params.script.length;
+    $("rounds-hint").textContent = n >= MAX_ROUNDS ? `That's ${MAX_ROUNDS} rounds, the most. Clear the rounds to go on.`
+      : n ? "Click a round to change what happened in it." : "";
+    $("over").disabled = !n;
+    $("add").disabled = n >= MAX_ROUNDS;
+    $("add").title = `Adds 5 rounds drawn from a speaker who is ${model.kindOptions[+$("kind").value].label}, without playing them`;
+    const plus = () => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "round plus"; b.id = "round-add";
+      b.textContent = "+"; b.title = "Add one round and choose what the speaker does in it"; b.setAttribute("aria-label", b.title);
+      b.disabled = n >= MAX_ROUNDS;
+      b.addEventListener("click", (e) => { e.stopPropagation(); openMenu(b, n, true); });
+      return b;
+    };
+    if (!n) {
+      const p = document.createElement("p"); p.className = "empty";
+      p.textContent = "No rounds yet. Press Play, or add rounds.";
+      const strip = document.createElement("div"); strip.className = "strip"; strip.append(plus(), p);
+      box.append(strip); return;
+    }
+    perRow = Math.max(1, Math.floor((box.clientWidth + GAP) / (SQ + GAP)));
+    for (let r0 = 0; r0 < n; r0 += perRow) {
+      const count = Math.min(perRow, n - r0);
+      const row = document.createElement("div"); row.className = "rrow";
+      const strip = document.createElement("div"); strip.className = "strip";
+      for (let i = r0; i < r0 + count; i++) {
+        const ch = params.script[i], b = document.createElement("button");
+        b.type = "button"; b.className = "round"; b.id = "round-" + i;
+        const o = model.chips[ch]; b.style.background = o.color; b.textContent = String(i + 1);
+        const from = kinds[i] != null ? ` (drawn from a speaker who is ${model.kindOptions[kinds[i]].label})` : "";
+        b.title = `Round ${i + 1}: ${o.label}${from}. Click to change.`;
+        b.setAttribute("aria-label", b.title);
+        b.addEventListener("click", (e) => { e.stopPropagation(); openMenu(b, i); });
+        strip.append(b);
+      }
+      if (r0 + count === n && count < perRow) strip.append(plus());
+      const tr = document.createElement("div"); tr.className = "track"; tr.tabIndex = 0;
+      tr.setAttribute("role", "slider"); tr.setAttribute("aria-label", `Where in rounds ${r0 + 1} to ${r0 + count}`);
+      tr.style.width = (count * (SQ + GAP) - GAP) + "px";
+      tr.innerHTML = '<div class="fill"></div><div class="head"></div>';
+      tr.dataset.r0 = r0; tr.dataset.count = count;
+      hookTrack(tr);
+      row.append(strip, tr); box.append(row);
+    }
+    if (n % perRow === 0) { const strip = document.createElement("div"); strip.className = "strip"; strip.append(plus()); box.append(strip); }
+    markStrip();
+  }
+  function markStrip() {
+    const now = Math.floor(Math.min(t, cur.T - 1.0001) / per);
+    $("rows").querySelectorAll(".round:not(.plus)").forEach((b) => {
+      const i = parseInt(b.id.slice(6), 10);
+      b.classList.toggle("done", i < now || (!playing && t >= cur.T - 1));
+      b.classList.toggle("now", i === now && t < cur.T - 1);
+    });
+    $("rows").querySelectorAll(".track").forEach((tr) => {
+      const r0 = +tr.dataset.r0, count = +tr.dataset.count, t0 = r0 * per, t1 = (r0 + count) * per;
+      const local = Math.max(0, Math.min(t - t0, count * per));
+      const rr = Math.min(Math.floor(local / per), count - 1), f = local / per - rr;
+      const x = local >= count * per ? count * (SQ + GAP) - GAP : rr * (SQ + GAP) + f * SQ;
+      tr.querySelector(".fill").style.width = x + "px";
+      const head = tr.querySelector(".head"); head.style.left = x + "px";
+      head.hidden = !(t >= t0 && (t < t1 || (t1 >= cur.T - 1 && t <= t1)));
+    });
+  }
+  let scrubbing = null;
+  function hookTrack(tr) {
+    const to = (e) => {
+      const r = tr.getBoundingClientRect(), x = e.clientX - r.left, r0 = +tr.dataset.r0, count = +tr.dataset.count;
+      const rr = Math.max(0, Math.min(count - 1, Math.floor(x / (SQ + GAP)))), f = Math.max(0, Math.min(1, (x - rr * (SQ + GAP)) / SQ));
+      playing = false; t = Math.max(0, Math.min(cur.T - 1, (r0 + rr + f) * per)); draw();
+    };
+    tr.addEventListener("pointerdown", (e) => { scrubbing = tr; tr.setPointerCapture(e.pointerId); to(e); });
+    tr.addEventListener("pointermove", (e) => { if (scrubbing === tr) to(e); });
+    tr.addEventListener("pointerup", () => { scrubbing = null; });
+    tr.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      e.preventDefault(); playing = false;
+      t = Math.max(0, Math.min(cur.T - 1, Math.round(t) + (e.key === "ArrowRight" ? 1 : -1))); draw();
+    });
+  }
+  let menu = null;
+  function closeMenu() { if (menu) { menu.remove(); menu = null; } }
+  function openMenu(anchor, i, adding = false) {
+    closeMenu();
+    menu = document.createElement("div"); menu.className = "menu"; menu.setAttribute("role", "menu");
+    menu.innerHTML = `<p>In round ${i + 1}, the speaker…</p>`;
+    for (const ch of model.outcomeOrder) {
+      const o = model.chips[ch], b = document.createElement("button");
+      b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(params.script[i] === ch));
+      b.innerHTML = `<i style="background:${o.color}"></i>`; b.append(o.label);
+      b.addEventListener("click", () => {
+        if (adding) { params.script += ch; kinds.push(null); }
+        else { const s = [...params.script]; s[i] = ch; params.script = s.join(""); }
+        closeMenu(); recompute();
+      });
+      menu.append(b);
+    }
+    if (adding) { document.body.append(menu); placeMenu(anchor); return; }
+    const w = document.createElement("button"); w.type = "button";
+    w.innerHTML = "&#9654;&#xFE0E;"; w.append(" Watch from this round");
+    w.style.borderTop = "1px solid var(--rule)";
+    w.addEventListener("click", () => { closeMenu(); t = i * per; held = 0; go(); });
+    menu.append(w);
+    document.body.append(menu);
+    placeMenu(anchor);
+  }
+  function placeMenu(anchor) {
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - menu.offsetWidth - 8)) + "px";
+    menu.style.top = (window.scrollY + r.bottom + 6) + "px";
+    menu.querySelector("button").focus();
+  }
+  document.addEventListener("click", (e) => { if (menu && !menu.contains(e.target)) closeMenu(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+
+  // ---------- picture and the explanation panel
+  const canvas = $("canvas");
+  function resize() {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+    canvas.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", () => {
+    resize();
+    const m = Math.max(1, Math.floor(($("rows").clientWidth + GAP) / (SQ + GAP)));
+    if (m !== perRow && params.script.length) buildStrip();
+    draw();
+  });
+
+  function draw() {
+    if (!cur) return;
+    const r = canvas.getBoundingClientRect();
+    ArrStage.drawLane(canvas.getContext("2d"), r.width, r.height, cur.lane, t, cur.T, tok);
+    markStrip();
+    {
+      const s = Math.min(Math.floor(t + 1e-9), cur.T - 1), L = cur.lane.boxes.find(b => b.id === "listener");
+      const k = cur.lane.links[0].strength[s], cost = L.costs[s], c = +params.c;
+      $("f-k").textContent = Math.round(100 * k) + "%";
+      $("f-p").textContent = Math.round(100 * L.breaks[s]) + "%";
+      $("f-fail").textContent = (+params.fail).toFixed(1);
+      $("f-c").textContent = c.toFixed(1);
+      // One sentence for a glance: which way the listener is going and why, in the step's own terms.
+      const dp = s < cur.T - 1 ? L.x[s + 1] - L.x[s] : 0;
+      const why = `it expects relying on the speaker to cost <b>${cost.toFixed(1)}</b> a round, ` +
+                  `${cost < c ? "less" : "more"} than the <b>${c.toFixed(1)}</b> of doing without`;
+      $("status").innerHTML = !params.script.length ? "Press Play to start the rounds."
+        : Math.abs(dp) < 1e-3 ? (cost < c ? `The listener stays beside the speaker: ${why}.` : `The listener stays away from the speaker: ${why}.`)
+        : dp < 0 ? `The listener is moving <b>toward</b> the speaker: ${why}.` : `The listener is moving <b>away</b> from the speaker: ${why}.`;
+    }
+    if (!$("what").hidden) {
+      const s = Math.min(Math.floor(t + 1e-9), cur.T - 1), caps = cur.lane.captions;
+      $("caption").textContent = params.script.length
+        ? (caps[s] || caps[caps.length - 1]).text
+        : `Nothing has happened yet. The listener starts with no idea which kind of speaker this is, and counts on the speaker ` +
+          `${(100 * cur.lane.links[0].strength[0]).toFixed(0)}% from where it stands.`;
+      const y = cur.lane.boxes[1].readout.values[s];
+      $("nums").innerHTML = model.kindOptions.map((k, i) => `<div><span>Believes the speaker is ${k.label}</span><b>${(100 * y[i]).toFixed(1)}%</b></div>`).join("") +
+        `<div><span>Counts on the speaker</span><b>${(100 * cur.lane.links[0].strength[s]).toFixed(1)}%</b></div>`;
+    }
+    $("play").textContent = playing ? "Pause" : "Play";
+
+  }
+  function buildMath() { $("math").innerHTML = "<h2>The math</h2>" + model.explain(params); }
+
+  // ---------- playing
+  let loop = 0;                                   // each start of play gets a new loop; an old one stops itself
+  function frame(now, id) {
+    if (!playing || id !== loop) return;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (held > 0) held -= dt;
+    else {
+      const before = Math.floor(t);
+      t += dt * FPS;
+      for (let s = before + 1; s <= Math.floor(t); s++) if (s % per === 0 && s < cur.T - 1) { t = s; held = HOLD; break; }
+      if (t >= cur.T - 1) {
+        t = cur.T - 1;
+        if (params.script.length < MAX_ROUNDS) addRound(); else playing = false;
+      }
+    }
+    draw();
+    if (playing) requestAnimationFrame((n) => frame(n, id));
+  }
+  function go() {
+    playing = true; last = performance.now(); const id = ++loop;
+    requestAnimationFrame((n) => frame(n, id)); draw();
+  }
+  // Play goes on until paused: it plays the rounds already there, then keeps drawing new ones, each from
+  // whichever kind of speaker the dropdown names at that moment.
+  function addRound() {
+    const k = parseInt($("kind").value, 10);
+    params.script += model.sample(params, k); kinds.push(k); recompute();
+  }
+  $("play").addEventListener("click", () => {
+    if (playing) { playing = false; draw(); return; }
+    if (t >= cur.T - 1) { if (params.script.length >= MAX_ROUNDS) return; addRound(); }
+    go();
+  });
+  $("add").addEventListener("click", () => {
+    const k = parseInt($("kind").value, 10);
+    for (let i = 0; i < 5 && params.script.length < MAX_ROUNDS; i++) { params.script += model.sample(params, k); kinds.push(k); }
+    recompute();
+  });
+  $("kind").addEventListener("change", () => { if (cur) buildStrip(); });
+  $("over").addEventListener("click", () => { playing = false; params.script = ""; kinds = []; t = 0; recompute(); });
+  $("replay").addEventListener("click", () => { t = 0; held = 0; recompute(); go(); });
+  // ---------- dragging the listener sets where it starts; the run is computed again from there. Moving it in
+  // the middle of a run would be the page pushing the listener, not the model, so a drag always goes back to
+  // the start.
+  let dragging = false;
+  function listenerAt(e) {
+    const r = canvas.getBoundingClientRect(), L = ArrStage.layout(r.width, r.height, cur.lane);
+    const b = cur.lane.boxes.find(x => x.id === "listener");
+    const x = L.X(ArrStage.at(b.x, t, cur.T)), y = L.rowMoving;
+    const px = e.clientX - r.left, py = e.clientY - r.top;
+    return { hit: Math.abs(px - x) < 30 && Math.abs(py - y) < 30, p: L.toPlacement(px) };
+  }
+  canvas.addEventListener("pointermove", (e) => {
+    if (!cur) return;
+    if (!dragging) { canvas.classList.toggle("grab", listenerAt(e).hit); return; }
+    const c = model.controls.find(x => x.key === "p0");
+    params.p0 = Math.round(Math.max(c.min, Math.min(c.max, listenerAt(e).p)) / c.step) * c.step;
+    const input = $("ctl-p0");
+    if (input) { input.value = params.p0; input.previousElementSibling.querySelector("output").textContent = params.p0.toFixed(2); }
+    t = 0; recompute();
+  });
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!cur || !listenerAt(e).hit) return;
+    dragging = true; playing = false; canvas.setPointerCapture(e.pointerId); canvas.classList.add("grabbing");
+    t = 0; recompute();
+  });
+  const endDrag = () => { if (dragging) { dragging = false; canvas.classList.remove("grabbing"); draw(); } };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  // ---------- the three buttons
+  for (const [btn, id] of [["b-what", "what"], ["b-math", "math"], ["b-set", "settings"]]) {
+    $(btn).addEventListener("click", () => {
+      const open = $(id).hidden; $(id).hidden = !open; $(btn).setAttribute("aria-expanded", String(open)); draw();
+    });
+  }
+
+  // ---------- settings
+  const getKey = (k) => k.split(".").reduce((o, p) => o[p], params);
+  function setKey(k, v) { const ps = k.split("."), lk = ps.pop(); ps.reduce((o, p) => o[p], params)[lk] = v; }
+  function buildSliders() {
+    $("sliders").innerHTML = "";
+    const groups = {};
+    for (const c of model.controls) {
+      if (c.where) continue;
+      const g = c.group || "";
+      if (!groups[g]) {
+        const el = document.createElement("div"); el.className = "group";
+        el.innerHTML = "<h3><i></i><span></span></h3>"; el.querySelector("span").textContent = g;
+        if (c.color) el.querySelector("i").style.background = c.color; else el.querySelector("i").remove();
+        $("sliders").append(el); groups[g] = el;
+      }
+      const id = "ctl-" + c.key.replace(/\./g, "-");
+      if (c.type === "choice") {
+        const box = document.createElement("div"); box.className = "slider";
+        box.innerHTML = `<label for="${id}"><span></span></label><select id="${id}"></select>`;
+        box.querySelector("span").textContent = c.label;
+        const sel = box.querySelector("select");
+        for (const o of c.options) { const op = document.createElement("option"); op.value = o.value; op.textContent = o.label; sel.append(op); }
+        sel.value = getKey(c.key);
+        sel.addEventListener("change", () => { setKey(c.key, sel.value); recompute(); });
+        groups[g].append(box);
+        continue;
+      }
+      const box = document.createElement("div"); box.className = "slider";
+      box.innerHTML = `<label for="${id}"><span></span><output></output></label><input type="range" id="${id}">`;
+      box.querySelector("span").textContent = c.label;
+      const input = box.querySelector("input"), out = box.querySelector("output");
+      const fmt = (v) => c.format === "pct" ? Math.round(100 * v) + "%" : Number(v).toFixed(2);
+      Object.assign(input, { min: c.min, max: c.max, step: c.step, value: getKey(c.key) });
+      out.textContent = fmt(getKey(c.key));
+      input.addEventListener("input", () => { setKey(c.key, parseFloat(input.value)); out.textContent = fmt(input.value); recompute(); });
+      groups[g].append(box);
+    }
+  }
+  $("reset").addEventListener("click", () => {
+    const script = params.script; params = { ...clone(model.defaults), script }; buildFactControls(); buildSliders(); recompute();
+  });
+
+  function buildFactControls() {
+    for (const key of ["fail", "c"]) {
+      const c = model.controls.find(x => x.key === key), input = $("ctl-" + key);
+      Object.assign(input, { min: c.min, max: c.max, step: c.step, value: params[key] });
+      input.oninput = () => { params[key] = parseFloat(input.value); recompute(); };
+    }
+  }
+  resize();
+  buildFactControls();
+  buildSliders();
+ 
+  recompute();
+})();
+</script>

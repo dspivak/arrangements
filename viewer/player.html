@@ -1,0 +1,461 @@
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;1,500&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an instrument panel. Header with the variant switch, then one band per lane (canvas left,
+   live readout right), then the transport: the script as round chips under a playhead, and controls. */
+:root {
+  --ground: #eef1f3;
+  --panel: #ffffff;
+  --ink: #1b232c;
+  --muted: #5a6672;
+  --rule: #d3dae0;
+  --accent: #2b4c8c;
+  --accent-ink: #ffffff;
+  --faint: rgba(43, 76, 140, 0.10);
+  --display: "Spectral", "Iowan Old Style", Georgia, serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --t-small: 12px; --t-body: 14px; --t-lead: 16px; --t-title: 30px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+    --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+  --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+  color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+body { background: var(--ground); color: var(--ink); font: var(--t-body)/1.5 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: var(--s4); padding-block: var(--s5) var(--s6);
+        display: grid; gap: var(--s5); }
+
+header { display: grid; gap: var(--s3); }
+h1 { font: 600 var(--t-title)/1.15 var(--display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.lede { margin: 0; max-width: 68ch; color: var(--muted); font-size: var(--t-lead); }
+.provenance { margin: 0; font: var(--t-small)/1.4 var(--data); color: var(--muted); }
+
+.variants { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.variants button { font: 500 var(--t-body)/1.2 var(--body); color: var(--ink); background: var(--panel);
+  border: 1px solid var(--rule); border-radius: 6px; padding: var(--s2) var(--s3); cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--s2); }
+.variants button .key { font: 500 var(--t-small)/1 var(--data); color: var(--muted); }
+.variants button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.variants button[aria-pressed="true"] .key { color: var(--accent-ink); opacity: 0.8; }
+.variant-note { margin: 0; max-width: 72ch; }
+.warning { margin: 0; max-width: 72ch; padding: var(--s2) var(--s3); border-radius: 6px; border: 1px solid #d39b2a;
+  background: rgba(211, 155, 42, 0.12); }
+
+.lanes { display: grid; gap: var(--s4); }
+.lane-pick { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.lane-pick span { font: 600 var(--t-small)/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-right: var(--s2); }
+.lane-pick button { font: 500 13px/1.2 var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 6px var(--s3); cursor: pointer; }
+.lane-pick button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.caption { margin: 0; padding: var(--s3) var(--s4); background: var(--faint); border-radius: 6px; font-size: 15px; line-height: 1.55; max-width: 80ch; min-height: 4.8em; }
+.lane { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 240px; }
+.lane-main { padding: var(--s4); display: grid; gap: var(--s2); min-width: 0; }
+.lane-main h2 { margin: 0; font: 600 18px/1.2 var(--display); }
+.lane-main p { margin: 0; color: var(--muted); max-width: 70ch; }
+.lane canvas { width: 100%; height: 190px; display: block; }
+.readout { border-left: 1px solid var(--rule); padding: var(--s4); display: grid; gap: var(--s3); align-content: start; }
+.readout h3 { margin: 0; font: 600 var(--t-small)/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.rows { display: grid; gap: var(--s1); }
+.row { display: grid; grid-template-columns: 10px 1fr auto; gap: var(--s2); align-items: center; font-size: 13px; }
+.row .sw { width: 10px; height: 10px; border-radius: 2px; }
+.row .v { font: 500 13px/1.3 var(--data); font-variant-numeric: tabular-nums; }
+.row.plain { grid-template-columns: 1fr auto; }
+
+.transport { display: grid; gap: var(--s3); background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 8px; padding: var(--s3) var(--s4); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
+.notes { display: grid; gap: var(--s3); }
+.hint { margin: var(--s1) 0 0; font-size: 12px; color: var(--muted); }
+.chips.editable .chip { cursor: pointer; border: 0; }
+.chips.editable .chip:hover { filter: brightness(1.12); }
+.inputs { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: var(--s4); display: grid; gap: var(--s4); }
+.inputs-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+.inputs-head h2 { margin: 0; font: 600 18px/1.2 var(--display); }
+.inputs-head p { margin: 0; color: var(--muted); flex-basis: 100%; }
+.inputs-head button { font: 500 13px/1.2 var(--body); color: var(--ink); background: var(--ground); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 6px var(--s3); cursor: pointer; }
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s4); }
+.input-block { display: grid; gap: var(--s2); padding-bottom: var(--s4); border-bottom: 1px solid var(--rule); }
+.input-block h3, .group h3 { margin: 0; font: 600 var(--t-small)/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.input-block .sub { margin: var(--s1) 0 0; color: var(--muted); font-size: 13px; max-width: 72ch; }
+.input-block .chips { height: 30px; }
+.group { display: grid; gap: var(--s3); align-content: start; padding: var(--s3); border: 1px solid var(--rule); border-radius: 6px; }
+.group h3 { display: flex; align-items: center; gap: var(--s2); }
+.group h3 i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.slider { display: grid; gap: var(--s1); }
+.slider label { display: flex; justify-content: space-between; gap: var(--s3); font-size: 13px; }
+.slider output { font: 500 13px/1.3 var(--data); font-variant-numeric: tabular-nums; }
+.slider input { width: 100%; accent-color: var(--accent); }
+.timeline { position: relative; }
+.chips { display: flex; gap: 2px; height: 22px; }
+.chip { flex: 1 1 0; border-radius: 3px; display: grid; place-items: center; font: 500 11px/1 var(--data); color: #fff; opacity: 0.85; }
+.chip.past { opacity: 1; }
+.chip.future { opacity: 0.35; }
+#scrub { width: 100%; margin: var(--s2) 0 0; accent-color: var(--accent); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.controls button, .controls select { font: 500 var(--t-body)/1 var(--body); color: var(--ink); background: var(--ground);
+  border: 1px solid var(--rule); border-radius: 6px; padding: var(--s2) var(--s3); cursor: pointer; min-height: 34px; }
+.controls button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 84px; }
+.clock { margin-left: auto; font: 500 13px/1 var(--data); font-variant-numeric: tabular-nums; color: var(--muted); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: var(--s4); color: var(--muted); font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: var(--s2); }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.howto { margin: 0; color: var(--muted); font-size: 13px; max-width: 80ch; }
+
+@media (max-width: 760px) {
+  .lane { grid-template-columns: 1fr; }
+  .readout { border-left: 0; border-top: 1px solid var(--rule); }
+  .lane canvas { height: 170px; }
+  h1 { font-size: 24px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1 id="title"></h1>
+    <p class="lede" id="lede"></p>
+    <div class="variants" id="variants" role="group" aria-label="Which run"></div>
+    <p class="variant-note" id="variant-note"></p>
+    <p class="warning" id="warning" role="status" hidden></p>
+  </header>
+
+  <div class="lane-pick" id="lane-pick" role="group" aria-label="Which wire"><span>Show</span></div>
+  <section class="transport" aria-label="Playback">
+    <div class="controls">
+      <button id="play" class="primary" type="button">Play</button>
+      <button id="back" type="button" aria-label="Back one step">&#8592; Step</button>
+      <button id="fwd" type="button" aria-label="Forward one step">Step &#8594;</button>
+      <button id="restart" type="button">Restart</button>
+      <select id="speed" aria-label="Speed">
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+      <span class="clock" id="clock"></span>
+    </div>
+    <div class="timeline">
+      <div class="chips" id="chips"></div>
+      <p class="hint" id="chip-hint" hidden>Click a round to change what the source does in it.</p>
+      <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" aria-label="Step">
+    </div>
+  </section>
+  <section class="lanes" id="lanes" aria-label="Runs side by side"></section>
+
+  <section class="inputs" id="inputs" hidden aria-label="What goes in">
+    <div class="inputs-head">
+      <h2>What goes in</h2>
+      <button id="reset" type="button">Reset</button>
+      <p>Change any of these and the run is computed again in the page, from the start, with the same equations as the library.</p>
+    </div>
+    <div class="input-block" id="rounds-block">
+      <h3>What the source does in each round</h3>
+      <p class="sub" id="ready-label">Or start from a ready-made list:</p>
+    </div>
+    <div class="input-block" id="wire-block">
+      <h3>Which listener</h3>
+      <p class="sub">On the one-way wire the listener's belief comes only from what it hears. On the exact wire, what counting on the source costs also pushes on its belief.</p>
+    </div>
+    <div class="sliders" id="sliders"></div>
+  </section>
+
+  <footer class="notes">
+    <div class="legend" id="legend"></div>
+    <p class="howto">Each box is drawn where it sits. A box on the attention parent moves along its placement; a box with no
+      placement stays put. The line between two boxes is darker the more the one counts on the other, and the bell
+      under the source is that weight at every placement. A flash is something sent along a wire: on the sender at
+      full strength, on the receiver at the strength it is heard. Space plays and pauses; the arrow keys step.</p>
+  </footer>
+
+</div>
+
+<script id="scene" type="application/json">/*SCENE*/null</script>
+<script>/*STAGE*/</script>
+<script>/*MODELS*/</script>
+<script>
+(function () {
+  const scene = JSON.parse(document.getElementById("scene").textContent);
+  if (!scene) { document.getElementById("title").textContent = "No scene inlined"; return; }
+  let T = scene.steps || 1;
+  const live = scene.live && window.ARR_MODELS ? window.ARR_MODELS[scene.live.model] : null;
+  const $ = (id) => document.getElementById(id);
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  $("title").textContent = scene.title;
+  $("lede").textContent = scene.description || "";
+  if (scene.source) {
+    const p = document.createElement("p"); p.className = "provenance"; p.textContent = scene.source;
+    $("lede").after(p);
+  }
+  for (const item of (live ? live.legend : scene.legend) || []) {
+    const s = document.createElement("span");
+    s.innerHTML = '<i></i>'; s.querySelector("i").style.background = item.color;
+    s.append(item.label); $("legend").append(s);
+  }
+
+  // ---------- state
+  const hot = window.claude && window.claude.hot;
+  const saved = (hot && hot.data) || {};
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  let params = live ? { ...clone(live.defaults), ...(saved.params ? clone(saved.params) : {}) } : null;
+  const variantList = live ? live.samples : scene.variants;
+  let variant = live ? null : (scene.variants.find(v => v.id === saved.variant) ||
+                scene.variants.find(v => v.id === scene.default_variant) || scene.variants[0]);
+  let cache = null;
+  // What is on screen now: a recorded variant, or the live model run on the current inputs.
+  function current() {
+    if (!live) return variant;
+    if (!cache) {
+      const sample = live.samples.find(v => v.script === params.script);
+      cache = { ...live.build(params), note: sample ? sample.note : "Your own list of rounds." };
+    }
+    return cache;
+  }
+  function recompute() { cache = null; build(); }
+  let t = typeof saved.t === "number" ? saved.t : 0;     // continuous time in steps
+  let laneSel = typeof saved.lane === "number" ? saved.lane : (typeof scene.default_lane === "number" ? scene.default_lane : -1);
+  let held = 0;                                           // seconds left to hold on an event step
+  let playing = false, last = 0;
+  if (hot && hot.snapshot) hot.snapshot(() => ({ variant: variant && variant.id, t, lane: laneSel, params }));
+
+  // ---------- variant buttons
+  const vbtns = variantList.map(v => {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = "variant-" + v.id;
+    b.innerHTML = '<span class="key"></span><span class="name"></span>';
+    b.querySelector(".key").textContent = v.id; b.querySelector(".name").textContent = v.name;
+    b.addEventListener("click", () => {
+      if (live) { params.script = v.script; recompute(); } else { variant = v; build(); }
+    });
+    $("variants").append(b); return [v, b];
+  });
+
+  // ---------- theme tokens for the canvas
+  let tok = {};
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ["ground", "panel", "ink", "muted", "rule", "accent", "faint"]) tok[k] = cs.getPropertyValue("--" + k).trim();
+    tok.data = cs.getPropertyValue("--data").trim();
+    tok.body = cs.getPropertyValue("--body").trim();
+  }
+  readTokens();
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTokens(); draw(); });
+  new MutationObserver(() => { readTokens(); draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------- lanes
+  let lanes = [];
+  function build() {
+    const cur = current();
+    T = cur.steps || scene.steps;
+    t = Math.min(t, T - 1);
+    for (const [v, b] of vbtns) b.setAttribute("aria-pressed", String(live ? v.script === params.script : v === variant));
+    $("variant-note").textContent = cur.note || "";
+    $("warning").textContent = cur.warning || "";
+    $("warning").hidden = !cur.warning;
+    $("lanes").innerHTML = "";
+    const pick = $("lane-pick");
+    pick.querySelectorAll("button").forEach(b => b.remove());
+    const opts = cur.lanes.map((l, i) => [i, l.name]).concat(cur.lanes.length > 1 ? [[-1, "Side by side"]] : []);
+    for (const [i, name] of opts) {
+      const b = document.createElement("button"); b.type = "button"; b.id = "lane-" + i; b.textContent = name;
+      b.setAttribute("aria-pressed", String(i === laneSel));
+      b.addEventListener("click", () => { laneSel = i; build(); });
+      pick.append(b);
+    }
+    pick.hidden = cur.lanes.length < 2;
+    const shown = cur.lanes.filter((_, i) => laneSel === -1 || i === laneSel);
+    lanes = shown.map(lane => {
+      const el = document.createElement("article"); el.className = "lane";
+      el.innerHTML = '<div class="lane-main"><h2></h2><p></p><canvas></canvas><p class="caption" aria-live="polite"></p></div><div class="readout"></div>';
+      el.querySelector("h2").textContent = lane.name;
+      el.querySelector("p").textContent = lane.note || "";
+      $("lanes").append(el);
+      return { lane, el, canvas: el.querySelector("canvas"), readout: el.querySelector(".readout"),
+               caption: el.querySelector(".caption"),
+               events: lane.events || [], byId: Object.fromEntries(lane.boxes.map(b => [b.id, b])) };
+    });
+    // chips
+    $("chips").innerHTML = "";
+    const ticks = cur.ticks || {};
+    $("chips").classList.toggle("editable", !!live);
+    $("chip-hint").hidden = !live;
+    for (const [i, c] of (ticks.chips || []).entries()) {
+      const d = document.createElement(live ? "button" : "div"); d.className = "chip"; d.style.background = c.color;
+      d.title = (ticks.label || "round") + " " + (i + 1) + ": " + c.label;
+      d.textContent = String(i + 1); $("chips").append(d);
+      if (live) {
+        d.type = "button"; d.id = "round-" + i;
+        d.setAttribute("aria-label", d.title + ". Click to change.");
+        d.addEventListener("click", () => {
+          const cyc = live.cycle, letters = [...params.script];
+          letters[i] = cyc[(cyc.indexOf(letters[i]) + 1) % cyc.length];
+          params.script = letters.join(""); recompute();
+        });
+      }
+    }
+    $("scrub").max = String(T - 1);
+    resize(); draw();
+  }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    for (const L of lanes) {
+      const r = L.canvas.getBoundingClientRect();
+      L.w = r.width; L.h = r.height;
+      L.canvas.width = Math.round(r.width * dpr); L.canvas.height = Math.round(r.height * dpr);
+      L.canvas.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }
+  window.addEventListener("resize", () => { resize(); draw(); });
+
+  function drawLane(L) {
+    ArrStage.drawLane(L.canvas.getContext("2d"), L.w, L.h, L.lane, t, T, tok);
+  }
+
+  function drawReadout(L) {
+    const s = Math.round(t), parts = [];
+    for (const b of L.lane.boxes) {
+      const r = b.readout;
+      if (!r) continue;
+      if (r.kind === "pie") {
+        const v = r.values[s];
+        parts.push(`<h3>${esc(r.title || b.label)}</h3><div class="rows">` +
+          r.labels.map((lab, k) => `<div class="row"><span class="sw" style="background:${r.colors[k]}"></span>` +
+            `<span>${esc(lab)}</span><span class="v">${(100 * v[k]).toFixed(1)}%</span></div>`).join("") + "</div>");
+      } else {
+        parts.push(`<h3>${esc(r.title || b.label)}</h3><div class="rows"><div class="row plain"><span>${esc(r.label || "")}</span>` +
+          `<span class="v">${r.values[s].toFixed(3)}</span></div></div>`);
+      }
+    }
+    const rows = [];
+    for (const b of L.lane.boxes) if (typeof b.x !== "number")
+      rows.push(`<div class="row plain"><span>${esc(b.label)}'s ${esc(L.lane.space.label)}</span><span class="v">${b.x[s].toFixed(3)}</span></div>`);
+    for (const l of L.lane.links || [])
+      rows.push(`<div class="row plain"><span>${esc(l.label || "link")}</span><span class="v">${l.strength[s].toFixed(3)}</span></div>`);
+    if (rows.length) parts.push(`<h3>Where it stands</h3><div class="rows">${rows.join("")}</div>`);
+    L.readout.innerHTML = parts.join("");
+    const caps = L.lane.captions || [];
+    let text = "";
+    for (const c of caps) { if (c.step <= Math.floor(t + 1e-9)) text = c.text; else break; }
+    L.caption.textContent = text;
+    L.caption.hidden = !caps.length;
+  }
+  const esc = (x) => String(x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function draw() {
+    for (const L of lanes) { drawLane(L); drawReadout(L); }
+    const s = Math.round(t), ticks = current().ticks || {}, every = ticks.every || T;
+    const round = Math.min(Math.floor(Math.min(s, T - 2) / every), (ticks.chips || []).length - 1);
+    [...$("chips").children].forEach((c, i) => {
+      c.className = "chip " + (i < round ? "past" : i === round ? "" : "future");
+      c.style.outline = i === round ? "2px solid " + tok.ink : "none"; c.style.outlineOffset = "1px";
+    });
+    $("scrub").value = String(t);
+    const r = ticks.chips && ticks.chips[round];
+    $("clock").textContent = `step ${String(s).padStart(String(T - 1).length, " ")} / ${T - 1}` +
+      (r ? ` · ${ticks.label || "round"} ${round + 1}: ${r.label}` : "");
+    $("play").textContent = playing ? "Pause" : (t >= T - 1 ? "Replay" : "Play");
+  }
+
+  // ---------- transport
+  function frame(now) {
+    if (!playing) return;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (held > 0) { held -= dt; draw(); requestAnimationFrame(frame); return; }
+    const before = Math.floor(t);
+    t += dt * (scene.fps || 8) * parseFloat($("speed").value);
+    const evSteps = new Set(lanes.flatMap(L => L.events.map(e => e.step)));
+    for (let s = before + 1; s <= Math.floor(t); s++) if (evSteps.has(s) && scene.hold) { t = s; held = scene.hold; break; }
+    if (t >= T - 1) { t = T - 1; playing = false; }
+    draw();
+    if (playing) requestAnimationFrame(frame);
+  }
+  function play() {
+    if (t >= T - 1) t = 0;
+    if (Math.floor(t) === 0 && t < 0.01 && scene.hold) held = scene.hold;
+    playing = true; last = performance.now(); requestAnimationFrame(frame); draw();
+  }
+  function pause() { playing = false; draw(); }
+  function stepBy(d) { pause(); t = Math.max(0, Math.min(T - 1, Math.round(t) + d)); draw(); }
+  $("play").addEventListener("click", () => playing ? pause() : play());
+  $("back").addEventListener("click", () => stepBy(-1));
+  $("fwd").addEventListener("click", () => stepBy(1));
+  $("restart").addEventListener("click", () => { t = 0; play(); });
+  $("scrub").addEventListener("input", (e) => { pause(); t = parseFloat(e.target.value); draw(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+    if (e.key === " ") { e.preventDefault(); playing ? pause() : play(); }
+    else if (e.key === "ArrowRight") stepBy(1);
+    else if (e.key === "ArrowLeft") stepBy(-1);
+  });
+
+  // ---------- inputs (live models only)
+  const getKey = (k) => k.split(".").reduce((o, part) => o[part], params);
+  function setKey(k, v) {
+    const parts = k.split("."), lastKey = parts.pop();
+    parts.reduce((o, part) => o[part], params)[lastKey] = v;
+  }
+  function buildInputs() {
+    if (!live) return;
+    $("inputs").hidden = false;
+    $("sliders").innerHTML = "";
+    const groups = {};
+    for (const c of live.controls) {
+      const g = c.group || "";
+      if (!groups[g]) {
+        const el = document.createElement("div"); el.className = "group";
+        el.innerHTML = "<h3><i></i><span></span></h3>";
+        el.querySelector("span").textContent = g;
+        const sw = el.querySelector("i");
+        if (c.color) sw.style.background = c.color; else sw.remove();
+        $("sliders").append(el); groups[g] = el;
+      }
+      const id = "ctl-" + c.key.replace(/\./g, "-");
+      const box = document.createElement("div"); box.className = "slider";
+      box.innerHTML = `<label for="${id}"><span></span><output></output></label><input type="range" id="${id}">`;
+      box.querySelector("span").textContent = c.label;
+      const input = box.querySelector("input"), out = box.querySelector("output");
+      Object.assign(input, { min: c.min, max: c.max, step: c.step, value: getKey(c.key) });
+      const fmt = (v) => c.format === "pct" ? Math.round(100 * v) + "%" : Number(v).toFixed(2);
+      out.textContent = fmt(getKey(c.key));
+      input.addEventListener("input", () => {
+        setKey(c.key, parseFloat(input.value)); out.textContent = fmt(input.value); recompute();
+      });
+      groups[c.group || ""].append(box);
+    }
+  }
+  $("reset").addEventListener("click", () => { params = clone(live.defaults); buildInputs(); recompute(); });
+
+  if (live) {
+    // In a live scene everything the viewer can change sits together under "What goes in"; the top holds the
+    // picture and the playback only.
+    const rb = $("rounds-block");
+    rb.insertBefore($("chips"), $("ready-label"));
+    rb.insertBefore($("chip-hint"), $("ready-label"));
+    rb.append($("variants"), $("variant-note"), $("warning"));
+    $("wire-block").append($("lane-pick"));
+    const showLabel = $("lane-pick").querySelector("span"); if (showLabel) showLabel.remove();
+  } else {
+    $("rounds-block").remove(); $("wire-block").remove();
+  }
+  buildInputs();
+  build();
+  // Starts paused on step 0, so the first caption can be read before anything moves.
+})();
+</script>

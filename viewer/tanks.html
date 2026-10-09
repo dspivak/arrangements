@@ -1,0 +1,541 @@
+<title>Two tanks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the listener page's system. One question in the bar (pipe or waterfall), Play beside it;
+   the picture with every number that is yours to set drawn on it; the next step's calculation under
+   the picture; the levels over time with the time track under them; explanations behind buttons. */
+:root {
+  --ground: #eef1f3;
+  --panel: #ffffff;
+  --ink: #1b232c;
+  --muted: #5a6672;
+  --rule: #d3dae0;
+  --accent: #2b4c8c;
+  --accent-ink: #ffffff;
+  --faint: rgba(43, 76, 140, 0.10);
+  --water1: #3a6fc4;
+  --water2: #1f8f7e;
+  --wall: #3a4651;
+  --warn: #b7791f;
+  --display: "Spectral", "Iowan Old Style", Georgia, serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+    --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+    --water1: #6f9be6; --water2: #45c2ad; --wall: #b5c0ca; --warn: #e0a84a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+  --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+  --water1: #6f9be6; --water2: #45c2ad; --wall: #b5c0ca; --warn: #e0a84a;
+  color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: var(--s4); padding-block: var(--s5) var(--s6); display: grid; gap: var(--s4); }
+.wrap > * { min-width: 0; }
+h1 { margin: 0; font: 600 30px/1.15 var(--display); letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 64ch; }
+
+.ask { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 8px; padding: var(--s3) var(--s4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
+.ask label { font-size: 16px; }
+select, button { font: 500 15px/1.2 var(--body); color: var(--ink); background: var(--ground); border: 1px solid var(--rule);
+  border-radius: 6px; padding: var(--s2) var(--s3); min-height: 38px; cursor: pointer; }
+select { font-weight: 600; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 84px; }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.small { font-size: 13px; min-height: 30px; padding: 4px var(--s3); }
+
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: var(--s4); }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-bottom: var(--s2); }
+.card-head h2 { margin: 0; font: 600 12px/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.card-head .hint { font-size: 13px; color: var(--muted); margin-right: auto; }
+.hint b { color: var(--accent); font-weight: 600; }
+
+svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+svg text { font-family: var(--body); }
+.knob { cursor: ew-resize; }
+.knob text.v { fill: var(--accent); font-family: var(--data); font-weight: 500; }
+.knob line { stroke: var(--accent); stroke-dasharray: 3 3; stroke-width: 1.5; }
+.knob:focus { outline: none; }
+.knob:focus-visible rect.hit { stroke: var(--accent); stroke-width: 2; }
+.water { cursor: ns-resize; }
+.dur { font-size: 15px; color: var(--muted); }
+.hknob { color: var(--accent); font: 500 16px var(--data); border-bottom: 1.5px dashed var(--accent); cursor: ew-resize; padding: 0 2px; user-select: none; -webkit-user-select: none; touch-action: none; }
+
+.calc { margin: var(--s3) 0 0; padding: var(--s3) var(--s4); background: var(--faint); border-radius: 6px; font-size: 16px; line-height: 1.6; }
+.tm { display: inline-block; text-align: right; }
+.n { font-family: var(--data); font-size: 15px; font-variant-numeric: tabular-nums; }
+.calc .t1 { color: var(--water1); font-weight: 600; }
+.calc .t2 { color: var(--water2); font-weight: 600; }
+.warning { margin: var(--s2) 0 0; padding: var(--s2) var(--s3); border-radius: 6px; border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.key { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); color: var(--muted); font-size: 13px; }
+.key span { display: inline-flex; align-items: center; gap: var(--s2); }
+.key i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+
+.more { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.more button[aria-expanded="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.panel { display: grid; gap: var(--s3); }
+.panel h2 { margin: 0; font: 600 18px/1.2 var(--display); }
+.panel p, .panel li { max-width: 70ch; margin: 0; }
+.panel ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s1); }
+.panel .src { color: var(--muted); font-size: 13px; }
+.panel .eq { font: 15px/1.7 var(--data); padding: var(--s2) var(--s3); background: var(--faint); border-radius: 6px; overflow-x: auto; }
+
+@media (max-width: 600px) { h1 { font-size: 24px; } .calc { font-size: 15px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <h1>Two tanks</h1>
+  <p class="lede">Join two tanks of water by a pipe or by a waterfall, press Play, and watch where the water goes. These are the tanks of the book's second chapter. Each step lasts as long as you choose and plays in real time; at 1 second it is the chapter's own step.</p>
+
+  <section class="ask" aria-label="Choose and play">
+    <label for="mode">Join the two tanks by</label>
+    <select id="mode">
+      <option value="pipe">a pipe</option>
+      <option value="fall">a waterfall</option>
+    </select>
+    <button id="play" class="primary" type="button">Play</button>
+    <button id="step" type="button">One step</button>
+    <span class="dur">each step lasts <span id="dt" class="hknob" tabindex="0" role="slider" aria-label="How long each step lasts"></span></span>
+  </section>
+
+  <section class="card" aria-label="The tanks">
+    <div class="card-head">
+      <h2>The tanks</h2>
+      <span class="hint"><b>Blue numbers</b> are yours: drag them sideways. Drag the water to set how much each tank holds.</span>
+      <button id="restart" type="button" class="small" title="Back to step 0, keeping everything you set">&#8634; Back to step 0</button>
+    </div>
+    <svg id="pic" role="img" aria-label="Two tanks and what joins them"></svg>
+    <p class="calc" id="calc" aria-live="polite"></p>
+    <p class="warning" id="warning" role="status" hidden></p>
+  </section>
+
+  <section class="card" aria-label="The levels over time">
+    <div class="card-head">
+      <h2>The levels over time</h2>
+      <span class="hint" id="when"></span>
+    </div>
+    <svg id="chart" tabindex="0" role="slider" aria-label="Step shown" aria-valuemin="0"></svg>
+    <div class="key">
+      <span><i style="background:var(--water1)"></i>Tank 1's level</span>
+      <span><i style="background:var(--water2)"></i>Tank 2's level</span>
+      <span>Click or drag along the track to see any step.</span>
+    </div>
+  </section>
+
+  <div class="more">
+    <button id="b-what" type="button" aria-expanded="false" aria-controls="what">Explain what's going on</button>
+    <button id="b-math" type="button" aria-expanded="false" aria-controls="math">Explain the math</button>
+  </div>
+  <section class="card panel" id="what" hidden></section>
+  <section class="card panel" id="math" hidden></section>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const HMAX = 8;                       // the walls are 8 units of level tall
+  const REST = 0.0005;                  // a flow below this is drawn as rest
+
+  // ---------- the model: Chapter 2's step, eqn.pipe_step and eqn.waterfall_step
+  // Each tank reads out its level h = q / A; the box between them returns -I to tank 1 and +I to tank 2;
+  // each tank adds the flow it receives to its volume.
+  function flow(mode, h1, h2, k) { return mode === "pipe" ? k * (h1 - h2) : k * h1; }
+  // A step lasts dt seconds: each tank adds the flow it receives times dt (Ch 3's integrator, handed a duration).
+  function next(q, p) {
+    const h1 = q[0] / p.A1, h2 = q[1] / p.A2, I = flow(p.mode, h1, h2, p.k[p.mode]);
+    return { q: [q[0] - p.dt * I, q[1] + p.dt * I], h1, h2, I };
+  }
+  const DTS = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2];
+  const fmtDt = (d) => d >= 1 ? `${d} s` : d >= 0.1 ? `${d} s` : `${Math.round(d * 1000)} ms`;
+
+  const DEFAULTS = { mode: "pipe", A1: 1, A2: 1, k: { pipe: 0.25, fall: 0.5 }, start: [4, 0], dt: 0.1 };
+  const hot = window.claude && window.claude.hot;
+  const saved = (hot && hot.data) || {};
+  let p = saved.p || JSON.parse(JSON.stringify(DEFAULTS));
+  if (!p.dt) p.dt = DEFAULTS.dt;
+  let traj = [], t = saved.t || 0, n = saved.n || 0;
+  let playing = false, tween = null, shown = null, note = "";
+  if (hot && hot.snapshot) hot.snapshot(() => ({ p, t, n }));
+
+  function recompute() {
+    traj = [p.start.slice()];
+    for (let i = 0; i < n; i++) traj.push(next(traj[i], p).q);
+    t = Math.min(t, n);
+  }
+  function extend() { traj.push(next(traj[n], p).q); n++; }
+
+  // ---------- small svg helpers
+  function el(tag, attrs, parent, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const a in attrs) e.setAttribute(a, attrs[a]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.append(e);
+    return e;
+  }
+  const f2 = (x) => (Math.abs(x) < 0.005 ? 0 : x).toFixed(2);
+  // Numbers that change while playing keep a fixed number of decimals, set by the step's length, so text holds still.
+  const dec = () => p.dt >= 1 ? 0 : Math.ceil(-Math.log10(p.dt) - 1e-9);
+  const f3 = (x) => x.toFixed(dec() + 2);
+  const fmtT = (s) => `${s.toFixed(dec())} s`;
+  function toSvg(svg, ev) {
+    const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+
+  // A number that is yours: drawn in the accent with a dashed underline, dragged sideways or stepped with arrow keys.
+  const KNOBS = {
+    A1: { get: () => p.A1, set: (v) => { p.A1 = v; }, min: 0.25, max: 3, step: 0.05, perPx: 0.01, label: "Tank 1's cross-section" },
+    A2: { get: () => p.A2, set: (v) => { p.A2 = v; }, min: 0.25, max: 3, step: 0.05, perPx: 0.01, label: "Tank 2's cross-section" },
+    k:  { get: () => p.k[p.mode], set: (v) => { p.k[p.mode] = v; }, min: 0.01, max: 1.5, step: 0.01, perPx: 0.004, label: "Conductance" },
+    q1: { get: () => shownQ()[0], set: (v) => setVolume(0, v), min: 0, max: () => HMAX * p.A1, step: 0.05, perPx: 0.04, label: "Tank 1's volume" },
+    q2: { get: () => shownQ()[1], set: (v) => setVolume(1, v), min: 0, max: () => HMAX * p.A2, step: 0.05, perPx: 0.04, label: "Tank 2's volume" },
+  };
+  function knob(parent, key, x, y, anchor, size) {
+    const K = KNOBS[key], v = K.get();
+    const g = el("g", { class: "knob", tabindex: 0, role: "slider", "data-knob": key, "aria-label": K.label,
+      "aria-valuenow": v.toFixed(2), "aria-valuemin": K.min, "aria-valuemax": typeof K.max === "function" ? K.max() : K.max }, parent);
+    const txt = el("text", { class: "v", x, y, "text-anchor": anchor, "font-size": size }, g, f2(v));
+    const w = 0.62 * size * txt.textContent.length;
+    const x0 = anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : x;
+    el("line", { x1: x0, x2: x0 + w, y1: y + 5, y2: y + 5 }, g);
+    el("rect", { class: "hit", x: x0 - 8, y: y - size, width: w + 16, height: size + 14, rx: 4, fill: "transparent" }, g);
+    return g;
+  }
+  function clampKnob(K, v) {
+    const max = typeof K.max === "function" ? K.max() : K.max;
+    return Math.min(max, Math.max(K.min, Math.round(v / K.step) * K.step));
+  }
+
+  function shownQ() { return shown || traj[t]; }
+
+  // Setting a volume starts the run again from what is on screen, with that change: the state you set is where it starts.
+  function setVolume(i, v) {
+    const q = traj[t].slice(); q[i] = v;
+    p.start = q; t = 0; n = 0; note = ""; recompute();
+  }
+
+  // ---------- the picture
+  const pic = $("pic");
+  function geometry() {
+    const S = 16;                                         // px per unit of level
+    const W = (A) => 64 * A;                               // px of tank width per unit of cross-section
+    if (p.mode === "pipe") {
+      return { S, W, vb: [800, 268], t1: { cx: 230, base: 200 }, t2: { cx: 570, base: 200 } };
+    }
+    return { S, W, vb: [800, 398], t1: { cx: 250, base: 168 }, t2: { cx: 540, base: 330 } };
+  }
+
+  function drawTank(g, G, i, q, A, color) {
+    const T = i === 0 ? G.t1 : G.t2, w = G.W(A), x0 = T.cx - w / 2, top = T.base - HMAX * G.S;
+    const h = q / A, hd = Math.max(0, Math.min(HMAX, h));
+    el("rect", { x: x0 - 22, y: top - 6, width: w + 44, height: HMAX * G.S + 12, fill: "transparent", class: "water", "data-tank": i }, g);
+    el("rect", { x: x0, y: T.base - hd * G.S, width: w, height: hd * G.S, fill: color, opacity: 0.85, class: "water", "data-tank": i }, g);
+    if (hd > 0) el("line", { x1: x0, x2: x0 + w, y1: T.base - hd * G.S, y2: T.base - hd * G.S, stroke: color, "stroke-width": 3, class: "water", "data-tank": i }, g);
+    el("path", { d: `M${x0} ${top} V${T.base} H${x0 + w} V${top}`, fill: "none", stroke: "var(--wall)", "stroke-width": 3, "stroke-linejoin": "round" }, g);
+    // the level, read out: plain, since it follows from the volume and the cross-section
+    const ly = T.base - hd * G.S;
+    const lx = i === 0 ? x0 - 12 : x0 + w + 12, anc = i === 0 ? "end" : "start";
+    el("text", { x: lx, y: ly + 6, "text-anchor": anc, "font-size": 17, fill: "var(--muted)" }, g, `level ${f2(h)}`);
+    el("text", { x: T.cx, y: top - 14, "text-anchor": "middle", "font-size": 17, "font-weight": 600, fill: color }, g, `Tank ${i + 1}`);
+    // what is yours: the volume and the cross-section
+    el("text", { x: T.cx - 6, y: T.base + 26, "text-anchor": "end", "font-size": 16, fill: "var(--muted)" }, g, "volume");
+    knob(g, i === 0 ? "q1" : "q2", T.cx + 2, T.base + 26, "start", 18);
+    el("text", { x: T.cx - 6, y: T.base + 50, "text-anchor": "end", "font-size": 16, fill: "var(--muted)" }, g, "cross-section");
+    knob(g, i === 0 ? "A1" : "A2", T.cx + 2, T.base + 50, "start", 18);
+    return { x0, w, top, ly, h };
+  }
+
+  function drawPicture(phase) {
+    const G = geometry(), q = shownQ();
+    pic.setAttribute("viewBox", `0 0 ${G.vb[0]} ${G.vb[1]}`);
+    pic.replaceChildren();
+    const g = el("g", {}, pic);
+    const a = drawTank(g, G, 0, q[0], p.A1, "var(--water1)");
+    const b = drawTank(g, G, 1, q[1], p.A2, "var(--water2)");
+    const I = flow(p.mode, q[0] / p.A1, q[1] / p.A2, p.k[p.mode]);
+    const moving = playing && Math.abs(I) > REST;
+    // The bore follows the conductance. For slow flow through a narrow pipe the conductance goes as the fourth
+    // power of the radius (Poiseuille), so the radius drawn goes as its fourth root.
+    const r = 7 * Math.pow(p.k[p.mode] / 0.25, 0.25), yl = G.t1.base - 9;   // labels stay put as the bore changes
+    if (p.mode === "pipe") {
+      const y = G.t1.base - r - 2, xa = a.x0 + a.w, xb = b.x0;
+      el("rect", { x: xa, y: y - r, width: xb - xa, height: 2 * r, fill: "var(--faint)", stroke: "var(--wall)", "stroke-width": 2 }, g);
+      if (Math.abs(I) > REST) {
+        const dir = Math.sign(I);
+        el("line", { x1: xa + 4, x2: xb - 4, y1: y, y2: y, stroke: I > 0 ? "var(--water1)" : "var(--water2)", "stroke-width": Math.max(2, 0.8 * r),
+          "stroke-dasharray": "10 10", "stroke-dashoffset": -(flowPhase % 20), opacity: 0.9 }, g);
+        const mid = (xa + xb) / 2, ah = 10;
+        el("path", { d: `M${mid - 30 * dir} ${yl - 38} H${mid + 30 * dir} m${-ah * dir} -${ah * 0.7} l${ah * dir} ${ah * 0.7} l${-ah * dir} ${ah * 0.7}`,
+          fill: "none", stroke: "var(--ink)", "stroke-width": 2 }, g);
+        el("text", { x: mid, y: yl - 50, "text-anchor": "middle", "font-size": 16, fill: "var(--muted)" }, g, `flow ${f2(Math.abs(I))}`);
+      } else {
+        el("text", { x: (xa + xb) / 2, y: y - 30, "text-anchor": "middle", "font-size": 16, fill: "var(--muted)" }, g, "no flow");
+      }
+      el("text", { x: (xa + xb) / 2 - 4, y: yl + 32, "text-anchor": "end", "font-size": 16, fill: "var(--muted)" }, g, "conductance");
+      knob(g, "k", (xa + xb) / 2 + 4, yl + 32, "start", 18);
+    } else {
+      // the spout leaves tank 1 at its base; the stream falls into tank 2
+      const y = G.t1.base - r - 2, xa = a.x0 + a.w, xs = xa + 34;
+      el("rect", { x: xa, y: y - r, width: 34, height: 2 * r, fill: "var(--faint)", stroke: "var(--wall)", "stroke-width": 2 }, g);
+      const land = Math.max(b.ly, b.top), xl = Math.max(xs + 20, b.x0 + Math.min(b.w * 0.5, 40));
+      if (I > REST) {
+        const wpx = Math.max(2, Math.min(14, 5 * I));
+        el("path", { d: `M${xs} ${y} C ${xs + 30} ${y}, ${xl} ${y + 40}, ${xl} ${land}`, fill: "none", stroke: "var(--water1)",
+          "stroke-width": wpx, "stroke-dasharray": moving ? "14 8" : "none", "stroke-dashoffset": -(flowPhase % 22), opacity: 0.85 }, g);
+        el("text", { x: xs + 14, y: yl - 22, "font-size": 16, fill: "var(--muted)" }, g, `flow ${f2(I)}`);
+      }
+      el("text", { x: xa + 16, y: yl - 52, "text-anchor": "start", "font-size": 16, fill: "var(--muted)" }, g, "spout's conductance");
+      knob(g, "k", xa + 16 + 158, yl - 52, "start", 18);
+    }
+  }
+
+  // ---------- the next step's calculation, in the order the math has it
+  function drawCalc() {
+    const q = traj[t], s = next(q, p), k = p.k[p.mode];
+    const lv = `the levels <span class="n t1">${f2(s.h1)}</span> and <span class="n t2">${f2(s.h2)}</span>`;
+    let how;
+    if (p.mode === "pipe") {
+      how = `The pipe receives ${lv} and returns the flow <span class="n">${f2(k)} × (${f2(s.h1)} − ${f2(s.h2)}) = ${f2(s.I)}</span>`;
+    } else {
+      how = `The waterfall receives ${lv}, uses only the first, and returns the flow <span class="n">${f2(k)} × ${f2(s.h1)} = ${f2(s.I)}</span>`;
+    }
+    const moved = Math.abs(s.I) * p.dt, over = `over the step's <span class="n">${fmtDt(p.dt)}</span>`;
+    let then;
+    if (Math.abs(s.I) <= REST) then = "so nothing moves: this is where the tanks rest.";
+    else if (s.I > 0) then = `per second; ${over}, tank 1 loses <span class="n">${f3(moved)}</span> and tank 2 gains it.`;
+    else then = `per second; ${over}, tank 2 loses <span class="n">${f3(moved)}</span> and tank 1 gains it.`;
+    $("calc").innerHTML = `<b>At <span class="n tm" style="min-width:${dec() + 6}ch">${fmtT(t * p.dt)}</span>.</b> ${how} ${then}`;
+  }
+
+  // ---------- warnings: where the step stops being what water does
+  function drawWarning() {
+    const k = p.k[p.mode];
+    const factor = p.mode === "pipe" ? 1 - p.dt * k * (1 / p.A1 + 1 / p.A2) : 1 - p.dt * k / p.A1;
+    const msgs = [];
+    if (factor < 0) msgs.push(p.mode === "pipe"
+      ? `With this conductance one step moves more water than it takes to even the levels, so they cross over each other at every step. Water doesn't do this: the step holds the flow fixed for its whole length. A shorter step removes it.`
+      : `With this conductance one step takes more water out of tank 1 than it holds. Water doesn't do this: the step holds the flow fixed for its whole length. A shorter step removes it.`);
+    const q = shownQ();
+    if (q[0] < -1e-9 || q[1] < -1e-9) msgs.push("A tank's volume has gone below zero, which no tank can hold.");
+    if (q[1] / p.A2 > HMAX + 1e-9 || q[0] / p.A1 > HMAX + 1e-9) msgs.push(p.mode === "fall"
+      ? "Tank 2 has filled past its walls. The book's waterfall holds only while tank 2's water stays below the spout."
+      : "A tank has filled past its walls.");
+    if (note) msgs.push(note);
+    $("warning").hidden = !msgs.length;
+    $("warning").textContent = msgs.join(" ");
+  }
+
+  // ---------- the levels over time, with the time track lined up under them
+  const chart = $("chart");
+  const CW = 800, PL = 44, PR = 16, PT = 12, PH = 130, TRK = PT + PH + 36;
+  const span = () => Math.max(n, Math.ceil(10 / p.dt));          // at least 10 seconds wide
+  function xs() { const sp = span(); return (i) => PL + (CW - PL - PR) * i / sp; }
+  function drawChart() {
+    chart.setAttribute("viewBox", `0 0 ${CW} ${TRK + 16}`);
+    chart.replaceChildren();
+    const X = xs();
+    let lo = 0, hi = HMAX;
+    for (const q of traj) { lo = Math.min(lo, q[0] / p.A1, q[1] / p.A2); hi = Math.max(hi, q[0] / p.A1, q[1] / p.A2); }
+    const Y = (h) => PT + PH * (hi - h) / (hi - lo);
+    const step = hi - lo > 20 ? 10 : hi - lo > 10 ? 4 : 2;
+    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
+      el("line", { x1: PL, x2: CW - PR, y1: Y(v), y2: Y(v), stroke: "var(--rule)", "stroke-width": 1 }, chart);
+      el("text", { x: PL - 8, y: Y(v) + 5, "text-anchor": "end", "font-size": 14, fill: "var(--muted)", "font-family": "var(--data)" }, chart, v);
+    }
+    const every = Math.max(1, Math.floor(n / 800));
+    const idx = []; for (let j = 0; j <= n; j += every) idx.push(j); if (idx[idx.length - 1] !== n) idx.push(n);
+    for (const [i, col] of [[0, "var(--water1)"], [1, "var(--water2)"]]) {
+      const A = i === 0 ? p.A1 : p.A2;
+      const d = idx.map((j, m) => `${m ? "L" : "M"}${X(j).toFixed(1)} ${Y(traj[j][i] / A).toFixed(1)}`).join(" ");
+      el("path", { d, fill: "none", stroke: col, "stroke-width": 2.5, "stroke-linejoin": "round" }, chart);
+      if (n <= 60) traj.forEach((q, j) => el("circle", { cx: X(j), cy: Y(q[i] / A), r: 3, fill: col }, chart));
+    }
+    // seconds along the bottom
+    const secs = span() * p.dt, tick = secs > 60 ? 20 : secs > 25 ? 10 : secs > 10 ? 5 : 2;
+    for (let s = 0; s <= secs + 1e-9; s += tick)
+      el("text", { x: X(s / p.dt), y: PT + PH + 16, "text-anchor": "middle", "font-size": 13, fill: "var(--muted)", "font-family": "var(--data)" }, chart, `${s} s`);
+    // the step shown
+    el("line", { x1: X(t), x2: X(t), y1: PT, y2: PT + PH, stroke: "var(--ink)", "stroke-width": 1, "stroke-dasharray": "3 3" }, chart);
+    // the track, under the plot and on its scale
+    el("line", { x1: PL, x2: CW - PR, y1: TRK, y2: TRK, stroke: "var(--rule)", "stroke-width": 5, "stroke-linecap": "round" }, chart);
+    if (n > 0) el("line", { x1: PL, x2: X(n), y1: TRK, y2: TRK, stroke: "var(--faint)", "stroke-width": 5, "stroke-linecap": "round" }, chart);
+    el("line", { x1: PL, x2: X(t), y1: TRK, y2: TRK, stroke: "var(--accent)", "stroke-width": 5, "stroke-linecap": "round" }, chart);
+    el("circle", { cx: X(t), cy: TRK, r: 9, fill: "var(--accent)", stroke: "var(--panel)", "stroke-width": 2.5 }, chart);
+    chart.setAttribute("aria-valuemax", n); chart.setAttribute("aria-valuenow", t);
+    $("when").textContent = n === 0 ? "Nothing has run yet." : `Showing ${fmtT(t * p.dt)} of ${fmtT(n * p.dt)}, step ${t} of ${n}.`;
+  }
+
+  // ---------- explanations, behind buttons
+  function drawPanels() {
+    const k = p.k[p.mode];
+    $("what").innerHTML = p.mode === "pipe" ? `
+      <h2>What's going on</h2>
+      <p>Each tank reports the level of its water, which is the volume divided by the cross-section. The pipe receives both levels and sends water from the higher one to the lower: the bigger the difference, the more it sends, and the conductance says how easily water passes.</p>
+      <p>So the levels even out and the tanks come to rest with equal levels. If the cross-sections differ, the volumes end up different: a wider tank holds more water at the same level.</p>
+      <p>Water is never made or lost: what leaves one tank arrives in the other, so the total stays at <span class="n">${f2(traj[0][0] + traj[0][1])}</span>.</p>
+      <p class="src">Book: Chapter 2, sections <i>One tank</i> and <i>The pipe</i>.</p>` : `
+      <h2>What's going on</h2>
+      <p>Tank 1 sits above tank 2 and empties through a spout; the water falls through the air into tank 2. The spout pours faster the higher tank 1's level, and the conductance says how easily water passes.</p>
+      <p>Tank 2's level never reaches back to tank 1: try dragging tank 2's water up or down, and tank 1 empties at exactly the same rate. The waterfall receives tank 2's level, since it is wired to tank 2 in order to deliver water there, but it does not use it.</p>
+      <p>Water is never made or lost: the total stays at <span class="n">${f2(traj[0][0] + traj[0][1])}</span>.</p>
+      <p class="src">Book: Chapter 2, sections <i>One tank</i> and <i>The waterfall</i>.</p>`;
+    $("math").innerHTML = (p.mode === "pipe" ? `
+      <h2>The math</h2>
+      <p>The state is the pair of volumes (q₁, q₂). Each tank reads out its level hᵢ = qᵢ / Aᵢ. The pipe has no state; its cost function is k(h₁, h₂) = (κ/2)(h₁ − h₂)², and its pushback is the incline of that cost, which returns −I to tank 1 and +I to tank 2. Each tank adds what it receives to its volume:</p>
+      <p class="eq">I = κ (h₁ − h₂)<br>q₁′ = q₁ − δ I,  q₂′ = q₂ + δ I</p>
+      <p>Here δ is how long the step lasts, now <span class="n">${fmtDt(p.dt)}</span>. In Chapter 2 every step lasts one unit of time, δ = 1; Chapter 3 hands each step its duration, and a tank's step adds the flow it receives times the duration.</p>
+      <p>At each step the difference of the levels is multiplied by 1 − δκ(1/A₁ + 1/A₂) = <span class="n">${f3(1 - p.dt * k * (1 / p.A1 + 1 / p.A2))}</span>. Between 0 and 1 the levels approach each other; below 0 they cross over at each step, which water does not do. As the step shrinks, the levels approach the way water's do.</p>` : `
+      <h2>The math</h2>
+      <p>The state is the pair of volumes (q₁, q₂), and each tank reads out its level hᵢ = qᵢ / Aᵢ, as with the pipe. The waterfall receives both levels and returns −I to tank 1 and +I to tank 2, with</p>
+      <p class="eq">I = κ h₁<br>q₁′ = q₁ − δ I,  q₂′ = q₂ + δ I</p>
+      <p>Here δ is how long the step lasts, now <span class="n">${fmtDt(p.dt)}</span>; Chapter 2's steps have δ = 1. Tank 1's volume is multiplied by 1 − δκ/A₁ = <span class="n">${f3(1 - p.dt * k / p.A1)}</span> at each step, whatever tank 2 holds.</p>
+      <p>How much the flow to tank 1 changes with tank 2's level is 0; how much the flow to tank 2 changes with tank 1's level is κ. For any cost function these two would be equal, so the waterfall's pushback is not the incline of any cost: it is a 1-form that is not exact. The pipe's two are both κ.</p>`) +
+      `<p class="src">The steps are the book's equations, computed in this page. Checked against the library: two tanks and a coupler composed as an arrangement and run (the tanks of <code>tests/test_two_tanks.py</code>, with the book's straight-line spout in place of the test's curved one) take the same steps when each lasts 1 second.</p>`;
+  }
+
+  // ---------- draw everything
+  function draw(phase) {
+    drawPicture(phase || 0); drawCalc(); drawWarning(); drawChart();
+    $("play").textContent = playing ? "Pause" : "Play";
+    $("dt").textContent = fmtDt(p.dt); $("dt").setAttribute("aria-valuetext", fmtDt(p.dt));
+    if (!$("what").hidden || !$("math").hidden) drawPanels();
+  }
+
+  // ---------- time: the page's time is the model's. Play takes one step per step's length of real time, until you
+  // pause it or the water is at rest. A screen redraws about 60 times a second, so a step shorter than that is still
+  // taken, several to a redraw.
+  const MAX_S = 300;
+  let wall0 = 0, t0 = 0, lastNow = null;
+  // How far the drawn water has moved along the pipe: summed frame by frame, signed by the flow, so it runs from the
+  // higher level to the lower at a speed that follows the flow.
+  let flowPhase = 0;
+  function frame(now) {
+    if (!playing) return;
+    const I = flow(p.mode, traj[t][0] / p.A1, traj[t][1] / p.A2, p.k[p.mode]);
+    if (lastNow != null) flowPhase += Math.max(-3, Math.min(3, I)) * 60 * (now - lastNow) / 1000;
+    lastNow = now;
+    const target = t0 + Math.floor((now - wall0) / 1000 / p.dt);
+    while (t < target) {
+      if (Math.abs(next(traj[t], p).I) <= REST) { playing = false; note = `At rest at ${fmtT(t * p.dt)}: the flow has fallen to zero.`; break; }
+      if (t * p.dt >= MAX_S) { playing = false; note = `Paused at ${MAX_S} s.`; break; }
+      if (t === n) extend();
+      t++;
+    }
+    draw(now / 1000);
+    if (playing) requestAnimationFrame(frame);
+  }
+  function startClock() { wall0 = performance.now(); t0 = t; lastNow = null; }
+  $("play").onclick = () => {
+    playing = !playing; note = "";
+    if (playing) { if (Math.abs(next(traj[t], p).I) <= REST) { playing = false; note = "The water is already at rest."; } else { startClock(); requestAnimationFrame(frame); } }
+    draw();
+  };
+  $("step").onclick = () => { playing = false; note = ""; if (t === n) extend(); t++; draw(); };
+  $("restart").onclick = () => { playing = false; note = ""; t = 0; draw(); };
+  $("mode").onchange = () => { playing = false; note = ""; p.mode = $("mode").value; recompute(); drawPanels(); draw(); };
+
+  // ---------- how long a step lasts: a number you drag sideways, through 1, 2, 5 times a power of ten
+  const dtEl = $("dt");
+  function setDt(i) {
+    i = Math.max(0, Math.min(DTS.length - 1, i));
+    const v = DTS[i]; if (v === p.dt) return;
+    const time = t * p.dt, total = n * p.dt;
+    p.dt = v; n = Math.round(total / v); t = Math.round(time / v); recompute();
+    if (playing) startClock();
+    draw();
+  }
+  const dtIndex = () => { const i = DTS.indexOf(p.dt); return i < 0 ? DTS.indexOf(0.1) : i; };
+  let dtDrag = null;
+  dtEl.addEventListener("pointerdown", (ev) => { dtDrag = { x0: ev.clientX, i0: dtIndex() }; dtEl.setPointerCapture(ev.pointerId); ev.preventDefault(); });
+  dtEl.addEventListener("pointermove", (ev) => { if (dtDrag) setDt(dtDrag.i0 + Math.round((ev.clientX - dtDrag.x0) / 28)); });
+  dtEl.addEventListener("pointerup", () => { dtDrag = null; });
+  dtEl.addEventListener("keydown", (ev) => {
+    const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[ev.key]; if (!d) return;
+    ev.preventDefault(); setDt(dtIndex() + d);
+  });
+
+  // ---------- dragging: knobs sideways, water up and down
+  let drag = null;
+  pic.addEventListener("pointerdown", (ev) => {
+    if (tween) return;
+    const kn = ev.target.closest(".knob"), wt = ev.target.closest(".water");
+    if (kn) {
+      const K = KNOBS[kn.dataset.knob];
+      drag = { kind: "knob", key: kn.dataset.knob, x0: ev.clientX, v0: K.get(), scale: pic.viewBox.baseVal.width / pic.getBoundingClientRect().width };
+    } else if (wt) {
+      drag = { kind: "water", i: +wt.dataset.tank };
+      dragWater(ev);
+    } else return;
+    playing = false; note = "";
+    pic.setPointerCapture(ev.pointerId); ev.preventDefault();
+  });
+  pic.addEventListener("pointermove", (ev) => {
+    if (!drag) return;
+    if (drag.kind === "knob") {
+      const K = KNOBS[drag.key];
+      const v = clampKnob(K, drag.v0 + (ev.clientX - drag.x0) * K.perPx);
+      if (v !== K.get()) { K.set(v); recompute(); draw(); }
+    } else dragWater(ev);
+  });
+  const endDrag = () => { drag = null; };
+  pic.addEventListener("pointerup", endDrag); pic.addEventListener("pointercancel", endDrag);
+  function dragWater(ev) {
+    const G = geometry(), T = drag.i === 0 ? G.t1 : G.t2, A = drag.i === 0 ? p.A1 : p.A2;
+    const y = toSvg(pic, ev).y, h = Math.max(0, Math.min(HMAX, (T.base - y) / G.S));
+    const q = Math.round(h * A / 0.05) * 0.05;
+    if (Math.abs(q - traj[t][drag.i]) > 1e-9 || t !== 0) { setVolume(drag.i, q); draw(); }
+  }
+  pic.addEventListener("keydown", (ev) => {
+    const kn = ev.target.closest && ev.target.closest(".knob"); if (!kn) return;
+    const K = KNOBS[kn.dataset.knob], d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[ev.key];
+    if (!d || tween) return;
+    ev.preventDefault(); playing = false; note = "";
+    K.set(clampKnob(K, K.get() + d * K.step)); recompute(); draw();
+    const again = pic.querySelector(`[data-knob="${kn.dataset.knob}"]`); if (again) again.focus();
+  });
+
+  // ---------- the time track
+  let scrubbing = false;
+  function scrubTo(ev) {
+    const x = toSvg(chart, ev).x;
+    const i = Math.round((x - PL) / (CW - PL - PR) * span());
+    const nt = Math.max(0, Math.min(n, i));
+    if (nt !== t) { t = nt; draw(); }
+  }
+  chart.addEventListener("pointerdown", (ev) => { if (tween) return; playing = false; scrubbing = true; chart.setPointerCapture(ev.pointerId); scrubTo(ev); });
+  chart.addEventListener("pointermove", (ev) => { if (scrubbing) scrubTo(ev); });
+  chart.addEventListener("pointerup", () => { scrubbing = false; });
+  chart.addEventListener("keydown", (ev) => {
+    const d = { ArrowRight: 1, ArrowLeft: -1 }[ev.key]; if (!d || tween) return;
+    ev.preventDefault(); playing = false; t = Math.max(0, Math.min(n, t + d)); draw();
+  });
+
+  // ---------- explain buttons
+  for (const [b, id] of [["b-what", "what"], ["b-math", "math"]]) {
+    $(b).onclick = () => {
+      const open = $(id).hidden; $(id).hidden = !open; $(b).setAttribute("aria-expanded", String(open));
+      if (open) drawPanels();
+    };
+  }
+
+  $("mode").value = p.mode;
+  recompute(); draw();
+})();
+</script>
