@@ -7,9 +7,13 @@ discrete wave equation. References in CDLM: CDLM sec.spring_first_pass
 (the particle and wiring), eqn.potlens_composite_final (the state update),
 eqn.discrete_wave / eqn.wave_bc (pinned ends).
 
-Environment covectors are forcings in the book's sign: the pin ``q_{K+1} = 0``
-is ``xi_N = -kappa * q~_K``; the published field is ``omega_N = pullback + omega|_N``,
-i.e. minus CDLM's ``dU``-based field (STATUS.md §1).
+The pinned runs hold their ends by boxes (plan P43 (b) job 4, Claude Opus 5.5, de71554a, 2026-10-10):
+``wiring.held_chain``, a held particle at ``0`` on each end, the right one joined to the last part by
+a spring, closed and run by ``Phi``. Until then the ends were held in code, ``q_prev = 0`` fed in and
+the pin's pull ``xi_N = -kappa * q~_K`` computed from the state each step; that run is kept and checked
+equal. The one-step tests feed given environment inputs through the open chain's ports, which is
+what they test. Environment covectors are forcings in the book's sign; the published field is
+``omega_N = pullback + omega|_N``, i.e. minus CDLM's ``dU``-based field (STATUS.md §1).
 """
 
 import jax.numpy as jnp
@@ -19,7 +23,7 @@ from arrangements.coalgebra import configuration, phase
 from arrangements.functors import Phi
 from arrangements.wiring import compose_chain
 
-from tests.chain import IN_POS, harmonic_particle, load_regress, phase_flat, phase_state
+from tests.chain import IN_POS, HeldChain, harmonic_particle, load_regress, phase_flat, phase_state
 
 
 def _wave_chain(K, m, kappa):
@@ -43,6 +47,18 @@ def _composite_final(q, p, q_prev_extern, xi_N_extern, m, kappa):
             p_i_new = p[i] + kappa * (q_prev - qt[i]) + xi_N_extern
         p_new.append(p_i_new)
     return q_new, jnp.stack(p_new)
+
+
+def _held(K, m, kappa):
+    """The chain with its ends held by boxes, closed."""
+    return HeldChain([harmonic_particle(phase, m, kappa)] * K, kappa, phase)
+
+
+def _step_by_port(O, q, p, kappa, m):
+    """The old pinned step, ends held in code: q_prev = 0 fed in, xi_N = -kappa * q~_K computed."""
+    xi_N = -kappa * float(q[-1] + p[-1] / m)
+    _, _, (q, p) = _run(O, q, p, xi_N, 0.0)
+    return q, p
 
 
 def _run(O, q, p, xi_N, q_prev):
@@ -101,7 +117,7 @@ def test_discrete_wave_equation_with_pinned_ends():
     K = 5
     T = 10
     m, kappa = 1.5, 0.9
-    O = Phi(_wave_chain(K, m, kappa))
+    H = _held(K, m, kappa)
 
     rng = np.random.default_rng(42)
     q = jnp.asarray(rng.standard_normal(K))
@@ -109,8 +125,7 @@ def test_discrete_wave_equation_with_pinned_ends():
 
     q_traj = [q]
     for _ in range(T + 2):
-        xi_N = -kappa * float(q[K - 1] + p[K - 1] / m)
-        _, _, (q, p) = _run(O, q, p, xi_N, 0.0)
+        q, p = H.step(q, p)
         q_traj.append(q)
 
     q_arr = np.stack([np.asarray(x) for x in q_traj], axis=0)
@@ -120,6 +135,20 @@ def test_discrete_wave_equation_with_pinned_ends():
         laplacian = q_aug[:-2] - 2.0 * q_aug[1:-1] + q_aug[2:]
         residual = m * ddot_q - kappa * laplacian
         np.testing.assert_allclose(residual, np.zeros(K), atol=1e-10)
+
+
+def test_held_ends_are_the_port_fed_run():
+    """The held chain's ``Phi`` equals the old run that held the ends in code, 200 steps."""
+    K, m, kappa = 5, 1.5, 0.9
+    H, O = _held(K, m, kappa), Phi(_wave_chain(K, m, kappa))
+    rng = np.random.default_rng(1)
+    q = a = jnp.asarray(rng.standard_normal(K))
+    p = b = jnp.asarray(rng.standard_normal(K))
+    for _ in range(200):
+        q, p = H.step(q, p)
+        a, b = _step_by_port(O, a, b, kappa, m)
+    np.testing.assert_allclose(np.asarray(q), np.asarray(a), atol=1e-12)
+    np.testing.assert_allclose(np.asarray(p), np.asarray(b), atol=1e-12)
 
 
 def test_heat_and_wave_are_two_arrangements_on_one_wiring():
@@ -170,12 +199,11 @@ def test_regression_matches_cdlm():
     np.testing.assert_allclose(np.asarray(omega_N(jnp.ones(1))), -R["field_at_1"], rtol=1e-10, atol=1e-12)
 
     K3, T3, m3, kappa3 = R["pin_params"]; K3, T3 = int(K3), int(T3)
-    O3 = Phi(_wave_chain(K3, m3, kappa3))
+    H3 = _held(K3, m3, kappa3)
     q, p = jnp.asarray(R["pin_q"][0]), jnp.asarray(R["pin_p"][0])
     qs, ps = [q], [p]
     for _ in range(T3 + 2):
-        xi_N = -kappa3 * float(q[K3 - 1] + p[K3 - 1] / m3)
-        _, _, (q, p) = _run(O3, q, p, xi_N, 0.0)
+        q, p = H3.step(q, p)
         qs.append(q); ps.append(p)
     np.testing.assert_allclose(np.stack([np.asarray(x) for x in qs]), R["pin_q"], rtol=1e-10, atol=1e-12)
     np.testing.assert_allclose(np.stack([np.asarray(x) for x in ps]), R["pin_p"], rtol=1e-10, atol=1e-12)

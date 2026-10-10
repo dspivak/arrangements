@@ -62,7 +62,7 @@ def test_the_page_model_is_the_library_run():
     js = (
         "const m = require(process.argv[1]); const out = {};"
         "for (const s of m.samples) for (const w of ['oneway', 'exact']) {"
-        "  const r = m.run({...m.defaults, script: s.script, ell: [0.4, 1.4, 8], hear: 'weighted', kernel: 'gaussian'}, w); out[s.script + '/' + w] = [r.ps, r.ys]; }"
+        "  const r = m.run({...m.defaults, script: s.script, ell: [0.4, 1.4, 8], hear: 'weighted', kernel: 'gaussian', sigma: 0, mu: 0.1}, w); out[s.script + '/' + w] = [r.ps, r.ys]; }"
         "process.stdout.write(JSON.stringify(out));"
     )
     model = str(VIEWER / "models" / "listener.js")
@@ -74,6 +74,32 @@ def test_the_page_model_is_the_library_run():
         dp, dy = np.abs(np.array(ps_js) - ps).max(), np.abs(np.array(ys_js) - ys).max()
         print(f"{key}: max |p| {dp:.1e}, max |y| {dy:.1e}")
         assert dp < 1e-12 and dy < 1e-12
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs node to run the page's model")
+def test_the_page_defaults_are_an_arrangement():
+    """P43 (b) job 8 (de71554a, 2026-10-10): the page's own defaults, the peaked kernel, full hearing, the losses from
+    one cost of a broken promise and personal space (David: "b seems good"), are the library's ``page_model()`` run
+    through ``listener_system``: the page's model agrees with it on every sample and both wires, to 1e-12; and no
+    listener reaches the speaker (the closest placement in the six runs stays above 0.1)."""
+    from arrangements.listener import page_model
+    js = (
+        "const m = require(process.argv[1]); const out = {};"
+        "for (const s of m.samples) for (const w of ['oneway', 'exact']) {"
+        "  const r = m.run({...m.defaults, script: s.script}, w); out[s.script + '/' + w] = [r.ps, r.ys]; }"
+        "process.stdout.write(JSON.stringify(out));"
+    )
+    model = str(VIEWER / "models" / "listener.js")
+    out = json.loads(subprocess.run(["node", "-e", js, model], capture_output=True, text=True, check=True).stdout)
+    closest = 1e9
+    for key, (ps_js, ys_js) in out.items():
+        script, wire = key.split("/")
+        ps, ys, _ = run_script(listener_system(page_model(), wire=wire), script)
+        dp, dy = np.abs(np.array(ps_js) - ps).max(), np.abs(np.array(ys_js) - ys).max()
+        closest = min(closest, float(np.min(ps)))
+        print(f"page defaults {key}: max |p| {dp:.1e}, max |y| {dy:.1e}, closest {np.min(ps):.3f}")
+        assert dp < 1e-12 and dy < 1e-12
+    assert closest > 0.1
 
 
 def test_the_live_page_carries_its_model():

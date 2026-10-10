@@ -38,7 +38,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arrangements.wiring import compose_seq, tensor_arrangements
+from arrangements.arrangement import Arrangement
+from arrangements.network import fan_box, map_box, plus_box
+from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 from tests import test_mutual_need as mn
 from tests.chain import flat_state
@@ -78,9 +80,54 @@ def F_many(n, wiring, beta=0.0, s_mask=None, out_mask=None, alpha=ALPHA, K=KGATE
     return F
 
 
-def collective(n, wiring, q0, s, beta=0.0, h=MOB, b=DISS, **kw):
-    """``compose_seq(tensor(P_1..P_n, S), coupler)``, configuration ``(q_1..q_n, s)``.
-    ``q0`` is one number or one per part."""
+def need_box(beta=0.0, alpha=ALPHA, K=KGATE, label="need"):
+    """A part's need, ``<0|3> -> I`` on ``(q, r, s)``: the part's own amplitude, what arrives from the
+    parts it needs, and the supply. It returns ``alpha (s g(r, q) + beta r)`` to the part and nothing to
+    the senders or the supply (one way, as the coupler's returned covector was)."""
+    def omega(_q, e, _n):
+        q, r, s = e[0], e[1], e[2]
+        u = r * q
+        return EMPTY, jnp.stack([alpha * (s * u / (K + u) + beta * r), 0.0, 0.0]), EMPTY
+
+    return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=3, in_dim_N=0, out_dim_N=0,
+                       out_f=lambda q, e: EMPTY, in_f=lambda q, e, n: EMPTY, omega=omega, label=label)
+
+
+def mean_of(k):
+    """The others' mean as boxes: a ``+`` box over ``k`` wires, then a box dividing by ``k``."""
+    return compose_seq(plus_box(k), map_box(lambda v: v / k, 1, 1, f"/{k}"))
+
+
+def collective(n, wiring, q0, s, beta=0.0, h=MOB, b=DISS, s_mask=None, out_mask=None, receive=None,
+               alpha=ALPHA, K=KGATE):
+    """The collective as parts (P43 (b) job 8, Claude Opus 5.5, de71554a, 2026-10-10): the ``n`` parts and
+    the supply, a box presenting ``0`` (what a cut wire delivers), and per part a need box hearing the part,
+    what arrives from the parts it needs and the supply. The wiring decides what arrives: *ring*, the
+    previous part's wire; *all*, the others' wires through a mean box (or ``receive``, a box over the
+    others). A cut supply or outgoing wire is the zero box wired in its place. Configuration
+    ``(q_1..q_n, s)``. Equal to ``collective_one_coupler``, where one coupler held the wiring, the mean and
+    the gates (``test_0b``)."""
+    q0 = [float(q0)] * n if isinstance(q0, (int, float)) else list(q0)
+    s_mask = [1.0] * n if s_mask is None else [float(x) for x in s_mask]
+    out_mask = [1.0] * n if out_mask is None else [float(x) for x in out_mask]
+    zero = map_box(lambda v: jnp.zeros(1), 0, 1, "cut wire")
+    parts = [mn.part(q0[i], b=b, h=h, label=f"P{i}") for i in range(n)] + [mn.supply(s), zero]
+    wire = lambda j: j if out_mask[j] else n + 1
+    idx, stages = [], []
+    for i in range(n):
+        senders = [wire((i - 1) % n)] if wiring == "ring" else [wire(j) for j in range(n) if j != i]
+        idx += [i] + senders + [n if s_mask[i] else n + 1]
+        recv = (fan_box(1, [0], "neighbour") if wiring == "ring"
+                else (receive(n - 1) if receive is not None else mean_of(n - 1)))
+        stages.append(compose_seq(tensor_arrangements([fan_box(1, [0], "own"), recv, fan_box(1, [0], "supply")]),
+                                  need_box(beta, alpha, K, f"need {i}")))
+    routed = compose_seq(tensor_arrangements(parts), fan_box(n + 2, idx, "wiring"))
+    return compose_seq(routed, tensor_arrangements(stages))
+
+
+def collective_one_coupler(n, wiring, q0, s, beta=0.0, h=MOB, b=DISS, **kw):
+    """The run before P43 (b): ``compose_seq(tensor(P_1..P_n, S), coupler)``, one coupler holding the
+    wiring, the others' mean and the gates. Configuration ``(q_1..q_n, s)``."""
     q0 = [float(q0)] * n if isinstance(q0, (int, float)) else list(q0)
     parts = [mn.part(q0[i], b=b, h=h, label=f"P{i}") for i in range(n)] + [mn.supply(s)]
     return compose_seq(tensor_arrangements(parts), mn.coupler(F_many(n, wiring, beta, **kw), n + 1))
@@ -166,6 +213,19 @@ def held_all(q):
 # ---------------------------------------------------------------------------
 # Test 0: the runs are Phi's.
 # ---------------------------------------------------------------------------
+
+
+def test_0b_the_parts_are_the_one_coupler():
+    """The collective as parts equals the one-coupler run, step for step over 2000 steps, on both
+    wirings, from an uneven start, with beta 0 and 0.5, a cut supply and a cut outgoing wire. The
+    prediction (the need boxes' covectors sum to the coupler's), not a premise."""
+    q0 = [0.4, 1.3, 0.9, 1.1, 0.2]
+    for wiring in WIRINGS:
+        for beta in (0.0, 0.5):
+            for kw in ({}, {"s_mask": [1, 0, 1, 1, 1]}, {"out_mask": [1, 1, 0, 1, 1]}):
+                a = trajectory(collective(5, wiring, q0, 4.0, beta, **kw), 2000)
+                o = trajectory(collective_one_coupler(5, wiring, q0, 4.0, beta, **kw), 2000)
+                np.testing.assert_allclose(a, o, atol=1e-12)
 
 
 def test_0_the_runs_are_the_dynamics_functors():

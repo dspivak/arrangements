@@ -14,9 +14,11 @@ and for a pinned chain of length K the Dirichlet eigenmodes are
 ``q_j^{(n)} = sin(j n pi / (K+1))`` with
 ``omega_n^2 = m_0^2/m + (kappa/m) 4 sin^2(n pi / (2(K+1)))``.
 
-Environment covectors are forcings in the book's sign: the pin ``q~_{K+1} = 0``
-is ``xi_N = -kappa * q~_K`` (CDLM seeded ``+kappa * q~_K`` and its integrator
-subtracted; STATUS.md §1). States are unchanged.
+The pinned runs hold their ends by boxes (plan P43 (b) job 4, Claude Opus 5.5, de71554a, 2026-10-10):
+``wiring.held_chain``, closed and run by ``Phi``. Until then the pin was computed in code each step,
+``xi_N = -kappa * q~_K`` (CDLM seeded ``+kappa * q~_K`` and its integrator subtracted; STATUS.md §1);
+that run is kept as ``_step_by_port`` and checked equal. The one-step tests feed given environment
+inputs through the open chain's ports. States are unchanged.
 """
 
 import os
@@ -31,7 +33,7 @@ from arrangements.functors import Phi
 from arrangements.rvect import diagonal
 from arrangements.wiring import compose_chain
 
-from tests.chain import IN_POS, load_regress, phase_flat, phase_state
+from tests.chain import IN_POS, HeldChain, load_regress, phase_flat, phase_state
 
 
 def _kg_particle(m: float, kappa: float, m0: float, parameter=phase) -> Arrangement:
@@ -77,11 +79,32 @@ def _run(O, q, p, xi_N, q_prev):
     return phase_flat(new_state, K)
 
 
-def _step_pinned(O, q, p, kappa, m):
-    """One pinned-end step: q_prev = 0, xi_N = -kappa * q~_K (presented), q~_{K+1} = 0."""
+def _held(K, m, kappa, m0):
+    """The Klein-Gordon chain with its ends held by boxes, closed (plan P43 (b) job 4): a held
+    particle at ``0`` on each end, the right one joined to the last part by a spring of constant
+    ``kappa``; the ends carry no on-site term."""
+    return HeldChain([_kg_particle(m, kappa, m0)] * K, kappa, phase)
+
+
+def _step_by_port(O, q, p, kappa, m):
+    """The old pinned step, ends held in code: q_prev = 0, xi_N = -kappa * q~_K computed."""
     K = q.shape[0]
     xi_N = -kappa * float(q[K - 1] + p[K - 1] / m)
     return _run(O, q, p, xi_N, 0.0)
+
+
+def test_held_ends_are_the_port_fed_run():
+    """The held chain's ``Phi`` equals the old run that held the ends in code, 200 steps."""
+    K, m, kappa, m0 = 5, 1.5, 0.9, 0.3
+    H, O = _held(K, m, kappa, m0), Phi(_kg_chain(K, m, kappa, m0))
+    rng = np.random.default_rng(1)
+    q = a = jnp.asarray(rng.standard_normal(K))
+    p = b = jnp.asarray(rng.standard_normal(K))
+    for _ in range(200):
+        q, p = H.step(q, p)
+        a, b = _step_by_port(O, a, b, kappa, m)
+    np.testing.assert_allclose(np.asarray(q), np.asarray(a), atol=1e-12)
+    np.testing.assert_allclose(np.asarray(p), np.asarray(b), atol=1e-12)
 
 
 def test_kg_state_update():
@@ -106,13 +129,13 @@ def test_kg_state_update():
 def test_kg_recurrence():
     K, T = 5, 10
     m, kappa, m0 = 1.5, 0.9, 0.3
-    O = Phi(_kg_chain(K, m, kappa, m0))
+    H = _held(K, m, kappa, m0)
 
     rng = np.random.default_rng(20260508)
     q, p = jnp.asarray(rng.standard_normal(K)), jnp.zeros(K)
     q_traj = [q]
     for _ in range(T + 2):
-        q, p = _step_pinned(O, q, p, kappa, m)
+        q, p = H.step(q, p)
         q_traj.append(q)
 
     q_arr = np.stack([np.asarray(x) for x in q_traj], axis=0)
@@ -128,7 +151,7 @@ def test_kg_dispersion():
     """Initialize in Dirichlet eigenmode n, evolve two steps, check ddot q = -omega_n^2 q."""
     K = 7
     m, kappa, m0 = 1.3, 0.8, 0.5
-    O = Phi(_kg_chain(K, m, kappa, m0))
+    H = _held(K, m, kappa, m0)
 
     js = np.arange(1, K + 1)
     for n in range(1, K + 1):
@@ -136,7 +159,7 @@ def test_kg_dispersion():
         q, p = q0, jnp.zeros(K)
         q_traj = [q0]
         for _ in range(2):
-            q, p = _step_pinned(O, q, p, kappa, m)
+            q, p = H.step(q, p)
             q_traj.append(q)
         q_arr = np.stack([np.asarray(x) for x in q_traj], axis=0)
         ddot_q = q_arr[2] - 2.0 * q_arr[1] + q_arr[0]
@@ -151,7 +174,7 @@ def test_kg_long_horizon_bounded():
     long horizon the amplitude stays bounded rather than diverging."""
     K, T = 5, 2000
     m, kappa, m0 = 1.5, 0.9, 0.3
-    O = Phi(_kg_chain(K, m, kappa, m0))
+    H = _held(K, m, kappa, m0)
 
     rng = np.random.default_rng(20260508)
     q0 = jnp.asarray(1e-3 * rng.standard_normal(K))
@@ -159,7 +182,7 @@ def test_kg_long_horizon_bounded():
     q, p = q0, jnp.zeros(K)
     peak = peak0
     for _ in range(T):
-        q, p = _step_pinned(O, q, p, kappa, m)
+        q, p = H.step(q, p)
         peak = max(peak, float(np.max(np.abs(np.asarray(q)))))
     assert peak < 50.0 * peak0
 
@@ -179,11 +202,11 @@ def test_regression_matches_cdlm():
 
     K2, T2 = int(R["kg_pin_params"][0]), int(R["kg_pin_params"][1])
     m2, kappa2, m02 = (float(v) for v in R["kg_pin_params"][2:])
-    O2 = Phi(_kg_chain(K2, m2, kappa2, m02))
+    H2 = _held(K2, m2, kappa2, m02)
     q, p = jnp.asarray(R["kg_pin_q"][0]), jnp.asarray(R["kg_pin_p"][0])
     qs, ps = [np.asarray(q)], [np.asarray(p)]
     for _ in range(T2 + 2):
-        q, p = _step_pinned(O2, q, p, kappa2, m2)
+        q, p = H2.step(q, p)
         qs.append(np.asarray(q)); ps.append(np.asarray(p))
     np.testing.assert_allclose(np.stack(qs), R["kg_pin_q"], rtol=1e-10, atol=1e-12)
     np.testing.assert_allclose(np.stack(ps), R["kg_pin_p"], rtol=1e-10, atol=1e-12)

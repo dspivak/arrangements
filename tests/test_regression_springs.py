@@ -27,9 +27,23 @@ before any run, not before the code as the library's convention asks:
     total-least-squares line (through the centroid, along the data's first principal
     direction), which differs from the least-squares line on noisy data. So the sliders
     are what make the rod do ordinary regression.
+
+**Composed since P43 (b) job 7** (Claude Opus 5.5, de71554a, 2026-10-10): every run below is ``Phi`` of
+``rod.rod_arrangement``, the rod, a pin, a slider (or a free ring) and a spring per point, each a box.
+It was plain numpy; those loops are kept (``_syrup``, ``_air``) and checked equal. In air the rod's
+integrator is the damped phase one, which evaluates the force after the drift where the numpy loop
+kicked first; the two give the same positions once the rod starts half a kick ahead, its momentum set
+to the force at its start (a start state set by hand, so said), and that is how the air runs start.
 """
 
+import jax
+import jax.numpy as jnp
 import numpy as np
+
+from arrangements import rod as R
+from arrangements.functors import closed_step
+
+jax.config.update("jax_enable_x64", True)
 
 K = 1.0
 
@@ -96,12 +110,71 @@ def _air(x, y, h, th, mass, inertia, friction, dt=1e-3, steps=200_000, record=Fa
     return h, th, np.array(energies)
 
 
+_Z = jnp.zeros(0)
+
+
+def _run(A, s, steps, record=None):
+    step = closed_step(A)
+    if record is None:
+        return jax.lax.fori_loop(0, steps, lambda _i, t: step(t), s)
+    return jax.lax.scan(lambda t, _: (step(t), record(step(t))), s, None, length=steps)
+
+
+def syrup_c(x, y, h0, th0, drag_h, drag_th, dt=1e-3, steps=200_000, rings=False):
+    """``Phi`` of the rod in syrup, springs on sliders (or free rings); the rod's ``(h, theta)`` at the end."""
+    A = R.rod_arrangement(x, y, R.rod_box(h0, th0, dt=dt, drags=[drag_h, drag_th], n_out=len(x)), rings=rings)
+    return tuple(float(v) for v in A.P.position(_run(A, A.P.init, steps)))
+
+
+def air_c(x, y, h0, th0, mass, inertia, friction, dt=1e-3, steps=200_000, record=False):
+    """``Phi`` of the rod in air, started half a kick ahead: ``(h, theta)`` at the end, and with
+    ``record`` the energy after each step, momentum read back to the numpy loop's convention."""
+    A = R.rod_arrangement(x, y, R.rod_box(h0, th0, dt=dt, mass_inertia=[mass, inertia], friction=friction,
+                                          n_out=len(x)), scale=dt)
+    leaves, tdef = jax.tree_util.tree_flatten(A.P.init)
+    leaves[1] = A.omega(A.P.position(A.P.init), _Z, _Z)[0]
+    s0 = jax.tree_util.tree_unflatten(tdef, leaves)
+    mi = jnp.array([mass, inertia])
+
+    def energy(s):
+        q, pL = jax.tree_util.tree_leaves(s)[:2]
+        c = dt * friction / mi                         # the damped integrator's friction per step
+        p = (pL - A.omega(q, _Z, _Z)[0]) / (1 - c)     # the numpy loop's momentum at the same step
+        r = q[0] + jnp.asarray(x) * jnp.tan(q[1]) - jnp.asarray(y)
+        return 0.5 * jnp.sum(p ** 2 / mi) + 0.5 * K * jnp.sum(r ** 2)
+
+    if record:
+        s, E = _run(A, s0, steps, record=energy)
+        q = jax.tree_util.tree_leaves(s)[0]
+        return float(q[0]), float(q[1]), np.asarray(E)
+    q = jax.tree_util.tree_leaves(_run(A, s0, steps))[0]
+    return float(q[0]), float(q[1]), None
+
+
+def test_the_composed_rod_is_the_numpy_rod():
+    """The composed rod equals the numpy loops: syrup and rings over 3000 steps, air with friction
+    over 20000 and without over 5000, positions to 1e-12, and the air energies to 1e-10."""
+    x, y = _data()
+    for dh, dth in [(1.0, 8.0), (5.0, 0.5)]:
+        np.testing.assert_allclose(syrup_c(x, y, -1.0, -0.4, dh, dth, steps=3000),
+                                   _syrup(lambda h, th: _vertical_force(x, y, h, th), -1.0, -0.4, dh, dth,
+                                          steps=3000), atol=1e-12)
+    np.testing.assert_allclose(syrup_c(x, y, -1.0, -0.4, 1.0, 1.0, steps=3000, rings=True),
+                               _syrup(lambda h, th: _ring_force(x, y, h, th), -1.0, -0.4, 1.0, 1.0,
+                                      steps=3000), atol=1e-6)   # the numpy ring force is a finite difference
+    a, b = _ols(x, y)
+    for fr, h0, th0, n in [(0.3, -1.0, -0.4, 20000), (0.0, a - 0.5, np.arctan(b) - 0.2, 5000)]:
+        hc, tc, Ec = air_c(x, y, h0, th0, 1.0, 1.0, fr, steps=n, record=True)
+        h, th, E = _air(x, y, h0, th0, 1.0, 1.0, fr, steps=n, record=True)
+        np.testing.assert_allclose([hc, tc], [h, th], atol=1e-12)
+        np.testing.assert_allclose(Ec, E, atol=1e-10)
+
+
 def test_syrup_rests_on_least_squares_whatever_the_drag():
     x, y = _data()
     a, b = _ols(x, y)
-    force = lambda h, th: _vertical_force(x, y, h, th)
     for drag_h, drag_th in [(1.0, 1.0), (1.0, 8.0), (5.0, 0.5)]:
-        h, th = _syrup(force, -1.0, -0.4, drag_h, drag_th)
+        h, th = syrup_c(x, y, -1.0, -0.4, drag_h, drag_th)
         np.testing.assert_allclose([h, np.tan(th)], [a, b], atol=1e-6)
 
 
@@ -110,8 +183,8 @@ def test_air_without_friction_swings_forever_and_keeps_its_energy():
     a, b = _ols(x, y)
     # start near rest: a hard swing drives theta toward +-pi/2, where tan blows up and the
     # fixed step no longer resolves the motion (the picture itself fails there too)
-    h, th, E = _air(x, y, a - 0.5, np.arctan(b) - 0.2, mass=1.0, inertia=1.0,
-                    friction=0.0, steps=100_000, record=True)
+    h, th, E = air_c(x, y, a - 0.5, np.arctan(b) - 0.2, mass=1.0, inertia=1.0,
+                     friction=0.0, steps=100_000, record=True)
     assert np.ptp(E) / E[0] < 1e-2
     # still far from rest at the end: the swing has not died down
     r_rest = a + x * b - y
@@ -121,18 +194,10 @@ def test_air_without_friction_swings_forever_and_keeps_its_energy():
 def test_air_with_friction_overshoots_then_settles_on_least_squares():
     x, y = _data()
     a, b = _ols(x, y)
-    h, th, _ = _air(x, y, -1.0, -0.4, mass=1.0, inertia=1.0, friction=0.3)
+    h, th, _ = air_c(x, y, -1.0, -0.4, mass=1.0, inertia=1.0, friction=0.3)
     np.testing.assert_allclose([h, np.tan(th)], [a, b], atol=1e-6)
     # overshoot: along the way the height passes the rest value and comes back
-    hs = []
-    hh, tt, ph, pt = -1.0, -0.4, 0.0, 0.0
-    for _ in range(20_000):
-        fh, ft = _vertical_force(x, y, hh, tt)
-        ph += 1e-3 * (fh - 0.3 * ph)
-        pt += 1e-3 * (ft - 0.3 * pt)
-        hh += 1e-3 * ph
-        tt += 1e-3 * pt
-        hs.append(hh)
+    hs = [air_c(x, y, -1.0, -0.4, 1.0, 1.0, 0.3, steps=n)[0] for n in range(1000, 20_001, 250)]
     assert max(hs) > a + 1e-3
 
 
@@ -140,7 +205,6 @@ def test_free_rings_give_total_least_squares_not_least_squares():
     x, y = _data()
     a_ols, b_ols = _ols(x, y)
     a_tls, b_tls = _tls(x, y)
-    force = lambda h, th: _ring_force(x, y, h, th)
-    h, th = _syrup(force, -1.0, -0.4, 1.0, 1.0, steps=100_000)
+    h, th = syrup_c(x, y, -1.0, -0.4, 1.0, 1.0, steps=100_000, rings=True)
     np.testing.assert_allclose([h, np.tan(th)], [a_tls, b_tls], atol=1e-4)
     assert abs(b_tls - b_ols) > 1e-2

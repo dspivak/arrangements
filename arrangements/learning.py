@@ -1,4 +1,10 @@
-"""Gradient descent and backpropagation via ``Phi`` (book sec.neural_network; CDLM sec.dl_warmup).
+"""Gradient descent and backpropagation via ``Phi``, the whole network as one box (CDLM sec.dl_warmup).
+
+The book's run of sec.neural_network is ``network.drawn_network``: a box per parameter, the
+datum, the label and the loss each a box, run by ``Phi`` with nothing computed outside it (plan
+P43 (b) job 1). This module's one-box network, with the loss's covector computed in code by
+``train``, is kept as a fast check, equal to the drawn arrangement at the test's settings
+(``tests/test_gradient_descent.py``); a run that cites it as a composite of boxes is wrong.
 
 A feedforward network is a smooth parameterized map ``F : Q x R^m -> R^n``,
 regarded as an arrangement
@@ -24,14 +30,17 @@ environment streams data ``(x, lambda)`` and seeds the output covector
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Callable, List, Sequence, Tuple
 
+import jax
 import jax.numpy as jnp
+import numpy as np
 from jax import Array
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, exact, zero_form
 from .coalgebra import CotCoalg
-from .functors import Phi
+from .functors import Phi, closed_step
 from .interpretation import interpretation, trivial_omega
 
 
@@ -106,8 +115,49 @@ def squared_error_forcing(y: Array, lam: Array) -> Array:
     return lam - y
 
 
+def loss_box(loss: Callable[[Array, Array], Array], n: int) -> Arrangement:
+    """The loss as a box: the 2-ary closed arrangement ``<0|n> (x) <0|n> -> I`` with cost
+    ``loss(y, lambda)`` on the answer ``y`` and the label ``lambda``; its 1-form is ``-d loss``."""
+    from .wiring import trivial_parameter
+
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=2 * n, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, nn: jnp.zeros(0),
+        omega=exact(lambda q, m, nn: -loss(m[:n], m[n:])), label="loss",
+    )
+
+
+def training_arrangement(
+    arr: Arrangement, init_q, data: Sequence[Tuple[Array, Array]],
+    loss: Callable[[Array, Array], Array] = None,
+) -> Arrangement:
+    """The closed arrangement that trains ``arr`` on a list of examples (book sec.neural_network).
+
+    The datum's box and the label's box (``network.example_box``: state the place in the list,
+    stepping to the next whatever comes back), the learner ``arr`` started at the state ``init_q``
+    beside plain wires carrying the label, and the loss as a box (``loss_box``), composed by
+    ``compose_seq`` and ``tensor_arrangements``. Its state is
+    ``(((datum, label), (learner, wires)), loss)``.
+    """
+    from .network import example_box, identity_box
+    from .wiring import compose_seq, tensor_arrangements
+
+    loss = squared_error if loss is None else loss
+    if arr.in_dim_M or arr.in_dim_N:
+        raise ValueError("training_arrangement: the learner's input ports must be trivial")
+    xs = jnp.stack([jnp.asarray(x, dtype=float).reshape(arr.out_dim_M) for x, _ in data])
+    lams = jnp.stack([jnp.asarray(l, dtype=float).reshape(arr.out_dim_N) for _, l in data])
+    learner = replace(arr, P=replace(arr.P, init=jnp.asarray(init_q, dtype=float)))
+    n = arr.out_dim_N
+    fed = compose_seq(
+        tensor_arrangements([example_box(xs, "datum"), example_box(lams, "label")]),
+        tensor_arrangements([learner, identity_box(n)]),
+    )
+    return compose_seq(fed, loss_box(loss, n))
+
+
 # ---------------------------------------------------------------------------
-# The training loop: Phi(net) closed by a data-streaming environment.
+# The training loop: the closed training arrangement, run by Phi.
 # ---------------------------------------------------------------------------
 
 
@@ -119,8 +169,53 @@ def train(
     forcing: Callable[[Array, Array], Array] = squared_error_forcing,
     loss: Callable[[Array, Array], Array] = squared_error,
     steps: int = None,
+    path: bool = False,
+):
+    """Run gradient descent as ``Phi`` of the closed training arrangement (``training_arrangement``).
+
+    The datum and the label are boxes stepping through ``data`` (cycling), the loss is a box with
+    cost ``loss``; nothing is computed outside the arrangement (plan P43 (b) job 5). ``forcing`` is
+    no longer used to drive the run; it is checked, at the first example, to be ``-d loss`` in the
+    answer, since a caller passing the two has said they agree. Returns the learner's final state
+    and the per-step loss history, read off the state before each step (and, with ``path``, the
+    learner's state after each step). The compiled step is checked against ``Phi`` on its first
+    two steps (``functors.closed_step``). The run this replaced, the learner alone with the loss's
+    covector computed in code each step, is ``train_by_port``, kept as the check.
+    """
+    A = training_arrangement(arr, init_q, data, loss)
+    n_steps = len(data) if steps is None else steps
+    m, n, k = arr.out_dim_M, arr.out_dim_N, arr.P.Q_dim
+    x0, lam0 = (jnp.asarray(v, dtype=float) for v in data[0])
+    y0 = arr.out_f(arr.P.position(jnp.asarray(init_q, dtype=float)), x0.reshape(m))
+    pushed = jax.grad(lambda y: -loss(y, lam0.reshape(n)))(y0)
+    if not np.allclose(np.asarray(forcing(y0, lam0.reshape(n))), np.asarray(pushed), atol=1e-9):
+        raise ValueError("train: forcing is not -d loss at the first example")
+    if n_steps == 0:
+        return jnp.asarray(init_q, dtype=float), ([], []) if path else []
+    step = closed_step(A)
+
+    def body(s, _):
+        pos = A.P.position(s)
+        x, lam, q = pos[:m], pos[m:m + n], pos[m + n:m + n + k]
+        s = step(s)
+        return s, (loss(arr.out_f(q, x), lam), s[0][1][0])
+
+    s, (hist, states) = jax.lax.scan(body, A.P.init, None, length=n_steps)
+    history = [float(h) for h in np.asarray(hist)]
+    final = s[0][1][0]
+    return (final, history, states) if path else (final, history)
+
+
+def train_by_port(
+    arr: Arrangement,
+    init_q: Array,
+    data: Sequence[Tuple[Array, Array]],
+    *,
+    forcing: Callable[[Array, Array], Array] = squared_error_forcing,
+    loss: Callable[[Array, Array], Array] = squared_error,
+    steps: int = None,
 ) -> Tuple[Array, List[float]]:
-    """Run gradient descent by stepping the coalgebra ``Phi(arr)``.
+    """The run ``train`` replaced: the learner alone, stepped by ``Phi(arr)``, the loss in code.
 
     At each step the environment emits a datum ``(x, lambda)``, the network
     outputs ``y = F(q, x)``, the loss seeds the output covector

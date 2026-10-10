@@ -75,13 +75,29 @@ lower than syrup (it is also lower than 0.9's); three different final poses.
 Weird, and an arm's alone: at beta 0.99 some joints whirl through many full turns on the way
 (18 on one start) before settling, since a joint angle is periodic and momentum carries it
 round; a network's parameters are not periodic, so this has no counterpart there.
+
+**Composed since P43 (b) job 7** (Claude Opus 5.5, de71554a, 2026-10-10). Every run is ``Phi`` of
+``arm.two_link_arm`` (geared joints, two link boxes per copy, a target and a spring per copy: the torque is
+what ``Phi`` passes back through the links) or ``arm.many_link_arm_power`` (the copies as tensor powers,
+checked equal to ``arm.many_link_arm``'s copy-by-copy tensor). The old loops are kept and checked equal.
+The step is the experimenter's: set where a run starts from the arm's stiffness there (``1 / (largest
+curvature)``), and in the random-start runs reset every 500 steps, so those runs are chains of arrangements,
+each started from the last's end state with the step set by hand. **Found on the way**: the momentum arm
+is chaotic. The hand loop started 1e-15 apart from itself is 7.9 radians apart after 500 steps at beta 0.9
+(a crumpled start), so no two implementations agree pathwise past a few dozen steps, and the per-start
+numbers below are one trajectory each; the claims are checked on the composite's own trajectories.
 """
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
+from arrangements import arm as Ar
+from arrangements.functors import closed_step
+
 jax.config.update("jax_enable_x64", True)
+
+_Z = jnp.zeros(0)
 
 L1, L2, K = 1.0, 0.7, 1.0
 
@@ -117,31 +133,46 @@ def _examples(q_true, xs):
 XS = [0.0, 0.8, -0.5]
 
 
+def _two_link(q0, ts, dt=0.05):
+    return Ar.two_link_arm(q0, XS, ts, L1=L1, L2=L2, k=K, dt=dt)
+
+
+def _syrup2(q0, ts, steps, dt=0.05):
+    """``Phi`` of the two-link arm in syrup; the joint angles at the end."""
+    A = _two_link(q0, ts, dt)
+    step = closed_step(A)
+    return np.asarray(A.P.position(jax.lax.fori_loop(0, steps, lambda _i, s: step(s), A.P.init)))
+
+
 def test_torque_through_the_links_is_minus_the_gradient():
+    """The torque ``Phi`` passes back through the link boxes is minus the gradient (and the numpy
+    transmission ``J^T F`` with finite-difference ``J``)."""
     rng = np.random.default_rng(1)
     ts = _examples([0.4, 1.1], XS)
     grad = jax.grad(_miss)
+    A = _two_link([0.0, 0.0], ts)
     for _ in range(5):
         q = rng.uniform(-2, 2, size=2)
-        np.testing.assert_allclose(_torque_through_links(q, XS, ts),
-                                   -np.asarray(grad(jnp.asarray(q), XS, ts)), atol=1e-7)
+        torque = np.asarray(A.omega(jnp.asarray(q), _Z, _Z)[0])
+        np.testing.assert_allclose(torque, -np.asarray(grad(jnp.asarray(q), XS, ts)), atol=1e-12)
+        np.testing.assert_allclose(torque, _torque_through_links(q, XS, ts), atol=1e-7)
 
 
 def test_in_syrup_the_arm_pulls_itself_onto_reachable_targets():
     q_true = np.array([0.4, 1.1])
     ts = _examples(q_true, XS)
-    q, dt = np.array([-0.3, 0.2]), 0.05
+    q = _syrup2([-0.3, 0.2], ts, 4000)
+    by_hand = np.array([-0.3, 0.2])
     for _ in range(4000):
-        q = q + dt * _torque_through_links(q, XS, ts)
+        by_hand = by_hand + 0.05 * _torque_through_links(by_hand, XS, ts)
+    np.testing.assert_allclose(q, by_hand, atol=1e-6)
     assert float(_miss(jnp.asarray(q), XS, ts)) < 1e-12
     np.testing.assert_allclose(q, q_true, atol=1e-5)
 
 
 def test_unreachable_targets_settle_where_the_forces_balance():
     ts = [np.array([1.5, 0.2]), np.array([0.1, 1.2]), np.array([-0.4, -0.9])]
-    q, dt = np.array([-0.3, 0.2]), 0.05
-    for _ in range(4000):
-        q = q + dt * _torque_through_links(q, XS, ts)
+    q = _syrup2([-0.3, 0.2], ts, 4000)
     np.testing.assert_allclose(_torque_through_links(q, XS, ts), 0.0, atol=1e-8)
     m = float(_miss(jnp.asarray(q), XS, ts))
     assert m > 1e-3
@@ -184,7 +215,40 @@ def _setup_n(n_examples, seed):
     return q_true, xs, ts
 
 
+_ARMS = {}
+
+
+def _arm(xs, ts, beta):
+    """The composed hundred-link arm (copies as tensor powers) and its compiled step, cached."""
+    key = (beta, float(jnp.sum(xs)), float(jnp.sum(ts)), int(xs.shape[0]))
+    if key not in _ARMS:
+        A = Ar.many_link_arm_power(jnp.zeros(N_LINKS), xs, ts, _tip_n, k=K, beta=beta)
+        step = closed_step(A)
+        _ARMS[key] = (A, jax.jit(lambda s, k: jax.lax.fori_loop(0, k, lambda _i, t: step(t), s),
+                                 static_argnums=1))
+    return _ARMS[key]
+
+
+def _composed(q, v, xs, ts, beta, lr, steps):
+    """``steps`` of the composed arm from angles ``q`` and velocity ``v`` at step ``lr`` (set by hand);
+    the angles and velocity at the end, in the hand loop's convention."""
+    A, run = _arm(xs, ts, beta)
+    leaves, tdef = jax.tree_util.tree_flatten(A.P.init)
+    tau = A.omega(q, _Z, _Z)[0]
+    leaves[0], leaves[1], leaves[2] = q, beta * v / lr + tau, jnp.full(1, lr)
+    s = run(jax.tree_util.tree_unflatten(tdef, leaves), steps)
+    qN, pN = jax.tree_util.tree_leaves(s)[:2]
+    vN = (lr * pN - lr * A.omega(qN, _Z, _Z)[0]) / beta if beta > 0 else jnp.zeros_like(qN)
+    return qN, vN
+
+
 def _syrup_n(q, xs, ts, steps):
+    """Syrup at step 1 / (largest curvature at the start), the step set by hand: ``Phi`` of the arm."""
+    lmax = float(jnp.max(jnp.linalg.eigvalsh(jax.hessian(_miss_n)(q, xs, ts))))
+    return _composed(q, jnp.zeros_like(q), xs, ts, 0.0, 1.0 / lmax, steps)[0]
+
+
+def _syrup_n_by_hand(q, xs, ts, steps):
     lmax = float(jnp.max(jnp.linalg.eigvalsh(jax.hessian(_miss_n)(q, xs, ts))))
     dt = 1.0 / lmax
     body = lambda _, qq: qq + dt * _torque_n(qq, xs, ts)
@@ -192,10 +256,35 @@ def _syrup_n(q, xs, ts, steps):
 
 
 def test_hundred_joints_torque_is_minus_the_gradient():
+    """The torque ``Phi`` passes back through the composed arm, the copies as one tensor power or as
+    sixty separate boxes, is minus the gradient (and the hand ``J^T F``)."""
     q_true, xs, ts = _setup_n(60, 3)
     q = q_true + 0.3
-    np.testing.assert_allclose(np.asarray(_torque_n(q, xs, ts)),
-                               -np.asarray(jax.grad(_miss_n)(q, xs, ts)), atol=1e-10)
+    power = _arm(xs, ts, 0.0)[0].omega(q, _Z, _Z)[0]
+    copies = Ar.many_link_arm(q, list(np.asarray(xs)), list(np.asarray(ts)), _tip_n, k=K, beta=0.0,
+                              held_step=True).omega(q, _Z, _Z)[0]
+    np.testing.assert_allclose(np.asarray(power), -np.asarray(jax.grad(_miss_n)(q, xs, ts)), atol=1e-10)
+    np.testing.assert_allclose(np.asarray(copies), np.asarray(power), atol=1e-12)
+    np.testing.assert_allclose(np.asarray(_torque_n(q, xs, ts)), np.asarray(power), atol=1e-10)
+
+
+def test_the_composed_arm_is_the_hand_arm():
+    """Syrup, three examples, 20000 steps: the composed arm equals the hand loop (1e-10). Momentum at
+    beta 0.9 from a crumpled start equals it for 20 steps (1e-12) and is chaotic after: the hand loop
+    against itself started 1e-15 apart is radians apart within 500 steps."""
+    q_true, xs, ts = _setup_n(3, 4)
+    q0 = jnp.zeros(N_LINKS)
+    np.testing.assert_allclose(np.asarray(_syrup_n(q0, xs, ts, 20_000)),
+                               np.asarray(_syrup_n_by_hand(q0, xs, ts, 20_000)), atol=1e-10)
+    q_true, xs, ts = _setup_n(60, 5)
+    q0 = jnp.asarray(np.random.default_rng(11).uniform(-np.pi, np.pi, N_LINKS))
+    lr = 0.5 / float(_STIFF(q0, xs, ts))
+    q, _ = _composed(q0, jnp.zeros_like(q0), xs, ts, 0.9, lr, 20)
+    st = jax.lax.fori_loop(0, 20, _momentum_body(xs, ts), (q0, jnp.zeros_like(q0), lr, 0.9))
+    np.testing.assert_allclose(np.asarray(q), np.asarray(st[0]), atol=1e-12)
+    a = jax.lax.fori_loop(0, 500, _momentum_body(xs, ts), (q0, jnp.zeros_like(q0), lr, 0.9))[0]
+    b = jax.lax.fori_loop(0, 500, _momentum_body(xs, ts), (q0 + 1e-15, jnp.zeros_like(q0), lr, 0.9))[0]
+    assert float(jnp.max(jnp.abs(a - b))) > 1.0
 
 
 def test_hundred_joints_three_examples_reach_but_not_the_true_setting():
@@ -232,14 +321,13 @@ def _momentum_body(xs, ts):
 
 
 def _run_adaptive(q, xs, ts, beta, chunks=40, per_chunk=500):
-    """beta = 0: syrup; beta > 0: in air with friction keeping beta of the velocity per step.
-    The step is half of 1/(current stiffness), reset every chunk, so the discrete run stays
-    faithful to the continuous one as the arm stiffens."""
-    run = jax.jit(lambda st: jax.lax.fori_loop(0, per_chunk, _momentum_body(xs, ts), st))
+    """beta = 0: syrup; beta > 0: in air with friction keeping beta of the velocity per step. A chain of
+    ``chunks`` runs of the composed arm, each from the last's end, its step set by hand to half of
+    1/(current stiffness), so the discrete run stays faithful to the continuous one as the arm stiffens."""
     v = jnp.zeros_like(q)
     for _ in range(chunks):
         lr = 0.5 / float(_STIFF(q, xs, ts))
-        q, v, _, _ = run((q, v, lr, beta))
+        q, v = _composed(q, v, xs, ts, beta, lr, per_chunk)
     return q
 
 

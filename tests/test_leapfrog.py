@@ -9,8 +9,11 @@ one chain wiring, next to heat (``configuration``) and wave (``phase``):
 
 The single-stage phase coalgebra is itself symplectic (presented-position
 readout), so it stays bounded too; leapfrog is a higher-order alternative.
-The boundary covector is a forcing: pinning ``q_{K+1} = 0`` is ``xi_N = -kappa q_K``
-(CDLM's ``+kappa q_K`` with a subtracting integrator; STATUS.md §1).
+The ends are held by boxes (plan P43 (b) job 4, Claude Opus 5.5, de71554a, 2026-10-10): every run is
+``Phi2`` of ``wiring.held_chain`` with leapfrog parts and leapfrog held ends, closed. Until then the
+pin was computed in code at each stage, ``xi_N = -kappa q_K`` from the emitted position (CDLM's
+``+kappa q_K`` with a subtracting integrator; STATUS.md §1); that run is kept as ``_boundary`` and
+checked equal. The phase chain in the boundedness test is held the same way.
 """
 
 import jax.numpy as jnp
@@ -22,7 +25,7 @@ from arrangements.leapfrog import leapfrog
 from arrangements.pc2 import Phi2
 from arrangements.wiring import compose_chain
 
-from tests.chain import IN_POS, harmonic_particle, load_regress, phase_flat, phase_state
+from tests.chain import IN_POS, HeldChain, harmonic_particle, load_regress, phase_flat, phase_state
 
 
 def _boundary(kappa):
@@ -47,6 +50,28 @@ def _leap_chain(K, m, kappa):
     return Phi2(compose_chain([harmonic_particle(leapfrog, m, kappa)] * K))
 
 
+def _held(K, m, kappa, parameter=leapfrog):
+    """The chain with its ends held by boxes, closed."""
+    return HeldChain([harmonic_particle(parameter, m, kappa)] * K, kappa, parameter,
+                     two_stage=parameter is leapfrog)
+
+
+def test_held_ends_are_the_port_fed_run():
+    """The held chain's ``Phi2`` equals the old run that held the ends in code, 300 steps."""
+    K, m, kappa = 5, 1.5, 0.9
+    O, H, bdy = _leap_chain(K, m, kappa), _held(K, m, kappa), _boundary(kappa)
+    rng = np.random.default_rng(0)
+    q = jnp.asarray(rng.standard_normal(K))
+    p = jnp.asarray(rng.standard_normal(K))
+    state = phase_state(q, p)
+    for _ in range(300):
+        _, _, state = O.with_state(state).run_one(IN_POS, bdy)
+        q, p = H.step(q, p)
+    a, b = phase_flat(state, K)
+    np.testing.assert_allclose(np.asarray(q), np.asarray(a), atol=1e-12)
+    np.testing.assert_allclose(np.asarray(p), np.asarray(b), atol=1e-12)
+
+
 def test_leapfrog_and_phase_are_both_bounded():
     """The presented-position readout makes the single-stage phase coalgebra
     symplectic, so it stays bounded like leapfrog (kappa/m = 0.6)."""
@@ -56,19 +81,19 @@ def test_leapfrog_and_phase_are_both_bounded():
     peak0 = float(np.max(np.abs(np.asarray(q0))))
     bdy = _boundary(kappa)
 
-    O = _leap_chain(K, m, kappa)
-    state = phase_state(q0, jnp.zeros(K))
+    H = _held(K, m, kappa)
+    q, p = q0, jnp.zeros(K)
     leap_peak = peak0
     for _ in range(300):
-        _, _, state = O.with_state(state).run_one(IN_POS, bdy)
-        leap_peak = max(leap_peak, float(np.max(np.abs(np.asarray(phase_flat(state, K)[0])))))
+        q, p = H.step(q, p)
+        leap_peak = max(leap_peak, float(np.max(np.abs(np.asarray(q)))))
 
-    Oe = Phi(compose_chain([harmonic_particle(phase, m, kappa)] * K))
-    es = phase_state(q0, jnp.zeros(K))
+    He = _held(K, m, kappa, phase)
+    q, p = q0, jnp.zeros(K)
     phase_peak = peak0
     for _ in range(300):
-        _, _, es = Oe.with_state(es).run_one(IN_POS, bdy)
-        phase_peak = max(phase_peak, float(np.max(np.abs(np.asarray(phase_flat(es, K)[0])))))
+        q, p = He.step(q, p)
+        phase_peak = max(phase_peak, float(np.max(np.abs(np.asarray(q)))))
 
     assert leap_peak < 10.0 * peak0
     assert phase_peak < 10.0 * peak0
@@ -77,15 +102,14 @@ def test_leapfrog_and_phase_are_both_bounded():
 def test_leapfrog_centered_wave_recurrence():
     """m (q_{n+1} - 2 q_n + q_{n-1}) = kappa * Lap(q_n), force at the CENTER point."""
     K, m, kappa = 5, 1.5, 0.9
-    O = _leap_chain(K, m, kappa)
+    H = _held(K, m, kappa)
     rng = np.random.default_rng(1)
-    state = phase_state(jnp.asarray(rng.standard_normal(K)), jnp.asarray(rng.standard_normal(K)))
-    bdy = _boundary(kappa)
+    q, p = jnp.asarray(rng.standard_normal(K)), jnp.asarray(rng.standard_normal(K))
 
-    traj = [np.asarray(phase_flat(state, K)[0])]
+    traj = [np.asarray(q)]
     for _ in range(12):
-        _, _, state = O.with_state(state).run_one(IN_POS, bdy)
-        traj.append(np.asarray(phase_flat(state, K)[0]))
+        q, p = H.step(q, p)
+        traj.append(np.asarray(q))
     a = np.stack(traj)
     for t in range(len(a) - 2):
         centered = m * (a[t + 2] - 2.0 * a[t + 1] + a[t])
@@ -95,15 +119,14 @@ def test_leapfrog_centered_wave_recurrence():
 def test_leapfrog_energy_is_bounded():
     """Symplectic: the energy stays in a bounded band (here well within a factor of 2)."""
     K, m, kappa = 5, 1.5, 0.9
-    O = _leap_chain(K, m, kappa)
+    chain = _held(K, m, kappa)
     rng = np.random.default_rng(2)
-    state = phase_state(jnp.asarray(rng.standard_normal(K)), jnp.asarray(rng.standard_normal(K)))
-    bdy = _boundary(kappa)
+    q, p = jnp.asarray(rng.standard_normal(K)), jnp.asarray(rng.standard_normal(K))
 
-    H0 = _energy(*phase_flat(state, K), m, kappa)
+    H0 = _energy(q, p, m, kappa)
     for _ in range(150):
-        _, _, state = O.with_state(state).run_one(IN_POS, bdy)
-        H = _energy(*phase_flat(state, K), m, kappa)
+        q, p = chain.step(q, p)
+        H = _energy(q, p, m, kappa)
         assert 0.5 * H0 < H < 2.0 * H0
 
 
@@ -112,13 +135,11 @@ def test_regression_matches_cdlm():
     R = load_regress("multistage")
     K, m, kappa = R["leap_params"]
     K = int(K)
-    O = _leap_chain(K, m, kappa)
-    state = phase_state(jnp.asarray(R["leap_q"][0]), jnp.asarray(R["leap_p"][0]))
-    bdy = _boundary(kappa)
+    H = _held(K, m, kappa)
+    q, p = jnp.asarray(R["leap_q"][0]), jnp.asarray(R["leap_p"][0])
     qs, ps = [R["leap_q"][0]], [R["leap_p"][0]]
     for _ in range(R["leap_q"].shape[0] - 1):
-        _, _, state = O.with_state(state).run_one(IN_POS, bdy)
-        q, p = phase_flat(state, K)
+        q, p = H.step(q, p)
         qs.append(np.asarray(q)); ps.append(np.asarray(p))
     np.testing.assert_allclose(np.stack(qs), R["leap_q"], rtol=1e-10, atol=1e-12)
     np.testing.assert_allclose(np.stack(ps), R["leap_p"], rtol=1e-10, atol=1e-12)

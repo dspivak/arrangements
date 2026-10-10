@@ -258,7 +258,28 @@ price of a nilpotent sharp and a potential that is not an energy -- or with
 doubled SPECIES boxes in log coordinates, exactly Euler-in-log, positive by
 construction, trading structural conservation for structural positivity; and
 directly, as the book allows, every network as a non-exact forcing on a plain
-configuration coalgebra, certifying nothing.
+configuration coalgebra, certifying nothing -- in one box (6), or composed with a
+box per chemical holding its amount and a box per reaction (7).
+
+7. COMPOSED DIRECT, any network (book Ch 1 ``sec.same_calculus``, *Chemical
+   reactions*; plan P43 (b) job 2, David's choice of 2026-10-10). Encoding 6
+   taken apart: a CHEMICAL box per species (``chemical_box``), the
+   configuration coalgebra on ``R`` holding its amount ``x_s`` with response
+   ``dt``, its amount broadcast to each reaction that touches it; a stateless
+   REACTION box per reaction (``reaction_box``), hearing the amounts of the
+   chemicals it touches and returning to each of them the 1-form component
+   ``zeta_rs v_r(x)`` -- its net rate times that chemical's stoichiometric
+   number -- which is not exact (its Jacobian is not symmetric once a reaction
+   consumes two chemicals, as the waterfall's coupling is not); and a routing
+   wire (``reaction_wire``). ``composed_mass_action_arrangement`` is
+   ``compose_seq(tensor(chemicals, reactions), wire)``; pullback-and-sum
+   gathers at each chemical the sum over reactions of ``zeta_rs v_r``, so one
+   ``Phi`` step is the Euler mass-action step at any molecularity, reversible
+   or not. Item 3's no-go does not reach it, being about exact forcings. As in
+   6, nothing is descended: on a detailed-balanced network the free energy
+   ``F`` falls along the run because the mass-action flow dissipates it (a
+   measured fact, at small ``dt``), not because the arrangement's forcing is
+   ``-dF``.
 """
 
 from __future__ import annotations
@@ -1128,3 +1149,118 @@ def mass_action_dynamics(
 ) -> PCMorphism:
     """``Phi`` of the direct mass-action arrangement."""
     return Phi(mass_action_arrangement(alpha, beta, kf, kb, dt, parameter))
+
+
+# ---------------------------------------------------------------------------
+# 7. COMPOSED DIRECT: a box per chemical, a box per reaction (module docstring, 7).
+# ---------------------------------------------------------------------------
+
+
+def reaction_incidences(alpha: Array, beta: Array) -> Tuple[List[List[int]], List[int], List[int]]:
+    """Which chemicals each reaction touches, each chemical's degree, and the routing bijection.
+
+    Reaction ``r`` touches ``S_r = {s : alpha_rs > 0 or beta_rs > 0}`` (in species order) and has
+    one in-port per chemical in ``S_r`` (in-ports reaction-major); chemical ``s`` has one
+    out-port per reaction touching it (out-ports species-major, reactions in order). ``perm``
+    satisfies ``in_f(m_out)[p] = m_out[perm[p]]``.
+    """
+    alpha = jnp.asarray(alpha, float)
+    beta = jnp.asarray(beta, float)
+    R, n = alpha.shape
+    touched = [[s for s in range(n) if float(alpha[r, s]) > 0 or float(beta[r, s]) > 0]
+               for r in range(R)]
+    out_port: Dict[Tuple[int, int], int] = {}
+    degrees: List[int] = []
+    idx = 0
+    for s in range(n):
+        deg = 0
+        for r in range(R):
+            if s in touched[r]:
+                out_port[(s, r)] = idx
+                idx += 1
+                deg += 1
+        degrees.append(deg)
+    perm = [out_port[(s, r)] for r in range(R) for s in touched[r]]
+    return touched, degrees, perm
+
+
+def chemical_box(x0: float, degree: int, dt: float = 1.0) -> Arrangement:
+    """A chemical's box ``<R^0|R^0> -> <R^0 | R^{degree}>``: its state the amount ``x_s``.
+
+    Configuration coalgebra on ``R`` with response ``dt``, initial amount ``x0``; reads out the
+    amount to each of the ``degree`` reactions that touch it; no inputs, zero forcing.
+    """
+    return Arrangement(
+        P=configuration(euclidean(1, dt), init=jnp.array([x0], dtype=float)),
+        in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=degree,
+        out_f=lambda q, m_out: jnp.tile(q, degree),
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=zero_form,
+        label="chemical",
+    )
+
+
+def reaction_box(alpha_r: Array, beta_r: Array, kf: float, kb: float) -> Arrangement:
+    """A reaction's stateless box ``<R^0|R^0> -> <R^k | R^0>``, ``k`` the chemicals it touches.
+
+    ``alpha_r``, ``beta_r`` are its reactant and product numbers on those ``k`` chemicals. It
+    hears their amounts ``x`` and returns to chemical ``s`` the component ``zeta_s v(x)``,
+    ``zeta = beta_r - alpha_r``, ``v(x) = kf x^alpha_r - kb x^beta_r``: a 1-form on its input
+    side written directly, with no potential (``kb = 0`` for a one-way reaction).
+    """
+    a = jnp.asarray(alpha_r, float)
+    b = jnp.asarray(beta_r, float)
+    zeta = b - a
+    k = int(a.shape[0])
+
+    def omega(q: Array, m_out: Array, n_in: Array):
+        v = kf * jnp.prod(n_in ** a) - kb * jnp.prod(n_in ** b)
+        return jnp.zeros_like(q), jnp.zeros_like(m_out), zeta * v
+
+    return Arrangement(
+        P=trivial_parameter(),
+        in_dim_M=0, out_dim_M=0, in_dim_N=k, out_dim_N=0,
+        out_f=lambda q, m_out: jnp.zeros(0),
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=omega,
+        label="reaction",
+    )
+
+
+def reaction_wire(alpha: Array, beta: Array) -> Arrangement:
+    """The routing wire ``<R^P|R^P> -> <R^0|R^0>``: each reaction's in-ports from its chemicals'
+    out-ports, by the bijection of ``reaction_incidences``; trivial parameter, zero forcing."""
+    _, _, perm = reaction_incidences(alpha, beta)
+    P = len(perm)
+    perm = jnp.asarray(perm, dtype=int)
+    return Arrangement(
+        P=trivial_parameter(),
+        in_dim_M=P, out_dim_M=P, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m_out: jnp.zeros(0),
+        in_f=lambda q, m_out, n_in: m_out[perm],
+        omega=zero_form,
+        label="reaction_wire",
+    )
+
+
+def composed_mass_action_arrangement(
+    alpha: Array, beta: Array, kf: Array, kb: Array, x0: Array, dt: float = 1.0,
+) -> Arrangement:
+    """The closed network ``compose_seq(tensor(chemicals, reactions), reaction_wire)`` (docstring, 7).
+
+    Its parameter's position is the amounts ``x`` in species order (the reaction boxes and the
+    wire are stateless), starting at ``x0``. The total forcing at chemical ``s``,
+    ``sum_r zeta_rs v_r(x)``, is gathered by ``compose_seq``'s pullback-and-sum and written
+    nowhere whole. No detailed-balance, reversibility or molecularity hypothesis.
+    """
+    alpha = jnp.asarray(alpha, float)
+    beta = jnp.asarray(beta, float)
+    kf = jnp.asarray(kf, float)
+    kb = jnp.asarray(kb, float)
+    x0 = jnp.asarray(x0, float)
+    touched, degrees, _ = reaction_incidences(alpha, beta)
+    chemicals = [chemical_box(float(x0[s]), degrees[s], dt) for s in range(len(degrees))]
+    reactions = [reaction_box(alpha[r, jnp.asarray(t)], beta[r, jnp.asarray(t)], float(kf[r]), float(kb[r]))
+                 for r, t in enumerate(touched)]
+    wired = compose_seq(tensor_arrangements(chemicals + reactions), reaction_wire(alpha, beta))
+    return replace(wired, label=f"composed_mass_action(n={len(degrees)}, R={len(touched)})")

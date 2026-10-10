@@ -2,13 +2,22 @@
 
 A line-learner holding what dataset D1 taught it is fed another dataset through its input port. The
 form is the same for it when it does not have to move. Predictions are in the note, written first.
+
+Every run is ``Phi`` of ``learning.training_arrangement``: the line-learner wired to a datum box, a label
+box and the loss as a box (plan P43 (b) job 5, Claude Opus 5.5, de71554a, 2026-10-10). The summed
+pulled-back forcing of prediction 1 is read off that arrangement too: at learning rate 1, one step on one
+example moves the learner by exactly the force the loss box passes back to it. Until then both were the
+learner alone with the loss's covector computed in code; ``test_the_boxes_are_the_port_fed_loop``
+checks the two equal.
 """
 
 import jax.numpy as jnp
 import numpy as np
 
 from arrangements.coalgebra import configuration
-from arrangements.learning import forward_backward, parameterized_map, squared_error_forcing, train
+from arrangements.learning import (
+    forward_backward, parameterized_map, squared_error_forcing, train, train_by_port,
+)
 from arrangements.rvect import euclidean
 
 
@@ -51,7 +60,15 @@ def _data(xy):
 
 
 def _summed_xi_Q(arr, q, xy):
-    """Sum over the dataset of the forcing pulled back to the parameter, by the arrangement's backward pass."""
+    """Sum over the dataset of the force the loss box passes back to the learner at ``q``: the
+    displacement of one ``Phi`` step of the training arrangement at learning rate 1, per example."""
+    unit = _learner(1.0)
+    q = jnp.asarray(q, dtype=float)
+    return sum(np.asarray(train(unit, q, [d], steps=1)[0] - q) for d in _data(xy))
+
+
+def _summed_xi_Q_by_port(arr, q, xy):
+    """The same sum as the run before P43 (b) computed it: the loss's covector in code."""
     tot = np.zeros(2)
     q = jnp.asarray(q, dtype=float)
     for x, lam in _data(xy):
@@ -64,11 +81,32 @@ def _summed_xi_Q(arr, q, xy):
 def _centre(arr, q, xy, passes):
     data = _data(xy)
     q, _ = train(arr, q, data, steps=passes * len(data))
+    q, _, path = train(arr, q, data, steps=len(data), path=True)
+    return q, np.mean(np.asarray(path), axis=0)
+
+
+def _centre_by_port(arr, q, xy, passes):
+    data = _data(xy)
+    q, _ = train_by_port(arr, q, data, steps=passes * len(data))
     path = []
     for t in range(len(data)):
-        q, _ = train(arr, q, [data[t]], steps=1)
+        q, _ = train_by_port(arr, q, [data[t]], steps=1)
         path.append(np.asarray(q))
     return q, np.mean(path, axis=0)
+
+
+def test_the_boxes_are_the_port_fed_loop():
+    """The training arrangement equals the old port-fed loop: the summed forces at w1 on D2 and D4,
+    and the centre after 400 passes over D1 at rate 0.05. The prediction, not a premise."""
+    w1, D = _datasets()
+    arr = _learner(0.05)
+    for k in ("D2", "D4"):
+        np.testing.assert_allclose(_summed_xi_Q(arr, w1, D[k]), _summed_xi_Q_by_port(arr, w1, D[k]),
+                                   atol=1e-12)
+    a, ca = _centre(arr, jnp.zeros(2), D["D1"], 400)
+    b, cb = _centre_by_port(arr, jnp.zeros(2), D["D1"], 400)
+    np.testing.assert_allclose(a, b, atol=1e-12)
+    np.testing.assert_allclose(ca, cb, atol=1e-12)
 
 
 def test_lines_agree():

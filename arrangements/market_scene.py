@@ -444,6 +444,91 @@ def nested_market(gammas, prior_outer=(0.5, 0.5), nA=3, nB=3):
     return out
 
 
+def nested_market_composed(arm: SceneArm, prior_outer=(0.5, 0.5), A=A_VALUES, B=B_VALUES, a0=A0, b0=B0,
+                           a_true=A_TRUE, b_true=B_TRUE, b2=B2, d0s=D0S, sigma=SIGMA_B, T=T_INNER):
+    """``nested_market`` with its likelihoods made by boxes (plan P43 (b) job 7, Claude Opus 5.5, de71554a):
+    a box stepping through the rounds' starting distances ``d_0`` (the environment's schedule); the world, a
+    gray box running the true scene from ``d_0`` (and the second scene of the comparison); a likelihood box per
+    scene, running that scene from the same ``d_0`` and reading the world's outcome by a Gaussian; and the
+    nested market (beliefs and the paying box) hearing the six likelihoods. One closed arrangement, run by
+    ``Phi``. Before, ``scene_likelihoods`` computed the likelihoods in numpy and fed them in. Returns the flat
+    trust after each round, as ``nested_market``."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+
+    from .arrangement import Arrangement, exact
+    from .belief import belief_coalgebra, belief_of
+    from .functors import Phi
+    from .interpretation import trivial_omega
+    from .network import example_box, fan_box, map_box
+    from .wiring import compose_seq, tensor_arrangements, trivial_parameter
+
+    def scene(a, b, d0):
+        s, c = 0.0, d0
+        for _ in range(T):
+            s, c = s + a * (c - s), c + b * (s + D_PREF - c)
+        return c - s, s
+
+    def world(v):
+        D, sT = scene(a_true, b_true, v[0])
+        return jnp.stack([v[0], D, sT, scene(a_true, b2, v[0])[0]])
+
+    lik = lambda x, y: jnp.exp(-0.5 * ((x - y) / sigma) ** 2)
+    fam = scene_family(A, B, a0, b0)
+
+    def likelihood_box(who, a, b):
+        def g(v):
+            d0, Dst, sst, D2st = v[0], v[1], v[2], v[3]
+            D, sT = scene(a, b, d0)
+            p = lik(Dst, D)
+            if arm.sighting:
+                p = p * lik(sst, sT)
+            if arm.comparison:
+                p = p * lik(D2st, scene(a if who == "snake" else a0, b2, d0)[0])
+            return jnp.reshape(p, (1,))
+        return map_box(g, 4, 1, f"likelihood({who}, {a:g}, {b:g})")
+
+    nA, nB = len(A), len(B)
+    n_tot = nA + nB
+    rounds = example_box(jnp.asarray(d0s, dtype=float).reshape(-1, 1), "d0")
+    seen = compose_seq(compose_seq(rounds, map_box(world, 1, 4, "world")),
+                       fan_box(4, list(range(4)) * n_tot, "copy"))
+    gammas = compose_seq(seen, tensor_arrangements([likelihood_box(*f) for f in fam]))
+
+    P = belief_coalgebra(2, jnp.log(jnp.asarray(prior_outer))).tensor(
+        belief_coalgebra(nA, jnp.zeros(nA))).tensor(belief_coalgebra(nB, jnp.zeros(nB)))
+    beliefs = Arrangement(
+        P=P, in_dim_M=0, out_dim_M=n_tot, in_dim_N=0, out_dim_N=2 + n_tot + n_tot,
+        out_f=lambda y, g: jnp.concatenate([y, g]), in_f=lambda y, g, n_in: jnp.zeros(0),
+        omega=lambda y, g, n_in: (jnp.zeros(2 + n_tot), jnp.zeros(n_tot), jnp.zeros(0)), label="beliefs")
+
+    def cost(q, w, n_in):
+        mu, nu_s, nu_c, g = w[:2], w[2:2 + nA], w[2 + nA:2 + n_tot], w[2 + n_tot:]
+        g_s, g_c = g[:nA], g[nA:]
+        agg = jnp.stack([jnp.dot(jax.lax.stop_gradient(nu_s), g_s), jnp.dot(jax.lax.stop_gradient(nu_c), g_c)])
+        return -jnp.dot(mu, jnp.log(agg)) - jnp.dot(nu_s, jnp.log(g_s)) - jnp.dot(nu_c, jnp.log(g_c))
+
+    pay = Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=2 + n_tot + n_tot, in_dim_N=0, out_dim_N=0,
+                      out_f=lambda q, w: jnp.zeros(0), in_f=lambda q, w, n_in: jnp.zeros(0),
+                      omega=exact(lambda q, w, n_in: -cost(q, w, n_in)), label="pay")
+    closed = compose_seq(gammas, compose_seq(beliefs, pay))
+    O = Phi(closed)
+    s = O.state
+    z = jnp.zeros(0)
+
+    def flat(s):
+        (l_mu, l_s), l_c = s[1][0]   # (the likelihood stage's, (the beliefs', the paying box's))
+        mu, nu_s, nu_c = belief_of(l_mu), belief_of(l_s), belief_of(l_c)
+        return np.concatenate([np.asarray(mu[0] * nu_s), np.asarray(mu[1] * nu_c)])
+
+    out = [flat(s)]
+    for _ in d0s:
+        _, _, s = O.with_state(s).run_one((z, trivial_omega(0)), lambda _o: (z, z))
+        out.append(flat(s))
+    return out
+
+
 def scene_likelihoods(arm: SceneArm, A=A_VALUES, B=B_VALUES, a0=A0, b0=B0, a_true=A_TRUE, b_true=B_TRUE, b2=B2,
                       d0s=D0S, sigma=SIGMA_B, T=T_INNER):
     """The six scenes' likelihoods of the recording, round by round (what pays the market)."""

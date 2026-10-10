@@ -18,6 +18,13 @@ rollout by ``Phi`` equals the closed form and the information gain is the book n
 shifted, the switch from looking to pushing sits where the closed form puts it, and exact wiring
 bends the belief 0.384 toward the preferred outcome while unilateral wiring leaves it on the
 evidence (held).
+
+G BY PARTS (plan P43 (b) job 6, Claude Opus 5.5, de71554a, 2026-10-10, at David's "A seems much better …
+is the looking part using figurines? Can we do it that way?"). Every look-to-push run now composes
+``ai.figurine_planner``: the belief box, copied to a figurine of the world per policy (the world's own step
+from the belief under the policy's push), a score box per step (risk plus ambiguity), and the chooser.
+Until then the planner was one box running those futures in its sending map, and the look-to-push
+switch fed it ``G`` computed in test code. The one-box agent is kept and checked equal (``one_box_agent``).
 """
 
 import jax.numpy as jnp
@@ -198,6 +205,24 @@ def closed_G(m, Sig, seq):
     return G
 
 
+def test_figurines_are_the_one_box_planner():
+    """The planner by parts equals the one-box planner: G from the figurines equals the closed form
+    at horizon 1 and 2 (1e-12), and the agent with the shifted chooser, exact and unilateral, settles
+    where the one-box agent does (1e-12) over 6000 steps. The prediction, not a premise."""
+    for Sig in [2.0, 0.05]:
+        for a in [PUSH, LOOK, RETREAT]:
+            for b in [None, PUSH, LOOK, RETREAT]:
+                pol = [a] if b is None else [a, b]
+                A = ai.figurine_planner([pol], Sig, 0.0, 0.0, 0.0, Q_W, OSTAR, P_PREF)
+                g = float(A.out_f(A.P.position(A.P.init), jnp.zeros(0))[0])
+                assert abs(g - closed_G(0.0, Sig, pol)) < 1e-12
+    for uni in (False, True):
+        m, p = settle(agent(uni, 2.0), 6000)
+        m0, p0 = ai.run(one_box_agent(uni, 2.0), 6000)
+        assert abs(float(m[0]) - float(m0[0])) < 1e-12
+        assert float(jnp.max(jnp.abs(p - p0))) < 1e-12
+
+
 def test_iii_a_rollout_by_phi_equals_closed_form():
     """(iii-a) horizon 1 at three Sigma, two m; horizon 2, nine sequences, two Sigma; to 1e-12."""
     for Sig in [2.0, 0.5, 0.05]:
@@ -228,9 +253,22 @@ def test_iii_b_risk_plus_ambiguity_is_cost_less_information_gain():
                 assert abs(I - 0.5 * np.log(1 + V / R)) < 1e-12
 
 
-def chooser_after(G, T, shift=0.0, steps=3000):
-    arr = compose_seq(ai.publisher(G), ai.open_chooser(3, T, dt=0.3, shift=shift))
-    return ai.run(arr, steps)[1]
+def figurine_agent(chooser, Sig=0.5, x_obs=-0.5, w_ev=4.0, eta=0.1):
+    """The planner by parts (belief, figurines, score boxes) wired to ``chooser``."""
+    return compose_seq(ai.figurine_planner(POLICIES, Sig, x_obs=x_obs, w_ev=w_ev, eta=eta, Q=Q_W,
+                                           ostar=OSTAR, P=P_PREF), chooser)
+
+
+def settle(arr, steps, k=3):
+    """Run to ``steps``; the belief's mean and the chooser's state, read off the composite's position."""
+    pos = arr.P.position(ai.run(arr, steps))
+    return pos[:1], pos[-k:]
+
+
+def chooser_after(Sig, T, shift=0.0, steps=3000):
+    """The chooser after the figurines, the belief held at 0 with spread ``Sig``."""
+    return settle(figurine_agent(ai.open_chooser(3, T, dt=0.3, shift=shift), Sig=Sig, x_obs=0.0,
+                                 w_ev=0.0, eta=0.0), steps)[1]
 
 
 @pytest.mark.parametrize("shift", [pytest.param(0.0, marks=pytest.mark.xfail(strict=True, reason=REFUTED)), 2.0])
@@ -238,8 +276,7 @@ def test_iii_c_look_while_unsure_push_once_sure(shift):
     """(iii-c) shares at Sigma = 0.2 and 0.02 (1e-10); ratio push/look = 1 at the switch (1e-9)."""
     got = {}
     for Sig in [0.2, 0.02, SIG_FLIP]:
-        got[Sig] = chooser_after(ai.G_vector(STEP, 0.0, Sig, POLICIES, Q_W, OSTAR, P_PREF), 0.2,
-                                 shift)
+        got[Sig] = chooser_after(Sig, 0.2, shift)
         print("shift", shift, "Sigma", Sig, "p", got[Sig], "sum", float(jnp.sum(got[Sig])))
     ratio = float(got[SIG_FLIP][0] / got[SIG_FLIP][1])
     print("ratio at switch", ratio)
@@ -251,6 +288,10 @@ def test_iii_c_look_while_unsure_push_once_sure(shift):
 
 
 def agent(unilateral, shift):
+    return figurine_agent(ai.open_chooser(3, 0.5, dt=0.3, unilateral=unilateral, shift=shift))
+
+
+def one_box_agent(unilateral, shift):
     return compose_seq(
         ai.planner(POLICIES, 0.5, x_obs=-0.5, w_ev=4.0, eta=0.1, Q=Q_W, ostar=OSTAR, P=P_PREF),
         ai.open_chooser(3, 0.5, dt=0.3, unilateral=unilateral, shift=shift))
@@ -259,7 +300,7 @@ def agent(unilateral, shift):
 @pytest.mark.parametrize("shift", [pytest.param(0.0, marks=pytest.mark.xfail(strict=True, reason=REFUTED)), 2.0])
 def test_iii_d_exact_wiring_bends_belief_toward_preference(shift):
     """(iii-d) exact: m* = -0.11620980279789729, p* as written; to 1e-9."""
-    m, p = ai.run(agent(False, shift), 6000)
+    m, p = settle(agent(False, shift), 6000)
     print("exact shift", shift, "m", float(m[0]), "p", p, "sum", float(jnp.sum(p)))
     assert abs(float(m[0]) - (-0.11620980279789729)) < 1e-9
     assert rel(p, [0.2703991878894675, 0.7261863226871871, 0.00341448942334541]) < 1e-9
@@ -268,7 +309,7 @@ def test_iii_d_exact_wiring_bends_belief_toward_preference(shift):
 @pytest.mark.parametrize("shift", [pytest.param(0.0, marks=pytest.mark.xfail(strict=True, reason=REFUTED)), 2.0])
 def test_iii_d_unilateral_wiring_leaves_belief_on_evidence(shift):
     """(iii-d) unilateral: m* = -0.5, p* as written; to 1e-9."""
-    m, p = ai.run(agent(True, shift), 6000)
+    m, p = settle(agent(True, shift), 6000)
     print("unilateral shift", shift, "m", float(m[0]), "p", p, "sum", float(jnp.sum(p)))
     assert abs(float(m[0]) - (-0.5)) < 1e-9
     assert rel(p, [0.4069992837643438, 0.5914956883515895, 0.00150502788406671]) < 1e-9
@@ -276,7 +317,7 @@ def test_iii_d_unilateral_wiring_leaves_belief_on_evidence(shift):
 
 def test_A3_unshifted_switch_ratio_survives_the_drift():
     """(A3) unshifted, the shares drift off the simplex but stay proportional: ratio 1 at the switch."""
-    p = chooser_after(ai.G_vector(STEP, 0.0, SIG_FLIP, POLICIES, Q_W, OSTAR, P_PREF), 0.2)
+    p = chooser_after(SIG_FLIP, 0.2)
     assert float(jnp.sum(p)) < 0.01
     assert abs(float(p[0] / p[1]) - 1) < 1e-9
 
@@ -284,7 +325,7 @@ def test_A3_unshifted_switch_ratio_survives_the_drift():
 def test_A3_unshifted_unilateral_belief_still_on_evidence():
     """Not predicted (A3 said all of (iii-d)'s numbers would fail unshifted): the unilateral
     chooser pulls nothing back, so the belief settles on the evidence whatever the chooser does."""
-    m, p = ai.run(agent(True, 0.0), 6000)
+    m, p = settle(agent(True, 0.0), 6000)
     assert abs(float(m[0]) - (-0.5)) < 1e-9
     assert float(jnp.sum(p)) < 0.05
 
@@ -311,18 +352,16 @@ def test_B1_natural_chooser_settles_on_policy_posterior(E, target):
 
 
 def natural_agent(unilateral):
-    return compose_seq(
-        ai.planner(POLICIES, 0.5, x_obs=-0.5, w_ev=4.0, eta=0.1, Q=Q_W, ostar=OSTAR, P=P_PREF),
-        ai.natural_chooser(3, 0.5, dt=0.3, unilateral=unilateral))
+    return figurine_agent(ai.natural_chooser(3, 0.5, dt=0.3, unilateral=unilateral))
 
 
 def test_B2_natural_chooser_in_the_planner_composite_unshifted():
     """(B2) exact: m* = -0.11620980279789729; unilateral: m* = -0.5; p* as in (iii-d); 1e-9."""
-    m, lam = ai.run(natural_agent(False), 6000)
+    m, lam = settle(natural_agent(False), 6000, k=2)
     print("natural exact m", float(m[0]), "p", ai.shares(lam))
     assert abs(float(m[0]) - (-0.11620980279789729)) < 1e-9
     assert rel(ai.shares(lam), [0.2703991878894675, 0.7261863226871871, 0.00341448942334541]) < 1e-9
-    m, lam = ai.run(natural_agent(True), 6000)
+    m, lam = settle(natural_agent(True), 6000, k=2)
     assert abs(float(m[0]) - (-0.5)) < 1e-9
     assert rel(ai.shares(lam), [0.4069992837643438, 0.5914956883515895, 0.00150502788406671]) < 1e-9
 

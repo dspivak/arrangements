@@ -42,6 +42,14 @@ The frontier under test (module docstring of reaction_network.py):
   networks, and it runs the networks the trick's no-go excludes -- a
   Wegscheider-violating triangle and an irreversible reaction -- whose forcing
   is provably not ``dU``.
+* COMPOSED DIRECT (book Ch 1, *Chemical reactions*; P43 (b) job 2): a box per
+  chemical holding its amount, a stateless box per reaction returning its net
+  rate times each chemical's stoichiometric number (not exact), and a wire.
+  Step for step it is the Euler mass-action step and the one-box direct
+  encoding, on the chain, A+B<->C, 2A<->B with A+B<->C, the Wegscheider-violating
+  triangle and the irreversible A+B->C; at the old convergence tests' settings
+  it reaches the same equilibria with the free energy falling at every step,
+  equal to the trick's trajectory to rounding.
 """
 
 import jax
@@ -49,8 +57,12 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from arrangements.functors import closed_step
 from arrangements.reaction_network import (
     check_detailed_balance,
+    composed_mass_action_arrangement,
+    reaction_box,
+    reaction_incidences,
     crn_arrangement,
     crn_dynamics,
     crn_step,
@@ -771,6 +783,104 @@ def test_direct_runs_what_the_no_go_excludes():
     # Not exact: d omega != 0, i.e. the field's Jacobian is not symmetric.
     J = np.asarray(jax.jacobian(lambda q: _omega_q(arr, q))(jnp.array([1.0, 2.0, 0.7])))
     assert not np.allclose(J, J.T)
+
+
+# ---------------------------------------------------------------------------
+# 7. COMPOSED DIRECT: a box per chemical, a box per reaction (P43 (b) job 2).
+# ---------------------------------------------------------------------------
+
+
+def _composed_trajectory(alpha, beta, kf, kb, x0, dt, steps):
+    """Amounts after each of ``steps`` ``Phi`` steps of the composed network (compiled,
+    checked against ``Phi`` on its first two steps by ``closed_step``)."""
+    A = composed_mass_action_arrangement(alpha, beta, kf, kb, x0, dt)
+    step = closed_step(A)
+
+    def body(st, _):
+        st = step(st)
+        return st, A.P.position(st)
+
+    _, xs = jax.lax.scan(body, A.P.init, None, length=steps)
+    return xs
+
+
+def test_composed_step_is_euler_and_one_box_any_network():
+    """Each ``Phi`` step of the composed network is ``x + dt V(x)`` and the one-box direct step,
+    for a chain, A+B<->C, 2A<->B with A+B<->C, a triangle with no balance point, and A+B->C."""
+    tri_alpha, tri_beta = unimolecular_stoichiometry(3, [(0, 1), (1, 2), (2, 0)])
+    two_alpha = jnp.array([[2.0, 0.0, 0.0], [1.0, 1.0, 0.0]])
+    two_beta = jnp.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    cases = [
+        (CHAIN_ALPHA, CHAIN_BETA, CHAIN_KF, CHAIN_KB, [3.0, 0.2, 1.0], 0.05),
+        (BI_ALPHA, BI_BETA, BI_KF, BI_KB, [2.0, 1.2, 0.3], 0.02),
+        (two_alpha, two_beta, [1.5, 2.0], [0.5, 1.0], [2.0, 0.4, 0.1], 0.01),
+        (tri_alpha, tri_beta, [1.0, 1.0, 1.0], [1.0, 1.0, 2.0], [1.0, 0.3, 2.0], 0.01),
+        (BI_ALPHA, BI_BETA, BI_KF, [0.0], [2.0, 1.2, 0.3], 0.01),
+    ]
+    for alpha, beta, kf, kb, x0, dt in cases:
+        xs = _composed_trajectory(alpha, beta, kf, kb, jnp.asarray(x0), dt, 200)
+        rhs = mass_action_rhs(alpha, beta, kf, kb)
+        O = mass_action_dynamics(alpha, beta, kf, kb, dt)
+        x = y = jnp.asarray(x0)
+        for k in range(200):
+            x = x + dt * rhs(x)
+            if k < 20:
+                y = crn_step(O, y)
+                np.testing.assert_allclose(np.asarray(xs[k]), np.asarray(y), rtol=0.0, atol=1e-14)
+            np.testing.assert_allclose(np.asarray(xs[k]), np.asarray(x), rtol=0.0, atol=1e-13)
+
+
+def test_composed_reaction_box_is_local_and_not_exact():
+    """A reaction box hears only the chemicals it touches, and its 1-form is not exact once it
+    consumes two: for A+B<->C the Jacobian of what it returns, in what it hears, is not symmetric."""
+    touched, degrees, perm = reaction_incidences(BI_ALPHA, BI_BETA)
+    assert touched == [[0, 1, 2]] and degrees == [1, 1, 1] and sorted(perm) == [0, 1, 2]
+    two_alpha = jnp.array([[2.0, 0.0, 0.0], [1.0, 1.0, 0.0]])
+    two_beta = jnp.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    touched, degrees, _ = reaction_incidences(two_alpha, two_beta)
+    assert touched == [[0, 1], [0, 1, 2]] and degrees == [2, 2, 1]
+
+    box = reaction_box(BI_ALPHA[0], BI_BETA[0], 2.0, 1.0)
+    assert box.in_dim_N == 3 and box.P.Q_dim == 0
+    J = np.asarray(jax.jacobian(lambda n: box.omega(NONE, NONE, n)[2])(jnp.array([1.0, 2.0, 0.7])))
+    assert not np.allclose(J, J.T)
+
+
+def test_composed_converges_with_free_energy_falling():
+    """At the old convergence tests' settings (chain: dt 0.05, 6000 steps; A+B<->C: dt 0.02,
+    8000 steps) the composed network reaches the same equilibria, the free energy falls at every
+    step, the conserved totals hold to rounding, and the first 300 steps equal the trick's."""
+    x0 = jnp.array([3.0, 0.2, 1.0])
+    xs = _composed_trajectory(CHAIN_ALPHA, CHAIN_BETA, CHAIN_KF, CHAIN_KB, x0, 0.05, 6000)
+    F = free_energy(CHAIN_XEQ)
+    f = np.asarray(jax.vmap(F)(xs))
+    assert np.all(np.diff(f) <= 1e-12) and float(F(x0)) >= f[0]
+    assert float(jnp.max(jnp.abs(jnp.sum(xs, axis=1) - jnp.sum(x0)))) < 1e-12
+    np.testing.assert_allclose(np.asarray(xs[-1]),
+                               np.asarray((jnp.sum(x0) / jnp.sum(CHAIN_XEQ)) * CHAIN_XEQ), atol=1e-9)
+    O = crn_dynamics(CHAIN_ALPHA, CHAIN_BETA, CHAIN_KF, CHAIN_KB, CHAIN_XEQ, 0.05)
+    y = x0
+    for k in range(300):
+        y = crn_step(O, y)
+    np.testing.assert_allclose(np.asarray(xs[299]), np.asarray(y), atol=1e-13)
+
+    kf, kb = BI_KF[0], BI_KB[0]
+    A0, B0, C0 = 2.0, 1.2, 0.3
+    x0 = jnp.array([A0, B0, C0])
+    xs = _composed_trajectory(BI_ALPHA, BI_BETA, BI_KF, BI_KB, x0, 0.02, 8000)
+    F = free_energy(BI_XEQ)
+    f = np.asarray(jax.vmap(F)(xs))
+    assert np.all(np.diff(f) <= 1e-12) and float(F(x0)) >= f[0]
+    assert float(jnp.max(jnp.abs(xs[:, 0] + xs[:, 2] - (A0 + C0)))) < 1e-12
+    assert float(jnp.max(jnp.abs(xs[:, 1] + xs[:, 2] - (B0 + C0)))) < 1e-12
+    roots = np.roots([kf, -(kf * (A0 + B0) + kb), kf * A0 * B0 - kb * C0])
+    s_ = min(r.real for r in roots if abs(r.imag) < 1e-12 and r.real < min(A0, B0))
+    np.testing.assert_allclose(np.asarray(xs[-1]), [A0 - s_, B0 - s_, C0 + s_], atol=1e-9)
+    O = crn_dynamics(BI_ALPHA, BI_BETA, BI_KF, BI_KB, BI_XEQ, 0.02)
+    y = x0
+    for k in range(300):
+        y = crn_step(O, y)
+    np.testing.assert_allclose(np.asarray(xs[299]), np.asarray(y), atol=1e-13)
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,15 @@ this file is its first run. The predictions were fixed before any of this code e
 **Every docstring below says whether its test could have come out otherwise**; the ones that could
 not are closed-form checks of the machinery, and only the others are results.
 
-The reader is one component ``I -> <R^2 | R^2>`` whose state is a fast coordinate ``q`` and a slow
+**The run is composed** (plan P43 (b) job 3, Claude Opus 5.5, de71554a, 2026-10-10): every result below
+is ``Phi`` of ``carving.reader``, a quick part (state ``q``, cost ``q^4/4 - u q``, hearing the note), a
+slow part, the tuning (state ``w``, cost ``gamma (w - w0)^2/2 + beta (w - w0)^4/4``), and a stateless
+coupling between them with cost ``-w q^2/2``, wired, with the note on the reader's port. Until then the
+reader was one box holding both coordinates under one cost (P43 (a)); that box and the hand loop
+``by_hand`` are kept beside the composite and checked equal to it, at the runs' settings. The
+non-reciprocal arm is a coupling with a 1-form and no cost (``carving.nonreciprocal_coupling``).
+
+The one-box reader was one component ``I -> <R^2 | R^2>`` whose state is a fast coordinate ``q`` and a slow
 one ``w``, its response the diagonal sharp ``diag(eta_q, eta_w)`` with ``eta_w << eta_q``. The cost,
 with the note ``u`` arriving on the exterior input, is
 
@@ -46,7 +54,8 @@ Results, against the five predictions (Claude Opus 5 (1M), session 1a70010f, 202
 4. **Held.** The joint cost never rises along a run, with the note on or off, so dissipation stays
    non-negative and the accounting is unharmed by the tuning moving.
 5. **Held, and it is the warning.** A tuning driven by ``q`` rather than ``q^2 / 2`` is non-reciprocal
-   and no longer descends the cost: the joint cost rises on 2915 of 8000 steps, by as much as 0.80,
+   and no longer descends the cost: the joint cost rises on 2915 of 8000 steps, by as much as 1.0e-4
+   (recorded as 0.80 until P43 (b) job 3, which found the figure matched no run),
    and the reader ends at ``(1.10, 1.22)``, at no rest of the exact model. So a carving tuning is
    accountable only while it descends the same cost its fast coordinate does.
 
@@ -79,6 +88,7 @@ cost the parts pay, cannot be billed to anybody.
 import jax.numpy as jnp
 import numpy as np
 
+from arrangements import carving
 from arrangements.arrangement import Arrangement, exact
 from arrangements.coalgebra import configuration
 from arrangements.functors import Phi
@@ -109,8 +119,8 @@ def dk_w(q, w):
     return -0.5 * q ** 2 + GAMMA * (w - W0) + BETA * (w - W0) ** 3
 
 
-def reader(q0=0.0, w0=W0):
-    """The reader component ``I -> <R^2 | R^2>``: it sends ``(q, w)`` and pays ``k`` on the note."""
+def one_box_reader(q0=0.0, w0=W0):
+    """The old reader, one component ``I -> <R^2 | R^2>``: it sends ``(q, w)`` and pays ``k`` on the note."""
     Q = diagonal(jnp.array([ETA_Q, ETA_W]))
     init = jnp.array([float(q0), float(w0)])
     return Arrangement(
@@ -134,8 +144,32 @@ def run_phi(arr, notes):
     return np.array(out)
 
 
-def fast(notes, q0=0.0, w0=W0, slow=None):
-    """The same step by hand. ``slow(q, w)`` overrides the slow coordinate's descent rule."""
+_COMPOSED = {}
+
+
+def composed(nonreciprocal=None):
+    """The composed reader and its compiled ``Phi`` step: the tuning with the curvature coupling, or,
+    with ``nonreciprocal = lam``, the same tuning with the non-reciprocal coupling (only the coupling
+    changes)."""
+    if nonreciprocal not in _COMPOSED:
+        if nonreciprocal is None:
+            A = carving.reader([carving.tuning_box(ETA_W, W0, W0, GAMMA, BETA)],
+                               [carving.curvature_coupling()], 0.0, ETA_Q)
+        else:
+            A = carving.reader([carving.tuning_box(ETA_W, W0, W0, GAMMA, BETA)],
+                               [carving.nonreciprocal_coupling(nonreciprocal)], 0.0, ETA_Q)
+        _COMPOSED[nonreciprocal] = (A, carving.note_step(A))
+    return _COMPOSED[nonreciprocal]
+
+
+def fast(notes, q0=0.0, w0=W0, nonreciprocal=None):
+    """``Phi`` of the composed reader on the note schedule from ``(q0, w0)``; every step's ``(q, w)``."""
+    A, step = composed(nonreciprocal)
+    return carving.play(A, step, notes, record=True, start=[q0, w0])
+
+
+def by_hand(notes, q0=0.0, w0=W0, slow=None):
+    """The one-box reader's step by hand. ``slow(q, w)`` overrides the slow coordinate's descent rule."""
     q, w, out = float(q0), float(w0), []
     for u in notes:
         dq = dk_q(q, w, u)
@@ -164,10 +198,23 @@ def is_carved(state):
 # the machinery
 
 
-def test_the_fast_step_is_Phi():
-    """The by-hand step is the ``Phi`` of the arrangement, pathwise. Cannot come out otherwise."""
+def test_the_composed_reader_is_the_one_box_reader():
+    """The composed reader's ``Phi`` equals the one-box reader's ``Phi`` pathwise, and the hand loop
+    at the runs' settings (4000 steps of the note, 4000 of silence, both arms, from the blank rest and
+    from ``q = -0.8``). The prediction, not a premise: the parts' and coupling's costs sum to ``k``."""
     notes = schedule(60, 40)
-    assert np.allclose(run_phi(reader(), notes), fast(notes), atol=1e-6)
+    np.testing.assert_allclose(fast(notes), run_phi(one_box_reader(), notes), atol=1e-12)
+    notes = schedule(4000, 4000)
+    np.testing.assert_allclose(fast(notes), by_hand(notes), atol=1e-12)
+    np.testing.assert_allclose(fast(notes, q0=-0.8, nonreciprocal=1.0),
+                               by_hand(notes, q0=-0.8, slow=lambda q, w: dk_w(q, w) + 0.5 * q ** 2 - q),
+                               atol=1e-12)
+
+
+def test_the_hand_step_is_Phi():
+    """The by-hand step is the ``Phi`` of the one-box arrangement, pathwise. Cannot come out otherwise."""
+    notes = schedule(60, 40)
+    assert np.allclose(run_phi(one_box_reader(), notes), by_hand(notes), atol=1e-6)
 
 
 def test_the_carved_rest_is_a_joint_fixed_point():
@@ -281,18 +328,24 @@ def test_non_reciprocal_tuning_is_not_accountable():
     rules are not one cost's gradient — and then the joint cost rises on some steps, so the spend
     can no longer be read off the cost. **Could have come out otherwise**: the mismatched pair might
     still have descended this cost. The lesson: carving is accountable while the tuning descends the
-    same cost its fast coordinate does."""
+    same cost its fast coordinate does.
+
+    Rebuilt as parts (P43 (b) job 3): the tuning keeps its own cost and only the coupling changes, to
+    ``carving.nonreciprocal_coupling``. The hand rule this replaced, ``-lam q + gamma (w - w0)``, had
+    also dropped the tuning's saturation, so its ``w`` ran away (to 32) and the quick part's step went
+    unstable after step 4859; the numbers recorded for this test (2915 rises, the end ``(1.10, 1.22)``)
+    were of the saturated run, which is what this now runs. The biggest rise is 1.0e-4, not 0.80 as
+    recorded."""
     lam = 1.0
-
-    def slow(q, w):
-        return -lam * q + GAMMA * (w - W0)
-
-    # non-reciprocal: d(force_q)/dw = q, while d(force_w)/dq = lam, equal only where q = lam
+    # the coupling returning lam q to the tuning (carving.nonreciprocal_coupling):
+    # non-reciprocal, d(force_q)/dw = q while d(force_w)/dq = lam, equal only where q = lam
     assert lam != Q_CARVED
 
     notes = schedule(4000, 4000)
-    path = fast(notes, q0=-0.8, slow=slow)
+    path = fast(notes, q0=-0.8, nonreciprocal=lam)
     q = np.concatenate([[-0.8], path[:, 0]])
     w = np.concatenate([[W0], path[:, 1]])
     rises = [t for t in range(len(notes)) if k(q[t + 1], w[t + 1], notes[t]) > k(q[t], w[t], notes[t]) + 1e-12]
     assert rises, "the mismatched tuning still descended the cost"
+    assert 2900 < len(rises) < 2930
+    np.testing.assert_allclose(path[-1], [1.10481607, 1.2206185], atol=1e-6)

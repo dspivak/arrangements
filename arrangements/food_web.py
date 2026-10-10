@@ -93,3 +93,39 @@ def by_hand(r, c, edges, x0, dt, steps):
     u0 = jnp.log(jnp.asarray(x0))
     _, us = jax.lax.scan(f, u0, None, length=steps)
     return jnp.concatenate([u0[None, :], us])
+
+
+# ---------------------------------------------------------------------------
+# The same web in the population chart (plan P43 (b) job 7): state the population itself.
+# ---------------------------------------------------------------------------
+
+
+def population_species(r: float, x0: float = 1.0, dt: float = 0.01, label: str = "sp") -> Arrangement:
+    """A species in the population chart: state ``x``, Euclidean response ``dt``, its own growth
+    ``r x`` as a 1-form (``d(r x^2 / 2)``), reporting ``x``. Alone, ``x' = x + dt r x``."""
+    from .rvect import euclidean
+
+    return Arrangement(
+        P=configuration(euclidean(1, dt), init=jnp.array([x0])),
+        in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+        out_f=lambda q, m: q,
+        in_f=lambda q, m, n: EMPTY,
+        omega=exact(lambda q, m, n: 0.5 * r * q[0] ** 2),
+        label=label,
+    )
+
+
+def population_eats(beta: float, delta: float) -> Arrangement:
+    """(prey, eater) in the population chart: ``-beta x y dx + delta x y dy``, not exact."""
+
+    def omega(q, e, n):
+        return (jnp.zeros_like(q), jnp.array([-beta * e[0] * e[1], delta * e[0] * e[1]]), jnp.zeros_like(n))
+
+    return stateless_coupler(2, omega, f"eats_pop({beta:g},{delta:g})")
+
+
+def population_web(sp: Sequence[Arrangement], edges: Sequence[Tuple[int, int, float, float]]) -> Arrangement:
+    """``web`` with population-chart couplers; the species must be ``population_species``."""
+    idx = [k for (i, j, _, _) in edges for k in (i, j)]
+    couplers = tensor_arrangements([population_eats(b, d) for (_, _, b, d) in edges])
+    return compose_seq(tensor_arrangements(list(sp)), compose_seq(copy(len(sp), idx), couplers))

@@ -319,6 +319,24 @@ def test_A4_the_runner_runs_the_figurine(figurine_runs):
     assert not (500 <= prog.Lp <= 5000), "the prediction's count was wrong; see RESULTS"
 
 
+@pytest.mark.skipif(not __import__("os").environ.get("RUN_SLOW"),
+                    reason="one round of the figurine's program through the library takes about five minutes")
+def test_A4c_the_runner_as_an_arrangement_at_the_figurines_settings():
+    """P43 (b) job 8 (Claude Opus 5.5, de71554a, 2026-10-10): A4 checks the runner on the figurine's program only
+    by `machine_run` (by hand); here the runner itself, `machine_net` denoted in the library and stepped by its own
+    forcing and integrator (compiled), runs one whole round of that program, 49,946 steps, and its data drum equals
+    `machine_run`'s exactly (0.0 on 2026-10-10, 314 s). Set RUN_SLOW=1 to run it."""
+    fig, wires, world, a2b, b2a = S.figurine_and_world()
+    c = R.couple_net(fig, world, a2b, b2a)
+    prog = R.compile_net(c, zero=0.0, one=1.0)
+    data = [float(x) for x in prog.encode(c.init_state())]
+    M = R.machine_net(prog.flags(), data, a0=0.0, minus_one=-1.0)
+    traj = R.library_run_jit(M, prog.Lp, check=0, every=prog.Lp)
+    hand = list(data)
+    R.machine_run(prog, hand, 0.0, 1)
+    assert np.abs(np.asarray(traj[0][6 * prog.Lp: 6 * prog.Lp + prog.L]) - np.asarray(hand)).max() == 0.0
+
+
 def _small_full_kit_net():
     """A small closed net using every new kind: a market over two guesses (one through exp, one through recip),
     paid by a world drum through a relay, and a register pushed by a relayed value."""

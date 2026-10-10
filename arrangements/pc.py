@@ -19,10 +19,22 @@ from typing import Any, Callable, Tuple
 from .polynomial import PolyMap, PolyValue
 
 
+def _at(at_pos, d, duration):
+    """Call a fiber's ``at_pos`` on direction ``d``, handing on ``duration`` when one is given.
+
+    ``duration=None`` is the unit step and calls ``at_pos(d)`` exactly as before
+    durations existed (book P9.5), so a hand-written fiber that takes no duration
+    still composes; it is handed one only when a run supplies one.
+    """
+    return at_pos(d) if duration is None else at_pos(d, duration)
+
+
 # Step signature, def.pq_coalg, in fully-curried Moore form (sec.dynamics_functor):
 #     state -> (act: PolyMap p -> q,
 #               in_pos -> (out_pos,
 #                          in_dir -> (out_dir, new_state)))
+# The innermost closure may also take a duration, ``(in_dir, duration=None)``: the
+# time the direction is held (Ch 3 def.duration_integrator; ``None`` is the unit step).
 # The PolyMap component IS act^beta(state) (def.pq_coalg); it
 # duplicates the position/direction logic that the curried closure
 # also exposes, but having it as a first-class poly map makes
@@ -50,17 +62,19 @@ class PCMorphism:
     state: Any
     step: StepFn
 
-    def run_one(self, in_pos: PolyValue, in_dir_from: Callable[[PolyValue], PolyValue]):
+    def run_one(self, in_pos: PolyValue, in_dir_from: Callable[[PolyValue], PolyValue],
+                duration=None):
         """Apply the coalgebra at ``state`` to one external position.
 
         ``in_dir_from`` is provided by the surrounding context: given the
         out-position emitted by ``self``, it returns the in-direction.
+        ``duration`` is how long that direction is held (``None``: the unit step).
         Returns ``(out_pos, out_dir, new_state)``.
         """
         act, fiber = self.step(self.state)
         out_pos, fiber_at_pos = fiber(in_pos)
         in_dir = in_dir_from(out_pos)
-        out_dir, new_state = fiber_at_pos(in_dir)
+        out_dir, new_state = _at(fiber_at_pos, in_dir, duration)
         return out_pos, out_dir, new_state
 
     def with_state(self, new_state: Any) -> "PCMorphism":
@@ -108,8 +122,8 @@ class PCMorphism:
                 inner_pos = before.on_position(i_before)          # p-position
                 out_pos, inner_at_pos = inner_fiber(inner_pos)    # q-position
 
-                def at_pos(d_q):             # d_q: q-direction at out_pos
-                    d_p, new_state = inner_at_pos(d_q)            # p-direction
+                def at_pos(d_q, duration=None):  # d_q: q-direction at out_pos
+                    d_p, new_state = _at(inner_at_pos, d_q, duration)  # p-direction
                     d_o = before.on_direction(i_before, d_p)      # o-direction
                     return d_o, new_state
 
@@ -158,9 +172,9 @@ class PCMorphism:
                 j, inner_at_pos = inner_fiber(i)                  # q-position
                 k = after.on_position(j)                          # r-position
 
-                def at_pos(d_r):             # d_r: r-direction at k
+                def at_pos(d_r, duration=None):  # d_r: r-direction at k
                     d_q = after.on_direction(j, d_r)              # q-direction at j
-                    return inner_at_pos(d_q)                      # (p-direction, new state)
+                    return _at(inner_at_pos, d_q, duration)       # (p-direction, new state)
 
                 return k, at_pos
 
@@ -213,9 +227,9 @@ class PCMorphism:
                 j, at_self = fiber_self(i)      # j: q-position
                 k, at_other = fiber_other(j)    # k: r-position
 
-                def at_pos(d_r):                # d_r: r-direction at k
-                    d_q, ns_other = at_other(d_r)   # d_q: q-direction at j
-                    d_p, ns_self = at_self(d_q)     # d_p: p-direction at i
+                def at_pos(d_r, duration=None):     # d_r: r-direction at k; one duration for both
+                    d_q, ns_other = _at(at_other, d_r, duration)   # d_q: q-direction at j
+                    d_p, ns_self = _at(at_self, d_q, duration)     # d_p: p-direction at i
                     return d_p, (ns_self, ns_other)
 
                 return k, at_pos
@@ -254,9 +268,9 @@ class PCMorphism:
                 op1, at1 = fiber1(i[0])
                 op2, at2 = fiber2(i[1])
 
-                def at_pos(d):
-                    od1, ns1 = at1(d[0])
-                    od2, ns2 = at2(d[1])
+                def at_pos(d, duration=None):     # one duration, shared (Ch 3 prop.duration_parameters)
+                    od1, ns1 = _at(at1, d[0], duration)
+                    od2, ns2 = _at(at2, d[1], duration)
                     return (od1, od2), (ns1, ns2)
 
                 return (op1, op2), at_pos

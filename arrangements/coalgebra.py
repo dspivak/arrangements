@@ -44,7 +44,7 @@ from CDLM's ``integrator.py`` with their status kept verbatim:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import jax.numpy as jnp
 from jax import Array
@@ -62,8 +62,14 @@ class CotCoalg:
     * ``step``     -- ``(S, xi_Q) -> S``, the new state after receiving the
                       covector ``xi_Q in T^*_{q(s)} Q``.
 
+    * ``timed_step`` -- optional ``(S, xi_Q, duration) -> S``: the step held for a
+                      duration (Ch 3 ``def.duration_integrator``, ``u : S ->
+                      (cot(Q) (x) y^{R>=0})(S)``); ``None`` when the part has no
+                      duration law yet. When given, ``step`` is its value at 1.
+
     Together ``position`` and ``step`` are ``u : S -> cot(Q)(S)``; the response
-    ``sharp`` is inside ``step``.
+    ``sharp`` is inside ``step``. The readout ``position`` precedes both inputs, so
+    it cannot depend on the duration (Ch 3, after ``def.duration_integrator``).
     """
 
     Q_dim: int
@@ -71,6 +77,23 @@ class CotCoalg:
     position: Callable[[Any], Array]
     step: Callable[[Any, Array], Any]
     label: str = ""
+    timed_step: Optional[Callable[[Any, Array, Any], Any]] = None
+
+    def step_over(self, s, xi_Q, duration=None):
+        """The new state after holding ``xi_Q`` for ``duration`` (book P9.5).
+
+        ``duration=None`` is the part's own unit step, ``step(s, xi_Q)``, exactly as
+        before durations existed. A part with no ``timed_step`` handed a duration
+        raises: it is not silently taken to ignore it.
+        """
+        if duration is None:
+            return self.step(s, xi_Q)
+        if self.timed_step is None:
+            raise TypeError(
+                f"part {self.label or '?'} has no duration law (timed_step is None); "
+                "run it with duration=None, its unit step"
+            )
+        return self.timed_step(s, xi_Q, duration)
 
     def tensor(self, other: "CotCoalg") -> "CotCoalg":
         """The parallel product ``(Q, S, u) (x) (Q', S', u')`` (sec.integrators).
@@ -92,12 +115,20 @@ class CotCoalg:
             s1, s2 = s
             return (self.step(s1, xi_Q[:n]), other.step(s2, xi_Q[n:]))
 
+        timed_step = None
+        if self.timed_step is not None and getattr(other, "timed_step", None) is not None:
+            def timed_step(s, xi_Q, duration):      # one duration, shared (Ch 3 prop.duration_parameters)
+                s1, s2 = s
+                return (self.timed_step(s1, xi_Q[:n], duration),
+                        other.timed_step(s2, xi_Q[n:], duration))
+
         return CotCoalg(
             Q_dim=n + other.Q_dim,
             init=(self.init, other.init),
             position=position,
             step=step,
             label=f"({self.label} (x) {other.label})",
+            timed_step=timed_step,
         )
 
 
@@ -116,6 +147,11 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
 
     With ``omega = dU = -dk`` this descends the cost ``k``; CDLM's
     ``q - sharp(dk)`` is the same update after translating conventions.
+
+    Held for a duration ``tau`` it is the Euler family of its tangent response
+    ``v_s(xi) = sharp_s(xi)`` (Ch 3 ``prop.duration_tangent``),
+    ``s |-> s + tau sharp_s(xi_Q)``: normalized (``tau = 0`` leaves ``s``), and the
+    unit step above at ``tau = 1``.
     """
 
     s0 = jnp.zeros(Q.dim) if init is None else jnp.asarray(init, dtype=float)
@@ -125,6 +161,7 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
         position=lambda s: s,
         step=lambda s, xi_Q: s + Q.apply_sharp(s, xi_Q),
         label="conf",
+        timed_step=lambda s, xi_Q, tau: s + tau * Q.apply_sharp(s, xi_Q),
     )
 
 

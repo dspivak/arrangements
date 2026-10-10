@@ -357,6 +357,16 @@ def rival_settle_fn(learned: tuple, T: float, steps: int = None):
 
 
 # --- test (f): a community against one mind -------------------------------------
+#
+# NOT AN ARRANGEMENT (P43 (b) job 7, Claude Opus 5.5, de71554a, 2026-10-10; item 55 said so first).
+# ``run_summaries`` with provenance keeps, for each holder, the set of papers it has read, a list that
+# grows, and ``run_conclusions`` keeps held sets, replication trials and an argmax, all plain bookkeeping
+# between steps of ``translate_beliefs``. The library's state spaces are Cartesian spaces ``R^d`` only
+# (STATUS.md §3.1), so no box here can hold a growing list; the book's smooth sets can (a list object, a
+# coproduct of powers), which is not built. Their arrangement counterparts are in
+# ``science_native.py``: the journal box (each paper arrives once on its wire; every holder ends where
+# the provenance bookkeeping ends, ``test_n2_journal_ends_where_the_provenance_bookkeeping_ends``) and
+# replication as a planted seed ((n3)-(n5)). The results to cite are those.
 
 
 @jax.jit

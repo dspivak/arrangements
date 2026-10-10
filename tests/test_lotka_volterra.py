@@ -207,15 +207,27 @@ def test_plain_step_raises_H_every_step_and_growth_per_cycle_halves():
 
 
 def test_population_chart_euler_also_spirals_outward():
-    """Prediction 3, the chart's irrelevance (ILLUSTRATION, numpy only): forward Euler in
-    ``(x, y)`` raises ``H`` at a comparable per-cycle rate to the log-chart step."""
+    """Prediction 3, the chart's irrelevance: the plain step in the population chart ``(x, y)`` raises
+    ``H`` at a comparable per-cycle rate to the log-chart step.
+
+    Run since P43 (b) job 7 (Claude Opus 5.5, de71554a, 2026-10-10) as ``Phi`` of the population-chart
+    web (``food_web.population_web``: prey and predator boxes with state the population and response
+    ``dt``, their own growth and death as 1-forms, and the eating as a non-exact directed coupler),
+    where it was a numpy Euler loop with no arrangement; that loop is kept and checked equal."""
+    from arrangements import food_web as fw
+
     dt = 0.02
     steps = int(round(4.6 * 7.0 / dt))
-    xy = np.empty((steps + 1, 2))
-    xy[0] = np.exp(Z0)
+    x0, y0 = (float(v) for v in np.exp(Z0))
+    W = fw.population_web([fw.population_species(ALPHA, x0, dt), fw.population_species(-GAMMA, y0, dt)],
+                          [(0, 1, BETA, DELTA)])
+    xy = np.asarray(fw.log_states(W, steps))
+    by_hand = np.empty((steps + 1, 2))
+    by_hand[0] = np.exp(Z0)
     for i in range(1, steps + 1):
-        x, y = xy[i - 1]
-        xy[i] = [x + dt * x * (ALPHA - BETA * y), y + dt * y * (DELTA * x - GAMMA)]
+        x, y = by_hand[i - 1]
+        by_hand[i] = [x + dt * x * (ALPHA - BETA * y), y + dt * y * (DELTA * x - GAMMA)]
+    np.testing.assert_allclose(xy, by_hand, rtol=1e-12, atol=1e-12)
     traj_pop = np.log(xy)
     H_pop = _H(traj_pop)
     g_pop = _growth_per_cycle(H_pop, _upward_crossings(traj_pop), 3)

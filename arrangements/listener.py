@@ -69,9 +69,22 @@ class Model(NamedTuple):
     c: float = 5.0
     mu_p: float = 0.1
     p0: float = 0.5
+    kernel: str = "bell"       # or "peak" (attention.spatial_kappa)
+    hear: str = "weighted"     # or "full": the evidence at full strength wherever the listener stands
+    sigma: float = 0.0         # the personal-space box's strength; 0 leaves it out
 
 
 DEFAULT = Model()
+
+
+def page_model(keep=(0.98, 0.6, 0.6), lined=(0.95, 0.95, 0.2), fail: float = 20.0) -> Model:
+    """The listener page's defaults as an arrangement (P43 (b) job 8, at David's "b seems good", 2026-10-10): the
+    table from how often each kind keeps a promise and how often its account lines up; the expected losses from one
+    cost of a broken promise, ``(1 - keep) * fail``; full hearing; the peaked kernel; and a personal-space box of
+    strength 1 with the listener's step 0.05, the strongest push and largest step at which the listener rests near
+    a reliable speaker without oscillating (``notes/runs/p43b-rebuild-de71554a/RESULTS.md``)."""
+    pi = tuple((k, (1 - k) * l, (1 - k) * (1 - l)) for k, l in zip(keep, lined))
+    return Model(pi=pi, ell=tuple((1 - k) * fail for k in keep), kernel="peak", hear="full", sigma=1.0, mu_p=0.05)
 
 
 def nll_table(model: Model) -> Array:
@@ -93,6 +106,8 @@ def belief_box(model: Model, n: int = 3, *, wire: str = "oneway", likelihood: st
     init = jnp.zeros(n) if init is None else jnp.asarray(init, float)
 
     def k_B(y, e):
+        if model.hear == "full":
+            return jnp.dot(y, N @ (e[:DH] / e[DH]))   # the message unweighted: heard at full strength
         return jnp.dot(y, N @ e[:DH])
 
     def omega(y, m_out, e):
@@ -140,9 +155,53 @@ def valuation_box(model: Model, n: int = 3) -> Arrangement:
     )
 
 
+def checker_box(model: Model, n: int = 3) -> Arrangement:
+    """The checker as its own box (P43 (b) job 8, Claude Opus 5.5, de71554a; David, 2026-10-07: "somebody
+    checking that force and making sure it's not there"), ``<E | R^n> -> <E | R^n>`` between the belief and
+    the valuation: it passes the belief forward and the parent's input back unchanged, and, knowing the
+    listener's losses ``ell`` and reading how much it counts on the source ``w`` (on the input it passes
+    back), pushes ``+w ell`` on the belief, cancelling the valuation's ``-w ell``. One way on the input."""
+    ell = jnp.asarray(model.ell, float)
+
+    def omega(q, y, e):
+        return jnp.zeros_like(q), e[DH] * ell, jnp.zeros_like(e)
+
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=EDIM, out_dim_M=n, in_dim_N=EDIM, out_dim_N=n,
+        out_f=lambda q, y: y, in_f=lambda q, y, e: e, omega=omega, label="checker",
+    )
+
+
+def personal_space_box(model: Model, n: int = 3) -> Arrangement:
+    """Personal space as its own box (David, 2026-10-10: "a listener who is in the exact same place as the speaker?
+    that never happens! so there's a bound to how close they can be"; his choice of a push that rises as the
+    listener nears): ``<E | R^n> -> <E | R^n>`` between the belief and the valuation, passing the belief forward and
+    the parent's input back, with cost ``-sigma log(1 - w)`` on how much the listener counts on the source ``w``,
+    which rises without bound as the listener nears the speaker (``w -> 1``). Its pullback through the parent pushes
+    the placement away."""
+    sigma = float(model.sigma)
+
+    def U(q, y, e):
+        return sigma * jnp.log(1.0 - e[DH])
+
+    grad = jax.grad(U, argnums=(0, 1, 2))
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=EDIM, out_dim_M=n, in_dim_N=EDIM, out_dim_N=n,
+        out_f=lambda q, y: y, in_f=lambda q, y, e: e, omega=grad, label="personal space",
+    )
+
+
 def listener(model: Model = DEFAULT, **kw) -> Arrangement:
-    """The listener ``I -> B``: the valuation box after the belief box."""
-    return compose_seq(belief_box(model, **kw), valuation_box(model))
+    """The listener ``I -> B``: the valuation box after the belief box. With ``wire="checker"`` the belief
+    is sent forward plainly and the checker box sits between it and the valuation; ``wire="subtract"`` is
+    the same checker folded into the belief box's forcing, the run before P43 (b) job 8."""
+    rest = valuation_box(model)
+    if model.sigma:
+        rest = compose_seq(personal_space_box(model), rest)
+    if kw.get("wire") == "checker":
+        kw = dict(kw, wire="exact")
+        rest = compose_seq(checker_box(model), rest)
+    return compose_seq(belief_box(model, **kw), rest)
 
 
 def source() -> Arrangement:
@@ -169,7 +228,7 @@ def listener_system(model: Model = DEFAULT, **kw) -> Arrangement:
     n_Q = 2 * DP + 2 * DH * DH
     diag = jnp.zeros(n_Q).at[0].set(model.mu_p)
     parent = spatial_arrangement(
-        2, DH, DP, model.tau,
+        2, DH, DP, model.tau, kernel=model.kernel,
         parameter=configuration(constant(jnp.diag(diag)),
                                 init=spatial_config((model.p0, 0.0), (jnp.eye(DH), jnp.eye(DH)))),
         label="spatial(2)")

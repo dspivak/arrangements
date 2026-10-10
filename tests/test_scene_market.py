@@ -72,10 +72,14 @@ def test_B0_every_arm_is_its_closed_form(arms):
 
 
 def test_B1_nested_equals_flat(arms):
+    """The nested market, its likelihoods made by boxes (``nested_market_composed``: the rounds' d_0, the world
+    and a likelihood box per scene, wired into the beliefs and the paying box; P43 (b) job 7, de71554a), equals
+    the flat closed form to 1e-12, and equals ``nested_market`` fed the numpy likelihoods it replaced."""
     worst = {}
     for key in ("O", "S", "C"):
-        gam = S.scene_likelihoods(S.SCENE_ARMS[key])
-        nested = S.nested_market(gam)
+        nested = S.nested_market_composed(S.SCENE_ARMS[key])
+        fed = S.nested_market(S.scene_likelihoods(S.SCENE_ARMS[key]))
+        assert max(np.abs(np.asarray(a) - np.asarray(b)).max() for a, b in zip(nested, fed)) < 1e-12
         worst[key] = max(np.abs(np.asarray(a) - b).max() for a, b in zip(nested, arms[key]["closed"]["trust"]))
         assert worst[key] < 1e-12
     print(f"\nB1 nested (library, three belief integrators, the outer paid by aggregates) vs flat: {worst}")

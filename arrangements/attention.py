@@ -648,9 +648,19 @@ def spatial_placement(n: int, dim_H: int, dim_P: int) -> Placement:
     return lambda q: spatial_split(q, n, dim_H, dim_P)[0]
 
 
-def spatial_kappa(ell_i: Array, ell_j: Array, tau: float) -> Array:
-    """``kappa_ij = exp(-||l_i - l_j||^2 / 2 tau)`` (eq:spatial-transfers)."""
-    return jnp.exp(-jnp.sum((ell_i - ell_j) ** 2) / (2.0 * tau))
+PEAK_EPS = 1e-3
+
+
+def spatial_kappa(ell_i: Array, ell_j: Array, tau: float, kernel: str = "bell") -> Array:
+    """``kappa_ij = exp(-||l_i - l_j||^2 / 2 tau)`` (eq:spatial-transfers), the bell.
+
+    ``kernel="peak"`` (book plan P43 (b), the listener page, de71554a): ``exp(-(sqrt(d^2 + eps^2) - eps) / tau)``,
+    ``d = ||l_i - l_j||``, ``eps = PEAK_EPS``: the peak ``exp(-d / tau)`` made smooth at the speaker, where it
+    differs from the peak by ``O(eps^2 / d)``; away from the speaker it slopes, so a listener near it is pushed."""
+    d2 = jnp.sum((ell_i - ell_j) ** 2)
+    if kernel == "peak":
+        return jnp.exp(-(jnp.sqrt(d2 + PEAK_EPS ** 2) - PEAK_EPS) / tau)
+    return jnp.exp(-d2 / (2.0 * tau))
 
 
 def _spatial_frame(q: Array, n: int, dim_H: int, dim_P: int) -> Tuple[Array, Array]:
@@ -661,7 +671,7 @@ def _spatial_frame(q: Array, n: int, dim_H: int, dim_P: int) -> Tuple[Array, Arr
     return ell, Vs
 
 
-def spatial_transfers(n: int, dim_H: int, dim_P: int, tau: float) -> Transfers:
+def spatial_transfers(n: int, dim_H: int, dim_P: int, tau: float, kernel: str = "bell") -> Transfers:
     """``T_{ij}(q)(h, w) = (kappa_ij V_j h, kappa_ij w)`` (eq:spatial-transfers).
 
     A message transfer with ``gamma = kappa_ij > 0`` and ``L = kappa_ij V_j``.
@@ -678,7 +688,7 @@ def spatial_transfers(n: int, dim_H: int, dim_P: int, tau: float) -> Transfers:
                 if i == j:
                     row.append(zero_transfer(dim_H))
                 else:
-                    k = spatial_kappa(ell[i], ell[j], tau)
+                    k = spatial_kappa(ell[i], ell[j], tau, kernel)
                     row.append(Transfer(gamma=k, L=k * Vs[j]))
             rows.append(tuple(row))
         return tuple(rows)
@@ -689,7 +699,7 @@ def spatial_transfers(n: int, dim_H: int, dim_P: int, tau: float) -> Transfers:
 def spatial_arrangement(
     n: int, dim_H: int, dim_P: int, tau: float, cost: Cost = zero_cost,
     parameter: Optional[CotCoalg] = None, init: Optional[Array] = None,
-    mobility: float = 1.0, label: str = "spatial",
+    mobility: float = 1.0, label: str = "spatial", kernel: str = "bell",
 ) -> AttentionArrangement:
     """An elementary spatial-attention arrangement over ``Q_n = P^n x End(H)^n``.
 
@@ -700,7 +710,7 @@ def spatial_arrangement(
         parameter = configuration(euclidean(spatial_Q_dim(n, dim_H, dim_P), mobility), init=init)
     return attention_arrangement(
         n, dim_H, dim_P,
-        spatial_placement(n, dim_H, dim_P), spatial_transfers(n, dim_H, dim_P, tau),
+        spatial_placement(n, dim_H, dim_P), spatial_transfers(n, dim_H, dim_P, tau, kernel),
         cost=cost, parameter=parameter, label=label,
     )
 

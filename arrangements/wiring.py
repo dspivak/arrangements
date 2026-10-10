@@ -16,6 +16,8 @@ Provides:
 * ``compose_chain(parts)`` -- the ``K``-ary composite
   ``chain_wire(K)(Part_1, ..., Part_K)`` directly in ``arr`` (the book's
   sec.heat_waves chain; CDLM sec.spring_first_pass).
+* ``held_end(...)`` / ``cap()`` / ``held_chain(parts, ...)`` -- a chain with its two ends held in
+  place by boxes, closed (book sec.heat_waves; plan P43 (b) job 4).
 * ``graph_wire(V, edges)`` / ``harmonic_vertex(...)`` / ``compose_graph(...)``
   -- the prism wiring ``R^{varphi_G}``, the vertex particle ``Part_v``, and their
   composite ``wire_G`` (CDLM sec.graph_laplacian).
@@ -263,6 +265,52 @@ def compose_chain(parts: Sequence[Arrangement]) -> Arrangement:
             raise ValueError(f"Part {i}: expected target <R|R>")
 
     return compose_seq(tensor_arrangements(list(parts)), chain_wire(K))
+
+
+# ---------------------------------------------------------------------------
+# A chain with its ends held (book sec.heat_waves; plan P43 (b) job 4).
+# ---------------------------------------------------------------------------
+
+
+def held_end(parameter, kappa: float = 0.0) -> Arrangement:
+    """A held end ``<R^0|R^0> -> <R|R>``: a particle at ``0`` with response ``0``, so it does not move.
+
+    Its integrator is ``parameter`` (the chain's own kind: ``configuration``, ``phase``, ``leapfrog``)
+    on ``R`` with the zero sharp, started at rest at ``0``; it reads out its position and pays
+    ``(kappa/2)(q - y)^2`` to the neighbor ``y`` on its input, the spring joining it to the chain
+    (``kappa = 0``: no spring on that side). The force the chain returns to it moves nothing.
+    """
+    return Arrangement(
+        P=parameter(diagonal(jnp.zeros(1))), in_dim_M=0, out_dim_M=0, in_dim_N=1, out_dim_N=1,
+        out_f=lambda q, m_out: q,
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=exact(lambda q, m_out, n_in: -0.5 * kappa * (q[0] - n_in[0]) ** 2),
+        label="held",
+    )
+
+
+def cap() -> Arrangement:
+    """``<R|R> -> <R^0|R^0>``: closes a chain's two outer ports. The value it presents to the chain's
+    input is ``0`` and the force it returns to the chain's output is ``0``; a held end on each side
+    makes both inert."""
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=1, out_dim_M=1, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m_out: jnp.zeros(0),
+        in_f=lambda q, m_out, n_in: jnp.zeros(1),
+        omega=zero_form, label="cap",
+    )
+
+
+def held_chain(parts: Sequence[Arrangement], kappa: float, parameter=configuration) -> Arrangement:
+    """The closed chain ``cap . chain_wire(K+2)(held_left, Part_1, ..., Part_K, held_right)``.
+
+    The left end is a held particle at ``0`` with no spring of its own (the first part's spring
+    reaches it); the right end is a held particle at ``0`` joined to the last part by a spring of
+    constant ``kappa``. Both ends are boxes of the chain's integrator kind with zero response. The
+    composite's position is ``(0, q_1, ..., q_K, 0)``.
+    """
+    ends = [held_end(parameter)], [held_end(parameter, kappa)]
+    return compose_seq(compose_chain(ends[0] + list(parts) + ends[1]), cap())
 
 
 # ---------------------------------------------------------------------------

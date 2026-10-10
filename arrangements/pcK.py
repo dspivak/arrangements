@@ -19,8 +19,9 @@ on the remaining rounds.
 
 Caveat: this provides the datatype, its execution, and these two composites
 (tested). The claim that ``arr → pc^(K)`` is a lax monoidal *functor* (the general
-case of rmk.multistage) is conjectural and is **not** proved here -- exactly as for
-``pc^(2)``. EXTENSION (beyond the paper): ``PhiK`` is the K-stage analog of the one
+case of rmk.multistage) is not proved *here*; it is proved by hand from the duoidal
+interchange in the book repo (``notes/multiround-composes-1be7dcb7.md``), for every K,
+``pc^(2)`` included. EXTENSION (beyond the paper): ``PhiK`` is the K-stage analog of the one
 dynamics functor ``Phi`` for arrangements whose parameter is a ``CotCoalgK``.
 """
 

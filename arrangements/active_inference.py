@@ -396,3 +396,85 @@ def hierarchy(kappa: float, Pi1: float, Pi2: float, pi_g: float, g: float, eta: 
         compose_seq(hand(kappa, eta), predictor(Pi1, eta, unilateral=not push1)),
         predictor(Pi2, eta, goal=(pi_g, g), top=True, unilateral=not push2),
     )
+
+
+# ---------------------------------------------------------------------------
+# G by parts: figurines of the world (plan P43 (b) job 6; David, 2026-10-10, "is the looking part using
+# figurines? Can we do it that way?").
+# ---------------------------------------------------------------------------
+#
+# Book Ch 1: "I check by running simulation with little internal models, like figurines." For each
+# policy the agent sets a figurine of its world where it believes the world is and lets it take the
+# world's own step under the policy's push; a score box reads where the figurine landed and how spread
+# the agent's belief would be, risk plus ambiguity; the scores go forward to the chooser as G. Every
+# piece is a box and the pieces are composed, so the chooser's pull reaches the belief through the
+# figurines and score boxes by pullback (exact), or does not (a unilateral chooser). The world here is
+# one box, so a figurine of it is one box: the world's own step (``phi_step``) and the spread carried
+# by that step's Jacobian (``predict``).
+
+
+def belief_box(Sig: float, x_obs: float, w_ev: float, eta: float, init: float = 0.0) -> Arrangement:
+    """The agent's belief ``I -> <0|2>``: state its mean ``m`` (response ``eta``; 0 holds it), its own
+    evidence potential ``-1/2 w_ev (m - x_obs)^2``, presenting ``(m, Sig)``, the spread held fixed."""
+    return Arrangement(
+        P=configuration(euclidean(1, eta), init=jnp.full(1, init)),
+        in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=2,
+        out_f=lambda q, m_out: jnp.concatenate([q, jnp.full(1, Sig)]),
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=exact(lambda q, m_out, n_in: -0.5 * w_ev * (q[0] - x_obs) ** 2),
+        label="belief",
+    )
+
+
+def figurine_box(step: Callable, u: float, Q: float) -> Arrangement:
+    """A figurine of the world ``<0|2> -> <0|2>``: set at the belief ``(m, Sig)``, it takes the world's
+    own step under the push ``u`` and presents where it lands and the spread carried there,
+    ``(mu, V)`` (``predict``)."""
+    from .network import map_box
+
+    def g(v):
+        mu, V = predict(step, v[:1], v[1:].reshape(1, 1), jnp.full(1, u), Q)
+        return jnp.concatenate([mu, V.reshape(1)])
+
+    return map_box(g, 2, 2, f"figurine(u={u:g})")
+
+
+def score_box(R: float, ostar: float, P: float) -> Arrangement:
+    """``<0|3> -> <0|3>`` on ``(mu, V, G)``: adds this step's risk and ambiguity for an observation of
+    noise ``R`` to the running ``G``, and passes on the belief after seeing,
+    ``(mu, (1/V + 1/R)^{-1}, G + risk + ambiguity)``."""
+    from .network import map_box
+
+    def g(v):
+        mu, V, G = v[0], v[1], v[2]
+        G = G + risk(mu, V + R, ostar, P) + ambiguity(R)
+        return jnp.stack([mu, 1.0 / (1.0 / V + 1.0 / R), G])
+
+    return map_box(g, 3, 3, f"score(R={R:g})")
+
+
+def figurine_planner(policies, Sig: float, x_obs: float, w_ev: float, eta: float, Q: float,
+                     ostar: float, P: float, init: float = 0.0, world_arr: Arrangement = None) -> Arrangement:
+    """The planner by parts, ``I -> <0|n>``: the belief box, copied to one chain per policy; each step
+    of a policy a figurine of the world, then a score box, the running ``G`` carried beside the
+    figurine on later steps; each chain presents its ``G``. Equal, by prediction, to ``planner``
+    (one box running the same futures inside its sending map)."""
+    from .network import fan_box, identity_box, map_box
+    from .wiring import compose_seq, tensor_arrangements
+
+    step = phi_step(world() if world_arr is None else world_arr)
+    chains = []
+    for pol in policies:
+        chain = None
+        for k, (u, R) in enumerate(pol):
+            if k == 0:
+                fig = compose_seq(figurine_box(step, u, Q),
+                                  map_box(lambda v: jnp.concatenate([v, jnp.zeros(1)]), 2, 3, "G = 0"))
+            else:
+                fig = tensor_arrangements([figurine_box(step, u, Q), identity_box(1)])
+            stage = compose_seq(fig, score_box(R, ostar, P))
+            chain = stage if chain is None else compose_seq(chain, stage)
+        chains.append(compose_seq(chain, map_box(lambda v: v[2:3], 3, 1, "G")))
+    n = len(policies)
+    copied = compose_seq(belief_box(Sig, x_obs, w_ev, eta, init), fan_box(2, [0, 1] * n, "copy belief"))
+    return compose_seq(copied, tensor_arrangements(chains))

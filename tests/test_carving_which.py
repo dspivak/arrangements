@@ -8,6 +8,12 @@ identical ``w``, so its slow coordinate records *that* something was held, not *
 kick of the fast state across 0 swaps the remembered side for good. This file asks whether a slow
 variable tuned by the note's sign, inside one exact cost, remembers which.
 
+**The run is composed** (plan P43 (b) job 3, Claude Opus 5.5, de71554a, 2026-10-10): every result is
+``Phi`` of ``carving.reader`` with two slow parts, the tuning and the bias, each coupled to the quick
+part by its own stateless box (curvature, cost ``-w q^2/2``; tilt, cost ``-b q``). Until then the reader
+was one box holding ``(q, w, b)`` under one cost; that box and the hand loop ``by_hand`` are kept beside
+the composite and checked equal to it at the runs' settings.
+
 **Model.** The reader of ``test_carving.py`` with one more slow coordinate, a bias ``b`` coupled to
 the fast state by ``-b q`` and held by its own restoring cost:
 
@@ -65,11 +71,13 @@ is not tested here, though result 2 says a deep enough displacement of the fast 
 import jax.numpy as jnp
 import numpy as np
 
+from arrangements import carving
 from arrangements.arrangement import Arrangement, exact
 from arrangements.coalgebra import configuration
 from arrangements.functors import Phi
 from arrangements.rvect import diagonal
 
+from tests import test_carving as one_slow
 from tests.chain import IN_POS
 
 ETA_Q = 0.05
@@ -111,8 +119,8 @@ def tilt_threshold(w):
     return 2 * (max(w, 0.0) / 3) ** 1.5
 
 
-def reader(s0=(0.0, W0, 0.0)):
-    """The reader ``I -> <R^1 | R^3>``: it sends ``(q, w, b)`` and pays ``k`` on the note."""
+def one_box_reader(s0=(0.0, W0, 0.0)):
+    """The old reader, one box ``I -> <R^1 | R^3>``: it sends ``(q, w, b)`` and pays ``k`` on the note."""
     Q = diagonal(jnp.array([ETA_Q, ETA_W, ETA_B]))
     return Arrangement(
         P=configuration(Q, init=jnp.array([float(x) for x in s0])),
@@ -133,8 +141,26 @@ def run_phi(arr, notes):
     return np.array(out)
 
 
+_COMPOSED = {}
+
+
+def composed(eta_b=ETA_B):
+    """The composed reader (quick part, tuning, bias, the curvature and tilt couplings) and its step."""
+    if eta_b not in _COMPOSED:
+        A = carving.reader([carving.tuning_box(ETA_W, W0, W0, GAMMA, BETA), carving.bias_box(eta_b, 0.0, RHO)],
+                           [carving.curvature_coupling(), carving.tilt_coupling()], 0.0, ETA_Q)
+        _COMPOSED[eta_b] = (A, carving.note_step(A))
+    return _COMPOSED[eta_b]
+
+
 def fast(notes, s0=(0.0, W0, 0.0), eta_b=ETA_B, record=False):
-    """The same step by hand."""
+    """``Phi`` of the composed reader on the note schedule from ``s0 = (q, w, b)``."""
+    A, step = composed(eta_b)
+    return carving.play(A, step, notes, record=record, start=s0)
+
+
+def by_hand(notes, s0=(0.0, W0, 0.0), eta_b=ETA_B, record=False):
+    """The one-box reader's step by hand."""
     q, w, b = (float(x) for x in s0)
     out = []
     for u in notes:
@@ -146,7 +172,12 @@ def fast(notes, s0=(0.0, W0, 0.0), eta_b=ETA_B, record=False):
 
 
 def old_fast(notes, q0, w0):
-    """``test_carving.py``'s reader, for the comparison: no bias."""
+    """``test_carving.py``'s reader, for the comparison: no bias (its composed reader, run by ``Phi``)."""
+    return one_slow.fast(notes, q0=q0, w0=w0)[-1]
+
+
+def old_by_hand(notes, q0, w0):
+    """``test_carving.py``'s one-box reader by hand."""
     q, w = float(q0), float(w0)
     for u in notes:
         dq = q ** 3 - w * q - u
@@ -179,10 +210,26 @@ def kicked(q_kick, steps=40000, **kw):
 # the machinery
 
 
-def test_the_fast_step_is_Phi():
-    """The by-hand step is the ``Phi`` of the arrangement, pathwise. Cannot come out otherwise."""
+def test_the_composed_reader_is_the_one_box_reader():
+    """The composed reader's ``Phi`` equals the one-box reader's ``Phi`` pathwise, and the hand loops at
+    the runs' settings: a 4000-step note and 4000 of silence, a full-mirror kick at both bias rates,
+    and the old reader's 4000 + 40000. The prediction, not a premise."""
     notes = schedule(60, 40)
-    assert np.allclose(run_phi(reader(), notes), fast(notes, record=True), atol=1e-6)
+    np.testing.assert_allclose(fast(notes, record=True), run_phi(one_box_reader(), notes), atol=1e-12)
+    notes = schedule(4000, 4000)
+    np.testing.assert_allclose(fast(notes, record=True), by_hand(notes, record=True), atol=1e-12)
+    for eta_b in (ETA_B, 0.0005):
+        s0 = (-Q_CARVED, W_CARVED, B_CARVED)
+        np.testing.assert_allclose(fast(np.zeros(60000), s0=s0, eta_b=eta_b),
+                                   by_hand(np.zeros(60000), s0=s0, eta_b=eta_b), atol=1e-10)
+    np.testing.assert_allclose(old_fast(schedule(4000, 40000), 0.0, W0),
+                               old_by_hand(schedule(4000, 40000), 0.0, W0), atol=1e-12)
+
+
+def test_the_hand_step_is_Phi():
+    """The by-hand step is the ``Phi`` of the one-box arrangement, pathwise. Cannot come out otherwise."""
+    notes = schedule(60, 40)
+    assert np.allclose(run_phi(one_box_reader(), notes), by_hand(notes, record=True), atol=1e-6)
 
 
 def test_the_accounting_holds():

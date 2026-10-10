@@ -43,8 +43,15 @@ checks the two-coordinate one pathwise against ``Phi`` of the seeded arrangement
    the mean it never switches back. (a) and (b) are near-certain given the numbers; (c) **could
    fail** if one member's stays are too short for ``R2`` to follow.
 
-Not composed: the members and ``R2`` are not wired in the library here; ``R2`` reads the
-members' mean as its exterior input, the aggregation left outside the picture.
+**Composed since P43 (b) job 7** (Claude Opus 5.5, de71554a, 2026-10-10; David: "division is a box"). Test 4's
+runs are ``Phi`` of ``population.population``: the members as boxes (the ``N``-fold tensor power of one noisy
+member, checked equal to ``tensor_arrangements`` of copies), the surrounds' note copied to them through the
+population's port, a ``+`` box and a ``1/N`` box for the mean, and ``R2`` reading the mean one way. Until
+then the members were averaged in numpy and ``R2`` was a hand loop fed the mean, never checked against
+``Phi``; those loops are kept (``members_mean``, ``slow_reader``) and checked equal on replayed noise, with
+one difference that is the composition's: ``R2`` hears the mean the members present at a step, so it reads
+it one step later than the hand loop, which fed it the members' new mean the same step. The noise of the
+composed runs is the library's (``rand.key_sampler``), not numpy's, so their numbers differ by sampling.
 """
 
 import jax.numpy as jnp
@@ -54,7 +61,9 @@ import pytest
 from arrangements.arrangement import Arrangement, exact
 from arrangements.coalgebra import configuration
 from arrangements.functors import Phi
-from arrangements.rand import euler_maruyama, replay_sampler, seed
+from arrangements import population as pop
+from arrangements.carving import note_step
+from arrangements.rand import euler_maruyama, key_sampler, replay_sampler, seed
 from arrangements.rvect import diagonal
 
 from tests.chain import IN_POS
@@ -232,11 +241,61 @@ def slow_reader(notes, q0=-1.0):
     return np.array(out)
 
 
+def composed_run(D_pop, n_after, N=2000, sd=0):
+    """``Phi`` of the population (members, mean, ``R2``) under the surrounds for ``D_pop`` steps, then
+    none: the members' mean after each step, the flips per member, and ``R2`` after each step."""
+    import jax
+
+    A = seed(pop.population(N, ETA, T, ETA2), key_sampler(sd))
+    step = note_step(A)
+    notes = jnp.asarray([S] * D_pop + [0.0] * n_after)
+
+    def body(carry, u):
+        s, side, flips = carry
+        s = step(s, u)
+        pos = A.P.position(s)
+        q = pos[:N]
+        now = jnp.where(q > 0.5, True, jnp.where(q < -0.5, False, side))
+        return (s, now, flips + (now != side)), (jnp.mean(q), pos[N])
+
+    (_, _, flips), (means, r2) = jax.lax.scan(body, (A.P.init, jnp.zeros(N, bool), jnp.zeros(N)), notes)
+    return np.asarray(means), np.asarray(flips), np.asarray(r2)
+
+
+def test_the_population_is_the_hand_loops():
+    """The composed population equals the hand loops on replayed noise: members' mean to 1e-12 over
+    300 steps at N = 2000, ``R2`` exactly once it is fed the mean one step earlier (the composition's
+    timing); and the power of the member equals the tensor of four members. The prediction."""
+    from arrangements.wiring import tensor_arrangements
+
+    z = np.random.default_rng(0).standard_normal((50, 4))
+    notes = [S] * 30 + [0.0] * 20
+    A = seed(pop.population(4, ETA, T, ETA2), replay_sampler(z))
+    B = seed(pop.population(4, ETA, T, ETA2,
+                            members_arr=tensor_arrangements([pop.member(ETA, T)] * 4)), replay_sampler(z))
+    sa, sb, a, b = note_step(A), note_step(B), A.P.init, B.P.init
+    for u in notes:
+        a, b = sa(a, u), sb(b, u)
+    assert np.max(np.abs(np.asarray(A.P.position(a)) - np.asarray(B.P.position(b)))) < 1e-14
+
+    N, n = 2000, 300
+    Z = np.random.default_rng(60).standard_normal((n, N))
+    A = seed(pop.population(N, ETA, T, ETA2), replay_sampler(Z))
+    step, s, means, r2 = note_step(A), A.P.init, [], []
+    for _ in range(n):
+        s = step(s, S)
+        pos = np.asarray(A.P.position(s))
+        means.append(pos[:N].mean())
+        r2.append(pos[N])
+    m_old, _ = members_mean(n, 0, sd=60)
+    assert np.max(np.abs(np.array(means) - m_old)) < 1e-12
+    assert np.max(np.abs(np.array(r2) - slow_reader(np.concatenate([[-1.0], m_old[:-1]])))) < 1e-12
+
+
 def test_a_note_no_member_holds_leaves_a_mark():
     """Prediction 4 (a), (b)."""
     D_pop, after = 6000, 6000
-    m, flips = members_mean(D_pop, after, sd=60)
-    r2 = slow_reader(m)
+    m, flips, r2 = composed_run(D_pop, after, sd=60)
     late = m[D_pop // 2: D_pop]
     print(f"\n[4, D_pop = 6000] flips per member {flips.mean():.2f}; members' mean over the note's "
           f"last half {late.mean():.3f} +- {late.std():.3f}, at the end {m[-1]:.3f}; "
@@ -244,28 +303,24 @@ def test_a_note_no_member_holds_leaves_a_mark():
     assert flips.mean() > 1.0 and late.max() - late.min() < 0.1
     assert r2[D_pop - 1] > 0.9 and r2[-1] > 0.9 and abs(m[-1]) < 0.3
     thresholds = []
-    for D in (1000, 1500, 2000, 3000, 4000):
-        mm, _ = members_mean(D, 3000, sd=61)
-        thresholds.append((D, slow_reader(mm)[-1] > 0))
+    for D in (1200, 1500, 2000, 3000, 4000):
+        _, _, r = composed_run(D, 3000, sd=61)
+        thresholds.append((D, r[-1] > 0))
     print("[4, threshold] D_pop: R2 right at the end  " + ", ".join(f"{D}: {r}" for D, r in thresholds))
     # Prediction 4(b)'s second half **failed** (2026-09-26): with D_pop = 1000, R2 did cross;
-    # it crossed for every D_pop tried. The members' mean rises faster than the agent
-    # estimated (e-fold about 400 steps, not 1000). The threshold is found below, observed.
+    # the members' mean rises faster than the agent estimated (e-fold about 400 steps, not 1000).
+    # At 1000 itself the outcome is the draw's (P43 (b) job 7, de71554a, 2026-10-10, ten seeds each
+    # way at these settings): R2 crossed in 4 of 10 composed runs and 6 of 10 hand-loop runs, never
+    # at 800 or 900, always at 1200 and 1500. The 2026-09-26 run's one draw at 1000 crossed; the
+    # composed run's draw (seed 61) does not. So the threshold is near 1000, a coin flip there.
     assert all(r for _, r in thresholds)
 
 
 def test_one_member_is_not_a_held_note():
     """Prediction 4 (c). Could fail."""
     n = 20000
-    rng = np.random.default_rng(70)
-    c = np.sqrt(2 * T * ETA)
-    q, one = -1.0, []
-    for _ in range(n):
-        q = q - ETA * dk_com(q, S) + c * rng.standard_normal()
-        one.append(q)
-    r_one = slow_reader(np.array(one))
-    m, _ = members_mean(n, 0, sd=71)
-    r_mean = slow_reader(m)
+    _, _, r_one = composed_run(n, 0, N=1, sd=70)       # R2 reading one member: a population of one
+    _, _, r_mean = composed_run(n, 0, sd=71)
     sw = lambda r: int(np.sum(np.diff(np.where(r > 0.5, 1, np.where(r < -0.5, -1, 0))[np.abs(r) > 0.5]) != 0))
     first_right = int(np.argmax(r_mean > 0.5))
     back = bool(np.any(r_mean[first_right:] < -0.5))
@@ -321,12 +376,12 @@ def test_the_race_at_lower_noise():
 
 def test_the_shortest_population_note_that_leaves_a_mark():
     """4', observed (2026-09-26): no D_pop from 100 to 800 left R2 right (the members' mean
-    peaked at 0.45 by 800); 1000 did, in the earlier test. The threshold is between 800 and
-    1000 steps, where the members' mean has passed R2's tilt threshold 0.385 long enough for
-    R2 to cross."""
+    peaked at 0.45 by 800). The threshold is near 1000 steps, where the members' mean has passed
+    R2's tilt threshold 0.385 long enough for R2 to cross: at 1000 it crosses in about half the
+    draws (4 of 10 composed, 6 of 10 by hand; P43 (b) job 7), at 1200 in every one."""
     rows = []
     for D in (100, 200, 300, 400, 600, 800):
-        mm, _ = members_mean(D, 3000, sd=62)
-        rows.append((D, bool(slow_reader(mm)[-1] > 0), float(mm[:D].max())))
+        mm, _, r = composed_run(D, 3000, sd=62)
+        rows.append((D, bool(r[-1] > 0), float(mm[:D].max())))
     print("\n[4'] D_pop: R2 right at the end, members' peak mean  "
           + ", ".join(f"{D}: {r} ({pk:.2f})" for D, r, pk in rows))

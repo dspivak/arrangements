@@ -13,6 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from arrangements.arrangement import Arrangement, exact
+from arrangements.functors import closed_step
 from arrangements.interpretation import trivial_omega
 from arrangements.polynomial import nest_left, unnest_left
 from arrangements.rvect import diagonal
@@ -86,3 +87,51 @@ def state_like(like, flat):
     if i != flat.shape[0]:
         raise ValueError(f"state_like: {flat.shape[0]} coordinates for a state of size {i}")
     return jax.tree_util.tree_unflatten(treedef, pieces)
+
+
+class HeldChain:
+    """A chain of ``parts`` with both ends held by boxes (``wiring.held_chain``), stepped from and to
+    flat coordinates: ``step(q)`` for configuration parts, ``step(q, p)`` for phase or leapfrog parts.
+
+    The ends are held particles at ``0`` with zero response; the right one is joined to the last part
+    by a spring of constant ``kappa``. Single-stage chains step by ``functors.closed_step`` (compiled,
+    checked against ``Phi``); a leapfrog chain by ``pc2.Phi2``. This replaces the pinned ends that the
+    chain tests computed in code each step (``q_prev = 0`` fed in, ``xi_N = -kappa q~_K`` computed from
+    the state; plan P43 (b) job 4).
+    """
+
+    def __init__(self, parts, kappa, parameter, two_stage=False):
+        from arrangements.wiring import held_chain
+        self.K = len(parts)
+        self.arr = held_chain(parts, kappa, parameter)
+        self.two_stage = two_stage
+        self.phase = flat_state(self.arr.P.init).shape[0] == 2 * self.arr.P.Q_dim  # (q, p) per part
+        if two_stage:
+            from arrangements.pc2 import Phi2
+            self.O = Phi2(self.arr)
+        else:
+            self._step = closed_step(self.arr)
+
+    def state(self, q, p=None):
+        z = jnp.zeros(1)
+        if p is None:
+            flat = jnp.concatenate([z, jnp.asarray(q, float), z])
+        else:
+            inner = jnp.stack([jnp.asarray(q, float), jnp.asarray(p, float)], axis=1).reshape(-1)
+            flat = jnp.concatenate([z, z, inner, z, z])
+        return state_like(self.arr.P.init, flat)
+
+    def flat(self, state):
+        x = flat_state(state)
+        if not self.phase:
+            return x[1:self.K + 1]
+        qp = x[2:2 + 2 * self.K].reshape(self.K, 2)
+        return qp[:, 0], qp[:, 1]
+
+    def step(self, q, p=None):
+        s = self.state(q, p)
+        if self.two_stage:
+            _, _, s = self.O.with_state(s).run_one(IN_POS, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+        else:
+            s = self._step(s)
+        return self.flat(s)

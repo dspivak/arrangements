@@ -100,10 +100,10 @@ def test_A2_equality_on_the_pair_and_random_pairs():
                 c0, c1 = rng.choice(wires), rng.choice(wires)
                 net.pcost([net.mul(net.const(0.1), c0), net.mul(net.const(0.1), c1)], rng.randrange(ports))
                 n_pcost += 1
-        _check_pair(a, b, [0, 1], [0], 4, tol=1e-12, library=(k < 3))
+        _check_pair(a, b, [0, 1], [0], 4, tol=1e-12, library=True)   # all eight through the library (P43 (b) job 8)
         assert _one_net_states(a, b, [0, 1], [0], 4) < 1e-12
     print(f"\nA′2 the pair for 50 steps and eight random pairs ({n_pcost} pcost sinks): the library's couple, the pair "
-          f"by hand and the one net wired by hand agree; the first three pairs through the library too")
+          f"by hand and the one net wired by hand agree, every pair through the library too")
 
 
 @pytest.fixture(scope="module")

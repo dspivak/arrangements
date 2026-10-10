@@ -151,7 +151,10 @@ def Phi(arr: Arrangement) -> PCMorphism:
     returned direction are the interpretation's, evaluated at the position
     ``arr.P.position(s)`` the coalgebra presents; the state update is
     ``arr.P.step(s, xi_Q)`` on the parameter covector of the covector triple.
-    Time is discrete by design: one covector, one step (sec.displacement).
+    Time is discrete by design: one covector, one step (sec.displacement). The
+    fiber's ``at_pos(in_dir, duration=None)`` also takes how long the step is held
+    (Ch 3 def.duration_integrator), handed to ``P.step_over``; ``None`` is the unit
+    step, ``P.step``, as before durations existed (book P9.5).
     For a long run of a closed arrangement use ``closed_step`` below: the same
     step compiled, checked against this one on its first steps.
     """
@@ -187,11 +190,11 @@ def Phi(arr: Arrangement) -> PCMorphism:
             out_m, omega_M = in_pos
             out_pos = position_action(out_m, omega_M)
 
-            def at_pos(in_dir):
+            def at_pos(in_dir, duration=None):
                 xi_N, in_n = in_dir
                 xi_Q, xi_M, in_m = direction_action(out_m, omega_M, xi_N, in_n)
                 out_dir = (xi_M, in_m)
-                new_state = P.step(state, xi_Q)
+                new_state = P.step(state, xi_Q) if duration is None else P.step_over(state, xi_Q, duration)
                 return out_dir, new_state
 
             return out_pos, at_pos
@@ -206,7 +209,7 @@ def Phi(arr: Arrangement) -> PCMorphism:
     )
 
 
-def closed_step(arr: Arrangement, check: int = 2):
+def closed_step(arr: Arrangement, check: int = 2, duration=None):
     """One step of ``Phi(arr)`` for a closed arrangement, compiled by JAX, checked against ``Phi``.
 
     For a closed arrangement (all four port dimensions zero) the covector triple collapses
@@ -219,6 +222,9 @@ def closed_step(arr: Arrangement, check: int = 2):
     ``compose_seq`` is retraced every call (2.5 s a step on the 19-node runner of
     ``runner.py``). ``commons.closed_step`` and ``cascade.closed_step`` are older copies
     without the check.
+
+    ``duration`` fixes how long every step is held (``None``: the unit step), and the
+    check runs ``Phi`` at the same duration.
     """
     from .interpretation import trivial_omega
 
@@ -230,13 +236,13 @@ def closed_step(arr: Arrangement, check: int = 2):
     @jax.jit
     def step(s):
         xi_q, _, _ = omega(P.position(s), z, z)
-        return P.step(s, xi_q)
+        return P.step(s, xi_q) if duration is None else P.step_over(s, xi_q, duration)
 
     if check:
         O, IN = Phi(arr), (jnp.zeros(0), trivial_omega(0))
         s_phi = s_fast = P.init
         for k in range(check):
-            _, _, s_phi = O.with_state(s_phi).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+            _, _, s_phi = O.with_state(s_phi).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)), duration)
             s_fast = step(s_fast)
             for a, b in zip(jax.tree_util.tree_leaves(s_phi), jax.tree_util.tree_leaves(s_fast)):
                 if not jnp.allclose(a, b, rtol=1e-10, atol=1e-12):

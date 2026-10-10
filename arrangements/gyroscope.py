@@ -31,6 +31,14 @@ realizes the same chain-rule pullbacks that ``cot`` encodes -- an AD-equivalence
 for genuine multi-stage *integrators* like leapfrog/RK4; the training rollout is not
 one.)
 
+**Training through the rollout is not a run of an arrangement** (plan P43 (b) job 7, Claude Opus 5.5,
+de71554a, 2026-10-10). ``train`` backpropagates a loss at the rollout's end to the physics, encoder and
+decoder and updates them with Adam between rollouts: an optimization over a family of arrangements. In a
+run a force reaches a box only the step it is sent, so ``online_classifier`` (below) builds what can learn
+inside one arrangement: the decoder, its loss read one way from the gyros, the physics and encoder held.
+Found on the way: at the initial physics (gyroscopic coefficient 0.2, damping 0.05) the undriven network
+grows without bound (a 0.1 kick to 5e7 in 300 steps); the 18-step rollouts from rest never showed it.
+
 Two realizations of the same dynamics live here (STATUS.md §2, trick vs direct):
 
 * ``gyro_arrangement`` -- the TRICK: the forcing is exact, ``omega = -dU`` on ``Q``, and
@@ -577,3 +585,129 @@ def main(rows: int = 4, cols: int = 5, epochs: int = 60, seed: int = 0):
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# The classifier as one arrangement, its decoder learning online (plan P43 (b) job 7).
+# ---------------------------------------------------------------------------
+#
+# ``train`` above backpropagates a loss at the end of each rollout through the whole rollout to the
+# physics, the encoder and the decoder, and Adam updates them between rollouts: an optimization over a
+# family of arrangements, not a run of one. In a run, a force reaches a box's state only at the step it
+# is sent (the dynamics functor's pullback is one step), so what can learn inside the arrangement is what
+# the loss reaches the step it is paid: the decoder, which reads the output gyros at that step. Here the
+# gyros, a fixed encoder and the decoder's weights are boxes in one closed arrangement: a stroke box and
+# a label box step through the examples (each stroke, then the settle, then a quiet gap in which the
+# damping clears the network); the loss, cross-entropy weighted by a flag the label box raises at the
+# readout step, pushes the decoder's weights. The physics and encoder are held at their initial values.
+
+
+def _stream(xs: Array, ys: Array, cfg: GyroConfig, gap: int):
+    """Per step: the stroke point (zero after the stroke), the one-hot label and the readout flag."""
+    xs, ys = np.asarray(xs), np.asarray(ys)
+    n, T = xs.shape[0], xs.shape[1]
+    L = T + cfg.settle + gap
+    X = np.zeros((n, L, 2))
+    X[:, :T] = xs
+    Y = np.zeros((n, L, cfg.n_classes + 1))
+    Y[np.arange(n), T + cfg.settle - 1, ys] = 1.0
+    Y[:, T + cfg.settle - 1, -1] = 1.0
+    return X.reshape(n * L, 2), Y.reshape(n * L, cfg.n_classes + 1)
+
+
+def online_classifier(cfg: GyroConfig, params: Dict[str, Array], xs: Array, ys: Array, *, lr: float,
+                      gap: int = 100) -> Arrangement:
+    """The closed arrangement: stroke box -> encoder (the drive lens) -> gyros -> readout -> the decoder's
+    flagged cross-entropy, read one way (it pushes the weights box, not the gyros), the label box beside. Its position is the
+    stroke box's place, the label box's place, the gyros' ``(q~, xi)``, then the decoder's weights."""
+    from .coalgebra import configuration
+    from .network import example_box, map_box
+    from .rvect import euclidean
+    from .wiring import compose_seq, tensor_arrangements, trivial_parameter
+
+    X, Y = _stream(xs, ys, cfg, gap)
+    n = 2 * cfg.V
+    inv_diag = jnp.repeat(jnp.exp(params["log_inv_mass"]), 2)
+    out_idx = jnp.asarray(cfg.out_idx)
+    net = gyro_arrangement_on_cotangent(
+        cfg, jnp.exp(params["log_inv_mass"]), jnp.exp(params["log_kappa"]), jnp.exp(params["log_grav"]),
+        gamma=params["gamma"], J=cfg.J,
+        parameter=lambda Q: phase_on_cotangent(Q, damping=cfg.damping))
+    R = 2 * cfg.n_out
+    net = Arrangement(P=net.P, in_dim_M=0, out_dim_M=0, in_dim_N=net.in_dim_N, out_dim_N=R,
+                      out_f=lambda qp, m: jnp.concatenate([qp[:n][out_idx], (inv_diag * qp[n:])[out_idx]]),
+                      in_f=net.in_f, omega=net.omega, label="gyros (positions, velocities)")
+    C = cfg.n_classes
+    W0 = jnp.concatenate([params["W_dec"].ravel(), params["b_dec"]])
+    weights = Arrangement(
+        P=configuration(euclidean(W0.shape[0], lr), init=W0), in_dim_M=0, out_dim_M=0, in_dim_N=0,
+        out_dim_N=W0.shape[0], out_f=lambda q, m: q, in_f=lambda q, m, nn: jnp.zeros(0),
+        omega=lambda q, m, nn: (jnp.zeros_like(q), jnp.zeros_like(m), jnp.zeros_like(nn)), label="decoder weights")
+    stroke, label = example_box(X, "stroke"), example_box(Y, "label")
+    parts = tensor_arrangements([net, stroke, label, weights])
+    # wires out: readout (R), stroke (2), label (C + 1), weights (W); the gyros' force input comes from the encoder
+    F = net.in_dim_N
+    Wenc, benc, fs = params["W_enc"], params["b_enc"], cfg.force_scale
+    nW = W0.shape[0]
+
+    def drive_in(q, m, nn):
+        return fs * (Wenc @ m[R:R + 2] + benc)
+
+    drive = Arrangement(
+        P=trivial_parameter(), in_dim_M=F, out_dim_M=R + 2 + C + 1 + nW, in_dim_N=0, out_dim_N=R + C + 1 + nW,
+        out_f=lambda q, m: jnp.concatenate([m[:R], m[R + 2:]]), in_f=drive_in,
+        omega=lambda q, m, nn: (jnp.zeros_like(q), jnp.zeros_like(m), jnp.zeros_like(nn)), label="encoder")
+    # the decoder reads the gyros one way: its loss pushes the weights and nothing else (an exact read would
+    # push the gyros toward a lower loss, the classifier moving the network it reads)
+    def decoder_loss(q, m, nn):
+        r, W, lab, flag = m[:R], m[R:R + nW], m[R + nW:R + nW + C], m[R + nW + C]
+
+        def ce(Wv):
+            lg = Wv[:C * R].reshape(C, R) @ r + Wv[C * R:]
+            return flag * (-jnp.dot(lab, lg - jax.scipy.special.logsumexp(lg)))
+
+        gW = -jax.grad(ce)(W)
+        return jnp.zeros_like(q), jnp.concatenate([jnp.zeros(R), gW, jnp.zeros(C + 1)]), jnp.zeros_like(nn)
+
+    loss = Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=R + nW + C + 1, in_dim_N=0, out_dim_N=0,
+                       out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, nn: jnp.zeros(0), omega=decoder_loss,
+                       label="decoder and its flagged cross-entropy, reading one way")
+    # after the encoder: [readout R, label C+1, weights nW]; reorder to [readout, weights, label]
+    order = list(range(R)) + list(range(R + C + 1, R + C + 1 + nW)) + list(range(R, R + C + 1))
+    from .network import fan_box
+    head = fan_box(R + C + 1 + nW, order, "order")
+    return compose_seq(compose_seq(compose_seq(parts, drive), head), loss)
+
+
+def online_weights(arr: Arrangement, state) -> Array:
+    """The decoder's weights in the online classifier's state."""
+    leaves = jax.tree_util.tree_leaves(state)
+    return leaves[4]
+
+
+def online_accuracy(cfg: GyroConfig, params: Dict[str, Array], W: Array, xs: Array, ys: Array,
+                    gap: int = 100) -> float:
+    """Run the classifier with its weights held (response 0) over ``xs`` and read, at each readout
+    step, which class its decoder ranks first."""
+    from .functors import closed_step
+
+    p = dict(params)
+    C, R = cfg.n_classes, 2 * cfg.n_out
+    p["W_dec"], p["b_dec"] = W[:C * R].reshape(C, R), W[C * R:]
+    A = online_classifier(cfg, p, xs, ys, lr=0.0, gap=gap)
+    step = closed_step(A, check=0)
+    L = xs.shape[1] + cfg.settle + gap
+    n = 2 * cfg.V
+    inv_diag = jnp.repeat(jnp.exp(params["log_inv_mass"]), 2)
+    out_idx = jnp.asarray(cfg.out_idx)
+
+    def body(s, _):
+        s = step(s)
+        q, xi = jax.tree_util.tree_leaves(s)[:2]
+        qt = q + inv_diag * xi
+        r = jnp.concatenate([qt[out_idx], (inv_diag * xi)[out_idx]])
+        return s, p["W_dec"] @ r + p["b_dec"]
+
+    _, lg = jax.lax.scan(body, A.P.init, None, length=xs.shape[0] * L)
+    at = np.arange(xs.shape[0]) * L + xs.shape[1] + cfg.settle - 2
+    return float(np.mean(np.argmax(np.asarray(lg)[at], axis=1) == np.asarray(ys)))

@@ -26,8 +26,10 @@ For ``ẋ = -A x`` these stages collect to ``x' = [I - hA + (hA)²/2 - (hA)³/6 
 genuine RK4, with global error ``O(h⁴)`` (``test_pck.py`` checks the ``h⁴`` rate).
 
 RK4 is **non-symplectic** -- fine here: it is what the multi-stage construction
-gives, and what the gyroscope blog uses; symplecticity is not required. Whether
-``arr → pc^(4)`` is lax monoidal is open (pcK.py).
+gives, and what the gyroscope blog uses; symplecticity is not required. That
+``arr → pc^(4)`` is a lax monoidal functor is proved by hand from the duoidal
+interchange (book repo ``notes/multiround-composes-1be7dcb7.md``); the parts of a
+composite take their rounds together, so RK4 parts run as RK4 on the whole.
 """
 
 from __future__ import annotations

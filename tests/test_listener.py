@@ -225,8 +225,15 @@ def test_7_a_repeated_account_counts_twice():
 def test_8_the_checker_that_knows_the_push_matches_the_one_way_wire(runs):
     """Prediction 8 (built to hold): David's internal checker, a part that notices the preference's push and
     cancels it, is the cascade's subtracting wire; it needs to know the losses and the reliance, and then its
-    belief is the one-way wire's, to 1e-10. The exact wire is printed beside them for the size of the push."""
-    arr = listener_system(wire="subtract")
+    belief is the one-way wire's, to 1e-10. The exact wire is printed beside them for the size of the push.
+
+    The checker is its own box since P43 (b) job 8 (``listener.checker_box``, between the belief, sent forward
+    plainly, and the valuation; de71554a); before, it was folded into the belief box's forcing
+    (``wire="subtract"``), checked equal to it here."""
+    folded = listener_system(wire="subtract")
+    arr = listener_system(wire="checker")
+    for sc in SCRIPTS.values():
+        np.testing.assert_allclose(run_script(arr, sc)[1], run_script(folded, sc)[1], atol=1e-12, rtol=0)
     for name, sc in SCRIPTS.items():
         ps, ys, _ = run_script(arr, sc)
         p1, y1, _ = runs[name]

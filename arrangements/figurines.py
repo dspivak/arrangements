@@ -14,7 +14,8 @@ each figurine's state and placement. Predictions fixed before this file existed:
 Minutes throughout; the bus is scheduled at 0.
 
 THE FIGURINES, each ``I -> B`` with one real state ``theta_j`` (a configuration integrator, Euclidean
-response ``mu_theta``), whose sending map RUNS a small system from that state and reads off a guess in
+response ``mu_theta``), whose sending map runs a small mechanism (a hand-typed loop inside the sending map, one smooth map, not a system in
+the book's sense; P43 (b) job 8) from that state and reads off a guess in
 minutes, sent as ``(g_j e_j, 1)`` in its own slot of ``H = R^6`` (slots 0..2 guesses, 3..5 the account's
 flags, used only by the exterior):
 

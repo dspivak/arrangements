@@ -150,6 +150,23 @@ def test_n2_journal_reader_is_the_pooled_mind(wname, truth):
         assert wrong == 0
 
 
+@pytest.mark.parametrize("wname", list(r2.F_WIRINGS))
+def test_n2_journal_ends_where_the_provenance_bookkeeping_ends(wname):
+    """P43 (b) job 7 (Claude Opus 5.5, de71554a, 2026-10-10). Round two's summaries with provenance
+    (``science.run_summaries``) are bookkeeping, not an arrangement: each holder keeps the set of papers
+    it has read, a growing list, which the library's state spaces (``R^d`` only) cannot hold, though the
+    book's smooth sets can. The journal box is the arrangement that does the same work,
+    each paper arriving once on the journal's wire. On the same draws, every holder ends with the same
+    weights either way (the pooled mind), to 1e-12; so the bookkeeping stands beside the arrangement
+    that replaces it."""
+    worst = 0.0
+    for dr, Y, _ in _summ(5.0, wname, "journal", r2.T_SUM + 2):
+        Ys, _ = sc.run_summaries(dr, r2.MUS_F, r2.F_WIRINGS[wname], True, r2.EXTRA[wname])
+        worst = max(worst, float(np.max(np.abs(sc.weights(Y[-1]) - sc.weights(np.asarray(Ys[-1]))))))
+    print(f"\n(n2 journal vs provenance) {wname}: worst final |weights| difference {worst:.2e}")
+    assert worst < 1e-12
+
+
 # ---------------------------------------------------------------------------
 # Stage 2: (f)'s conclusions arms natively, (n3)-(n5)
 # ---------------------------------------------------------------------------

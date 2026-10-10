@@ -53,11 +53,17 @@
     // How much the listener counts on the speaker from placement p. The library's spatial parent uses a bell,
     // exp(-p^2 / 2 tau), flat at its top, so a listener beside the speaker gets no push either way whatever it
     // believes (plan §5.9 item 63, "a listener beside the source cannot leave"). The page's default is a peak,
-    // exp(-p / tau) with the placement a distance, never below 0: its slope at the top is 1 / tau, so a listener
-    // beside the speaker leaves as soon as relying costs more than doing without (David, 2026-10-09: "I guess so").
+    // exp(-p / tau), so a listener near the speaker leaves as soon as relying costs more than doing without (David,
+    // 2026-10-09: "I guess so"), smoothed at the speaker as exp(-(sqrt(p^2 + eps^2) - eps) / tau), eps = 1e-3, so that
+    // it is the library's (attention.spatial_kappa, kernel "peak"). A listener never stands on the speaker (David,
+    // 2026-10-10: "that never happens! so there's a bound to how close they can be"): personal space, a cost
+    // -sigma log(1 - k(p)) rising as the listener nears, pushes it away (listener.personal_space_box). The page's
+    // defaults are the library's page_model() and checked equal to it (tests/test_animate.py).
+    const EPS = 1e-3, sigma = params.sigma || 0, mu = params.mu || MU;
     const peak = params.kernel !== "gaussian";
-    const kappa = peak ? p => Math.exp(-p / tau) : p => Math.exp(-p * p / (2 * tau));
-    const dkappa = peak ? p => -kappa(p) / tau : p => -p / tau * kappa(p);
+    const rho = p => Math.sqrt(p * p + EPS * EPS);
+    const kappa = peak ? p => Math.exp(-(rho(p) - EPS) / tau) : p => Math.exp(-p * p / (2 * tau));
+    const dkappa = peak ? p => -kappa(p) * (p / rho(p)) / tau : p => -p / tau * kappa(p);
     let l = [0, 0, 0], p = p0;
     const ps = [], ys = [], ks = [];
     const T = STEPS_PER_ROUND * script.length;
@@ -69,14 +75,14 @@
       const heard = params.hear === "weighted" ? k : 1;
       let xi = letter ? LOGPI.map(row => heard * row[OUTCOME[letter]]) : [0, 0, 0];
       if (wire === "exact") xi = xi.map((x, i) => x - k * ell[i]);
-      const xp = -dkappa(p) * (dot(y, ell) - c);
+      const xp = -dkappa(p) * (dot(y, ell) - c) - (sigma ? sigma * dkappa(p) / (1 - k) : 0);
       // Bayes' rule on log-heights. A kind that gives what happened probability 0 goes to minus infinity and
       // stays there, so the heights are renormalized by their largest finite entry rather than the library's
       // belief-weighted mean (the belief is the same either way). If what happened is impossible under every kind,
       // the listener has nothing to update by, and the step leaves the belief alone.
       const nl = l.map((x, i) => x + xi[i]), finite = nl.filter(Number.isFinite);
       if (finite.length) { const top = Math.max(...finite); l = nl.map(x => x - top); }
-      p = peak ? Math.max(0, p + MU * xp) : p + MU * xp;
+      p = p + mu * xp;
     }
     ps.push(p); ys.push(softmax(l)); ks.push(kappa(p));
     return { ps, ys, ks };
@@ -137,7 +143,7 @@
 
   const model = {
     defaults: { script: "KXKXKKXKXK", hear: "full", kernel: "peak", keep: [0.98, 0.6, 0.6], lined: [0.95, 0.95, 0.2], fail: 20,
-                c: 5, tau: 0.8, p0: 0.5 },
+                c: 5, tau: 0.8, p0: 0.5, sigma: 1, mu: 0.05 },
     samples: [
       { id: "A", name: "One exceptional failure", script: "KKKKLKKKKK",
         note: "The source keeps nine promises out of ten; its one failure comes with an account that lines up." },

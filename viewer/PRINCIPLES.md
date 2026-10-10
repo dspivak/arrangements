@@ -65,3 +65,9 @@ great." A page that departs from one says why in its own header comment.
     step by step ("I don't know if you can grab the data from the website. That'd be a cool feature, like a debug
     button"; asked on the listener, not yet built on either page).
 17. **When the page changes, give one instruction** for seeing it, such as "reload" ("don't tell me five things to do").
+
+## Checking a page in headless Chrome
+
+Headless virtual time does not advance `requestAnimationFrame`, so a screenshot taken after pressing Play shows step 0.
+To see a page mid-run, set the state directly in a debug copy (`params.script`, `t`, then `recompute()`) and capture
+that (Claude Opus 5.5, 9effcd80, 2026-10-09, from the suggestion box; moved here by the sweep, e4e712b7, 2026-10-10).

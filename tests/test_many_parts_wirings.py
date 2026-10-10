@@ -92,11 +92,35 @@ def F_wired(n, wiring, s_mask=None, k=None, alpha=ALPHA, K=KGATE):
     return F
 
 
+def receive_box(wiring, k=None):
+    """What a part receives from the others, as a box over their ``m`` wires (P43 (b) job 8)."""
+    from arrangements.network import map_box
+
+    fn = {"mean": lambda v: jnp.mean(v), "sum": lambda v: jnp.sum(v), "min": lambda v: jnp.min(v),
+          "softmin": lambda v: -jax.scipy.special.logsumexp(-k * v) / k}[wiring]
+    return lambda m: map_box(lambda v: jnp.reshape(fn(v), (1,)), m, 1, f"receive {wiring}")
+
+
 def collective(n, wiring, q0, s, s_mask=None, k=None):
+    """The collective as parts (``test_many_parts.collective``, the all-to-all wiring with a receive box
+    per part); equal to ``collective_one_coupler`` (``test_0_parts_equal_one_coupler``)."""
+    return mp.collective(n, "all", q0, s, 0.0, s_mask=s_mask, receive=receive_box(wiring, k))
+
+
+def collective_one_coupler(n, wiring, q0, s, s_mask=None, k=None):
     q0 = [float(q0)] * n if isinstance(q0, (int, float)) else list(q0)
     parts = [mn.part(q0[i], label=f"P{i}") for i in range(n)] + [mn.supply(s)]
     return compose_seq(tensor_arrangements(parts),
                        mn.coupler(F_wired(n, wiring, s_mask, k), n + 1))
+
+
+def test_0_parts_equal_one_coupler():
+    """Each receive wiring as parts equals the one-coupler run over 1000 steps, with a cut supply."""
+    q0 = [0.4, 1.3, 0.9, 1.1]
+    for wiring, k in (("mean", None), ("sum", None), ("min", None), ("softmin", 8.0)):
+        a = mp.trajectory(collective(4, wiring, q0, 4.0, [1, 1, 0, 1], k), 1000)
+        o = mp.trajectory(collective_one_coupler(4, wiring, q0, 4.0, [1, 1, 0, 1], k), 1000)
+        np.testing.assert_allclose(a, o, atol=1e-12)
 
 
 def sum_roots(n, s, cut=False, alpha=ALPHA, b=DISS, K=KGATE):

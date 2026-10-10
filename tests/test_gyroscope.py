@@ -18,6 +18,7 @@ every environment covector ``xi_N`` is zero, so no input is sign-translated from
 (STATUS.md §1); only the module's cost became the forcing ``omega = -dU``.
 """
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -143,6 +144,53 @@ def test_classifier_trains_and_separates():
 
     assert hist[-1]["loss"] < 0.7 * loss0    # training drove the loss down
     assert best > 0.8                        # well above chance (0.5) on a learnable task
+
+
+def test_online_classifier_is_one_arrangement_and_separates():
+    """P43 (b) job 7 (Claude Opus 5.5, de71554a, 2026-10-10). ``gyroscope.online_classifier``: stroke and
+    label boxes, the encoder as the drive lens, the gyros, and the decoder's flagged cross-entropy read one
+    way, pushing a weights box; one closed arrangement run by ``Phi`` over five passes of the 400 training
+    strokes, the physics and encoder held at their initial values. Validation accuracy 0.535 before (the
+    untrained decoder, chance), 1.0 after; the old Adam-through-the-rollout training also reaches 1.0 (the
+    CDLM recording, every epoch), so this is no better, only a run of one arrangement. Damping 0.2, not the default
+    0.05: at the default the network is unstable (next test), which twelve-step rollouts from rest never
+    showed. **Could have come out otherwise**: a fixed network's readout might not have separated."""
+    rng = np.random.default_rng(1)
+    cfg = make_config(rows=2, cols=3, n_classes=2, settle=6, damping=0.2)
+    Xtr, Ytr = _synthetic(400, 6, rng)
+    Xva, Yva = _synthetic(200, 6, rng)
+    p = init_params(cfg, seed=0)
+    W0 = jnp.concatenate([p["W_dec"].ravel(), p["b_dec"]])
+    from arrangements.functors import closed_step
+    from arrangements.gyroscope import online_accuracy, online_classifier, online_weights
+    A = online_classifier(cfg, p, np.concatenate([Xtr] * 5), np.concatenate([Ytr] * 5), lr=0.2)
+    step = closed_step(A)
+    s = jax.lax.fori_loop(0, 5 * 400 * (6 + 6 + 100), lambda _i, u: step(u), A.P.init)
+    before, after = online_accuracy(cfg, p, W0, Xva, Yva), online_accuracy(cfg, p, online_weights(A, s), Xva, Yva)
+    print(f"\nonline classifier: validation accuracy {before:.3f} -> {after:.3f}")
+    assert before < 0.6 and after > 0.8
+
+
+def test_the_default_network_is_unstable_beyond_its_rollouts():
+    """Found by P43 (b) job 7: at the initial physics (gyroscopic coefficient 0.2, damping 0.05) the
+    undriven network grows, a 0.1 kick to 5e7 in 300 steps; the explicit gyroscopic kick outruns the
+    damping. At damping 0.2, or with no precession, it decays. The trained classifier's rollouts are
+    18 steps from rest, too short to show it."""
+    from arrangements.gyroscope import _IN_POS as IN
+    out = {}
+    for gamma, damping in ((0.2, 0.05), (0.2, 0.2), (0.0, 0.05)):
+        cfg = make_config(rows=2, cols=3, n_classes=2, settle=6, damping=damping)
+        p = dict(init_params(cfg, seed=0))
+        p["gamma"] = jnp.array(gamma)
+        O = coalgebra(cfg, p)
+        f, z = jnp.zeros(len(cfg.in_idx)), jnp.zeros(len(cfg.out_idx))
+        step = jax.jit(lambda s, O=O, f=f, z=z: O.with_state(s).run_one(IN, lambda _o: (z, f))[2])
+        s = (0.1 * jnp.asarray(np.random.default_rng(0).standard_normal(2 * cfg.V)), jnp.zeros(2 * cfg.V))
+        for _ in range(300):
+            s = step(s)
+        out[(gamma, damping)] = float(jnp.max(jnp.abs(s[0])))
+    print("\n|q| after 300 undriven steps:", out)
+    assert out[(0.2, 0.05)] > 1e3 and out[(0.2, 0.2)] < 0.1 and out[(0.0, 0.05)] < 0.1
 
 
 def test_regression_matches_cdlm():

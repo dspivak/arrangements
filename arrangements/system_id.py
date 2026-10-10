@@ -213,3 +213,131 @@ def one_step_error(
             errs.append(float(jnp.linalg.norm(F(params, s) - s_next)))
             base.append(float(jnp.linalg.norm(s - s_next)))
     return float(np.mean(errs)), float(np.mean(base))
+
+
+# ---------------------------------------------------------------------------
+# The pendulums wired to their learner (plan P43 (b) job 5): no data passed in code.
+# ---------------------------------------------------------------------------
+#
+# A box reads out only its configuration; a phase pendulum's is its presented position
+# a_t = q_t + p_t/m, which is q_{t+1}. So the learner sees what the pendulum presents, and learns
+# to predict a_t from (a_{t-2}, a_{t-1}): two successive positions carry the momentum. Delay boxes
+# hold the past positions; one parameter box's weights are copied to a net per pendulum, so the
+# forces from all the pendulums add; each loss is one-way, so no pendulum is moved by the learner.
+
+
+def observed_oscillator(potential: Callable[[Array], Array], m: float, q0: float, p0: float) -> Arrangement:
+    """A one-dimensional pendulum ``<0|0> -> <0|1>`` that reads out its presented position."""
+    return Arrangement(
+        P=phase(diagonal(jnp.full(1, 1.0 / m)), init=(jnp.array([float(q0)]), jnp.array([float(p0)]))),
+        in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+        out_f=lambda q, m_out: q,
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=exact(lambda q, m_out, n_in: -potential(q)),
+        label="pendulum",
+    )
+
+
+def delay_box(x0: float = 0.0) -> Arrangement:
+    """A one-step delay ``<0|0> -> <1|1>``: presents what it heard on the previous step.
+
+    Configuration ``Q = R^2``, ``(h, z)``: it presents ``h``; its 1-form puts ``n - z`` on ``z``, ``n``
+    the value it hears, and nothing on its input (it hears without pulling); its integrator sets
+    both coordinates to ``z + xi_z = n`` and ignores the push ``xi_h`` that comes back on what it
+    presents, as the book's datum box ignores the force that comes back.
+    """
+    from .coalgebra import CotCoalg
+
+    P = CotCoalg(
+        Q_dim=2, init=jnp.array([float(x0), float(x0)]),
+        position=lambda s: s,
+        step=lambda s, xi: jnp.full(2, s[1] + xi[1]),
+        label="delay",
+    )
+
+    def omega(q, m_out, n_in):
+        return jnp.array([0.0, n_in[0] - q[1]]), jnp.zeros_like(m_out), jnp.zeros_like(n_in)
+
+    return Arrangement(
+        P=P, in_dim_M=0, out_dim_M=0, in_dim_N=1, out_dim_N=1,
+        out_f=lambda q, m_out: q[:1], in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=omega, label="delay",
+    )
+
+
+def one_way_squared_error(n: int = 1) -> Arrangement:
+    """``<0|n> (x) <0|n> -> I`` returning ``l - y`` to the answer ``y`` and nothing to the label ``l``."""
+    from .wiring import trivial_parameter
+
+    def omega(q, m, nn):
+        y, lab = m[:n], m[n:]
+        return jnp.zeros_like(q), jnp.concatenate([lab - y, jnp.zeros(n)]), jnp.zeros_like(nn)
+
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=2 * n, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, nn: jnp.zeros(0),
+        omega=omega, label="one-way loss",
+    )
+
+
+def wired_identification(
+    starts: Sequence[Tuple[float, float]],
+    *,
+    potential: Callable[[Array], Array] = PENDULUM[0],
+    m: float = 1.0,
+    hidden: int = 32,
+    eta: float = 1.5e-4,
+    seed: int = 0,
+) -> Arrangement:
+    """The closed arrangement: a pendulum per start ``(q0, p0)``, two delays each, one parameter box
+    for the net's weights (response ``eta``), a copy of the net per pendulum predicting the pendulum's
+    presented position from the two delayed ones, and a one-way loss per pendulum.
+
+    Leaves in order: per pendulum ``[pendulum, delay1, delay2]``, then the weights. Its position is
+    ``(a_i, h1_i, z1_i, h2_i, z2_i)`` per pendulum (a the presented position), then the weights.
+    """
+    from .network import map_box
+    from .wiring import compose_seq, tensor_arrangements, trivial_parameter
+
+    K = len(starts)
+    F, n = mlp(hidden, 2, 1)
+    rng = np.random.default_rng(seed)
+    init = 0.1 * jnp.asarray(rng.standard_normal(n))
+    weights = Arrangement(
+        P=configuration(euclidean(n, eta), init=init), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=n,
+        out_f=lambda q, m_out: q, in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=lambda q, m_out, n_in: (jnp.zeros_like(q), jnp.zeros_like(m_out), jnp.zeros_like(n_in)),
+        label="weights",
+    )
+    leaves = []
+    for q0, p0 in starts:
+        leaves += [observed_oscillator(potential, m, q0, p0), delay_box(), delay_box()]
+    parts = tensor_arrangements(leaves + [weights])
+    # parts' outputs: per pendulum [a, d1, d2] (3K), then the weights (n); inputs: per pendulum [d1, d2]
+    W = 3 * K
+    out_idx = []
+    for i in range(K):
+        out_idx += list(range(W, W + n)) + [3 * i + 2, 3 * i + 1, 3 * i]   # weights, d2, d1, label a
+    out_idx = jnp.asarray(out_idx, dtype=int)
+    in_idx = jnp.asarray([j for i in range(K) for j in (3 * i, 3 * i + 1)], dtype=int)  # d1 hears a, d2 hears d1
+    route = Arrangement(
+        P=trivial_parameter(), in_dim_M=2 * K, out_dim_M=W + n, in_dim_N=0, out_dim_N=len(out_idx),
+        out_f=lambda q, m_out: m_out[out_idx], in_f=lambda q, m_out, n_in: m_out[in_idx],
+        omega=lambda q, m_out, n_in: (jnp.zeros_like(q), jnp.zeros_like(m_out), jnp.zeros_like(n_in)),
+        label="route",
+    )
+    net = map_box(lambda v: F(v[:n], v[n:n + 2]), n + 2, 1, "net")
+    nets = tensor_arrangements([tensor_arrangements([net, map_box(lambda v: v, 1, 1, "id")])
+                                for _ in range(K)])
+    losses = tensor_arrangements([one_way_squared_error(1) for _ in range(K)])
+    return compose_seq(compose_seq(compose_seq(parts, route), nets), losses)
+
+
+def wired_weights(arr: Arrangement, state, K: int) -> Array:
+    """The weights held in the wired arrangement's state."""
+    return arr.P.position(state)[5 * K:]
+
+
+def wired_presented(arr: Arrangement, state, K: int) -> Array:
+    """Each pendulum's presented position."""
+    return arr.P.position(state)[:5 * K].reshape(K, 5)[:, 0]

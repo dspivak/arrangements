@@ -34,7 +34,15 @@ checks the discrete analogue separately (§3.2).
 **Everything a run computes is an arrangement** (David, 2026-10-10: "just put it in a box … Just use it").
 An average, a threshold, a reader or a coupling is a box, wired, and `Phi` runs the whole; nothing is
 computed in plain code between runs. A hand-typed loop for speed stands only beside the arrangement it
-replaces, checked equal to it at the run's settings. Runs that break this are being sorted (book plan P43).
+replaces, checked equal to it at the run's settings. Runs that break this are sorted, file by file, in the book's
+`notes/runs/p43-composites-cb545383/SORT.md` and rebuilt job by job in `REBUILD.md` beside it (book plan P43). Before
+describing what a run composes, print its composite's `label` (as `(((contact || contact) . pair_wire(2)) . ...)`):
+it shows the boxes and wires the code has, where a docstring shows what was meant (the suggestion box, 2026-10-10,
+dfb252e2: one summing box described as one per pair). All eight jobs of the rebuild were done on 2026-10-10
+(de71554a, §§3.52–3.59); what still computes outside an arrangement, said where it lives: science (f)'s bookkeeping
+(§3.58, beside the journal box that replaces it), the gyroscope classifier's training through the rollout (an
+optimization over arrangements, §3.58), and the one-box runs no record
+tells as parts (§3.59). The listener page's defaults, a clamp at first, are now an arrangement (§3.59).
 
 ## 2. What the tests are evidence of
 
@@ -750,10 +758,16 @@ third time.
 committed reader receiving that mean crosses and is still across 6000 steps after the surrounds
 go and the mean has returned to 0.011. Driven by one member instead, it switches 5 times; driven
 by the mean, once, never back. The predicted threshold (1000 steps too short) was wrong: the
-threshold is between 800 and 1000.
+threshold is near 1000, a coin flip there (R2 crossed in 4 of 10 composed and 6 of 10 hand-loop
+draws at 1000, none at 800 or 900, all at 1200; the first run's one draw at 1000 crossed, and this
+record said "between 800 and 1000" from it; P43 (b) job 7, de71554a).
 
-**What it is not.** The members and the slower reader are not composed in the library; the
-slower reader reads the members' mean as its exterior input. One-dimensional readers throughout.
+**Composed since P43 (b) job 7** (Claude Opus 5.5, de71554a, 2026-10-10): `population.population`, the
+members as boxes (the tensor power of one noisy member), the note copied to them through a port, a `+`
+box and a `1/N` box for the mean, and the slower reader reading it one way, run by `Phi`. Equal to the
+hand loops on replayed noise (mean to 1e-12; the reader exactly, once it is fed the mean a step earlier:
+in the composite it hears the mean the members present, a step after the hand loop fed it). One-dimensional
+readers throughout.
 
 ### 3.14 The cascade: a fund that pays its parts, and how deep a shock runs
 
@@ -1277,8 +1291,8 @@ at `u = 0` and was a rest before any note played. Carving is basin selection at 
 new is the *fast* landscape at the slow coordinate's new value. The book says it that way.
 
 **The warning.** A tuning driven by `q` rather than `q^2/2` is non-reciprocal, no single cost has both
-rules as its gradient, and then the joint cost rises on 2915 of 8000 steps, by up to 0.80, ending at no
-rest of the exact model. A tuning that carves is accountable only while it descends the same cost its
+rules as its gradient, and then the joint cost rises on 2915 of 8000 steps, by up to 1.0e-4 (recorded as 0.80, a
+figure no run gave; P43 (b) job 3, de71554a), ending at no rest of the exact model. A tuning that carves is accountable only while it descends the same cost its
 fast coordinate does.
 
 **Rain, at David's ask** (2026-09-28: "should have been something like a weekly rainfall … if you get to
@@ -1506,7 +1520,7 @@ predator boxes with log state and opposite-signed responses, a stateless hunt bo
 wired as CDLM `ex.lotka_volterra`: one step of the composite is forward Euler on CDLM's field to 1e-12,
 the coexistence point is fixed, composite equals monolithic. The plain configuration step raises the
 Lotka–Volterra invariant at every step (4.8e-2 per cycle at dt 0.02, halving with dt), in the log chart
-and the population chart alike; the two-stage `CotCoalg2` step (predator first, prey second, `pc2.Phi2`)
+and the population chart alike (the population chart run as `food_web.population_web` since P43 (b) job 7, de71554a; it was a numpy Euler loop, now kept as its check); the two-stage `CotCoalg2` step (predator first, prey second, `pc2.Phi2`)
 bounds it (max |H − H0| 3.8e-3 over 22 cycles, second order). So "rabbits and foxes rise and fall in
 turn" is true of the two-stage arrangement and false of the plain one over many cycles. Runner note:
 `-s` passed to `scripts/run_tests.sh` is read as a selection and starts the whole suite; use
@@ -1943,6 +1957,110 @@ Every 8-bit pattern is copied and held; the copy threshold is `K = 0.2592` (`1/4
 is 20, 49, 167 steps at `K = 1, 0.5, 0.3`. The source is pulled 0.239 toward the copy during a write and returns; with equal
 depth a write copies nothing (the pair falls to the middle). `contact_one_way`, a non-exact forcing on the copy only (Ch 2's waterfall), moves no source and copies at
 equal depth (threshold 1/4 exactly). **What this does not show**: four states, base-by-base copying, errors, a form copying itself.
+
+### 3.52 The neural network as drawn: a box per parameter, the loss a box
+
+Book P43 (b) job 1 (Claude Opus 5.5, de71554a, 2026-10-10; `tests/test_gradient_descent.py`, 8 passed, 45 s; record in the
+book repo's `notes/runs/p43b-rebuild-de71554a/RESULTS.md`). `network.drawn_network` composes Ch 2 `sec.neural_network`'s
+picture: a white box per parameter (response the learning rate), the datum's and the label's boxes (state the place in a list
+of examples, stepping to the next whatever comes back), gray `x`, `+`, `tanh` boxes, the wiring's copies, and the loss as a
+2-ary closed arrangement; `Phi` runs the whole, nothing computed outside it. The book's step comes out box by box, every wire
+of its picture carrying its printed force; for h=4, m=3, n=2 the forces are minus `jax.grad`'s and the one-box run's to 1e-12;
+the CDLM recording's 5000-step linear training, drawn, matches it to 1e-10; the drawn two-layer run equals the one-box loop
+for 2000 steps and fits to below 1% of its starting cost. Before this the run was `learning.parameterized_map` of the whole
+map, one box, its loss's covector computed in code by `learning.train` (P43 (a)); that run is kept as the check.
+**What this does not show**: anything beyond the chain rule, which is what the equality is.
+
+### 3.53 Chemical reactions with a box per chemical and a box per reaction, any molecularity
+
+Book P43 (b) job 2 (Claude Opus 5.5, de71554a, 2026-10-10, at David's choice "A"; `tests/test_reaction_network.py`, 36
+passed, 3 new). `reaction_network.composed_mass_action_arrangement` (its docstring's item 7): a box per chemical holding its
+amount, a stateless box per reaction returning to each chemical it touches its net rate times that chemical's stoichiometric
+number, a wire. The reaction boxes' 1-forms are not exact, as the waterfall's coupling is not, so item 3's no-go (about one
+shared potential) does not reach them. Each `Phi` step is the Euler mass-action step, for the chain, A+B<->C, 2A<->B with
+A+B<->C, a triangle with no balance point and a one-way reaction; at the old convergence settings it reaches the same
+equilibria with the free energy falling every step. Before this every run of a reaction network with more than one-molecule
+reactions was one box (`crn_arrangement`, `mass_action_arrangement`; P43 (a)), kept as checks.
+**What this does not show**: why the free energy falls. Nothing in the arrangement is the free energy; the fall is measured,
+and certified only by the one-box Onsager encoding (item 1).
+
+### 3.54 The carving reader composed: a quick part, slow parts, couplings
+
+Book P43 (b) job 3 (Claude Opus 5.5, de71554a, 2026-10-10; `tests/test_carving.py` and `tests/test_carving_which.py`, 9
+passed each). `carving.reader` composes the quick part (cost `q^4/4 - u q`, hearing the note on the reader's port), slow
+parts with their own costs (the tuning, the bias) and a stateless coupling box between the quick part and each (cost
+`-w q^2/2`, `-b q`; or the non-reciprocal coupling, a 1-form with no cost). Every result of §3.27 and of the bias run is now
+`Phi` of the composite, equal to the one-box readers to 1e-12 at the runs' settings; the thresholds (1337, 123) and every
+other number stand. Found on the way: §3.27's non-reciprocal arm, as hand-typed, also dropped the tuning's saturation, ran
+away and went Euler-unstable after step 4859; its recorded numbers were of the arm that changes only the coupling, which is
+what the composite runs, and its biggest rise is 1.0e-4, not 0.80 (corrected above).
+
+### 3.55 The chains' ends held by boxes
+
+Book P43 (b) job 4 (Claude Opus 5.5, de71554a, 2026-10-10). `wiring.held_chain` closes a chain with a held particle at
+each end (the chain's own integrator kind, zero response, the right one joined by a spring) and a cap; the heat, wave,
+Klein–Gordon and leapfrog tests run it, where before each step fed `q_prev = 0` in and computed the wall's pull
+`-kappa q~_K` in code. The port-fed run is kept in each file and equal to the held chain to 1e-12; the CDLM regressions
+still hold. **What this does not show**: anything new about the chains; it makes Ch 2's "ends held in place" literal.
+
+### 3.56 Every learner's loss a box; the pendulums wired to their learner
+
+Book P43 (b) job 5 (Claude Opus 5.5, de71554a, 2026-10-10). `learning.train` now runs `training_arrangement`: a datum box,
+a label box, the learner, and the loss as a box (`loss_box`), closed and run by `Phi`; the old loop, the loss's covector
+computed in code, is `train_by_port`, equal to it to 1e-12, and the gradient-descent, PINN and system-identification CDLM
+regressions still hold to 1e-10. `system_id.wired_identification` runs forty pendulums and their learner as one arrangement
+with no data passed in code: each pendulum reads out its presented position, two delay boxes hold the two before, the
+weights are one box copied to a net per pendulum, each loss is one-way so no pendulum is moved; after 3000 steps the
+one-step error on held-out runs is 0.045 against "no change"'s 0.56. **What this does not show**: that this equals the
+recorded run (it cannot: the learner sees positions, not momenta, and all forty at once).
+
+### 3.57 Expected free energy by figurines
+
+Book P43 (b) job 6 (Claude Opus 5.5, de71554a, 2026-10-10). The check first: item 43's form (a prediction held inside and
+pushed back) makes the push and never the look, since exact wiring makes reading precision and pulling stiffness one
+number (the precise channel pushes the world to 0.828, the noisy one to 0.758) and reading without pushing pushes nothing.
+At David's choice ("is the looking part using figurines? Can we do it that way?") `active_inference.figurine_planner`
+builds `G` by parts: the belief box copied to a figurine of the world per policy (the world's own step from the belief
+under the policy's push, with the spread it carries) and a score box per step (risk plus ambiguity). Equal to the one-box
+`planner` and the closed form to 1e-12; every number of §3.29 (iii) stands, and the look-to-push switch no longer takes
+`G` from test code. **What this does not show**: a world of more than one box, where a figurine would itself be a copy
+of a composite.
+
+### 3.58 Job 7 of P43 (b): a population, the rod, the arm, Lotka–Volterra's chart, science (f), the gyroscope classifier
+
+Book P43 (b) job 7 (Claude Opus 5.5, de71554a, 2026-10-10); numbers in the book repo's
+`notes/runs/p43b-rebuild-de71554a/RESULTS.md`. Composed, each equal to the run it replaced where equality is possible:
+the spells' population (`population.py`, §3.13 above), Lotka–Volterra's population chart (`food_web.population_web`,
+§3.35), the rod on springs (`rod.py`), the jointed arm (`arm.py`). Found: the momentum arm is chaotic (the hand loop
+1e-15 apart from itself is radians apart in 500 steps), so its numbers are one trajectory each. Science (f) is not an
+arrangement and is not rebuilt: a holder's set of papers is a growing list, which the library's state spaces (`R^d`
+only, §3.1) cannot hold, though a smooth set can (a list object; not built); the journal box of `science_native.py`
+does the same work and ends at the same weights to 1e-12 (`test_n2_journal_ends_where_the_provenance_bookkeeping_ends`).
+The gyroscope classifier: training through the rollout is an optimization over arrangements, not a run of one;
+`gyroscope.online_classifier` runs, as one arrangement, what can learn inside one (the decoder, its loss read one way),
+validation accuracy 0.535 (untrained) to 1.0 on the synthetic task, as the old training also reached. Found: the default network (precession 0.2, damping 0.05) is
+unstable beyond its 18-step rollouts (a 0.1 kick to 5e7 in 300 steps). The scene market's likelihoods
+(§3.47) are boxes in one arrangement with the nested market (`market_scene.nested_market_composed`), equal to the numpy-fed run.
+
+### 3.59 One-box runs told as parts, and checks at the real settings
+
+Book P43 (b) job 8 (Claude Opus 5.5, de71554a, 2026-10-10). Told as parts and now built so: the many-parts collective
+(Ch 1's footnote), each part's need its own box and the ring or all-to-all a difference of wiring, equal to the one
+coupler step for step (`test_many_parts.py`, `test_many_parts_wirings.py`); the listener's checker, its own box between
+the belief and the valuation (`listener.checker_box`), equal to the folded one. The figurines' records corrected: a
+sending map runs a mechanism, not a system. Not told as parts anywhere, and left one box: the gyroscope network, the
+science readers, word of mouth's parent, the PINN's and system identification's networks. Checks at the real
+settings: all eight random same-step pairs through the library; the runner as an arrangement for one whole round of the
+figurine's program equals `machine_run` exactly (slow test, `RUN_SLOW=1`). The listener page's own defaults were a
+hand loop no arrangement ran (a peaked kernel and the placement clamped at 0, the clamp binding in 4 of its 6 runs).
+At David's word ("a listener who is in the exact same place as the speaker? that never happens! so there's a bound to
+how close they can be"; "b seems good") they are now `listener.page_model()`: the peak smoothed at the speaker
+(`attention.spatial_kappa`, kernel "peak"), full hearing, and a personal-space box (`listener.personal_space_box`,
+cost `-sigma log(1 - w)`) that pushes a listener away as it nears; the page's model equals the arrangement at its
+defaults to 4e-16 (`test_the_page_defaults_are_an_arrangement`). The push's strength and the listener's step are
+chosen together: at the page's old step 0.1 a push weak enough to let the listener rely on a reliable speaker more
+than 57% oscillates or throws the listener far off (at strength 0.5 it ends 8.8 away); strength 1 at step 0.05 rests
+it where it counts on a reliable speaker 78%, the closest 0.197.
 
 ## 4. Where the mathematics is written down
 
