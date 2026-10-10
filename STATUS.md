@@ -31,6 +31,11 @@ not an Euler approximation of an underlying ODE that the library secretly means;
 the semantics. Where a source proves a continuous-time result, the test says so and
 checks the discrete analogue separately (§3.2).
 
+**Everything a run computes is an arrangement** (David, 2026-10-10: "just put it in a box … Just use it").
+An average, a threshold, a reader or a coupling is a box, wired, and `Phi` runs the whole; nothing is
+computed in plain code between runs. A hand-typed loop for speed stands only beside the arrangement it
+replaces, checked equal to it at the run's settings. Runs that break this are being sorted (book plan P43).
+
 ## 2. What the tests are evidence of
 
 **Running and extending tests.** Follow `README.md`, “Run it”: use
@@ -1912,6 +1917,31 @@ library's settings (expected losses 0.4, 1.4, 8; hearing scaled by the kernel we
 differ on all three, at David's word or finding (book plan §5.9 item 63, P42): one cost of a broken
 promise for every kind, full hearing, and a peaked kernel with the placement a distance, none yet built here.
 **What this does not show**: that the page's defaults are right, which is P42 (b).
+
+### 3.50 Copying as a learner: a voice that sings along takes on a source's pitch and keeps it
+
+Book P27 (Claude Opus 5.5, dfb252e2, 2026-10-09; `tests/test_copying_learner.py`, 5 passed; predictions and verdicts in the
+book repo's `notes/runs/p27-copying-dfb252e2/`). `copying.singing_along` is `compose_seq(parallel(voice, id_2), ear)`, a
+`<0 | 2> -> I` arrangement whose external input is the source's value and loudness on the environment's schedule. The voice's
+configuration is its last two values (fast, `eta_w`) and its pitch `theta = 2 cos(omega)` (slow, `eta_theta`); it sends its
+next value `theta w1 - w2`, and its own forcing, a rotation and not exact, steps its window. The ear's cost is
+`(K/2)(y - s)^2`. `copying.driven_step` compiles the step and checks it against `Phi`. The voice learns a pitch it did not
+have (0.22 to 0.30, mismatch 2e-13) and sings it at the source's loudness after the source stops; frozen, it half-follows
+and returns to its own. The same pitch at another loudness and phase pushes the pitch only while the window re-follows, then
+the pitch returns (a well); another pitch, the octave included, moves it all the way; a chord is heard near its
+power-weighted mean pitch, biased by the follow. **What this does not show**: a singer. The names voice and ear are only
+names: the pushback along the voice's wire stands for nothing in a person, whose correction runs through the brain over
+100-200 ms, and the window here is corrected within one period of the wave. Nor an ear that hears pitch, a tune, any variation.
+
+### 3.51 Template copying: a row of two-well parts, each tipped by its partner in a source row
+
+Book P27 (Claude Opus 5.5, dfb252e2, 2026-10-10; `tests/test_template_copying.py`, 5 passed; predictions and verdicts in the
+book repo's `notes/runs/p27-copying-dfb252e2/TEMPLATE-*.md`). `copying.template` composes `n` source parts of depth `alpha`,
+`n` copy parts of depth 1 and the contacts `(g K / 2) sum (a_i - b_i)^2`, the write-enable `K` arriving through the port.
+Every 8-bit pattern is copied and held; the copy threshold is `K = 0.2592` (`1/4` with the source held); the shortest write
+is 20, 49, 167 steps at `K = 1, 0.5, 0.3`. The source is pulled 0.239 toward the copy during a write and returns; with equal
+depth a write copies nothing (the pair falls to the middle). `contacts_one_way`, a non-exact forcing on the copy only, moves no source and copies at
+equal depth (threshold 1/4 exactly). **What this does not show**: four states, base-by-base copying, errors, a form copying itself.
 
 ## 4. Where the mathematics is written down
 
