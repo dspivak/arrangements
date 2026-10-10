@@ -1937,10 +1937,11 @@ names: the pushback along the voice's wire stands for nothing in a person, whose
 
 Book P27 (Claude Opus 5.5, dfb252e2, 2026-10-10; `tests/test_template_copying.py`, 5 passed; predictions and verdicts in the
 book repo's `notes/runs/p27-copying-dfb252e2/TEMPLATE-*.md`). `copying.template` composes `n` source parts of depth `alpha`,
-`n` copy parts of depth 1 and the contacts `(g K / 2) sum (a_i - b_i)^2`, the write-enable `K` arriving through the port.
+`n` copy parts of depth 1 and `n` contacts, each its own box with the cost `(g K / 2)(a_i - b_i)^2`, wired by `pair_wire`,
+which routes each pair to its contact and copies the write-enable `K`, arriving through the port, to every contact.
 Every 8-bit pattern is copied and held; the copy threshold is `K = 0.2592` (`1/4` with the source held); the shortest write
 is 20, 49, 167 steps at `K = 1, 0.5, 0.3`. The source is pulled 0.239 toward the copy during a write and returns; with equal
-depth a write copies nothing (the pair falls to the middle). `contacts_one_way`, a non-exact forcing on the copy only, moves no source and copies at
+depth a write copies nothing (the pair falls to the middle). `contact_one_way`, a non-exact forcing on the copy only (Ch 2's waterfall), moves no source and copies at
 equal depth (threshold 1/4 exactly). **What this does not show**: four states, base-by-base copying, errors, a form copying itself.
 
 ## 4. Where the mathematics is written down

@@ -189,39 +189,54 @@ def two_well(alpha: float, eta: float, init: float) -> Arrangement:
     )
 
 
-def contacts(n: int, g: float) -> Arrangement:
-    """The contacts ``<0 | 2n + 1> -> I`` on ``(a_1..a_n, b_1..b_n, K)``: the cost ``(g K / 2) sum_i (a_i - b_i)^2``.
+def contact(g: float) -> Arrangement:
+    """One contact ``<0 | 3> -> I`` on ``(a, b, K)``: the cost ``(g K / 2)(a - b)^2``, conducting with the write-enable ``K``.
 
-    One contact per pair, conducting in proportion to the write-enable ``K``; its pushback reaches both parts.
+    Its pushback reaches both parts it joins (a pass transistor between two latches; pairing at a template).
     """
     return Arrangement(
-        P=trivial_parameter(),
-        in_dim_M=0,
-        out_dim_M=2 * n + 1,
-        in_dim_N=0,
-        out_dim_N=0,
-        out_f=lambda q, m: jnp.zeros(0),
-        in_f=lambda q, m, n_in: jnp.zeros(0),
-        omega=exact(lambda q, m, n_in: -0.5 * g * m[2 * n] * jnp.sum((m[:n] - m[n:2 * n]) ** 2)),
-        label="contacts",
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=3, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n_in: jnp.zeros(0),
+        omega=exact(lambda q, m, n_in: -0.5 * g * m[2] * (m[0] - m[1]) ** 2),
+        label="contact",
     )
 
 
-def contacts_one_way(n: int, g: float) -> Arrangement:
-    """One-way contacts ``<0 | 2n + 1> -> I``: the forcing ``g K (a_i - b_i)`` on each copy value and nothing on the source's.
+def contact_one_way(g: float) -> Arrangement:
+    """One one-way contact ``<0 | 3> -> I`` on ``(a, b, K)``: the forcing ``g K (a - b)`` on ``b`` and nothing on ``a``.
 
-    Not the differential of any cost (non-exact): the copy is pushed toward the source and nothing is pulled back to the
-    source, as light the source sends anyway pushes nothing back on it when the copier absorbs it.
+    Not the differential of any cost (Ch 2's waterfall, sec.waterfall): the copy is pushed toward the source and nothing is
+    pulled back to the source, as light off a still life is absorbed by the eye and never returns to the fruit.
     """
     def omega(q, m, n_in):
-        a, b, K = m[:n], m[n:2 * n], m[2 * n]
-        xi_m = jnp.concatenate([jnp.zeros(n), g * K * (a - b), jnp.zeros(1)])
-        return jnp.zeros_like(q), xi_m, jnp.zeros_like(n_in)
+        return jnp.zeros_like(q), jnp.array([0.0, g * m[2] * (m[0] - m[1]), 0.0]), jnp.zeros_like(n_in)
 
     return Arrangement(
-        P=trivial_parameter(), in_dim_M=0, out_dim_M=2 * n + 1, in_dim_N=0, out_dim_N=0,
-        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n_in: jnp.zeros(0), omega=omega, label="one-way contacts",
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=3, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n_in: jnp.zeros(0), omega=omega, label="one-way contact",
     )
+
+
+def pair_wire(n: int) -> Arrangement:
+    """The wiring ``<0 | 2n + 1> -> <0 | 3n>``: ``(a_1..a_n, b_1..b_n, K) |-> ((a_1, b_1, K), ..., (a_n, b_n, K))``.
+
+    Static, zero forcing: it routes each source part and its partner to their contact and copies the write-enable to every
+    contact; its backward map, the transpose, sums the copies' covectors (as ``wiring.chain_wire`` routes a chain).
+    """
+    idx = jnp.array([k for i in range(n) for k in (i, n + i, 2 * n)])
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=2 * n + 1, in_dim_N=0, out_dim_N=3 * n,
+        out_f=lambda q, m: m[idx], in_f=lambda q, m, n_in: jnp.zeros(0), omega=zero_form, label=f"pair_wire({n})",
+    )
+
+
+def contacts(n: int, g: float, one_way: bool = False) -> Arrangement:
+    """The ``n`` contacts composed: ``(C_1 (x) ... (x) C_n) . pair_wire(n) : <0 | 2n + 1> -> I``."""
+    C = [contact_one_way(g) if one_way else contact(g) for _ in range(n)]
+    row = C[0]
+    for c in C[1:]:
+        row = parallel_arrangements(row, c)
+    return compose_seq(pair_wire(n), row)
 
 
 def template(a0, b0, alpha: float = 4.0, g: float = 1.0, eta: float = 0.05, one_way: bool = False) -> Arrangement:
@@ -236,7 +251,7 @@ def template(a0, b0, alpha: float = 4.0, g: float = 1.0, eta: float = 0.05, one_
     row = parts[0]
     for p in parts[1:]:
         row = parallel_arrangements(row, p)
-    C = contacts_one_way(n, g) if one_way else contacts(n, g)
+    C = contacts(n, g, one_way)
     return compose_seq(parallel_arrangements(row, identity(1)), C)
 
 
