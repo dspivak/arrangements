@@ -253,6 +253,7 @@ def delay_box(x0: float = 0.0) -> Arrangement:
         position=lambda s: s,
         step=lambda s, xi: jnp.full(2, s[1] + xi[1]),
         label="delay",
+        timed_step=lambda s, xi, t: jnp.full(2, s[1] + xi[1]),   # one step per step, any duration (book P9.5)
     )
 
     def omega(q, m_out, n_in):

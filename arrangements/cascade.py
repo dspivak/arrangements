@@ -1,5 +1,10 @@
 """A fund that pays its parts, nested to any depth (STATUS.md §3.14).
 
+Historical subsidy model: the outside source has no claim on workers' product,
+so this fund can earn income from output that source supports. Retained for the
+recorded experiments, not as a model of competing contracted suppliers. The
+contracted one-level replacement is ``contracts.piecework`` (book P24).
+
 The pieces of the cascade test (``tests/test_cascade.py``), on ``collective.py`` with two
 channels, ``H = R^2``: channel 1 carries *supply* (a wage, a source's offer), channel 2 carries
 *product*. A message is ``(h_1, h_2, w)``; an input adds a reference position.

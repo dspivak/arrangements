@@ -197,6 +197,8 @@ def belief_coalgebra(n: int, init: Array, tau: float = 1.0) -> CotCoalg:
         position=belief_of,
         step=lambda l, xi: l + tau * (xi - jnp.dot(belief_of(l), xi)),
         label="belief(Q=beliefs)",
+        # over a duration t (book P9.5): the Euler family of its response, still at t = 0
+        timed_step=lambda l, xi, t: l + t * tau * (xi - jnp.dot(belief_of(l), xi)),
     )
 
 

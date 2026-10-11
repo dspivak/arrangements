@@ -30,6 +30,11 @@ from .pc import PCMorphism
 from .polynomial import DirichletProduct, PolyMap
 
 
+def _step(pcm, s, duration):
+    """``pcm.step(s)``, or ``pcm.step(s, duration)`` when a duration is given (as ``pc._step``)."""
+    return pcm.step(s) if duration is None else pcm.step(s, duration)
+
+
 @dataclass(frozen=True)
 class PCMorphism2:
     """A ``[p,q]^{∘2}``-coalgebra: a morphism in ``pc^(2)``, in two-round Moore form.
@@ -53,25 +58,25 @@ class PCMorphism2:
 
     # ---- execution ----
 
-    def run_two(self, in_pos1, in_dir_from1, in_pos2, in_dir_from2):
+    def run_two(self, in_pos1, in_dir_from1, in_pos2, in_dir_from2, duration=None):
         """General two-round execution.
 
         Returns ``(out_pos1, out_dir1, out_pos2, out_dir2, new_state)``. The two
         environments may differ (round 2 sees the inner coalgebra produced by
-        round 1).
+        round 1). ``duration`` is told once, before round 1 (``None``: the unit step; book P9.5).
         """
-        act, fiber = self.step(self.state)
+        act, fiber = _step(self, self.state, duration)
         out_pos1, at_pos1 = fiber(in_pos1)
         out_dir1, inner = at_pos1(in_dir_from1(out_pos1))
         out_pos2, out_dir2, new_state = inner.run_one(in_pos2, in_dir_from2)
         return out_pos1, out_dir1, out_pos2, out_dir2, new_state
 
-    def run_one(self, in_pos, in_dir_from):
+    def run_one(self, in_pos, in_dir_from, duration=None):
         """Closed-system convenience: the same environment at both rounds.
 
         Returns ``(out_pos1, out_pos2, new_state)``.
         """
-        op1, _, op2, _, new_state = self.run_two(in_pos, in_dir_from, in_pos, in_dir_from)
+        op1, _, op2, _, new_state = self.run_two(in_pos, in_dir_from, in_pos, in_dir_from, duration)
         return op1, op2, new_state
 
     # ---- composition (mirrors pc.PCMorphism, lifted to two stages) ----
@@ -84,8 +89,8 @@ class PCMorphism2:
         ``pc.PCMorphism.pre_static``.
         """
 
-        def new_step(s):
-            inner_act, inner_fiber = self.step(s)
+        def new_step(s, duration=None):
+            inner_act, inner_fiber = _step(self, s, duration)
             composed_act = PolyMap(
                 src=before.src,
                 tgt=inner_act.tgt,
@@ -114,10 +119,10 @@ class PCMorphism2:
     def parallel(self, other: "PCMorphism2") -> "PCMorphism2":
         """Monoidal product: two ``pc^(2)`` morphisms run side by side."""
 
-        def new_step(s):
+        def new_step(s, duration=None):     # one duration, told to both
             s1, s2 = s
-            act1, fiber1 = self.step(s1)
-            act2, fiber2 = other.step(s2)
+            act1, fiber1 = _step(self, s1, duration)
+            act2, fiber2 = _step(other, s2, duration)
 
             act = PolyMap(
                 src=DirichletProduct(act1.src, act2.src),
@@ -173,8 +178,9 @@ def Phi2(arr) -> PCMorphism2:
     src_p = phi_box_poly(arr.out_dim_M, arr.in_dim_M)
     tgt_p = phi_box_poly(arr.out_dim_N, arr.in_dim_N)
 
-    def step(state):
-        q1 = P.read1(state)
+    def step(state, duration=None):
+        Pd = P.for_duration(duration)            # the two rounds of a step of this duration (book P9.5)
+        q1 = Pd.read1(state)
         position_action, direction_action = interp(q1)
 
         def act_positions(in_pos):
@@ -196,11 +202,11 @@ def Phi2(arr) -> PCMorphism2:
             def at_pos(in_dir):
                 xi_N, in_n = in_dir
                 xi_Q1, xi_M, in_m = direction_action(out_m, omega_M, xi_N, in_n)
-                mid = P.advance(state, xi_Q1)
+                mid = Pd.advance(state, xi_Q1)
                 # round 2: a 1-stage pc-morphism from the 1-stage coalgebra (read2, finish)
                 round2 = CotCoalg(
-                    Q_dim=P.Q_dim, init=mid, position=P.read2,
-                    step=lambda s, xi_Q2, st=state: P.finish(st, s, xi_Q2),
+                    Q_dim=Pd.Q_dim, init=mid, position=Pd.read2,
+                    step=lambda s, xi_Q2, st=state: Pd.finish(st, s, xi_Q2),
                     label="stage2",
                 )
                 inner = Phi(replace(arr, P=round2))

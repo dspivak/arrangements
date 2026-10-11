@@ -31,18 +31,19 @@ from .coalgebra import CotCoalg2
 from .rvect import ReactiveVectorSpace
 
 
-def leapfrog(Q: ReactiveVectorSpace, init=None) -> CotCoalg2:
+def leapfrog(Q: ReactiveVectorSpace, init=None, dt: float = 1.0) -> CotCoalg2:
     """The leapfrog (velocity Verlet) two-stage coalgebra on ``(Q, sharp_Q)``,
-    ``Store∘S ⇒ cot^{◁2}``; state ``(q, xi)``."""
+    ``Store∘S ⇒ cot^{◁2}``; state ``(q, xi)``. Over a duration ``tau`` each round holds its push
+    for it: half-kicks of ``tau/2``, a drift of ``tau`` (book P9.5); ``dt`` is the unit step's length."""
 
     def advance(s, xi_Q1):
         q, xi = s
-        xi_half = xi + 0.5 * xi_Q1            # half-kick
-        return (q + Q.apply_sharp(q, xi_half), xi_half)   # drift -> mid = (q', ξ½)
+        xi_half = xi + 0.5 * dt * xi_Q1            # half-kick
+        return (q + dt * Q.apply_sharp(q, xi_half), xi_half)   # drift -> mid = (q', ξ½)
 
     def finish(s, mid, xi_Q2):
         q2, xi_half = mid
-        return (q2, xi_half + 0.5 * xi_Q2)    # half-kick -> (q', ξ')
+        return (q2, xi_half + 0.5 * dt * xi_Q2)    # half-kick -> (q', ξ')
 
     s0 = (jnp.zeros(Q.dim), jnp.zeros(Q.dim)) if init is None else init
     return CotCoalg2(
@@ -52,5 +53,6 @@ def leapfrog(Q: ReactiveVectorSpace, init=None) -> CotCoalg2:
         advance=advance,
         read2=lambda mid: mid[0],
         finish=finish,
-        label="leapfrog",
+        label="leapfrog" if dt == 1.0 else f"leapfrog(dt={dt})",
+        durational=lambda tau: leapfrog(Q, init, dt * tau),
     )

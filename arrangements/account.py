@@ -1,5 +1,10 @@
 """Workers who report what they want, and a fund that reads it (``tests/test_account.py``).
 
+Historical subsidy model: the outside source has no contractual claim on the
+product it supports. Its no-ruin result is about that subsidized construction.
+Use ``contracts.piecework(needs=...)`` for the contracted wage/output comparison
+(book P24); the original tests remain reproducible as historical controls.
+
 The cascade's pieces (``cascade.py``) with a third channel, ``H = R^3``: supply, product, and a
 **report**. A message is ``(h_1, h_2, h_3, w)``.
 

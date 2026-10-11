@@ -62,14 +62,20 @@ class CotCoalg:
     * ``step``     -- ``(S, xi_Q) -> S``, the new state after receiving the
                       covector ``xi_Q in T^*_{q(s)} Q``.
 
-    * ``timed_step`` -- optional ``(S, xi_Q, duration) -> S``: the step held for a
-                      duration (Ch 3 ``def.duration_integrator``, ``u : S ->
-                      (cot(Q) (x) y^{R>=0})(S)``); ``None`` when the part has no
-                      duration law yet. When given, ``step`` is its value at 1.
+    * ``timed_step`` -- optional ``(S, xi_Q, duration) -> S``: the step over a
+                      duration, ``xi_Q`` received at the look-ahead for that duration;
+                      ``None`` when the part has no duration law yet. When given,
+                      ``step`` is its value at 1.
+    * ``look_ahead`` -- optional ``(S, duration) -> Q``: the position shown when the
+                      coming step lasts ``duration``; ``None`` means the same point,
+                      ``position(s)``, at every duration.
 
     Together ``position`` and ``step`` are ``u : S -> cot(Q)(S)``; the response
-    ``sharp`` is inside ``step``. The readout ``position`` precedes both inputs, so
-    it cannot depend on the duration (Ch 3, after ``def.duration_integrator``).
+    ``sharp`` is inside ``step``. With durations the part is first told how long the
+    coming step lasts, then shows its look-ahead, then receives a covector there
+    (David, 2026-10-10: "output a function … from duration to look ahead"; Ch 3
+    ``def.duration_integrator``, ``u : S -> (y^{R>=0} <| cot(Q))(S)``). A look-ahead at
+    half the duration makes the leapfrog step one round (``tests/test_duration.py``).
     """
 
     Q_dim: int
@@ -78,9 +84,16 @@ class CotCoalg:
     step: Callable[[Any, Array], Any]
     label: str = ""
     timed_step: Optional[Callable[[Any, Array, Any], Any]] = None
+    look_ahead: Optional[Callable[[Any, Any], Array]] = None
+
+    def position_at(self, s, duration=None):
+        """The position shown when the coming step lasts ``duration`` (``None``: ``position(s)``)."""
+        if duration is None or self.look_ahead is None:
+            return self.position(s)
+        return self.look_ahead(s, duration)
 
     def step_over(self, s, xi_Q, duration=None):
-        """The new state after holding ``xi_Q`` for ``duration`` (book P9.5).
+        """The new state after a step of ``duration``, ``xi_Q`` received at the look-ahead (book P9.5).
 
         ``duration=None`` is the part's own unit step, ``step(s, xi_Q)``, exactly as
         before durations existed. A part with no ``timed_step`` handed a duration
@@ -115,6 +128,12 @@ class CotCoalg:
             s1, s2 = s
             return (self.step(s1, xi_Q[:n]), other.step(s2, xi_Q[n:]))
 
+        look_ahead = None
+        if self.look_ahead is not None or getattr(other, "look_ahead", None) is not None:
+            def look_ahead(s, duration):            # each factor's look-ahead at the one duration
+                s1, s2 = s
+                return jnp.concatenate([self.position_at(s1, duration), other.position_at(s2, duration)])
+
         timed_step = None
         if self.timed_step is not None and getattr(other, "timed_step", None) is not None:
             def timed_step(s, xi_Q, duration):      # one duration, shared (Ch 3 prop.duration_parameters)
@@ -129,6 +148,7 @@ class CotCoalg:
             step=step,
             label=f"({self.label} (x) {other.label})",
             timed_step=timed_step,
+            look_ahead=look_ahead,
         )
 
 
@@ -150,7 +170,7 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
 
     Held for a duration ``tau`` it is the Euler family of its tangent response
     ``v_s(xi) = sharp_s(xi)`` (Ch 3 ``prop.duration_tangent``),
-    ``s |-> s + tau sharp_s(xi_Q)``: normalized (``tau = 0`` leaves ``s``), and the
+    ``s |-> s + tau sharp_s(xi_Q)``: normalized (it tends to ``s`` as ``tau`` shrinks; durations are positive), and the
     unit step above at ``tau = 1``.
     """
 
@@ -186,6 +206,11 @@ def phase(Q: ReactiveVectorSpace, init=None, dt: float = 1.0) -> CotCoalg:
     ``(q, xi) |-> (q + dt sharp_q(xi), xi + dt xi_Q)``, so a phase part can share a
     coupler with a configuration part whose step is carried by its ``sharp``; the
     default ``dt = 1`` is the unit step above, with ``dt`` folded into the costs.
+
+    Over a duration ``tau`` (in units of ``dt``) it shows the look-ahead
+    ``q + tau dt sharp_q(xi)``, the point it coasts to, receives ``xi_Q`` there, and
+    steps ``(q, xi) |-> (q + tau dt sharp_q(xi), xi + tau dt xi_Q)``: today's step at
+    ``tau = 1``, tending to the state as ``tau`` shrinks, symplectic Euler at every ``tau``.
     """
 
     s0 = (jnp.zeros(Q.dim), jnp.zeros(Q.dim)) if init is None else init
@@ -195,6 +220,8 @@ def phase(Q: ReactiveVectorSpace, init=None, dt: float = 1.0) -> CotCoalg:
         position=lambda s: s[0] + dt * Q.apply_sharp(s[0], s[1]),
         step=lambda s, xi_Q: (s[0] + dt * Q.apply_sharp(s[0], s[1]), s[1] + dt * xi_Q),
         label="phase" if dt == 1.0 else f"phase(dt={dt})",
+        look_ahead=lambda s, tau: s[0] + tau * dt * Q.apply_sharp(s[0], s[1]),
+        timed_step=lambda s, xi_Q, tau: (s[0] + tau * dt * Q.apply_sharp(s[0], s[1]), s[1] + tau * dt * xi_Q),
     )
 
 
@@ -237,6 +264,12 @@ def damped(Q: ReactiveVectorSpace, damping: float = 0.0, init=None) -> CotCoalg:
         position=lambda s: s[0] + Q.apply_sharp(s[0], s[1]),
         step=lambda s, xi_Q: (s[0] + Q.apply_sharp(s[0], s[1]), (1.0 - c) * s[1] + xi_Q),
         label=f"damped({c:g})",
+        # Over a duration tau: friction is a push like any other, -c xi, held for the duration
+        # (David, 2026-10-10, "yes" to the straight line over compounding): the look-ahead
+        # q + tau sharp(xi), and the momentum (1 - c tau) xi + tau xi_Q. Today's step at tau = 1.
+        look_ahead=lambda s, tau: s[0] + tau * Q.apply_sharp(s[0], s[1]),
+        timed_step=lambda s, xi_Q, tau: (
+            s[0] + tau * Q.apply_sharp(s[0], s[1]), (1.0 - c * tau) * s[1] + tau * xi_Q),
     )
 
 
@@ -367,6 +400,14 @@ def gyro(
         new_xi = (1.0 - c) * xi + xi_Q + gyro_kick(v, gamma, J, drag, gyro_block)
         return (q + v, new_xi)
 
+    def timed_step(s, xi_Q, tau):
+        # every push held for the duration, friction, the gyroscopic and drag kicks among them
+        # (David, 2026-10-10, for damped: friction "a push held for the duration"; extended here)
+        q, xi = s
+        v = Q.apply_sharp(q, xi)
+        new_xi = (1.0 - c * tau) * xi + tau * (xi_Q + gyro_kick(v, gamma, J, drag, gyro_block))
+        return (q + tau * v, new_xi)
+
     s0 = (jnp.zeros(Q.dim), jnp.zeros(Q.dim)) if init is None else init
     return CotCoalg(
         Q_dim=Q.dim,
@@ -374,6 +415,8 @@ def gyro(
         position=lambda s: s[0] + Q.apply_sharp(s[0], s[1]),
         step=step,
         label="gyro",
+        look_ahead=lambda s, tau: s[0] + tau * Q.apply_sharp(s[0], s[1]),
+        timed_step=timed_step,
     )
 
 
@@ -407,8 +450,17 @@ def phase_on_cotangent(Q: ReactiveVectorSpace, damping: float = 0.0, init=None) 
         q, xi = s
         return (q + Q.apply_sharp(q, xi), (1.0 - c) * xi + xi_Qp[:n])
 
+    def look_ahead(s, tau):
+        q, xi = s
+        return jnp.concatenate([q + tau * Q.apply_sharp(q, xi), xi])
+
+    def timed_step(s, xi_Qp, tau):             # friction and the received push held for the duration
+        q, xi = s
+        return (q + tau * Q.apply_sharp(q, xi), (1.0 - c * tau) * xi + tau * xi_Qp[:n])
+
     s0 = (jnp.zeros(n), jnp.zeros(n)) if init is None else init
-    return CotCoalg(Q_dim=2 * n, init=s0, position=position, step=step, label=f"phase_on_T*Q({c:g})")
+    return CotCoalg(Q_dim=2 * n, init=s0, position=position, step=step, label=f"phase_on_T*Q({c:g})",
+                    look_ahead=look_ahead, timed_step=timed_step)
 
 
 # ---------------------------------------------------------------------------
@@ -444,6 +496,12 @@ class CotCoalg2:
     read2: Callable[[Any], Array]
     finish: Callable[[Any, Any, Array], Any]
     label: str = ""
+    durational: Optional[Callable[[Any], "CotCoalg2"]] = None
+
+    def for_duration(self, duration=None) -> "CotCoalg2":
+        """The two rounds for one step of ``duration``, told once before round 1 (book P9.5).
+        ``None`` is the unit step, ``self``; a part with no duration law raises."""
+        return _for_duration(self, duration)
 
     def tensor(self, other) -> "CotCoalg2":
         """Parallel product; a single-stage ``other`` is lifted by ``iterate``."""
@@ -462,10 +520,14 @@ class CotCoalg2:
         def finish(s, mid, xi):
             return (self.finish(s[0], mid[0], xi[:n]), other.finish(s[1], mid[1], xi[n:]))
 
+        durational = None
+        if self.durational is not None and other.durational is not None:
+            durational = lambda tau: self.for_duration(tau).tensor(other.for_duration(tau))
+
         return CotCoalg2(
             Q_dim=n + other.Q_dim, init=(self.init, other.init),
             read1=read1, advance=advance, read2=read2, finish=finish,
-            label=f"({self.label} (x) {other.label})",
+            label=f"({self.label} (x) {other.label})", durational=durational,
         )
 
 
@@ -499,10 +561,16 @@ class CotCoalgK:
     reads: Tuple[Callable[[Any], Array], ...]
     advances: Tuple[Callable[[Any, Array], Any], ...]
     label: str = ""
+    durational: Optional[Callable[[Any], "CotCoalgK"]] = None
 
     @property
     def K(self) -> int:
         return len(self.reads)
+
+    def for_duration(self, duration=None) -> "CotCoalgK":
+        """The ``K`` rounds for one step of ``duration``, told once before round 1 (book P9.5).
+        ``None`` is the unit step, ``self``; a part with no duration law raises."""
+        return _for_duration(self, duration)
 
     def tensor(self, other) -> "CotCoalgK":
         """Parallel product; a single-stage ``other`` is lifted by ``iterate``."""
@@ -517,11 +585,15 @@ class CotCoalgK:
         def advance(i):
             return lambda m, xi: (self.advances[i](m[0], xi[:n]), other.advances[i](m[1], xi[n:]))
 
+        durational = None
+        if self.durational is not None and other.durational is not None:
+            durational = lambda tau: self.for_duration(tau).tensor(other.for_duration(tau))
+
         return CotCoalgK(
             Q_dim=n + other.Q_dim, init=(self.init, other.init),
             reads=tuple(read(i) for i in range(self.K)),
             advances=tuple(advance(i) for i in range(self.K)),
-            label=f"({self.label} (x) {other.label})",
+            label=f"({self.label} (x) {other.label})", durational=durational,
         )
 
 
@@ -534,6 +606,7 @@ def iterate(P: CotCoalg, K: int) -> CotCoalgK:
         Q_dim=P.Q_dim, init=P.init,
         reads=(P.position,) * K, advances=(P.step,) * K,
         label=f"{P.label}-K{K}",
+        durational=(lambda tau: iterate(at_duration(P, tau), K)) if P.timed_step is not None else None,
     )
 
 
@@ -544,4 +617,27 @@ def as_two_stage(P: CotCoalg) -> CotCoalg2:
         read1=P.position, advance=P.step, read2=P.position,
         finish=lambda s, mid, xi: P.step(mid, xi),
         label=f"{P.label}-2",
+        durational=(lambda tau: as_two_stage(at_duration(P, tau))) if P.timed_step is not None else None,
     )
+
+
+def at_duration(P: CotCoalg, duration) -> CotCoalg:
+    """``P`` fixed at one duration: its look-ahead and its step over ``duration`` as an ordinary unit
+    coalgebra (book P9.5). How a one-round part rides inside a many-round composite: each of its
+    rounds is a step of that duration."""
+    if P.timed_step is None:
+        raise TypeError(f"part {P.label or '?'} has no duration law (timed_step is None)")
+    return CotCoalg(
+        Q_dim=P.Q_dim, init=P.init,
+        position=lambda s: P.position_at(s, duration),
+        step=lambda s, xi: P.step_over(s, xi, duration),
+        label=f"{P.label}@{duration}",
+    )
+
+
+def _for_duration(P, duration):
+    if duration is None:
+        return P
+    if P.durational is None:
+        raise TypeError(f"part {P.label or '?'} has no duration law (durational is None)")
+    return P.durational(duration)

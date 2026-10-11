@@ -95,6 +95,7 @@ def rk4(Q: ReactiveVectorSpace, h: float = 0.1, init=None) -> CotCoalgK:
         reads=(read1, read2, read3, read4),
         advances=(advance1, advance2, advance3, finish),
         label=f"rk4(h={h:g})",
+        durational=lambda tau: rk4(Q, h * tau, init),   # over a duration: step h tau (book P9.5)
     )
 
 
@@ -132,7 +133,9 @@ def rk4_gyro(
         v = Q.apply_sharp(q_s, xi_s)
         return (v, xi_Q + gyro_kick(v, gamma, J, drag, gyro_block))
 
-    return _rk4_phase(Q, h, deriv, init, label=f"rk4_gyro(h={h:g})")
+    from dataclasses import replace
+    return replace(_rk4_phase(Q, h, deriv, init, label=f"rk4_gyro(h={h:g})"),
+                   durational=lambda tau: rk4_gyro(Q, h * tau, drag, gamma, J, gyro_block, init))
 
 
 def rk4_gyro_on_cotangent(Q: ReactiveVectorSpace, h: float = 0.1, init=None) -> CotCoalgK:
@@ -147,7 +150,9 @@ def rk4_gyro_on_cotangent(Q: ReactiveVectorSpace, h: float = 0.1, init=None) -> 
     def deriv(q_s, xi_s, xi_Qp):
         return (Q.apply_sharp(q_s, xi_s), xi_Qp[:n])
 
-    return _rk4_phase(Q, h, deriv, init, label=f"rk4_on_T*Q(h={h:g})", present=lambda q, xi: jnp.concatenate([q, xi]))
+    from dataclasses import replace
+    return replace(_rk4_phase(Q, h, deriv, init, label=f"rk4_on_T*Q(h={h:g})", present=lambda q, xi: jnp.concatenate([q, xi])),
+                   durational=lambda tau: rk4_gyro_on_cotangent(Q, h * tau, init))
 
 
 def _rk4_phase(Q, h, deriv, init, label, present=lambda q, xi: q):

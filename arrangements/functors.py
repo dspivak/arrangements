@@ -152,9 +152,11 @@ def Phi(arr: Arrangement) -> PCMorphism:
     ``arr.P.position(s)`` the coalgebra presents; the state update is
     ``arr.P.step(s, xi_Q)`` on the parameter covector of the covector triple.
     Time is discrete by design: one covector, one step (sec.displacement). The
-    fiber's ``at_pos(in_dir, duration=None)`` also takes how long the step is held
-    (Ch 3 def.duration_integrator), handed to ``P.step_over``; ``None`` is the unit
-    step, ``P.step``, as before durations existed (book P9.5).
+    step may be told how long it lasts, ``step(state, duration=None)``, before
+    anything is shown: the parameter then presents its look-ahead
+    ``P.position_at(s, duration)`` and steps by ``P.step_over`` (Ch 3
+    def.duration_integrator); ``None`` is the unit step, as before durations
+    existed (book P9.5).
     For a long run of a closed arrangement use ``closed_step`` below: the same
     step compiled, checked against this one on its first steps.
     """
@@ -164,8 +166,8 @@ def Phi(arr: Arrangement) -> PCMorphism:
     src_p = phi_box_poly(arr.out_dim_M, arr.in_dim_M)
     tgt_p = phi_box_poly(arr.out_dim_N, arr.in_dim_N)
 
-    def step(state):
-        q = P.position(state)
+    def step(state, duration=None):
+        q = P.position(state) if duration is None else P.position_at(state, duration)
         position_action, direction_action = interp(q)
 
         def act_positions(in_pos):
@@ -190,7 +192,7 @@ def Phi(arr: Arrangement) -> PCMorphism:
             out_m, omega_M = in_pos
             out_pos = position_action(out_m, omega_M)
 
-            def at_pos(in_dir, duration=None):
+            def at_pos(in_dir):
                 xi_N, in_n = in_dir
                 xi_Q, xi_M, in_m = direction_action(out_m, omega_M, xi_N, in_n)
                 out_dir = (xi_M, in_m)
@@ -235,7 +237,8 @@ def closed_step(arr: Arrangement, check: int = 2, duration=None):
 
     @jax.jit
     def step(s):
-        xi_q, _, _ = omega(P.position(s), z, z)
+        q = P.position(s) if duration is None else P.position_at(s, duration)
+        xi_q, _, _ = omega(q, z, z)
         return P.step(s, xi_q) if duration is None else P.step_over(s, xi_q, duration)
 
     if check:

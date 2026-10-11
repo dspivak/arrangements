@@ -60,7 +60,7 @@ class PCMorphismK:
 
     # ---- execution ----
 
-    def run(self, in_poss: List, in_dir_froms: List):
+    def run(self, in_poss: List, in_dir_froms: List, duration=None):
         """General K-round execution.
 
         ``in_poss`` and ``in_dir_froms`` are length-``K`` lists, one per round (the
@@ -70,7 +70,8 @@ class PCMorphismK:
         coalg = self
         out_poss, out_dirs = [], []
         for i in range(self.K):
-            _act, fiber = coalg.step(coalg.state)
+            # the duration is told once, before round 1; the later rounds already carry it (book P9.5)
+            _act, fiber = coalg.step(coalg.state) if (i > 0 or duration is None) else coalg.step(coalg.state, duration)
             out_pos, at_pos = fiber(in_poss[i])
             out_dir, rest = at_pos(in_dir_froms[i](out_pos))
             out_poss.append(out_pos)
@@ -78,13 +79,13 @@ class PCMorphismK:
             coalg = rest  # an inner PCMorphismK for i < K-1; the new state for i = K-1
         return out_poss, out_dirs, coalg  # after the loop, coalg is the new macro-state
 
-    def run_one(self, in_pos, in_dir_from):
+    def run_one(self, in_pos, in_dir_from, duration=None):
         """Closed-system convenience: the same environment at every round.
 
         Returns ``(out_poss, new_state)`` with ``out_poss`` a length-``K`` list.
         """
         out_poss, _out_dirs, new_state = self.run(
-            [in_pos] * self.K, [in_dir_from] * self.K
+            [in_pos] * self.K, [in_dir_from] * self.K, duration
         )
         return out_poss, new_state
 
@@ -99,8 +100,8 @@ class PCMorphismK:
         ``pc.PCMorphism.pre_static``.
         """
 
-        def new_step(s):
-            inner_act, inner_fiber = self.step(s)
+        def new_step(s, duration=None):
+            inner_act, inner_fiber = self.step(s) if duration is None else self.step(s, duration)
             composed_act = PolyMap(
                 src=before.src,
                 tgt=inner_act.tgt,
@@ -133,10 +134,10 @@ class PCMorphismK:
         if self.K != other.K:
             raise ValueError(f"parallel needs equal stage counts, got {self.K} and {other.K}")
 
-        def new_step(s):
+        def new_step(s, duration=None):     # one duration, told to both
             s1, s2 = s
-            act1, fiber1 = self.step(s1)
-            act2, fiber2 = other.step(s2)
+            act1, fiber1 = self.step(s1) if duration is None else self.step(s1, duration)
+            act2, fiber2 = other.step(s2) if duration is None else other.step(s2, duration)
 
             act = PolyMap(
                 src=DirichletProduct(act1.src, act2.src),
@@ -196,12 +197,14 @@ def PhiK(arr) -> PCMorphismK:
     src_p = phi_box_poly(arr.out_dim_M, arr.in_dim_M)
     tgt_p = phi_box_poly(arr.out_dim_N, arr.in_dim_N)
     K = P.K
-    reads, advances = P.reads, P.advances
 
-    def make(level: int, mid: Any) -> PCMorphismK:
+    def make(level: int, mid: Any, PP=P) -> PCMorphismK:
         rounds_left = K - level
 
-        def step(state):
+        def step(state, duration=None):
+            # the duration is told before round 1 and fixes every round (book P9.5)
+            Pd = PP if duration is None else PP.for_duration(duration)
+            reads, advances = Pd.reads, Pd.advances
             q = reads[level](state)
             position_action, direction_action = interp(q)
 
@@ -228,7 +231,7 @@ def PhiK(arr) -> PCMorphismK:
                     if rounds_left == 1:
                         rest = nxt  # finish: a new macro-state
                     else:
-                        rest = make(level + 1, nxt)  # the (K-level-1)-round inner coalgebra
+                        rest = make(level + 1, nxt, Pd)  # the (K-level-1)-round inner coalgebra
                     return (xi_M, in_m), rest
 
                 return out_pos, at_pos

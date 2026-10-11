@@ -108,6 +108,10 @@ def goes_first(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg2:
         read2=lambda mid: mid,
         finish=lambda s, mid, xi: mid,
         label="first",
+        durational=lambda tau: CotCoalg2(          # the push held for the duration (book P9.5)
+            Q_dim=Q.dim, init=s0, read1=lambda s: s,
+            advance=lambda s, xi: s + tau * Q.apply_sharp(s, xi), read2=lambda mid: mid,
+            finish=lambda s, mid, xi: mid, label=f"first@{tau}"),
     )
 
 
@@ -123,6 +127,9 @@ def goes_second(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg2:
         read2=lambda mid: mid,
         finish=lambda s, mid, xi: mid + Q.apply_sharp(mid, xi),
         label="second",
+        durational=lambda tau: CotCoalg2(          # the push held for the duration (book P9.5)
+            Q_dim=Q.dim, init=s0, read1=lambda s: s, advance=lambda s, xi: s, read2=lambda mid: mid,
+            finish=lambda s, mid, xi: mid + tau * Q.apply_sharp(mid, xi), label=f"second@{tau}"),
     )
 
 

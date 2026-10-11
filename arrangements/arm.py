@@ -62,6 +62,9 @@ def geared_joints(q0, beta: float, n_out: int = 1) -> Arrangement:
         position=lambda s: s[0] + s[2] * s[1],
         step=lambda s, tau: (s[0] + s[2] * s[1], beta * s[1] + tau, s[2]),
         label=f"geared(beta={beta:g})",
+        # over a duration t (book P9.5): friction a push held for the duration, as for coalgebra.damped
+        look_ahead=lambda s, t: s[0] + t * s[2] * s[1],
+        timed_step=lambda s, tau, t: (s[0] + t * s[2] * s[1], (1 - (1 - beta) * t) * s[1] + t * tau, s[2]),
     )
     return Arrangement(
         P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=n * n_out,

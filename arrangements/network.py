@@ -67,6 +67,12 @@ def example_coalgebra(values: Array) -> CotCoalg:
 
     ``u : S -> cot(Q)(S)`` sends ``s`` to ``(values[s mod n], xi |-> s + 1)``: whatever covector
     comes back, the box steps to the next example. ``Q = R^d``, ``S`` the integers.
+
+    Over any duration it also steps to the next example (David, 2026-10-10: "can we just always show
+    the next one? … They do 0.01, bam, bam, bam … we just show them 100 new data points per second"):
+    the data source has no rate, and a run of short steps runs the examples fast. It has no limit as the
+    duration shrinks, so no differential equation of its own; a learner fed by it does (full-batch gradient
+    flow, ``tests/test_duration.py``). Durations are positive (Ch 3).
     """
     values = jnp.asarray(values, dtype=float)
     n, d = values.shape
@@ -76,6 +82,7 @@ def example_coalgebra(values: Array) -> CotCoalg:
         position=lambda s: values[s % n],
         step=lambda s, xi: s + 1,
         label="examples",
+        timed_step=lambda s, xi, tau: s + 1,
     )
 
 

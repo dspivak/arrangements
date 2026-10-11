@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Optional, Any, Callable
 
 import jax
 import jax.numpy as jnp
@@ -155,6 +155,16 @@ class CotCoalgR:
     step: Callable[[Any, Array], Any]
     kind: type
     label: str = ""
+    timed_step: Optional[Callable[[Any, Array, Any], Any]] = None
+
+    def step_over(self, s, xi_Q, duration=None):
+        """The random variable over next states after a step of ``duration`` (book P9.5); ``None`` is
+        the unit step; a part with no duration law raises."""
+        if duration is None:
+            return self.step(s, xi_Q)
+        if self.timed_step is None:
+            raise TypeError(f"part {self.label or '?'} has no duration law (timed_step is None)")
+        return self.timed_step(s, xi_Q, duration)
 
     def tensor(self, other) -> "CotCoalgR":
         """The parallel product: base ``Q x Q'``, state a pair, and the independent
@@ -171,10 +181,15 @@ class CotCoalgR:
         def step(s, xi_Q):
             return self.step(s[0], xi_Q[:n]).tensor(other.step(s[1], xi_Q[n:]))
 
+        timed_step = None
+        if self.timed_step is not None and other.timed_step is not None:
+            def timed_step(s, xi_Q, tau):            # one duration, shared
+                return self.timed_step(s[0], xi_Q[:n], tau).tensor(other.timed_step(s[1], xi_Q[n:], tau))
+
         return CotCoalgR(
             Q_dim=n + other.Q_dim, init=(self.init, other.init),
             position=position, step=step, kind=self.kind,
-            label=f"({self.label} (x) {other.label})",
+            label=f"({self.label} (x) {other.label})", timed_step=timed_step,
         )
 
     def rtensor(self, left: CotCoalg) -> "CotCoalgR":
@@ -188,6 +203,7 @@ def lift(P: CotCoalg, kind: type) -> CotCoalgR:
         Q_dim=P.Q_dim, init=P.init, position=P.position,
         step=lambda s, xi_Q: kind.unit(P.step(s, xi_Q)),
         kind=kind, label=P.label,
+        timed_step=(lambda s, xi_Q, tau: kind.unit(P.step_over(s, xi_Q, tau))) if P.timed_step is not None else None,
     )
 
 
@@ -221,8 +237,15 @@ def euler_maruyama(Q: ReactiveVectorSpace, temperature: float, init: Array = Non
         L = jnp.linalg.cholesky(Q.sharp_at(s))
         return GaussianRV(Q.dim, lambda z: drift + c * (L @ z))
 
+    def timed_step(s, xi_Q, tau):
+        # over a duration: the push held for it, the jostling grown by its square root, which is how
+        # independent kicks add up and the only scaling with a limit as steps shrink (book P9.5)
+        drift = s + tau * Q.apply_sharp(s, xi_Q)
+        L = jnp.linalg.cholesky(Q.sharp_at(s))
+        return GaussianRV(Q.dim, lambda z: drift + c * jnp.sqrt(tau) * (L @ z))
+
     return CotCoalgR(Q_dim=Q.dim, init=s0, position=lambda s: s, step=step,
-                     kind=GaussianRV, label=f"EM(T={temperature:g})")
+                     kind=GaussianRV, label=f"EM(T={temperature:g})", timed_step=timed_step)
 
 
 # ---------------------------------------------------------------------------
@@ -274,10 +297,17 @@ def seeded(P: CotCoalgR, sampler: Sampler) -> CotCoalg:
         i = rv.position
         return (rv.ret(sampler.draw(t, i)), sampler.step(t, i))
 
+    def timed_step(state, xi_Q, tau):
+        s, t = state
+        rv = P.step_over(s, xi_Q, tau)
+        i = rv.position
+        return (rv.ret(sampler.draw(t, i)), sampler.step(t, i))
+
     return CotCoalg(
         Q_dim=P.Q_dim, init=(P.init, sampler.init),
         position=lambda state: P.position(state[0]), step=step,
         label=f"{P.label}|{sampler.label}",
+        timed_step=timed_step if P.timed_step is not None else None,
     )
 
 

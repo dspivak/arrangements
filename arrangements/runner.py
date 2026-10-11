@@ -409,7 +409,8 @@ def _kit():
     def drum(cells):
         cells = jnp.asarray([float(c) for c in cells])
         P = CotCoalg(Q_dim=int(cells.size), init=cells, position=lambda s: s,
-                     step=lambda s, xi: jnp.roll(s + xi, -1), label="drum")
+                     step=lambda s, xi: jnp.roll(s + xi, -1), label="drum",
+                     timed_step=lambda s, xi, t: jnp.roll(s + xi, -1))   # one cell per step, any duration (book P9.5)
         return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
                            out_f=lambda q, m: q[:1], in_f=lambda q, m, n: Z(), omega=zero_form, label="drum")
 
@@ -440,7 +441,8 @@ def _kit():
         delivered to its ear, `r` what landed on its value wire."""
         return CotCoalg(Q_dim=3, init=jnp.array([float(x0), 0.0]),
                         position=lambda s: jnp.concatenate([s, jnp.zeros(1)]),
-                        step=lambda s, xi: jnp.stack([xi[2], xi[0]]), label="copier")
+                        step=lambda s, xi: jnp.stack([xi[2], xi[0]]), label="copier",
+                        timed_step=lambda s, xi, t: jnp.stack([xi[2], xi[0]]))   # one copy per step (book P9.5)
 
     def inbox(x0):
         def omega(q, m, n):

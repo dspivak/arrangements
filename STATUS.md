@@ -2062,6 +2062,25 @@ chosen together: at the page's old step 0.1 a push weak enough to let the listen
 than 57% oscillates or throws the listener far off (at strength 0.5 it ends 8.8 away); strength 1 at step 0.05 rests
 it where it counts on a reliable speaker 78%, the closest 0.197.
 
+### 3.60 The duration input (book P9.5)
+
+A part is told the duration first, shows its look-ahead (`CotCoalg.look_ahead`, `position_at`), and steps by
+`timed_step` (`step_over`); `Phi`, every `PCMorphism` composite, `closed_step`, `Phi2`, `PhiK` and the random step
+carry it, one duration shared; `None` is the unit step, the old path. Durations are positive (book Ch 3). Laws: pushes
+held for the duration (configuration, phase, damped, gyro, phase on T*Q, geared arm, phase_dt, belief); a data source,
+drum, copier and delay take one step per step; leapfrog and RK4 told the duration before round 1; Euler–Maruyama's kick
+by its square root; the finite random kick has none. A half-duration look-ahead is leapfrog in one round. Short steps of
+one example each converge to full-batch gradient flow. `tests/test_duration.py`; book
+`notes/runs/p95-duration-33faae02/RESULTS.md`.
+
+### 3.61 Contracts: a fund paid only for output it bought (book P24)
+
+`contracts.py` (Codex 193def97; finished by Claude 33faae02): contracts allocate output once, payments are conserved
+transfers, `piecework` composes workers, two suppliers, a market and accounts as boxes. Against a matched control that
+differs only in the receipt rule, the floor-worker fund is ruined from a drain of 35 (the old rule recovers through 80),
+and the rise of balance with worker count is reduced. The historical runs (`test_cascade.py::test_12`,
+`test_account.py::test_28`) reproduce and are kept as the subsidized model. Book `notes/FINISHED-PROJECTS.md`, P24.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

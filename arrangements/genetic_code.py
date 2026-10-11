@@ -222,6 +222,9 @@ def tensor_all(parts: Sequence[Arrangement], label: str = "tensor_all") -> Arran
         position=lambda s: jnp.concatenate([parts[i].P.position(s[i]) for i in range(n)]),
         step=lambda s, xi: tuple(parts[i].P.step(s[i], xi[cq[i]:cq[i + 1]]) for i in range(n)),
         label=label,
+        # over a duration (book P9.5): each part's own law, one duration shared
+        look_ahead=lambda s, t: jnp.concatenate([parts[i].P.position_at(s[i], t) for i in range(n)]),
+        timed_step=lambda s, xi, t: tuple(parts[i].P.step_over(s[i], xi[cq[i]:cq[i + 1]], t) for i in range(n)),
     )
 
     def omega(q, m_out, n_in):

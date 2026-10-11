@@ -57,6 +57,8 @@ def phase_dt(dt: float, q0: float, p0: float = 0.0) -> CotCoalg:
         position=lambda s: s[0] + dt * s[1],
         step=lambda s, xi: (s[0] + dt * s[1], s[1] + dt * xi),
         label="phase_dt",
+        look_ahead=lambda s, t: s[0] + t * dt * s[1],             # as coalgebra.phase (book P9.5)
+        timed_step=lambda s, xi, t: (s[0] + t * dt * s[1], s[1] + t * dt * xi),
     )
 
 
