@@ -1,12 +1,14 @@
 """Stock-and-flow diagrams as arrangements in ``arr`` (book Ch 4 ``sec.stock_flow``).
 
 Any stock-and-flow diagram with smooth rates and acyclic auxiliaries is an arrangement whose internal
-boxes are its stocks, its auxiliaries and its flows, and nothing else (``prop.stock_flow``):
+boxes are its stocks and its flows, and whose gray space computes its auxiliaries (``prop.stock_flow``):
 
   stock      state = its level, reported on its one output port; no forcing of its own; the
              configuration coalgebra with sharp ``dt`` (``euclidean(1, dt)``), so it moves by ``dt``
              times the force on it.
-  auxiliary  a gray box (trivial parameter, zero forcing): a smooth function of what it reads.
+  auxiliary  not a box but gray space: a static arrangement (trivial parameter, zero forcing), like the
+             book's ``tanh`` (Ch 3 ``sec.static_arrangements``), composed after what it reads; its one
+             internal box shows the values it reads, and its output is a smooth function of them.
   flow       trivial parameter; reads its links and its pipe ends; forcing ``-rate`` on the port of
              the stock it drains, ``+rate`` on the stock it fills, ``0`` on every other port. A cloud end
              is no wire.
