@@ -2119,6 +2119,17 @@ arbitrary signed value maps are supplied computing idealizations, not empirical
 claims about those scales. Book evidence, derivation and full printed composite
 labels: `notes/runs/p34-attention-1eda4400/RESULTS.md` and `logs/final-tests.txt`.
 
+### 3.63 A spot that feeds and divides (book P27)
+
+Claude Opus 5.5, c2fac8e7, 2026-10-12. `spot.py`, `tests/test_dividing_spot.py` (5 passed, 43 s). Gray–Scott chemistry on a
+ring of 120 cells as one closed arrangement of 480 boxes: per cell a cell box (food and builder, configuration integrator), an
+exchange with the reservoir (exact), the reaction U + 2V -> 3V (`reaction_network.reaction_box`, non-exact), and a joint per
+neighboring pair (exact, diffusion); `ring_wire` routes them. Its step equals the one-formula numpy step to 1e-16. One spot
+becomes 2, 4, then 6 identical spots (peaks equal to 1e-10, all 14 cells wide); a random blob ends the same way; with no
+supply the spot dies. The middle's food falls first, then food × builder drops below the washout rate and the builder there
+cannot restart even when food returns. No heredity: the form is the chemistry's one spot. Predictions and verdicts in the
+book repo, `notes/runs/p27-copying-c2fac8e7/`.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:
