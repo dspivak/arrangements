@@ -33,7 +33,7 @@ def test_phase_single_particle_update():
 
 
 def test_conf_single_particle_displacement():
-    """sec.displacement: q -> q + sharp_q(xi_Q), the forcing -dk descends the spring cost."""
+    """sec.differential_equations: q -> q + sharp_q(xi_Q), the forcing -dk descends the spring cost."""
     m, kappa = 2.0, 3.0
     O = Phi(harmonic_particle(configuration, m, kappa))
     q0, xi_N, q_prev = jnp.array([0.7]), jnp.array([0.4]), jnp.array([0.55])

@@ -1,4 +1,4 @@
-"""``cot(Q)``-coalgebras: the parameters of arrangements (sec.integrators).
+"""``cot(Q)``-coalgebras: the parameters of arrangements (sec.matter).
 
 An object of ``cotcoalg`` is a triple ``(Q, S, u)`` of smooth sets ``Q`` (the
 base) and ``S`` (the state) with a ``cot(Q)``-coalgebra
@@ -21,7 +21,7 @@ The standard coalgebras take a reactive vector space ``(Q, sharp_Q)`` as input
 (rvect.py):
 
 * ``configuration(Q)`` -- state ``S = Q``, position the identity, step
-  ``s + sharp_s(xi)`` (sec.displacement): the integrator *advances* along the
+  ``s + sharp_s(xi)`` (sec.differential_equations): the integrator *advances* along the
   forcing, whose sign (``omega = dU = -dk``) already makes it descend a cost.
 * ``phase(Q)`` -- state ``S = T^*Q = Q x Q^*``, position the presented position
   ``q + sharp_q(xi)``, step one symplectic-Euler step of Hamilton's equations.
@@ -54,7 +54,7 @@ from .rvect import ReactiveVectorSpace
 
 @dataclass(frozen=True)
 class CotCoalg:
-    """A ``cot(Q)``-coalgebra ``(Q, S, u)`` (sec.integrators), with an initial state.
+    """A ``cot(Q)``-coalgebra ``(Q, S, u)`` (sec.matter), with an initial state.
 
     * ``Q_dim``    -- the base ``Q = R^{Q_dim}``.
     * ``init``     -- the initial state ``s_0 in S`` (the state ``Phi`` starts from).
@@ -109,7 +109,7 @@ class CotCoalg:
         return self.timed_step(s, xi_Q, duration)
 
     def tensor(self, other: "CotCoalg") -> "CotCoalg":
-        """The parallel product ``(Q, S, u) (x) (Q', S', u')`` (sec.integrators).
+        """The parallel product ``(Q, S, u) (x) (Q', S', u')`` (sec.matter).
 
         Base ``Q x Q'``, state ``S x S'`` (a pair), and the product coalgebra
         induced by ``cot(Q x Q') ~= cot(Q) (x) cot(Q')``: the position is the
@@ -161,7 +161,7 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
     """The configuration coalgebra on ``(Q, sharp_Q)``: ``S = Q``, one displacement per step.
 
     The state is the position, ``q(s) = s``, and an incoming covector displaces it
-    *along* the forcing (sec.displacement, STATUS.md §1):
+    *along* the forcing (sec.differential_equations, STATUS.md §1):
 
         s |-> s + sharp_s(xi_Q).
 

@@ -10,7 +10,7 @@ The construction
 ----------------
 
 **Stage** (``stage``): a ``<R^0|R^0> -> <R^1|R^1>`` arrangement (def:arr) with
-parameter the configuration coalgebra (sec.integrators) on ``Q = R^2``, state
+parameter the configuration coalgebra (sec.matter) on ``Q = R^2``, state
 ``q = (v, w)``, reported output ``out_f(q) = v``, one input port carrying the
 drive voltage ``e``, forcing ``omega = -dU`` (sec.forcing) for the cost
 
@@ -23,7 +23,7 @@ scaled by the timestep:
                    [0, 0]]  =  dt * KERNEL_SHARP.
 
 ``Phi`` of the configuration arrangement steps ``q -> q + sharpR(omega_Q)``
-(sec.displacement), i.e.
+(sec.differential_equations), i.e.
 
     v <- v + dt kappa (A g(e) - v - w),        w <- w  (frozen; start at 0),
 

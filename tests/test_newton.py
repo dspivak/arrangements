@@ -3,7 +3,7 @@
 A closed arrangement ``f : I -> I`` whose parameter is ``configuration(Q)`` with the
 position-dependent response ``sharp_q = (T_q dk)^{-1}`` (the inverse Hessian of the
 cost ``k``, rvect.inverse_hessian) and whose forcing is ``omega = -dk`` has, by
-sec.displacement,
+sec.differential_equations,
 
     Phi(f) : q |-> q - (T_q dk)^{-1}(dk|_q)   (CDLM eqn.newton),
 

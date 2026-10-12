@@ -12,7 +12,7 @@ with zero forcing of its own (the simplest honest choice: all closed-loop forces
 come from the controller); the coupling is a wiring; and the closed-loop
 behavior is whatever the dynamics functor ``Phi`` (sec.dynamics_functor) makes
 of the composite -- which behavior it is now depends on the *parameter*, the
-coalgebra inside the arrangement (def:arr, sec.integrators), not on a choice
+coalgebra inside the arrangement (def:arr, sec.matter), not on a choice
 made in the semantics:
 
 * ``configuration`` -- proportional setpoint tracking,

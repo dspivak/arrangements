@@ -3,7 +3,7 @@ configuration arrangement.
 
 EXTENSION (beyond the paper). This reuses the dynamics functor ``Phi`` of an
 arrangement with a *configuration* parameter (sec.dynamics_functor,
-sec.integrators) and the learner of learning.py unchanged, but the deep-Ritz
+sec.matter) and the learner of learning.py unchanged, but the deep-Ritz
 Dirichlet energy, the coordinate MLP ansatz, and the Poisson discretization are
 standard numerics, not part of the paper's formal development. It is a toy
 demonstration that the primitives compose -- not an implementation of a paper
@@ -19,7 +19,7 @@ whose unique minimizer is the discrete Poisson solution ``L u = b`` (the
 second-difference of ``-u''=f``). The network outputs the field on a grid; under
 ``Phi`` with the configuration parameter (sec.neural_network) its weights are
 displaced along the forcing of the energy, ``-dE/du = b - L u`` pulled back
-through the net (sec.displacement), so they descend ``E``. Hard Dirichlet
+through the net (sec.differential_equations), so they descend ``E``. Hard Dirichlet
 boundary conditions are baked in by the ansatz ``u_theta(x) = x(1-x) g_theta(x)``.
 
 This is the *energy* (deep-Ritz) reading of a physics-informed network: the loss

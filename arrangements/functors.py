@@ -151,7 +151,7 @@ def Phi(arr: Arrangement) -> PCMorphism:
     returned direction are the interpretation's, evaluated at the position
     ``arr.P.position(s)`` the coalgebra presents; the state update is
     ``arr.P.step(s, xi_Q)`` on the parameter covector of the covector triple.
-    Time is discrete by design: one covector, one step (sec.displacement). The
+    Time is discrete by design: one covector, one step (sec.differential_equations). The
     step may be told how long it lasts, ``step(state, duration=None)``, before
     anything is shown: the parameter then presents its look-ahead
     ``P.position_at(s, duration)`` and steps by ``P.step_over`` (Ch 3

@@ -3,7 +3,7 @@
 An arrangement ``a : M -> N`` with parameter ``P = (Q, S, u)`` (a ``cot(Q)``-coalgebra,
 coalgebra.py) is a morphism ``Q (x) M -> N`` of ``omegalens``, the lens category
 over the writer monad ``Omega(X) = X x Omega^1`` of one-forms (sec.forcing,
-sec.lenses). Writing an interface as ``M = <M^- | M^+>`` (two smooth sets, the
+sec.forces). Writing an interface as ``M = <M^- | M^+>`` (two smooth sets, the
 input and the output side), the lens morphism consists of smooth maps
 
     out_f : Q x M^+          -> N^+

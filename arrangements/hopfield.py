@@ -6,7 +6,7 @@ The claim under test: the continuous Hopfield network (Hopfield 1984, units
     u_i' = -u_i + sum_j W_ij g(u_j) + I_i,        g = tanh,  W symmetric,
 
 is the dynamics ``Phi`` (sec.dynamics_functor) of a closed arrangement with
-*configuration* parameters (def:arr, sec.integrators), built by *genuine
+*configuration* parameters (def:arr, sec.matter), built by *genuine
 composition* in ``arr`` (no hand-written total forcing):
 
 * one **neuron box** per unit ``i``: parameter the configuration coalgebra on
@@ -44,7 +44,7 @@ forcing ``omega = -dU`` for the cost
 *emerges* from ``compose_seq``'s pullback-and-sum (the Kleisli composition of
 the writer monad ``Omega``, sec.forcing). Then, since the composite is closed,
 the parameter covector is ``xi_Q = -dU/du`` and one ``Phi`` step (the
-configuration coalgebra *adds* ``sharp(xi_Q)``, sec.displacement) is
+configuration coalgebra *adds* ``sharp(xi_Q)``, sec.differential_equations) is
 
     u_i  |->  u_i - (dt / g'(u_i)) * g'(u_i) * (u_i - I_i - sum_j W_ij g(u_j))
           =  u_i + dt * (-u_i + sum_j W_ij g(u_j) + I_i),

@@ -17,7 +17,7 @@ parameter is the configuration coalgebra on ``(Q, eta_LR * I)``. Under the
 dynamics functor ``Phi`` this is the learner: a coalgebra on state ``Q`` whose
 backward pass pulls an output covector ``xi`` back to a parameter covector
 ``xi_Q`` and an input covector ``xi_M``, and whose state update displaces along
-the forcing, ``q |-> q + sharp_q(xi_Q)`` (sec.displacement). With the incoming
+the forcing, ``q |-> q + sharp_q(xi_Q)`` (sec.differential_equations). With the incoming
 covector the forcing ``omega = -dk`` of the loss (a cost) and
 ``sharp_q = eta_LR * I`` this is vanilla gradient descent at rate ``eta_LR``, and
 backpropagation is the chain rule packaged as the functoriality of ``Phi``.

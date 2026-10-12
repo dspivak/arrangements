@@ -11,7 +11,7 @@ The network is *detailed balanced* if some ``x_eq > 0`` equalizes every
 reaction's forward and backward flux: ``kf_r x_eq^{alpha_r} = kb_r
 x_eq^{beta_r} =: w_r``. This module settles which of these ODEs are the
 configuration dynamics -- ``Phi`` of an arrangement whose parameter is the
-configuration coalgebra ``configuration(Q)`` (def:arr, sec.integrators) -- and
+configuration coalgebra ``configuration(Q)`` (def:arr, sec.matter) -- and
 in which encoding.
 
 VACUITY GUARD. ``def.rvect`` puts no symmetry or definiteness condition on a
@@ -47,7 +47,7 @@ THE VERIFIED FRONTIER.
    The realization is EXACT, not asymptotic: since ``dF = log(x/x_eq)`` and
    detailed balance gives ``zeta_r . dF = log(b_r/f_r)``, the identity
    ``Lambda(f, b) log(b/f) = b - f`` makes one configuration-coalgebra step
-   ``x -> x + sharpR_x(omega)``, ``omega = -dF`` (sec.displacement) literally
+   ``x -> x + sharpR_x(omega)``, ``omega = -dF`` (sec.differential_equations) literally
    the forward-Euler mass-action step ``x + dt * sum_r zeta_r v_r(x)``, to
    machine precision. ``K(x)`` is symmetric PSD on ``x > 0`` (``Lambda > 0``),
    so ``F`` decreases along the flow and the equilibrium in each stoichiometric
@@ -413,7 +413,7 @@ def step_matrix(P: CotCoalg, flat: Array) -> Array:
     with flat coordinates ``flat``: for a configuration coalgebra with constant
     sharp this IS the composite sharp (``rvect.direct_sum`` of the boxes'),
     which the book stores inside ``step`` rather than as a field
-    (sec.integrators)."""
+    (sec.matter)."""
     s = state_from_flat(P.init, flat)
     base = flat_state(s)
     return jax.jacobian(lambda xi: flat_state(P.step(s, xi)) - base)(jnp.zeros(P.Q_dim))

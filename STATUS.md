@@ -2083,6 +2083,42 @@ differs only in the receipt rule, the floor-worker fund is ruined from a drain o
 and the rise of balance with worker count is reduced. The historical runs (`test_cascade.py::test_12`,
 `test_account.py::test_28`) reproduce and are kept as the subsidized model. Book `notes/FINISHED-PROJECTS.md`, P24.
 
+### 3.62 Attention and three additions (book P34 k)
+
+**Constructed and run** (Codex, GPT-6, 1eda4400, 2026-10-12, at David's
+"let's do the three-adition construction"). `attention_runner.py` supplies a
+unit-message source, scalar multiplication and non-exact push, then constructs
+constants, register/drum readouts, addition, copy/drop and cost with actual
+`AttentionArrangement` operations and explicit scalar/message adapters. The
+adapters retain separate signal coordinates; they do not average. The same
+original runner syntax is interpreted with the constructed kit.
+
+**Checked:** `tests/test_attention_runner.py`, 18 passed in 58.12 seconds.
+Forward maps, backward forces and state updates match the old eight-part kit.
+Three guest steps and three complete interpreter passes of two tanks, the
+non-exact turner and crossed pair match an independent Fraction calculation.
+Interpreter steps per guest step are 182, 30, 20; maximum absolute data/work-cell
+errors are 3.11e-15, 0, 0 in float64. The compiled step of each composite is
+checked against Phi for its first two steps. All computation in the modeled
+run is the composed arrangement; reference calculations are checks beside it.
+An entropy-Bregman transfer separately checks ordered, asymmetric attenuation,
+both placement forces and the update through Phi against hand formulas.
+
+**Scope:** exact execution uses the general attention operad's specified
+transfers, not only a metric or Bregman kernel. The optional smooth positive
+gain really attenuates signals; no compensating inverse hides it. Arbitrary
+attenuation is not claimed to preserve a program. No speedup, adaptive discovery
+of a runner, distributed interpreter, internal translator or unbounded memory
+is established. The real-valued correspondence follows constructor by
+constructor and then by composition (hand proof, unreviewed); floating-point
+tests are not that theorem's exact arithmetic hypothesis.
+
+**Interpretation:** retaining a part's state and directing its communication
+is reasonable for towns, bodies and cells; exact clocks, real registers and
+arbitrary signed value maps are supplied computing idealizations, not empirical
+claims about those scales. Book evidence, derivation and full printed composite
+labels: `notes/runs/p34-attention-1eda4400/RESULTS.md` and `logs/final-tests.txt`.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

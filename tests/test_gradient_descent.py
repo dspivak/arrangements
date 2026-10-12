@@ -256,7 +256,7 @@ def test_backprop_matches_autodiff():
 
 
 def test_phi_step_is_gradient_descent():
-    """sec.displacement with sharp = eta * I: new q = q + eta * (-grad k) = q - eta * grad k."""
+    """sec.differential_equations with sharp = eta * I: new q = q + eta * (-grad k) = q - eta * grad k."""
     F, dim = _two_layer(4, 3, 2)
     eta = 0.05
     arr = parameterized_map(F, configuration(euclidean(dim, eta)), in_dim=3, out_dim=2)

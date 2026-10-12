@@ -1,4 +1,4 @@
-"""A convection roll as a ring of stirred heat tanks (book sec.driven; ``notes/CONVECTION-RESULTS.md``).
+"""A convection roll as a ring of stirred heat tanks (book sec.convection; ``notes/CONVECTION-RESULTS.md``).
 
 Four cells around a loop -- bottom, right, top, left -- each a *tank of heat*: state its temperature ``T_i``
 (unit heat capacity), response the step size ``s``, output ``T_i``, zero forcing. Two *plates* are tanks whose

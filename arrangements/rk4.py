@@ -8,7 +8,7 @@ dynamics, an ``pc^(4)`` morphism, exactly parallel to the two-stage leapfrog sto
 
     ẋ = f(x),      f(x) = sharp_x(ξ_Q(x)),
 
-i.e. the same flow the configuration coalgebra steps (sec.displacement; CDLM's
+i.e. the same flow the configuration coalgebra steps (sec.differential_equations; CDLM's
 ``-sharp(dU)`` in the book's sign, STATUS.md §1), but with the classical four-stage
 Runge--Kutta update instead of explicit Euler. The per-round "force" ``ξ_Q`` is the
 framework covector -- the forcing ``omega`` -- at the emitted position (computed by

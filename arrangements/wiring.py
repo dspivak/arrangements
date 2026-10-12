@@ -1,4 +1,4 @@
-"""Composition and wiring constructors in ``arr`` (def:arr, sec.lenses).
+"""Composition and wiring constructors in ``arr`` (def:arr, sec.forces).
 
 Provides:
 

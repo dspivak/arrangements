@@ -52,7 +52,7 @@ def test_conf_one_step_is_exact_virtual_spring_descent():
     The plant's forcing is zero (the honest simplest choice), so the *entire*
     parameter covector is the controller's ``xi_Q = -k(q - s)`` and the
     configuration coalgebra applies ``q <- q + sharpR_q(xi_Q)`` with
-    ``sharpR = dt * I`` (sec.displacement).
+    ``sharpR = dt * I`` (sec.differential_equations).
     """
     dt, k = 0.07, 1.3
     arr = impedance_arrangement(euclidean(1, dt), k, parameter=configuration)

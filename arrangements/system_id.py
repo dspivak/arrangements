@@ -2,7 +2,7 @@
 (CDLM rmk.graph_environment, "Predicting a closed system").
 
 EXTENSION (beyond the paper). This reuses the dynamics functor ``Phi`` of an
-arrangement with a *phase* parameter (sec.dynamics_functor, sec.integrators)
+arrangement with a *phase* parameter (sec.dynamics_functor, sec.matter)
 and the learner of learning.py unchanged, and the data stream is the environment
 of rmk.graph_environment / ex.training_data; but the nonlinear pendulum, the
 tanh-MLP predictor, and the libration-regime sampling are standard ML layered on
@@ -62,7 +62,7 @@ def oscillator(
     ``(1/m) I``, on-site potential (a cost) ``U(q)``, forcing ``omega = -dU``.
 
     The parameter is ``parameter(Q)``, by default the phase coalgebra (def:arr,
-    sec.integrators); under ``Phi`` (sec.dynamics_functor) the arrangement is then
+    sec.matter); under ``Phi`` (sec.dynamics_functor) the arrangement is then
     the symplectic flow of the Hamiltonian ``H = |p|^2 / (2m) + U(q)``, with state
     ``(q, p)`` in ``R^dim x R^dim``. Quadratic ``U`` gives a linear flow; any other
     gives a nonlinear one.

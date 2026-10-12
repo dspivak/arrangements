@@ -18,7 +18,7 @@ and whose forcing is exact, ``omega = dU`` for the mean fitness
 
 Sign derivation against the code's conventions (no free choices left):
 the configuration coalgebra steps ``x -> x + sharpR_x(xi_Q)``
-(``coalgebra.configuration``, sec.displacement), and for a closed scalar the
+(``coalgebra.configuration``, sec.differential_equations), and for a closed scalar the
 covector triple's parameter component is ``xi_Q = omega|_x`` (sec.dynamics_functor;
 CDLM eqn.bigtheta, the other two pullbacks vanish). With ``A`` symmetric,
 ``omega|_x = dU|_x = A x``, so one step is

@@ -24,7 +24,7 @@ and the cost
 
 where ``vgs = eG - eS`` and ``vds = eD - eS``, the forcing is ``omega = -dU``
 (sec.forcing; STATUS.md §1) and the configuration step *adds* ``sharp(omega)``
-(sec.displacement), so
+(sec.differential_equations), so
 
     dq_0 = (sharpR omega)_0 = -dU/dq1 = kappa (vgs - q0 - q1),
     dq_1 = 0.

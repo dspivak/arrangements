@@ -1,4 +1,4 @@
-"""The standard ``cot(Q)``-coalgebras and their tensor (sec.integrators)."""
+"""The standard ``cot(Q)``-coalgebras and their tensor (sec.matter)."""
 
 import jax.numpy as jnp
 import numpy as np
@@ -8,7 +8,7 @@ from arrangements.rvect import diagonal
 
 
 def test_configuration_adds_the_forcing():
-    """s |-> s + sharp_s(xi): the displacement is *along* the forcing (sec.displacement)."""
+    """s |-> s + sharp_s(xi): the displacement is *along* the forcing (sec.differential_equations)."""
     P = configuration(diagonal(jnp.array([0.5, 2.0])))
     s = jnp.array([1.0, -1.0])
     np.testing.assert_allclose(P.position(s), s)
