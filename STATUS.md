@@ -2130,6 +2130,36 @@ supply the spot dies. The middle's food falls first, then food × builder drops 
 cannot restart even when food returns. No heredity: the form is the chemistry's one spot. Predictions and verdicts in the
 book repo, `notes/runs/p27-copying-c2fac8e7/`.
 
+### 3.64 Bregman attention: nesting and private-prediction-driven placement (book P44)
+
+Codex GPT-6, b19e7526, 2026-10-13. `bregman_attention.py`, `tests/test_bregman_attention.py`:
+14 passed in 17.99 s. Ordered divergence parents use the existing attention operad;
+three-level quadratic, entropy and boundary-entropy smooth-peak examples agree with
+pathwise direct-sum divergences, independent lens composition, full forces and three
+Phi steps. Printed labels show the nested parents and each private receiver/source.
+
+Private prediction target (1,0), two fixed senders with signals (1,0) and (0,1): at the
+same mobility 0.005, bell and peak approach the helpful source and recede from the harmful
+one at distances 0.02, 1, 5 (3/3 each). Reversing the target reverses motion. Original
+mobility 0.05 refutes approach for the near peak: it steps 0.0489965 from separation 0.02
+and ends farther from the helper. This counterexample is retained in the tests.
+Both smooth kernels have zero positional derivative at coincidence despite private cost 1.
+The rounded peak uses D_entropy(0,d)=d with a smooth distance feature; it is not entropy
+divergence between physical locations. The exact absolute-distance peak is nonsmooth at zero.
+
+Interior entropy forces and positive log-coordinate updates match the chain rule. A quadratic
+negative-log-total-weight receiver lands on the loudness-weighted sender mean in one Phi step.
+For entropy, the additive site-update is partial under arbitrary force: the mean identity
+is checked algebraically only, not claimed as a run of that integrator. Positive message
+weights are the attention-interface domain of the log-weight cost. Every modeled step
+runs through Phi; closed-form references are ordinary calculations beside it.
+
+Interpretation (agent judgment): current cost can modulate influence; fixed senders,
+private target and signal coordinates are supplied idealizations. No survival, integrity,
+biological mechanism or human-reliance claim; exact-coincidence stasis is a geometric
+limitation, not a fact about people. Book evidence and predictions:
+`notes/runs/p44-bregman-codex-20261013/RESULTS.md`. Proposed Ch 5 placement after private prediction.
+
 ## 4. Where the mathematics is written down
 
 - The category of arrangements, the forcing, the coalgebra, and the dynamics functor:

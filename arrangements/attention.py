@@ -655,8 +655,9 @@ def spatial_kappa(ell_i: Array, ell_j: Array, tau: float, kernel: str = "bell") 
     """``kappa_ij = exp(-||l_i - l_j||^2 / 2 tau)`` (eq:spatial-transfers), the bell.
 
     ``kernel="peak"`` (book plan P43 (b), the listener page, de71554a): ``exp(-(sqrt(d^2 + eps^2) - eps) / tau)``,
-    ``d = ||l_i - l_j||``, ``eps = PEAK_EPS``: the peak ``exp(-d / tau)`` made smooth at the speaker, where it
-    differs from the peak by ``O(eps^2 / d)``; away from the speaker it slopes, so a listener near it is pushed."""
+    ``d = ||l_i - l_j||``, ``eps = PEAK_EPS``: the peak ``exp(-d / tau)`` made smooth at the speaker. Its
+    exponent differs from ``-d/tau`` by ``(eps + O(eps^2 / d))/tau`` away from zero.
+    The subtraction normalizes the weight to one at coincidence; its positional slope there is still zero."""
     d2 = jnp.sum((ell_i - ell_j) ** 2)
     if kernel == "peak":
         return jnp.exp(-(jnp.sqrt(d2 + PEAK_EPS ** 2) - PEAK_EPS) / tau)
