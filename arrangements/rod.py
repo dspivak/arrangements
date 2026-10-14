@@ -2,7 +2,7 @@
 
 The picture (David, 2026-09-27): pins at the data points ``(x_i, y_i)``; a stiff rod on a vertical rail at
 ``x = 0`` with height ``h`` and tilt ``theta``; at each ``x_i`` a zero-length spring from the pin to the rod.
-The test ran it as plain numpy (P43 (a), cb545383). Here each piece is a box:
+The test ran it as plain numpy (P43 (a), cb545383). Here each segment is a box:
 
 * the ROD, state ``(h, theta)``, its integrator saying how it moves: in syrup the configuration integrator
   with response ``diag(dt / drag_h, dt / drag_theta)``; in air the damped phase integrator with mass and

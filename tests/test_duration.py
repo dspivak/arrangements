@@ -27,7 +27,7 @@ Added with the look-ahead (David's "yes," 2026-10-10), predictions before the co
 8. a part whose look-ahead is half the coming duration is the leapfrog step in one round: second order
    (the error falls by about 4 when the duration halves) where the full look-ahead falls by about 2.
 
-The rod is Ch 3's grouped rod: three pieces of heat capacity 4, joined by conductance 1, insulated at
+The rod is Ch 3's grouped rod: three segments of heat capacity 4, joined by conductance 1, insulated at
 both ends (held ends with no spring), from ``(8, 4, 0)``.
 """
 
@@ -46,8 +46,8 @@ NO_DIR = lambda _o: (jnp.zeros(0), jnp.zeros(0))
 
 
 def grouped_rod(parameter=configuration):
-    """Ch 3's grouped rod as ``wiring.held_chain``: the first piece has no spring to the left end and the
-    right end none to the last piece, so both ends are insulated; capacity 4 is ``sharp = 1/4``."""
+    """Ch 3's grouped rod as ``wiring.held_chain``: the first segment has no spring to the left end and the
+    right end none to the last segment, so both ends are insulated; capacity 4 is ``sharp = 1/4``."""
     parts = [harmonic_particle(parameter, 4.0, 0.0)] + [harmonic_particle(parameter, 4.0, 1.0)] * 2
     return held_chain(parts, 0.0, parameter)
 
