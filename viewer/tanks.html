@@ -65,7 +65,7 @@ button.small { font-size: 13px; min-height: 30px; padding: 4px var(--s3); }
 .hint b { color: var(--accent); font-weight: 600; }
 
 svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
-svg text { font-family: var(--body); }
+svg text { font-family: var(--body); font-variant-numeric: tabular-nums; }
 .knob { cursor: ew-resize; }
 .knob text.v { fill: var(--accent); font-family: var(--data); font-weight: 500; }
 .knob line { stroke: var(--accent); stroke-dasharray: 3 3; stroke-width: 1.5; }
@@ -189,11 +189,13 @@ svg text { font-family: var(--body); }
     if (parent) parent.append(e);
     return e;
   }
-  const f2 = (x) => (Math.abs(x) < 0.005 ? 0 : x).toFixed(2);
+  // Every changing number is padded with figure spaces to the widest it can be, so text never shifts (PRINCIPLES.md 12).
+  const FS = "\u2007", fw = (str, w) => str.length >= w ? str : FS.repeat(w - str.length) + str;
+  const f2 = (x) => fw((Math.abs(x) < 0.005 ? 0 : x).toFixed(2), 5);
   // Numbers that change while playing keep a fixed number of decimals, set by the step's length, so text holds still.
   const dec = () => p.dt >= 1 ? 0 : Math.ceil(-Math.log10(p.dt) - 1e-9);
-  const f3 = (x) => x.toFixed(dec() + 2);
-  const fmtT = (s) => `${s.toFixed(dec())} s`;
+  const f3 = (x) => fw(x.toFixed(dec() + 2), dec() + 5);
+  const fmtT = (s) => `${fw(s.toFixed(dec()), dec() + 5)} s`;
   function toSvg(svg, ev) {
     const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());

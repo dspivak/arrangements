@@ -44,8 +44,14 @@ great." A page that departs from one says why in its own header comment.
    is on the picture and keeps what the viewer set.
 11. **The page never grows.** Its width stays fixed and long histories shrink. A body never leaves the screen; the
     axis compresses, with an end at infinity ("I shouldn't have to lose my guy").
-12. **Text that changes while playing holds still.** Use a fixed number of decimals and a fixed width, so a
-    sentence never shifts sideways ("when it moves to five, it doesn't say 5.00, and so the entire text moves left").
+12. **Text that changes while playing holds still: every changing number has its width decided in advance.** Use a
+    fixed number of decimals, always show the sign of a number that can change sign, choose a unit by a setting that is
+    fixed during the run (never by the number itself), and pad the number to the widest it can be with figure spaces
+    (U+2007, as wide as a digit in a tabular font), so a sentence never shifts sideways ("when it moves to five, it
+    doesn't say 5.00, and so the entire text moves left"; and on the pendulum, 2026-10-14: "10 versus 10.1 has a
+    different length … otherwise it's like constantly vibrating … there just needs to be space decided in advance for
+    how long something's gonna be … a common thing we need to put throughout"). Numbers that change every frame are
+    rewritten about ten times a second, not every frame, so they can be read. `pendulum.html`'s `fw` is the helper.
 13. **Built for a glance, not for reading top to bottom.** Whatever the eye lands on says what it is. A thing is
     named by its role every time, "the speaker," never "them" ("they're going to glance around and they're going
     to need to know what they're seeing right when they see it"). Keep few words on the page and put the rest

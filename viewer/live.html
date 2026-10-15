@@ -182,6 +182,8 @@ button.small { font-size: 13px; min-height: 30px; padding: 4px var(--s3); }
 (function () {
   const scene = JSON.parse(document.getElementById("scene").textContent);
   const $ = (id) => document.getElementById(id);
+  // Every changing number is padded with figure spaces to the widest it can be, so text never shifts (PRINCIPLES.md 12).
+  const FS = "\u2007", fw = (str, w) => str.length >= w ? str : FS.repeat(w - str.length) + str;
   const model = window.ARR_MODELS[scene.live.model];
   const wire = model.wires[0];                     // the one-way listener only, for now
   const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -365,14 +367,14 @@ button.small { font-size: 13px; min-height: 30px; padding: 4px var(--s3); }
     {
       const s = Math.min(Math.floor(t + 1e-9), cur.T - 1), L = cur.lane.boxes.find(b => b.id === "listener");
       const k = cur.lane.links[0].strength[s], cost = L.costs[s], c = +params.c;
-      $("f-k").textContent = Math.round(100 * k) + "%";
-      $("f-p").textContent = Math.round(100 * L.breaks[s]) + "%";
+      $("f-k").textContent = fw(String(Math.round(100 * k)), 3) + "%";
+      $("f-p").textContent = fw(String(Math.round(100 * L.breaks[s])), 3) + "%";
       $("f-fail").textContent = (+params.fail).toFixed(1);
       $("f-c").textContent = c.toFixed(1);
       // One sentence for a glance: which way the listener is going and why, in the step's own terms.
       const dp = s < cur.T - 1 ? L.x[s + 1] - L.x[s] : 0;
-      const why = `it expects relying on the speaker to cost <b>${cost.toFixed(1)}</b> a round, ` +
-                  `${cost < c ? "less" : "more"} than the <b>${c.toFixed(1)}</b> of doing without`;
+      const why = `it expects relying on the speaker to cost <b>${fw(cost.toFixed(1), 4)}</b> a round, ` +
+                  `${cost < c ? "less" : "more"} than the <b>${fw(c.toFixed(1), 4)}</b> of doing without`;
       $("status").innerHTML = !params.script.length ? "Press Play to start the rounds."
         : Math.abs(dp) < 1e-3 ? (cost < c ? `The listener stays beside the speaker: ${why}.` : `The listener stays away from the speaker: ${why}.`)
         : dp < 0 ? `The listener is moving <b>toward</b> the speaker: ${why}.` : `The listener is moving <b>away</b> from the speaker: ${why}.`;
@@ -384,8 +386,8 @@ button.small { font-size: 13px; min-height: 30px; padding: 4px var(--s3); }
         : `Nothing has happened yet. The listener starts with no idea which kind of speaker this is, and counts on the speaker ` +
           `${(100 * cur.lane.links[0].strength[0]).toFixed(0)}% from where it stands.`;
       const y = cur.lane.boxes[1].readout.values[s];
-      $("nums").innerHTML = model.kindOptions.map((k, i) => `<div><span>Believes the speaker is ${k.label}</span><b>${(100 * y[i]).toFixed(1)}%</b></div>`).join("") +
-        `<div><span>Counts on the speaker</span><b>${(100 * cur.lane.links[0].strength[s]).toFixed(1)}%</b></div>`;
+      $("nums").innerHTML = model.kindOptions.map((k, i) => `<div><span>Believes the speaker is ${k.label}</span><b>${fw((100 * y[i]).toFixed(1), 5)}%</b></div>`).join("") +
+        `<div><span>Counts on the speaker</span><b>${fw((100 * cur.lane.links[0].strength[s]).toFixed(1), 5)}%</b></div>`;
     }
     $("play").textContent = playing ? "Pause" : "Play";
 

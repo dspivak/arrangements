@@ -88,9 +88,11 @@
     return { ps, ys, ks };
   }
 
-  const pct = y => `${(100 * y[0]).toFixed(0)}% reliable, ${(100 * y[1]).toFixed(0)}% unreliable but accountable, ` +
-                   `${(100 * y[2]).toFixed(0)}% unaccountable`;
-  const num = x => (Math.round(x * 10) / 10).toString();
+  // numbers padded with figure spaces to a fixed width, so a caption never shifts as they change (PRINCIPLES.md 12)
+  const fw = (str, w) => str.length >= w ? str : "\u2007".repeat(w - str.length) + str;
+  const pct = y => `${fw((100 * y[0]).toFixed(0), 3)}% reliable, ${fw((100 * y[1]).toFixed(0), 3)}% unreliable but accountable, ` +
+                   `${fw((100 * y[2]).toFixed(0), 3)}% unaccountable`;
+  const num = x => fw((Math.round(x * 10) / 10).toFixed(1), 4);
 
   // One caption per step, in the step's own order: the move is set by the belief going in, the news arrives in
   // the same step, and the belief after it is the next step's.
@@ -106,7 +108,7 @@
       const r = Math.floor(t / STEPS_PER_ROUND), s = t % STEPS_PER_ROUND;
       let news;
       if (s === 0) news = `Round ${r + 1}: ${NEWS[script[r]]}. ` + (params.hear === "weighted"
-        ? `The listener hears it at strength ${ks[t].toFixed(2)}.` : "The listener sees it.");
+        ? `The listener hears it at strength ${fw(ks[t].toFixed(2), 4)}.` : "The listener sees it.");
       else if (wire === "exact") news = "No news, but the cost of counting on the speaker pushes the belief toward the kind that is cheapest to count on.";
       else news = "No news, so the belief does not change.";
       out.push({ step: t, text: `${move} ${news} After this step it believes the speaker is ${pct(ys[t + 1])}.` });

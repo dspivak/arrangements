@@ -1,0 +1,395 @@
+<title>Pendulum of links</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the viewer pages' system (tanks.html, PRINCIPLES.md). One question in the bar, Play beside it; the
+   pendulum with every number that is yours drawn where it is shown; the next step's calculation under it; the
+   energy over time; explanations behind buttons. Book: Ch 3 sec.arr, eqn.link; library: pendulum.py. */
+:root {
+  --ground: #eef1f3;
+  --panel: #ffffff;
+  --ink: #1b232c;
+  --muted: #5a6672;
+  --rule: #d3dae0;
+  --accent: #2b4c8c;
+  --accent-ink: #ffffff;
+  --faint: rgba(43, 76, 140, 0.10);
+  --bob: #4a5560;
+  --bar: #1b232c;
+  --force: #c0392b;
+  --line1: #3a6fc4;
+  --warn: #b7791f;
+  --display: "Spectral", "Iowan Old Style", Georgia, serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+    --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+    --bob: #aab6c1; --bar: #dfe5ea; --force: #ff7b6b; --line1: #6f9be6; --warn: #e0a84a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+  --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142, 174, 245, 0.12);
+  --bob: #aab6c1; --bar: #dfe5ea; --force: #ff7b6b; --line1: #6f9be6; --warn: #e0a84a;
+  color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: var(--s4); padding-block: var(--s5) var(--s6); display: grid; gap: var(--s4); }
+.wrap > * { min-width: 0; }
+h1 { margin: 0; font: 600 30px/1.15 var(--display); letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 66ch; }
+
+.ask { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 8px; padding: var(--s3) var(--s4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); font-size: 16px; }
+select, button { font: 500 15px/1.2 var(--body); color: var(--ink); background: var(--ground); border: 1px solid var(--rule);
+  border-radius: 6px; padding: var(--s2) var(--s3); min-height: 38px; cursor: pointer; }
+select { font-weight: 600; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 84px; }
+button:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.small { font-size: 13px; min-height: 30px; padding: 4px var(--s3); }
+.hknob { color: var(--accent); font: 500 16px var(--data); border-bottom: 1.5px dashed var(--accent); cursor: ew-resize; padding: 0 2px;
+  user-select: none; -webkit-user-select: none; touch-action: none; white-space: nowrap; }
+
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: var(--s4); }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-bottom: var(--s2); }
+.card-head h2 { margin: 0; font: 600 12px/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.card-head .hint { font-size: 13px; color: var(--muted); margin-right: auto; font-variant-numeric: tabular-nums; }
+.hint b { color: var(--accent); font-weight: 600; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--s4); align-items: start; }
+@media (max-width: 720px) { .stage { grid-template-columns: 1fr; } }
+svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+svg text { font-family: var(--body); fill: var(--muted); }
+.bob { cursor: grab; }
+.bob:active { cursor: grabbing; }
+.readout { display: grid; grid-template-columns: auto 1fr; gap: var(--s1) var(--s3); margin: 0; font-size: 14px; }
+.readout dt { color: var(--muted); }
+.readout dd { margin: 0; text-align: right; }
+.n { font-family: var(--data); font-size: 14px; font-variant-numeric: tabular-nums; white-space: pre; }
+.calc { margin: var(--s3) 0 0; padding: var(--s3) var(--s4); background: var(--faint); border-radius: 6px; font-size: 15px; line-height: 1.65; }
+.warning { margin: var(--s2) 0 0; padding: var(--s2) var(--s3); border-radius: 6px; border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.key { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); color: var(--muted); font-size: 13px; }
+.key span { display: inline-flex; align-items: center; gap: var(--s2); }
+.key i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+
+.more { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.more button[aria-expanded="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.panel { display: grid; gap: var(--s3); }
+.panel h2 { margin: 0; font: 600 18px/1.2 var(--display); }
+.panel p, .panel li { max-width: 70ch; margin: 0; }
+.panel ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--s1); }
+.panel .src { color: var(--muted); font-size: 13px; }
+.panel .eq { font: 14px/1.7 var(--data); padding: var(--s2) var(--s3); background: var(--faint); border-radius: 6px; overflow-x: auto; white-space: pre; }
+
+@media (max-width: 600px) { h1 { font-size: 24px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <h1>Pendulum of links</h1>
+  <p class="lede">Hang links from a support and let them go. Each link is a bar with a bob at its bottom, and each link hangs from the bob above it: the arrangement of the book's third chapter, nested. The bars are springs, as real bars are. Make them stiffer and the pendulum swings like a rigid one, but each step has to get shorter.</p>
+
+  <section class="ask" aria-label="Choose and play">
+    <label for="nlinks">Hang</label>
+    <select id="nlinks">
+      <option value="1">1 link</option>
+      <option value="2" selected>2 links</option>
+      <option value="3">3 links</option>
+      <option value="4">4 links</option>
+      <option value="5">5 links</option>
+    </select>
+    <span>on bars of stiffness <span id="kappa" class="hknob" tabindex="0" role="slider" aria-label="Bar stiffness, newtons per meter"></span></span>
+    <button id="play" class="primary" type="button">Play</button>
+    <button id="step" type="button">One step</button>
+    <span>each step lasts <span id="dt" class="hknob" tabindex="0" role="slider" aria-label="How long each step lasts"></span></span>
+  </section>
+
+  <section class="card" aria-label="The pendulum">
+    <div class="card-head">
+      <h2>The pendulum</h2>
+      <span class="hint"><b>Blue numbers</b> are yours: drag them sideways. Drag a bob to swing its link; the run restarts from rest.</span>
+      <button id="restart" type="button" class="small" title="Back to the start, keeping everything you set">&#8634; Back to the start</button>
+    </div>
+    <div class="stage">
+      <svg id="pic" viewBox="-240 -240 480 480" role="img" aria-label="The pendulum"></svg>
+      <dl class="readout" id="readout"></dl>
+    </div>
+    <p class="calc" id="calc" aria-live="off"></p>
+    <p class="warning" id="warning" role="status" hidden></p>
+  </section>
+
+  <section class="card" aria-label="Energy over time">
+    <div class="card-head">
+      <h2>Energy over time</h2>
+      <span class="hint" id="when"></span>
+    </div>
+    <svg id="chart" viewBox="0 0 900 200" role="img" aria-label="The pendulum's energy, compared with its start"></svg>
+    <div class="key">
+      <span><i style="background:var(--line1)"></i>Change in total energy since the start, in joules. Nothing outside adds or removes energy, so a good run keeps this near 0.</span>
+    </div>
+  </section>
+
+  <div class="more">
+    <button id="b-what" type="button" aria-expanded="false" aria-controls="what">Explain what's going on</button>
+    <button id="b-math" type="button" aria-expanded="false" aria-controls="math">Explain the math</button>
+  </div>
+  <section class="card panel" id="what" hidden>
+    <h2>What's going on</h2>
+    <p>The support at the top is fixed. A bar hangs from it with a bob at its bottom; that is one link. A second link hangs from the first link's bob, and so on. Gravity pulls each bob down, and each bar pulls on the two things it joins.</p>
+    <p>Every bar is a very stiff spring, 1 meter long. Steel bar 1 square centimeter thick has stiffness about 20,000,000 newtons per meter (Young's modulus times area over length). It stretches by micrometers, so the pendulum moves like a rigid one. But the bar also rings along its length, about a thousand times a second, and a step has to be shorter than that ringing or the run blows up. Try steel with a step of 1 millisecond, then 0.1 milliseconds.</p>
+    <p>With two or more links the motion is chaotic: two starts that differ by a hair end up far apart within seconds.</p>
+  </section>
+  <section class="card panel" id="math" hidden>
+    <h2>The math</h2>
+    <p>Each bob of mass <i>m</i> = 1 kg stores a position <i>q</i> in the plane and a momentum <i>p</i>. Told that a step lasts &tau;, it reads out where it is headed, <i>q</i> + &tau;<i>p</i>/<i>m</i>. Each bar and gravity have costs, and the force on each bob is minus the derivative of their sum at the positions read out. The bob adds &tau; times its force to its momentum and moves to where it was headed (symplectic Euler).</p>
+    <div class="eq">bar from x to q:  k_bar(x, q) = &kappa;/(8&ell;&sup2;) (|q &minus; x|&sup2; &minus; &ell;&sup2;)&sup2;    &ell; = 1 m
+gravity on q:     m g ht(q)                            g = 9.81 m/s&sup2;
+one link:         k_link(x, q) = k_bar(x, q) + m g ht(q)
+n links:          drop &#8728; link&#8319; &#8728; pivot, the pivot reading out the fixed point 0</div>
+    <p>Near its rest length the bar's cost is &frac12;&kappa;&delta;&sup2;, where &delta; is the stretch; the form above is used because it stays smooth even if two ends meet.</p>
+    <p class="src">Book: Chapter 3, <i>Arrangements</i> (the link, the double pendulum, and the exercises on them). Checked: this page's step and the library's <code>arrangements/pendulum.py</code> composite, run through the dynamics functor, agree to 4e-15 m over 2,000 steps (stiffness 10,000 N/m, steps of 1 ms, two links from rest at 1 and 1.5 radians).</p>
+  </section>
+</div>
+
+<script>
+// MODEL BEGIN
+const Model = {
+  m: 1, ell: 1, g: 9.81,
+  start(angles) {
+    const s = { q: [], p: [] };
+    let x = 0, y = 0;
+    for (const a of angles) { x += this.ell * Math.sin(a); y -= this.ell * Math.cos(a); s.q.push([x, y]); s.p.push([0, 0]); }
+    return s;
+  },
+  // minus the derivative of the bars' and gravity's costs at the positions a (top bob first)
+  forces(a, kappa) {
+    const n = a.length, F = a.map(() => [0, -this.m * this.g]);
+    const c = kappa / (2 * this.ell * this.ell);
+    for (let i = 0; i < n; i++) {
+      const up = i === 0 ? [0, 0] : a[i - 1];
+      const dx = a[i][0] - up[0], dy = a[i][1] - up[1];
+      const w = c * (dx * dx + dy * dy - this.ell * this.ell);
+      F[i][0] -= w * dx; F[i][1] -= w * dy;
+      if (i > 0) { F[i - 1][0] += w * dx; F[i - 1][1] += w * dy; }
+    }
+    return F;
+  },
+  step(s, kappa, tau) {
+    const a = s.q.map((q, i) => [q[0] + tau * s.p[i][0] / this.m, q[1] + tau * s.p[i][1] / this.m]);
+    const F = this.forces(a, kappa);
+    return { q: a, p: s.p.map((p, i) => [p[0] + tau * F[i][0], p[1] + tau * F[i][1]]), F, a };
+  },
+  energy(s, kappa) {
+    let E = 0;
+    const k = kappa / (8 * this.ell * this.ell);
+    for (let i = 0; i < s.q.length; i++) {
+      const p = s.p[i], q = s.q[i], up = i === 0 ? [0, 0] : s.q[i - 1];
+      const d2 = (q[0] - up[0]) ** 2 + (q[1] - up[1]) ** 2;
+      E += (p[0] * p[0] + p[1] * p[1]) / (2 * this.m) + this.m * this.g * q[1] + k * (d2 - this.ell * this.ell) ** 2;
+    }
+    return E;
+  },
+  stretch(s) {
+    let worst = 0;
+    for (let i = 0; i < s.q.length; i++) {
+      const up = i === 0 ? [0, 0] : s.q[i - 1];
+      worst = Math.max(worst, Math.abs(Math.hypot(s.q[i][0] - up[0], s.q[i][1] - up[1]) - this.ell));
+    }
+    return worst;
+  },
+};
+// MODEL END
+
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const KAPPAS = [1e2, 1e3, 1e4, 1e5, 1e6, 2e7];
+  const KNAMES = ["100 N/m", "1,000 N/m", "10,000 N/m", "100,000 N/m", "1,000,000 N/m", "20,000,000 N/m (steel)"];
+  const DTS = [1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2];
+  const fmtDt = (d) => d >= 1e-3 ? `${+(d * 1000).toPrecision(2)} ms` : `${+(d * 1e6).toPrecision(2)} µs`;
+  const DEFAULT_ANGLES = [1.0, 1.5, 1.8, 2.0, 2.1];
+  const REACH = 205;                      // pixels from the support to the farthest a straight pendulum reaches
+  const MAX_STEPS_PER_FRAME = 40000;
+
+  const hot = window.claude && window.claude.hot;
+  const saved = (hot && hot.data) || {};
+  let p = saved.p || { n: 2, ki: 4, di: 3, angles: DEFAULT_ANGLES.slice() };
+  let s, t, E0, history, playing = false, last = null, owed = 0, lastText = 0, blown = false, slow = false, lastStep = null;
+  if (hot && hot.snapshot) hot.snapshot(() => ({ p }));
+
+  const kappa = () => KAPPAS[p.ki], tau = () => DTS[p.di];
+  // the bars' fastest ringing: a bob between two bars of stiffness kappa rings at about 2 sqrt(kappa/m)
+  const omegaMax = () => 2 * Math.sqrt(kappa() / Model.m);
+
+  function restart() {
+    s = Model.start(p.angles.slice(0, p.n)); t = 0; E0 = Model.energy(s, kappa());
+    history = [[0, 0]]; blown = false; lastStep = null; render();
+  }
+
+  function advance(k) {
+    for (let i = 0; i < k; i++) {
+      const r = Model.step(s, kappa(), tau());
+      s = { q: r.q, p: r.p }; lastStep = r; t += tau();
+      if (!(Math.abs(s.q[0][0]) < 1e6)) { blown = true; break; }
+    }
+    const dE = Model.energy(s, kappa()) - E0;
+    if (!isFinite(dE) || Math.abs(dE) > 1e4) blown = true;
+    history.push([t, blown ? NaN : dE]);
+    if (history.length > 1200) history = history.filter((_, i) => i % 2 === 0 || i === history.length - 1);
+  }
+
+  function frame(now) {
+    if (!playing) return;
+    if (last == null) last = now;
+    // real time owed is carried from frame to frame, so the steps taken per frame do not jump between roundings
+    owed += Math.min(0.1, (now - last) / 1000); last = now;
+    let k = Math.floor(owed / tau() + 1e-9);
+    slow = k > MAX_STEPS_PER_FRAME; k = Math.min(k, MAX_STEPS_PER_FRAME);
+    owed = slow ? 0 : owed - k * tau();
+    if (k > 0) advance(k);
+    if (blown) setPlaying(false);
+    // the picture every frame; the numbers and the chart ten times a second, so they can be read
+    const text = !playing || now - lastText > 100;
+    if (text) lastText = now;
+    render(text);
+    if (playing) requestAnimationFrame(frame);
+  }
+  function setPlaying(v) {
+    playing = v; last = null; owed = 0; $("play").textContent = v ? "Pause" : "Play";
+    if (v) requestAnimationFrame(frame);
+  }
+
+  // ---------- drawing
+  function el(tag, attrs, parent, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const a in attrs) e.setAttribute(a, attrs[a]);
+    if (text != null) e.textContent = text;
+    if (parent) parent.append(e);
+    return e;
+  }
+  // the support sits in the middle, so a link can swing above it; the scale fits n straight links
+  const px = (q) => { const k = REACH / (p.n * Model.ell); return [q[0] * k, -q[1] * k]; };
+
+  function drawPic() {
+    const svg = $("pic"); svg.textContent = "";
+    el("ellipse", { cx: 0, cy: -12, rx: 46, ry: 14, fill: "var(--panel)", stroke: "var(--muted)", "stroke-dasharray": "4 3" }, svg);
+    el("text", { x: 0, y: -8, "text-anchor": "middle", "font-size": 13 }, svg, "support");
+    if (blown) { el("text", { x: 0, y: 200, "text-anchor": "middle", "font-size": 16, fill: "var(--warn)" }, svg, "The run blew up."); return; }
+    let prev = [0, 0];
+    s.q.forEach((q) => {
+      const b = px(q);
+      el("line", { x1: prev[0], y1: prev[1], x2: b[0], y2: b[1], stroke: "var(--bar)", "stroke-width": 3, "stroke-linecap": "round" }, svg);
+      prev = b;
+    });
+    el("circle", { cx: 0, cy: 0, r: 3, fill: "var(--ink)" }, svg);
+    s.q.forEach((q, i) => {
+      const b = px(q);
+      el("line", { x1: b[0], y1: b[1] + 14, x2: b[0], y2: b[1] + 38, stroke: "var(--force)", "stroke-width": 2, "marker-end": "url(#arrow)" }, svg);
+      const c = el("circle", { cx: b[0], cy: b[1], r: Math.max(6, 12 - p.n), fill: "var(--bob)", class: "bob", "data-i": i, tabindex: 0, role: "button", "aria-label": `Bob ${i + 1}: drag to swing its link` }, svg);
+      el("text", { x: b[0] + 16, y: b[1] - 10, "font-size": 13, fill: "var(--line1)" }, svg, `q${"₁₂₃₄₅"[i]}`);
+      c.addEventListener("pointerdown", (ev) => startDrag(ev, i));
+    });
+    const defs = el("defs", {}, svg);
+    const mk = el("marker", { id: "arrow", viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", fill: "var(--force)" }, mk);
+  }
+
+  function startDrag(ev, i) {
+    ev.preventDefault(); setPlaying(false);
+    const svg = $("pic");
+    const move = (e) => {
+      const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+      const m = pt.matrixTransform(svg.getScreenCTM().inverse());
+      const up = i === 0 ? [0, 0] : px(Model.start(p.angles.slice(0, i)).q[i - 1] || [0, 0]);
+      p.angles[i] = Math.atan2(m.x - up[0], m.y - up[1]);
+      restart();
+    };
+    const end = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", end); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", end);
+  }
+
+  function drawChart() {
+    const svg = $("chart"); svg.textContent = "";
+    const W = 900, H = 200, L = 70, R = 12, T = 12, B = 30;
+    const tmax = Math.max(1, t);
+    const vals = history.filter((h) => isFinite(h[1])).map((h) => Math.abs(h[1]));
+    let ymax = Math.max(1e-6, ...vals); ymax = Math.pow(10, Math.ceil(Math.log10(ymax)));
+    const X = (x) => L + (W - L - R) * x / tmax, Y = (y) => T + (H - T - B) * (1 - (y + ymax) / (2 * ymax));
+    el("line", { x1: L, y1: Y(0), x2: W - R, y2: Y(0), stroke: "var(--rule)" }, svg);
+    for (const y of [-ymax, 0, ymax]) el("text", { x: L - 8, y: Y(y) + 4, "text-anchor": "end", "font-size": 12 }, svg, y === 0 ? "0" : `${y > 0 ? "+" : "−"}${ymax.toExponential(0)} J`);
+    const ticks = [0, tmax / 2, tmax];
+    for (const x of ticks) el("text", { x: X(x), y: H - 8, "text-anchor": "middle", "font-size": 12 }, svg, `${x.toFixed(x < 10 ? 2 : 1)} s`);
+    let d = "";
+    history.forEach((h, i) => { if (isFinite(h[1])) d += `${d ? "L" : "M"}${X(h[0]).toFixed(1)},${Y(h[1]).toFixed(1)}`; });
+    el("path", { d, fill: "none", stroke: "var(--line1)", "stroke-width": 2 }, svg);
+  }
+
+  // Every number that changes while playing has its width decided in advance: padded with figure spaces, which are
+  // as wide as a digit, and with its sign always shown, so the text around it never moves (PRINCIPLES.md 12).
+  const FS = "\u2007";
+  const fw = (str, w) => str.length >= w ? str : FS.repeat(w - str.length) + str;
+  const sgn = (x, d, w) => fw((x < 0 ? "−" : "+") + Math.abs(x).toFixed(d), w);
+  // the unit of a stretch is chosen by the stiffness, which is fixed during a run, never by the stretch itself
+  const fmtLen = (x) => kappa() >= 1e5 ? `${fw((x * 1e6).toFixed(2), 9)} µm` : `${fw((x * 1000).toFixed(2), 9)} mm`;
+  const fmtE = (E) => { const e = Math.abs(E).toExponential(2).split("e"); return `${E < 0 ? "−" : "+"}${e[0]}×10^${fw(String(+e[1]), 3)} J`; };
+  function render(text = true) {
+    drawPic();
+    if (!text) return;
+    $("kappa").textContent = KNAMES[p.ki];
+    $("dt").textContent = fmtDt(tau());
+    $("nlinks").value = String(p.n);
+    drawChart();
+    const E = blown ? NaN : Model.energy(s, kappa()) - E0;
+    const ringHz = omegaMax() / (2 * Math.PI);
+    $("readout").innerHTML =
+      `<dt>time</dt><dd class="n">${fw(t.toFixed(3), 9)} s</dd>` +
+      `<dt>steps taken</dt><dd class="n">${fw(String(Math.round(t / tau())), 10)}</dd>` +
+      `<dt>largest bar stretch now</dt><dd class="n">${blown ? "—" : fmtLen(Model.stretch(s))}</dd>` +
+      `<dt>energy change</dt><dd class="n">${blown ? "—" : fmtE(E)}</dd>` +
+      `<dt>the bars ring about</dt><dd class="n">${Math.round(ringHz).toLocaleString()} times/s</dd>`;
+    const i = s.q.length - 1;
+    if (lastStep && !blown) {
+      const a = lastStep.a[i], F = lastStep.F[i];
+      $("calc").innerHTML = `Last step, for the lowest bob: it read out where it was headed, <span class="n">(${sgn(a[0], 4, 8)}, ${sgn(a[1], 4, 8)})</span> m; its bars and gravity pushed back with <span class="n">(${sgn(F[0], 2, 9)}, ${sgn(F[1], 2, 9)})</span> N; it added ${fmtDt(tau())} times that push to its momentum and moved to where it was headed.`;
+    } else {
+      $("calc").textContent = "Each step: every bob reads out where it is headed; the bars and gravity push back on those positions; every bob adds the step's length times its push to its momentum and moves to where it was headed.";
+    }
+    const unstable = tau() * omegaMax() > 2;
+    const w = $("warning");
+    if (blown) { w.hidden = false; w.textContent = `The run blew up. A step of ${fmtDt(tau())} is longer than the bars' ringing allows (about ${fmtDt(2 / omegaMax())} at most for this stiffness). Shorten the step and go back to the start.`; }
+    else if (unstable) { w.hidden = false; w.textContent = `A step of ${fmtDt(tau())} is longer than these bars' ringing allows, about ${fmtDt(2 / omegaMax())} at most: this run will blow up.`; }
+    else if (slow && playing) { w.hidden = false; w.textContent = "Steps this short are too many to take in real time; the page is running slower than the clock."; }
+    else w.hidden = true;
+    $("when").textContent = `${fw(t.toFixed(2), 8)} s of model time`;
+  }
+
+  // ---------- controls
+  function knob(id, get, set, max) {
+    const k = $(id); let x0 = null, v0 = 0;
+    k.addEventListener("pointerdown", (e) => { x0 = e.clientX; v0 = get(); k.setPointerCapture(e.pointerId); });
+    k.addEventListener("pointermove", (e) => { if (x0 == null) return; const v = Math.max(0, Math.min(max, v0 + Math.round((e.clientX - x0) / 24))); if (v !== get()) { set(v); } });
+    k.addEventListener("pointerup", () => { x0 = null; });
+    k.addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowUp") set(Math.min(max, get() + 1)); if (e.key === "ArrowLeft" || e.key === "ArrowDown") set(Math.max(0, get() - 1)); });
+  }
+  knob("kappa", () => p.ki, (v) => { p.ki = v; setPlaying(false); restart(); }, KAPPAS.length - 1);
+  knob("dt", () => p.di, (v) => { p.di = v; render(); }, DTS.length - 1);
+  $("nlinks").addEventListener("change", (e) => { p.n = +e.target.value; setPlaying(false); restart(); });
+  $("play").addEventListener("click", () => { if (blown) restart(); setPlaying(!playing); });
+  $("step").addEventListener("click", () => { setPlaying(false); if (!blown) { advance(1); render(); } });
+  $("restart").addEventListener("click", () => { setPlaying(false); restart(); });
+  for (const [b, panel] of [["b-what", "what"], ["b-math", "math"]]) {
+    $(b).addEventListener("click", () => { const open = $(panel).hidden; $(panel).hidden = !open; $(b).setAttribute("aria-expanded", String(open)); });
+  }
+  restart();
+})();
+</script>

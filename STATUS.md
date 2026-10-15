@@ -2171,3 +2171,12 @@ limitation, not a fact about people. Book evidence and predictions:
   paper on affine quadratic arrangements, in preparation.
 - Everything ported from CDLM cites CDLM's own labels (`ex.`, `prop.`, `sec.`) in its
   docstring, so a reader with that draft can find the statement being implemented.
+
+### 3.65 The n-fold pendulum by nesting links (book Ch 3 `sec.arr`, §5.9 item 77)
+
+Claude Opus 5.5, fa95b8ae, 2026-10-14. `pendulum.py`, `tests/test_pendulum.py`: 3 passed in 3.85 s.
+`drop . link^n . pivot` (each link a rod from its support with a bob at its bottom; first drafted upside down as `pivot . link^(n-1) . end`, same costs), one bob of matter per level, rods smooth stiff springs. The composite equals the
+flat loop to 1e-10; its lower bob approaches the rigid double pendulum (RK4 in the angles, ordinary code beside
+it) as the rods stiffen, within 1 mm over 1 s at steel's 2e7 N/m, stretch under 10 micrometres; at steel a
+1e-3 s step blows up and a 1e-4 s step keeps the energy within 0.1%. Predictions and fuller numbers in the
+book's `notes/runs/pendulum-fa95b8ae/`.
