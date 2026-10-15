@@ -2180,3 +2180,12 @@ flat loop to 1e-10; its lower bob approaches the rigid double pendulum (RK4 in t
 it) as the rods stiffen, within 1 mm over 1 s at steel's 2e7 N/m, stretch under 10 micrometres; at steel a
 1e-3 s step blows up and a 1e-4 s step keeps the energy within 0.1%. Predictions and fuller numbers in the
 book's `notes/runs/pendulum-fa95b8ae/`.
+
+### 3.66 "Does not have to move" is not an equivalence in general (book P41 (b), §5.9 item 78)
+
+Claude Opus 5.5, 3b93bdf7, 2026-10-15. `tests/test_same_form_relation.py`: 4 passed in 4.34 s. A one-parameter
+learner, model `q x_1 + q^2 x_2`, run by `learning.train` (the loss a box), one datum per source: A a well at 1, B
+wells at ±1, C a well at -1. From -0.5, A then B moves it by 8e-16, B then A by 2, B then C by 0, A then C by 2; from
++0.5, B then A by 0. So "the reader holding what s left is not moved by s'" is neither symmetric nor transitive, and
+depends on the start; it is an equivalence when each source has one attractor (the line-learner of §3.48).
+Predictions in the book's `notes/runs/p41b-equivalence-3b93bdf7/`.
