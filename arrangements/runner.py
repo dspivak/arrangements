@@ -87,7 +87,7 @@ from typing import List, Sequence
 # Nets: closed terms over the kit, as netlists.
 # ---------------------------------------------------------------------------
 
-LEAF_KINDS = ("const", "register", "drum", "inbox", "market", "relay")
+LEAF_KINDS = ("const", "register", "drum", "inbox", "market", "relay", "tape")
 BOX_KINDS = ("add", "mul", "exp", "recip")
 UNARY_KINDS = ("exp", "recip")
 
@@ -97,9 +97,29 @@ def leaf_width(nd) -> int:
     covector, ear), every other leaf one."""
     if nd[0] == "market":
         return len(nd[1])
-    if nd[0] == "relay":
+    if nd[0] in ("relay", "tape"):
         return 3
     return 1
+
+
+def _tape_step(s: dict, xw, xl, xr) -> dict:
+    """A tape's update (P34 (i); notes/runs/p34-tape-7d46b5bb/DESIGN.md §1): `s` the finitely
+    supported cells, keyed by place relative to the head, 0 the cell under it. Write first,
+    `t = s + xw e_0`, then move: `s'_i = (1 - xl - xr) t_i + xr t_{i+1} + xl t_{i-1}`. At
+    `xr = 1` the contents shift one place toward the head's left (the head moves right); a
+    move pushed by a fraction blends the shifted and unshifted tape. Zero cells are dropped."""
+    t = dict(s)
+    if xw != 0:
+        t[0] = t.get(0, 0) + xw
+    if xl == 0 and xr == 0:
+        return {i: v for i, v in t.items() if v != 0}
+    keep = 1 - xl - xr
+    out = {}
+    for i in set(t) | {i - 1 for i in t} | {i + 1 for i in t}:
+        v = keep * t.get(i, 0) + xr * t.get(i + 1, 0) + xl * t.get(i - 1, 0)
+        if v != 0:
+            out[i] = v
+    return out
 
 
 class Net:
@@ -157,6 +177,21 @@ class Net:
         w = self._node("relay", x0)
         return tuple(self._node("slot", w, i) for i in range(3))
 
+    def tape(self, cells=None, window: int = 0):
+        """A tape (P34 (i)): its state the finitely supported real sequences, `cells` a dict from
+        place (relative to the head) to value, or a list from place 0. Its configuration is R^3:
+        the cell under the head and two levers, which always present 0. A covector `(xw, xl, xr)`
+        writes `xw` into the cell and moves by `xl`, `xr` (`_tape_step`). `window` is the width of
+        the library's state for it (`_kit`): exact while the contents stay inside. Returns the
+        wires `(front, left, right)`."""
+        if cells is None:
+            cells = {}
+        elif not isinstance(cells, dict):
+            cells = {i: v for i, v in enumerate(cells)}
+        cells = {i: v for i, v in cells.items() if v != 0}
+        w = self._node("tape", cells, int(window))
+        return tuple(self._node("slot", w, i) for i in range(3))
+
     def hear(self, src, x0=0):
         """A relay listening to wire `src`: the one-net form of an inbox wired to `src`."""
         x, r, ear = self.relay(x0)
@@ -201,6 +236,8 @@ class Net:
                 st[w] = [nd[1], 0]
             elif nd[0] in ("drum", "market"):
                 st[w] = list(nd[1])
+            elif nd[0] == "tape":
+                st[w] = dict(nd[1])
         return st
 
 
@@ -230,9 +267,13 @@ def _forward(net: Net, state: dict) -> list:
             val[w] = state[w][0]
         elif k == "market":
             val[w] = _softmax(state[w])
+        elif k == "tape":
+            val[w] = state[w].get(0, 0)
         elif k == "slot":
             src, i = nd[1], nd[2]
-            if net.nodes[src][0] == "market":
+            if net.nodes[src][0] == "tape":   # the cell under the head, and two levers at 0
+                val[w] = state[src].get(0, 0) if i == 0 else 0
+            elif net.nodes[src][0] == "market":
                 val[w] = val[src][i]
             else:   # a relay: x, r, ear
                 val[w] = state[src][i] if i < 2 else 0
@@ -326,6 +367,9 @@ def ref_step(net: Net, state: dict, inputs: Sequence = (), pushes: Sequence = ()
         elif nd[0] == "relay":
             got = wide.get(w, {})
             new[w] = [got.get(2, 0), got.get(0, 0)]
+        elif nd[0] == "tape":
+            got = wide.get(w, {})
+            new[w] = _tape_step(state[w], got.get(0, 0), got.get(1, 0), got.get(2, 0))
     return new
 
 
@@ -454,6 +498,31 @@ def _kit():
         return Arrangement(P=copier(x0), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=3,
                            out_f=lambda q, m: q, in_f=lambda q, m, n: Z(), omega=zero_form, label="relay")
 
+    def tape(cells, window):
+        """A tape on a window of `window` cells, the head at the middle: exact while the contents
+        stay inside the window (the shift fills the edge with 0)."""
+        N = int(window)
+        if N < 1:
+            raise ValueError("a tape run through the library needs a window")
+        c = N // 2
+        init = [0.0] * N
+        for i, v in cells.items():
+            if not -c <= i < N - c:
+                raise ValueError("a tape's contents do not fit its window")
+            init[c + i] = float(v)
+        z1 = jnp.zeros(1)
+
+        def timed(s, xi, tau):   # the design's law (P34 (i) DESIGN.md §1): write tau xw, then move by tau xl, tau xr
+            t = s.at[c].add(tau * xi[0])
+            right = jnp.concatenate([t[1:], z1])    # t_{i+1}
+            left = jnp.concatenate([z1, t[:-1]])    # t_{i-1}
+            return t + tau * (xi[2] * (right - t) + xi[1] * (left - t))
+
+        P = CotCoalg(Q_dim=3, init=jnp.asarray(init), position=lambda s: jnp.stack([s[c], 0.0 * s[c], 0.0 * s[c]]),
+                     step=lambda s, xi: timed(s, xi, 1.0), label="tape", timed_step=timed)
+        return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=3, out_f=lambda q, m: q,
+                           in_f=lambda q, m, n: Z(), omega=zero_form, label="tape")
+
     def market(cells):
         from .belief import belief_coalgebra
         n = len(cells)
@@ -497,7 +566,7 @@ def _kit():
                            omega=zero_form, label="portsplit")
 
     return dict(const=const, register=register, drum=drum, add=add, mul=mul, cost=cost, push=push, fan=fan,
-                inbox=inbox, inwire=inwire, relay=relay, market=market, exp=exp_, recip=recip, pcost=pcost,
+                inbox=inbox, inwire=inwire, relay=relay, market=market, tape=tape, exp=exp_, recip=recip, pcost=pcost,
                 portsplit=portsplit)
 
 
@@ -580,6 +649,8 @@ def leaf_cells(nd) -> int:
         return len(nd[1])
     if nd[0] in ("inbox", "relay"):
         return 2
+    if nd[0] == "tape":
+        return nd[2]
     return 1
 
 
@@ -724,7 +795,11 @@ def flat_ref(net: Net, state: dict) -> list:
     out = []
     for w in net.leaves():
         if w in state:
-            out.extend(state[w] if isinstance(state[w], list) else [state[w]])
+            if net.nodes[w][0] == "tape":   # the library's window, the head at its middle
+                N = net.nodes[w][2]
+                out.extend(state[w].get(i - N // 2, 0) for i in range(N))
+            else:
+                out.extend(state[w] if isinstance(state[w], list) else [state[w]])
     return out
 
 
@@ -815,6 +890,8 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
     their derivatives, `e^v` and `-1/v^2`.
     """
     nodes = net.nodes
+    if any(nd[0] == "tape" for nd in nodes):
+        raise ValueError("a net with a tape is run by the tape runner (tape_runner.compile_tape)")
     data0: list = []
 
     def alloc(v=zero):

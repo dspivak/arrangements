@@ -2189,3 +2189,21 @@ wells at ±1, C a well at -1. From -0.5, A then B moves it by 8e-16, B then A by
 +0.5, B then A by 0. So "the reader holding what s left is not moved by s'" is neither symmetric nor transitive, and
 depends on the start; it is an equivalence when each source has one attractor (the line-learner of §3.48).
 Predictions in the book's `notes/runs/p41b-equivalence-3b93bdf7/`.
+
+### 3.67 One runner for every closed term, with a tape, run on itself (book P34 (i), §5.9 item 79)
+
+`arrangements/tape_runner.py`, the tape leaf in `arrangements/runner.py`, `tests/test_tape_runner.py` (18 passed: the
+exact ones in seconds, the library's run of U about 5 min); the design is the book repo's
+`notes/runs/p34-tape-7d46b5bb/DESIGN.md`, the build's results `notes/runs/p34-tape-95e16660/RESULTS.md` (Claude Opus 5.5,
+95e16660, 2026-10-15). **The tape**: state a finitely supported real sequence, configuration R^3 (the cell under the
+head, two levers at 0); a covector writes, then moves by its two lever components, a fraction blending the tape.
+**U**: one closed net over the kit and the tape, 17 tapes, 34 registers, 178 boxes, 66 pushes, the same for every guest;
+a guest's straight-line program addressed by walking, then a sweep per guest tape, then END. **Held, exact in
+fractions**: U's fast step on six guests (two tanks, turner, crossed pair, trail, a tape moved by fractions, two tapes
+and a drum) for 8 steps and on 200 random nets with tapes for 3; the fast step equal to `ref_step` of U's net at every
+phase boundary of two guest steps; U's term through the library for 342 steps; U handed its own description holding
+two tanks runs three steps of itself, and, by the fast step, one whole tank step (1,029 inner steps, 18,060,119,973
+outer steps; the tanks read off the inner data tape are 29/10 and 11/10). **Slowdown**: 1,029 steps for the tanks'
+first step; 5,292,237 outer steps for U's. **Weird**: the extent widens every guest step whether anything moves or
+not (U cannot test a number for zero), so the cost of k steps is quadratic in k, and at depth two the growth is most of
+the cost. **A Turing machine is a term**: Rado's two-state busy beaver (`busy_beaver_2`), state one-hot registers, write, moves and next state polynomials in them and the symbol read, halts after 6 steps with four 1s, by its own step and by U. **Not shown**: a proof for every closed term; ports, energy, copying; the translator run by U.
