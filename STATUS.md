@@ -2217,3 +2217,30 @@ scripts/build_site.py OUT` writes each as `OUT/<name>.html`, a whole document (d
 published: where and when are David's. The book prints a page's address with `\arrpage{<name>}` (`articulating.tex`),
 which falls back to the file in this repository while its base address is empty. All four built pages drawn by
 headless Chrome from disk. A new page is added to `PAGES`; a standalone page keeps its `viewer/` file name.
+
+### 3.69 The swap, piece 1: each part on its own evidence, and a trigger box (book P37 (b)(vii), §5.9 item 80)
+
+Claude Opus 5.5, 4f4ee268, 2026-10-15 (`arrangements/swap.py`, `tests/test_swap.py`, 16 passed in four pieces;
+predictions in the book repo's `notes/runs/p37-swap-build-4f4ee268/PREDICTIONS.md`, nine of nine held). S0, stage
+(B)'s nested market over the start's one-part-altered scenes, and S6, two belief integrators (the snake's paid by the
+comparison, the cat's by the snake's mixture read one-way), each one closed arrangement run by `Phi`, equal to their
+numpy recurrences to 3e-16. S6 finds the two-wrong-parts case at round 1 but never reads the start and imagines 144
+scenes against the whole library's 108 (a 1-form cannot read the snake's top). The trigger, a configuration box
+storing each scene's summed miss and the round count, its 1-form zero on its inputs (trust unchanged, to 0), fires when
+every scene of trust at least 0.1 is past 3 sigma sqrt(t): on P3 from round 6 at sigma 0.1, not within 12 at 0.25;
+once in forty noisy P1 runs. A run of S0 takes about 7 s eager (13 steps); arm N's twenty seeds about two minutes.
+Added the same day, at David's "generic snake": `s6g_arrangement`, the cat's scenes run with the average snake under
+the snake's belief, read one-way by a `stop_gradient` in the scene box's map; 72 scenes, settled at round 2 at both
+noises, equal to its recurrence to 2e-16 (tests 10–12; 19 passed in all).
+
+### 3.70 A dividing spot that carries a pattern (book P52 (b), §5.9 item 81)
+
+Claude Opus 5.5, 49346cc0, 2026-10-15 (`arrangements/spot.py`, `pattern_ring` and helpers appended; `tests/test_heredity.py`,
+7 passed in 189 s; predictions in the test's docstring, written first; results in the book repo's
+`notes/runs/p52-heredity-49346cc0/RESULTS.md`). Item 75's ring with a third chemical `p` per cell, diffusing at `D_p = D_v`,
+and a well box per cell pushing `p` by `-v p (p^2 - 1)` (a 1-form, not exact; the exact cost would push `v` by
+`-(p^2 - 1)^2 / 4`); the reaction optionally at rate `(1 + eps p) u v^2`. 600 boxes, closed, equal to `numpy_pattern_step` to
+2e-16; at eps = 0, `(u, v)` equal item 75's run to 3e-15. Each spot's children carry its sign (24 of 24 final spots in four
+rings, none blank or flipped); two seeds of opposite sign end 3 and 3. eps = 0.01: 4 to 2; 0.03: 6 to 0; 0.05: a band. The
+control (each sign alone) refuted "a lone -1 spot at 0.03 divides": it never divides. A ring run takes about 10 s after a
+20 s compile per eps. `tests/test_dividing_spot.py` still 5 passed.

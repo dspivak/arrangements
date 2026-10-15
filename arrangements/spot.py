@@ -182,3 +182,155 @@ def run_counting(step, state, steps: int, every: int):
         state = block(state)
         out.append(state)
     return state, out
+
+
+# --- The pattern: heredity from relaxation alone (book P52 (b)) ---------------------------------------------------------
+#
+# Each cell carries a third chemical, the pattern ``p``, and gets one more box, the WELL: a 1-form pushing ``p`` by
+# ``-v p (p^2 - 1)``, the ``p``-derivative of ``(v/4)(p^2 - 1)^2`` with the builder ``v`` held, so the two wells exist only where
+# a spot is. Written directly, not exact: the exact cost would also push ``v`` by ``-(p^2 - 1)^2 / 4``, whatever ``v`` is.
+# ``p`` diffuses across each joint like the builder and has no exchange with the reservoir. The reaction may be biased by the
+# pattern, rate ``(1 + eps p) u v^2``. Predictions and verdicts: book repo ``notes/runs/p52-heredity-49346cc0/``;
+# tests in ``tests/test_heredity.py``.
+
+PDEGREE = 5  # exchange, reaction, well, joint to the left, joint to the right
+
+
+def pattern_cell_box(u0: float, v0: float, p0: float, dt: float) -> Arrangement:
+    """A cell ``I -> <0 | 15>``: state ``(u, v, p)``, response ``dt``, sending ``(u, v, p)`` to each of its five boxes."""
+    return Arrangement(
+        P=configuration(diagonal(jnp.array([dt, dt, dt])), init=jnp.array([float(u0), float(v0), float(p0)])),
+        in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=3 * PDEGREE,
+        out_f=lambda q, m: jnp.tile(q, PDEGREE), in_f=lambda q, m, n: jnp.zeros(0), omega=zero_form,
+        label="cell",
+    )
+
+
+def pattern_exchange_box(F: float, k: float) -> Arrangement:
+    """The exchange ``I -> <3 | 0>`` on ``(u, v, p)``: cost ``(F/2)(u - 1)^2 + ((F + k)/2) v^2``; no term in ``p``."""
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=3, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n: jnp.zeros(0),
+        omega=exact(lambda q, m, n: -(0.5 * F * (n[0] - 1.0) ** 2 + 0.5 * (F + k) * n[1] ** 2)),
+        label="exchange",
+    )
+
+
+def pattern_reaction_box(eps: float = 0.0) -> Arrangement:
+    """The reaction ``U + 2V -> 3V`` on ``(u, v, p)``, one-way, at rate ``(1 + eps p) u v^2``; it pushes ``p`` by nothing.
+
+    With ``eps = 0`` it is ``growth_box`` with a third, unused input. A 1-form written directly, as ``reaction_box``."""
+    def omega(q, m, n):
+        r = (1.0 + eps * n[2]) * n[0] * n[1] ** 2
+        return jnp.zeros_like(q), jnp.zeros_like(m), jnp.array([-r, r, 0.0])
+
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=3, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n: jnp.zeros(0), omega=omega,
+        label="reaction",
+    )
+
+
+def well_box() -> Arrangement:
+    """The well ``I -> <3 | 0>`` on ``(u, v, p)``: pushes ``p`` by ``-v p (p^2 - 1)`` and ``u``, ``v`` by nothing.
+
+    Not exact: its ``p``-component depends on ``v`` while its ``v``-component is 0."""
+    def omega(q, m, n):
+        return jnp.zeros_like(q), jnp.zeros_like(m), jnp.array([0.0, 0.0, -n[1] * n[2] * (n[2] ** 2 - 1.0)])
+
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=3, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n: jnp.zeros(0), omega=omega,
+        label="well",
+    )
+
+
+def pattern_joint_box(Du: float, Dv: float, Dp: float) -> Arrangement:
+    """The joint ``I -> <6 | 0>`` on ``(u_i, v_i, p_i, u_j, v_j, p_j)``: cost the sum of ``(D/2)(x_i - x_j)^2`` per chemical."""
+    D = jnp.array([Du, Dv, Dp])
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=6, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n: jnp.zeros(0),
+        omega=exact(lambda q, m, n: -0.5 * jnp.sum(D * (n[:3] - n[3:]) ** 2)),
+        label="joint",
+    )
+
+
+def pattern_ring_wire(N: int) -> Arrangement:
+    """The wiring ``<15N | 15N> -> I``: the inputs of the exchanges, reactions, wells and joints, in that order, from the cells.
+
+    Cell ``i``'s copies are slots ``15i + 3s + (0, 1, 2)`` for ``s`` = 0 exchange, 1 reaction, 2 well, 3 the joint to its
+    left (joint ``i - 1``, where it is the second cell), 4 the joint to its right (joint ``i``, where it is the first).
+    Static, zero forcing; its backward map is the transpose, as ``ring_wire``."""
+    def slot(i, s):
+        b = 3 * PDEGREE * (i % N) + 3 * s
+        return [b, b + 1, b + 2]
+
+    perm = []
+    for s in (0, 1, 2):
+        for i in range(N):
+            perm += slot(i, s)
+    for i in range(N):
+        perm += slot(i, 4) + slot(i + 1, 3)
+    perm = jnp.asarray(perm, dtype=int)
+    P = 3 * PDEGREE * N
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=P, out_dim_M=P, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n: m[perm], omega=zero_form,
+        label=f"pattern_ring_wire({N})",
+    )
+
+
+def pattern_ring(u0, v0, p0, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512, Dv: float = 0.256,
+                 Dp: float = 0.256, eps: float = 0.0, dt: float = 0.5) -> Arrangement:
+    """The closed ring ``pattern_ring_wire . (cells (x) exchanges (x) reactions (x) wells (x) joints)``."""
+    N = len(u0)
+    boxes = ([pattern_cell_box(u0[i], v0[i], p0[i], dt) for i in range(N)]
+             + [pattern_exchange_box(F, k) for _ in range(N)]
+             + [pattern_reaction_box(eps) for _ in range(N)]
+             + [well_box() for _ in range(N)]
+             + [pattern_joint_box(Du, Dv, Dp) for _ in range(N)])
+    return compose_seq(balanced_tensor(boxes), pattern_ring_wire(N))
+
+
+def pattern_seed(N: int, signs, centers=None, width: int = 10, medium: float = 0.0):
+    """The run's start: a ``seed`` spot of ``width`` cells at each center, its cells at ``p = sign``; every other cell at
+    the reservoir's ``(1, 0)`` and ``p = medium``. One center defaults to the ring's middle, two to opposite sides."""
+    if centers is None:
+        centers = [N // 2] if len(signs) == 1 else [N // 4 + j * N // len(signs) for j in range(len(signs))]
+    u, v, p = np.ones(N), np.zeros(N), np.full(N, float(medium))
+    for c, s in zip(centers, signs):
+        idx = np.arange(c - width // 2, c + width // 2) % N
+        u[idx], v[idx], p[idx] = 0.5, 0.25, float(s)
+    return u, v, p
+
+
+def pattern_amounts(arr: Arrangement, state):
+    """``(u, v, p)``, each an array over the cells, read off the ring's position."""
+    q = np.asarray(arr.P.position(state))
+    return q[0::3], q[1::3], q[2::3]
+
+
+def pattern_state_at(arr: Arrangement, u, v, p):
+    """The ring's state with the cells at ``(u, v, p)``."""
+    import jax
+
+    leaves, tree = jax.tree_util.tree_flatten(arr.P.init)
+    N = len(u)
+    new = [jnp.array([float(u[i]), float(v[i]), float(p[i])]) for i in range(N)] + leaves[N:]
+    return jax.tree_util.tree_unflatten(tree, new)
+
+
+def spot_signs(v, p, threshold: float = 0.1):
+    """Each spot's mean pattern over its cells, in the order ``spots`` gives them."""
+    N = len(v)
+    return [float(np.mean(np.take(p, range(a, a + (b - a) % N + 1), mode="wrap"))) for a, b in spots(v, threshold)]
+
+
+def numpy_pattern_step(u, v, p, *, F=0.04, k=0.06, Du=0.512, Dv=0.256, Dp=0.256, eps=0.0, dt=0.5):
+    """The same step as one numpy formula, for checking the composite against (not a model of its own)."""
+    lap = lambda x: np.roll(x, 1) + np.roll(x, -1) - 2 * x
+    r = (1 + eps * p) * u * v * v
+    return (u + dt * (Du * lap(u) - r + F * (1 - u)),
+            v + dt * (Dv * lap(v) + r - (F + k) * v),
+            p + dt * (Dp * lap(p) - v * p * (p * p - 1)))
