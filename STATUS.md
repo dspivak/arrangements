@@ -2207,3 +2207,13 @@ outer steps; the tanks read off the inner data tape are 29/10 and 11/10). **Slow
 first step; 5,292,237 outer steps for U's. **Weird**: the extent widens every guest step whether anything moves or
 not (U cannot test a number for zero), so the cost of k steps is quadratic in k, and at depth two the growth is most of
 the cost. **A Turing machine is a term**: Rado's two-state busy beaver (`busy_beaver_2`), state one-hot registers, write, moves and next state polynomials in them and the symbol read, halts after 6 steps with four 1s, by its own step and by U. **Not shown**: a proof for every closed term; ports, energy, copying; the translator run by U.
+
+### 3.68 The viewer pages as one site, ready to publish (book P42 (d))
+
+Claude Opus 5.5, d83feb9d, 2026-10-15 (`tests/test_site.py`, 1 passed). `arrangements/site.py` lists the pages
+(`PAGES`: `tanks`, `pendulum`, `listener`), each with the `\label` of the book unit it shows; `uv run python
+scripts/build_site.py OUT` writes each as `OUT/<name>.html`, a whole document (doctype, charset, viewport and a
+`book-section` meta tag added to the viewer's head-less pages), with `OUT/index.html` and `OUT/pages.json`. Nothing is
+published: where and when are David's. The book prints a page's address with `\arrpage{<name>}` (`articulating.tex`),
+which falls back to the file in this repository while its base address is empty. All four built pages drawn by
+headless Chrome from disk. A new page is added to `PAGES`; a standalone page keeps its `viewer/` file name.
