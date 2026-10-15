@@ -32,7 +32,7 @@ def harmonic_particle(parameter, m, kappa) -> Arrangement:
     ``parameter(Q)``, ``Q = R`` with ``sharp(p) = p/m``; ``out_f = id``, ``in_f``
     vacuous, forcing ``omega = -dk`` for the spring cost ``k(q, y) = (kappa/2)(q - y)^2``.
     The *same* particle data with ``configuration`` or ``phase`` are two different
-    arrangements (def:arr): heat and wave.
+    arrangements (def.arr): heat and wave.
     """
     return Arrangement(
         P=parameter(diagonal(jnp.array([1.0 / m]))),

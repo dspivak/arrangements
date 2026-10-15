@@ -2,7 +2,7 @@
 
 The same chain wiring as test_heat_equation.py; the particles' parameter is
 ``phase(Q)`` instead of ``configuration(Q)``, which makes a *different*
-arrangement (def:arr), and ``Phi`` of it is the conservative second-order
+arrangement (def.arr), and ``Phi`` of it is the conservative second-order
 discrete wave equation. References in CDLM: CDLM sec.spring_first_pass
 (the particle and wiring), eqn.potlens_composite_final (the state update),
 eqn.discrete_wave / eqn.wave_bc (pinned ends).

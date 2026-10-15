@@ -63,7 +63,7 @@ the gauge's **reference value** is thin, by about `1e-16` over its height; the 2
 inverse and `cond(G) ~ 1/min q`, was wrong (`notes/BAYES-EVERY-BELIEF.md` §3, verdicts 6 and 10). The box on all
 `n` log-heights, `belief.log_height_response`, has no reference value and is exact down to the smallest height
 float64 holds. In Chapter 3's
-`def:arr` the two objects named are therefore
+`def.arr` the two objects named are therefore
 
 * the **response** `sharp = grad^2 AA*`, the raised inverse Fisher metric, living inside the
   coalgebra's step (`def.duration_integrator`) — the slot the two-layer learner fills with
@@ -182,7 +182,7 @@ response turns that into `lam + t(x)`. So the loss is a separate box and *backpr
 supplies the parameter covector, exactly as for a network. Checked to 1e-12
 (`test_bayes_also_has_the_learners_shape_loss_downstream`).
 
-**(b) Where each piece of Khan and Rue's objective lands in `def:arr`.** Their rule (Eq. (3),
+**(b) Where each piece of Khan and Rue's objective lands in `def.arr`.** Their rule (Eq. (3),
 p. 3) descends `E_{q_lam}[lbar] - H(q_lam)` with `lbar = -log p(y, theta)`, prior included,
 and the entropy term's natural gradient is `-lam` (their App. B), which turns the step into a
 *replacement* of `lam` rather than an increment — their one-shot Eq. (54), p. 22. In `arr` the

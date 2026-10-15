@@ -166,7 +166,7 @@ def test_wire_routing_is_a_bijection():
 def test_state_dependent_sharp_is_positive():
     """The neuron sharp ``dt * cosh(u)^2`` is positive at every state (g' > 0).
 
-    The sharp is now inside the neurons' configuration coalgebras (def:arr,
+    The sharp is now inside the neurons' configuration coalgebras (def.arr,
     sec.matter), so it is read off the step: ``step(u, xi) - u = sharp_u(xi)``.
     """
     N, dt = 3, 0.1

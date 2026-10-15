@@ -1,4 +1,4 @@
-"""The operad of adaptive attention, realized in ``arr`` (def:arr).
+"""The operad of adaptive attention, realized in ``arr`` (def.arr).
 
 The mathematics is ``background/affine_quadratic_operad.tex`` in the book repository
 (*An operad of adaptive attention*), cited below by its own labels
@@ -8,7 +8,7 @@ operation of the symmetric operad ``A_B``; ``prop:operad`` says that
 ``(I_a, sigma_a, rho_a, omega_a)`` is an operad morphism into ``End(B)``, so each
 such ``a`` is a morphism ``B^(x)n -> B`` of ``arr``. The interface is
 ``B = (E, M)`` with message space ``M = H x W``, ``W = R``, and input space
-``E = M x P``; in the notation of def:arr, ``B^+ = M`` and ``B^- = E``, so the
+``E = M x P``; in the notation of def.arr, ``B^+ = M`` and ``B^- = E``, so the
 paper's interaction space ``D_n = M^n x E`` *is* an ``Arrangement``'s pair ``(M^+, N^-)`` for an
 arrangement ``B^(x)n -> B``, and the port dimensions are
 

@@ -661,6 +661,11 @@ def library_run_jit(net: Net, steps: int, check: int = 2, every: int = 1) -> Lis
 
     For a closed arrangement `Phi`'s step is: present q, take the forcing's component on Q at
     q, hand it to the integrator. That is what is compiled here.
+
+    Size a piece by the term's depth, not by `steps`: the first step compiles, and compiling grows
+    with the depth of the term `to_term(net)` builds. A term 178 boxes deep took about 280 s to
+    compile, after which each step was cheap (P34 (i), the book's 95e16660, 2026-10-15; written here
+    by its suggestion-box sweep, a2cd536d).
     """
     import jax
     import jax.numpy as jnp

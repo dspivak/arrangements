@@ -13,7 +13,7 @@ is the dynamics of the closed arrangement whose forcing is ``omega = -dk`` for
 built compositionally (oscillator boxes + stateless edge coupling boxes +
 routing wire, composed with ``compose_seq``/``tensor_arrangements``), and the
 swing equation is the *same lens data* with the ``phase`` parameter and sharp
-``xi/m``. Because the integrator is part of the arrangement (def:arr), these
+``xi/m``. Because the integrator is part of the arrangement (def.arr), these
 are two arrangements, not two readings of one; ``Phi`` takes no integrator.
 Conventions, as in test_heat_equation / test_wave_equation: the framework's
 step is unit-time and the time step lives in the sharp -- ``sharp_scale = dt``

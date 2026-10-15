@@ -1,4 +1,4 @@
-"""Arrangements: morphisms of ``arr = Para(cotcoalg, omegalens)`` (def:arr).
+"""Arrangements: morphisms of ``arr = Para(cotcoalg, omegalens)`` (def.arr).
 
 An arrangement ``a : M -> N`` with parameter ``P = (Q, S, u)`` (a ``cot(Q)``-coalgebra,
 coalgebra.py) is a morphism ``Q (x) M -> N`` of ``omegalens``, the lens category
@@ -41,7 +41,7 @@ OneForm = Callable[..., Tuple[Array, ...]]  # (x_1, ..., x_k) -> (xi_1, ..., xi_
 
 @dataclass(frozen=True)
 class Arrangement:
-    """An arrangement ``a : M -> N`` with parameter ``P`` (def:arr).
+    """An arrangement ``a : M -> N`` with parameter ``P`` (def.arr).
 
     The (possibly tensored) domain ``M = <M^- | M^+>`` has input dimension
     ``in_dim_M`` and output dimension ``out_dim_M``; the codomain ``N`` has

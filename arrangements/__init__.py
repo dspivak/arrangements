@@ -1,7 +1,7 @@
 """arrangements: the category of arrangements ``arr``, executable.
 
 A Python implementation of the principal constructions of *Articulating Forms
-that Matter*, Chapter 3 (def:arr): ``cot(Q)``-coalgebras as parameters
+that Matter*, Chapter 3 (def.arr): ``cot(Q)``-coalgebras as parameters
 (integrators are part of the arrangement), arrangements carrying a forcing
 one-form (exact or not), pullback-and-sum composition, the polynomial
 interpretation, and the one dynamics functor ``Phi : arr -> pc``

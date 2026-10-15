@@ -18,7 +18,7 @@ conjugate family ``q_lam(theta) = exp(<lam, Psi(theta)> - AA(lam))``, ``Psi = (t
   inverse mass. Then ``lam + sharp_lam(omega_x) = lam + t(x)``: Bayes exactly, not to first
   order.
 
-So in ``def:arr`` the response is ``grad^2 AA*`` and the forcing one-form is ``-d k_x`` on
+So in ``def.arr`` the response is ``grad^2 AA*`` and the forcing one-form is ``-d k_x`` on
 ``Q = Lam``; interface, forcing lens, wiring and ``Phi`` are untouched.
 
 THE FIVE PREDICTIONS, verbatim from notes/BAYES-INTEGRATOR.md §3, written before any
@@ -350,7 +350,7 @@ def test_bayes_also_has_the_learners_shape_loss_downstream():
     ``mu = grad AA(lam)``; the downstream box's ``omega = -dk`` pushes ``t(x)`` back on the
     ``mu`` port; the pullback along the Legendre map is ``(grad^2 AA)^T t(x) = G(lam) t(x)``,
     and the inverse-Fisher response turns that into ``lam + t(x)``. So Bayes occupies the
-    learner's slot in ``def:arr`` as well as Newton's: the loss is a separate box and
+    learner's slot in ``def.arr`` as well as Newton's: the loss is a separate box and
     backpropagation supplies the parameter covector.
     """
     composite = compose_seq(expectation_reporter(bayes_response()), likelihood_box())

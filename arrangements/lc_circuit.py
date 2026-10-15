@@ -8,7 +8,7 @@ charge ``q``, with
 * forcing         ``omega = -dU``, ``U(q) = q^2 / (2 C)`` -- the capacitor's
   electrostatic energy (a cost; STATUS.md §1),
 
-made into two arrangements (def:arr) by two parameters (sec.matter), read
+made into two arrangements (def.arr) by two parameters (sec.matter), read
 by the one dynamics functor ``Phi`` (sec.dynamics_functor):
 
 * ``phase(Q)`` stores ``(q, xi)`` and steps ``q -> q + xi/L``, ``xi -> xi - q~/C``

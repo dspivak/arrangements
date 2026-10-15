@@ -11,7 +11,7 @@ The network is *detailed balanced* if some ``x_eq > 0`` equalizes every
 reaction's forward and backward flux: ``kf_r x_eq^{alpha_r} = kb_r
 x_eq^{beta_r} =: w_r``. This module settles which of these ODEs are the
 configuration dynamics -- ``Phi`` of an arrangement whose parameter is the
-configuration coalgebra ``configuration(Q)`` (def:arr, sec.matter) -- and
+configuration coalgebra ``configuration(Q)`` (def.arr, sec.matter) -- and
 in which encoding.
 
 VACUITY GUARD. ``def.rvect`` puts no symmetry or definiteness condition on a
@@ -132,7 +132,7 @@ THE VERIFIED FRONTIER.
 
    The no-go is about EXACT forcings (a shared potential ``U``): closedness of
    ``dU`` is what forces the separability. The book's forcing need not be
-   exact (def:arr), and item 6 is the realization the obstruction does not
+   exact (def.arr), and item 6 is the realization the obstruction does not
    reach -- at the price of certifying nothing.
 
 4. COMPOSITIONAL, ARBITRARY Petri net (the paper's "Petri nets" item): put the
@@ -214,7 +214,7 @@ THE VERIFIED FRONTIER.
    orthant at ``dt > 1/rate`` while the log tick ``x e^{-rate dt}`` is
    positive, monotone, and stable at every ``dt``.
 
-6. DIRECT, any network (the book's non-exact forcing, def:arr, sec.forcing;
+6. DIRECT, any network (the book's non-exact forcing, def.arr, sec.forcing;
    STATUS.md §2, trick vs direct). An arrangement's forcing need not be exact, so the
    mass-action field itself is admissible as a one-form.
    ``mass_action_arrangement`` is the closed one-box arrangement whose
@@ -1121,7 +1121,7 @@ def mass_action_arrangement(
 
     with NO potential: it is exact iff ``DV`` is symmetric, which already
     ``A + B <-> C`` violates (module docstring, 3 and 6), and in general it is
-    a genuinely non-exact forcing (def:arr, sec.forcing). One ``Phi`` step is
+    a genuinely non-exact forcing (def.arr, sec.forcing). One ``Phi`` step is
     ``x + dt * V(x)`` for ANY network -- no detailed balance, reversibility or
     molecularity hypothesis, so it runs what ``crn_arrangement`` (the TRICK,
     module docstring 1) rejects; on a detailed-balanced network the two agree

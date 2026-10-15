@@ -1,4 +1,4 @@
-"""Composition and wiring constructors in ``arr`` (def:arr, sec.forces).
+"""Composition and wiring constructors in ``arr`` (def.arr, sec.forces).
 
 Provides:
 
@@ -48,7 +48,7 @@ def trivial_parameter() -> CotCoalg:
 
 
 def compose_seq(f: Arrangement, g: Arrangement) -> Arrangement:
-    """Sequential composition ``g . f`` in ``arr`` (def:arr).
+    """Sequential composition ``g . f`` in ``arr`` (def.arr).
 
     For ``f : L -> M`` and ``g : M -> N`` (so ``f.out_dim_N == g.out_dim_M`` and
     ``f.in_dim_N == g.in_dim_M``), the composite ``g . f : L -> N`` has the lens

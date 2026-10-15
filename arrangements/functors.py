@@ -1,7 +1,7 @@
 """The cotangent functor and the dynamics functor ``Phi : arr -> pc`` (sec.dynamics_functor).
 
 There is **one** dynamics functor (NOTATION.md "Dynamics functor"): the
-integrator is the coalgebra ``u`` inside the arrangement's parameter (def:arr),
+integrator is the coalgebra ``u`` inside the arrangement's parameter (def.arr),
 so ``Phi`` takes no integrator argument. CDLM's ``Phiconf`` and ``Phiphase`` are
 ``Phi`` applied to arrangements whose parameter is ``coalgebra.configuration(Q)``
 or ``coalgebra.phase(Q)``; they are different arrangements, not two readings of
@@ -246,6 +246,47 @@ def closed_step(arr: Arrangement, check: int = 2, duration=None):
         s_phi = s_fast = P.init
         for k in range(check):
             _, _, s_phi = O.with_state(s_phi).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)), duration)
+            s_fast = step(s_fast)
+            for a, b in zip(jax.tree_util.tree_leaves(s_phi), jax.tree_util.tree_leaves(s_fast)):
+                if not jnp.allclose(a, b, rtol=1e-10, atol=1e-12):
+                    raise AssertionError(f"compiled step differs from Phi's at step {k + 1}")
+    return step
+
+
+def open_step(arr: Arrangement, n_in, xi_out=None, check: int = 2, duration=None):
+    """One step of ``Phi(arr)`` for a system ``1 -> <N-|N+>``, told fixed input values and a fixed force at its
+    outputs, compiled by JAX and checked against ``Phi``, as ``closed_step`` is for a closed one.
+
+    The system has no ``M`` ports (``in_dim_M == out_dim_M == 0``). It is told the values ``n_in`` at its
+    ``N`` inputs and the covector ``xi_out`` at its ``N`` outputs (``None``: zero, no force), the same each step,
+    so the step is ``s |-> u(s, omega(q, (), n_in)|_Q + (d out_f)^T xi_out)``. Use it to run such a system to
+    rest. The first ``check`` steps from ``arr.P.init`` are compared with ``Phi(arr).run_one`` told the same.
+    (From P45 stage (d)'s run, ``notes/runs/p45-rest-lagrangian-8cba38c1/run_arr.py`` in the book's repo, Claude
+    Fable 5.1, 8cba38c1; moved here by the book's suggestion-box sweep, Claude Opus 5.5, a2cd536d, 2026-10-15.)
+    """
+    from .interpretation import trivial_omega
+
+    if arr.in_dim_M or arr.out_dim_M:
+        raise ValueError(f"open_step needs a system 1 -> <N-|N+>; M dimensions {(arr.in_dim_M, arr.out_dim_M)}")
+    P, omega, z = arr.P, arr.omega, jnp.zeros(0)
+    n_in = jnp.asarray(n_in, dtype=float).reshape(arr.in_dim_N)
+    xi_N = jnp.zeros(arr.out_dim_N) if xi_out is None else jnp.asarray(xi_out, dtype=float).reshape(arr.out_dim_N)
+
+    @jax.jit
+    def step(s):
+        q = P.position(s) if duration is None else P.position_at(s, duration)
+        xi_q, _, _ = omega(q, z, n_in)
+        _, vjp_out = jax.vjp(lambda qq: arr.out_f(qq, z), q)
+        (a_q,) = vjp_out(xi_N)
+        xi = xi_q + a_q
+        return P.step(s, xi) if duration is None else P.step_over(s, xi, duration)
+
+    if check:
+        O, IN = Phi(arr), (z, trivial_omega(0))
+        tell = lambda _o: (xi_N, n_in)
+        s_phi = s_fast = P.init
+        for k in range(check):
+            _, _, s_phi = O.with_state(s_phi).run_one(IN, tell, duration)
             s_fast = step(s_fast)
             for a, b in zip(jax.tree_util.tree_leaves(s_phi), jax.tree_util.tree_leaves(s_fast)):
                 if not jnp.allclose(a, b, rtol=1e-10, atol=1e-12):

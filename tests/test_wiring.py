@@ -31,7 +31,7 @@ def test_chain_wire_out_and_in_f():
 
 
 def test_chain_wire_has_zero_forcing_and_trivial_parameter():
-    """A wiring is a static arrangement: trivial parameter, zero one-form (def:arr)."""
+    """A wiring is a static arrangement: trivial parameter, zero one-form (def.arr)."""
     W = chain_wire(3)
     assert W.P.Q_dim == 0
     for xi in W.omega(jnp.zeros(0), jnp.array([1.0, 2.0, 3.0]), jnp.array([4.0])):

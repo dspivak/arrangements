@@ -28,7 +28,7 @@ built by *genuine composition* in ``arr`` (no hand-written total forcing):
 
 ``kuramoto_arrangement`` is ``compose_seq(tensor(boxes), wire)``; the total
 forcing above *emerges* from ``compose_seq``'s pullback-and-sum (sec.forcing).
-Because the integrator is part of the arrangement (def:arr), the Kuramoto and
+Because the integrator is part of the arrangement (def.arr), the Kuramoto and
 the swing-equation systems are two *different* arrangements on the same boxes,
 selected by the ``parameter`` keyword -- there is no second dynamics functor.
 """
@@ -227,7 +227,7 @@ def kuramoto_arrangement(
     ``sharp_scale = 1/m``) steps the swing equation
     ``m * ddot(theta)_i = omega_i + K sum_j sin(theta_j - theta_i)`` by
     semi-implicit Euler (unit time step, as in the graph-wave test). They are
-    two arrangements on one wiring (def:arr), selected by ``parameter``.
+    two arrangements on one wiring (def.arr), selected by ``parameter``.
     """
     N = len(omegas)
     degrees, _ = _incidences(N, edges)

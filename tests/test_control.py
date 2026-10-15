@@ -9,7 +9,7 @@ setpoint ``s`` a genuine run-time input on the outer boundary, gives
 * with the ``phase`` parameter: undamped oscillation about ``s`` at frequency
   ``~ sqrt(k/m)`` (the classical stiffness-only impedance controller).
 
-One wiring, two arrangements (def:arr): the parameter -- the coalgebra inside
+One wiring, two arrangements (def.arr): the parameter -- the coalgebra inside
 the arrangement -- is what differs, and there is one dynamics functor ``Phi``.
 
 Timestep convention: the framework has no separate ``dt``; it lives in the

@@ -258,7 +258,7 @@ def test_rk4_buys_1_4x_the_step_for_4x_the_work():
 
     Fixing the circuit's *rate ratio* and sweeping a single timestep ``h``, the
     four-stage ``rk4`` parameter (``pc^(4)``, four gradients per macro-tick; the
-    integrator is part of the arrangement, def:arr) is stable where Euler is not
+    integrator is part of the arrangement, def.arr) is stable where Euler is not
     -- but only by the classical linear-stability factor ``2.785/2 = 1.39``, so
     its net throughput is about ``0.35``.  If the step is the binding constraint
     the answer is a better *sharp* (preconditioning, cf.

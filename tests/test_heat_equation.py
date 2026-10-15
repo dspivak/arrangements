@@ -1,6 +1,6 @@
 """The heat equation: the chain of harmonic particles with *configuration* parameters.
 
-One wiring, two arrangements (book sec.heat_waves, def:arr): the chain wiring
+One wiring, two arrangements (book sec.heat_waves, def.arr): the chain wiring
 applied to particles whose parameter is ``configuration(Q)`` is the dissipative
 first-order discrete heat equation; the same wiring applied to particles with
 ``phase(Q)`` is the wave equation (test_wave_equation.py). There is one dynamics

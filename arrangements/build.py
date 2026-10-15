@@ -8,7 +8,7 @@ You pick the parameter coalgebra (``phase`` = Hamilton/conservative, ``conf`` =
 descent/dissipative, ``leapfrog`` = two-stage), pick a system from a small palette
 of prebuilt boxes (harmonic particles wired as a chain or a graph, or a linear
 model trained by gradient descent), give numeric parameters, and the tool
-composes the arrangement -- the integrator is part of it (def:arr) -- applies the
+composes the arrangement -- the integrator is part of it (def.arr) -- applies the
 one dynamics functor ``Phi`` (sec.dynamics_functor; ``Phi2`` for leapfrog), runs
 it, and prints a check (the discrete wave/heat residual, or the training loss).
 

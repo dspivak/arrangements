@@ -25,7 +25,7 @@ leapfrog coalgebra ``leapfrog(Q)`` (leapfrog.py) as parameter, wired from
 
 The closed composite (``compose_seq(tensor(parts), graph_wire(...))``, exactly
 the ``compose_graph`` pattern of CDLM sec.graph_laplacian) is a 0-ary arrangement
-(def:arr) with parameter base ``Q = (R^d)^N`` whose total forcing
+(def.arr) with parameter base ``Q = (R^d)^N`` whose total forcing
 
     omega(q) = -d sum_{pairs p = (i,j)} U_LJ(q_i, q_j)
 
@@ -228,7 +228,7 @@ def md_potential(
 ) -> Callable[[Array], Array]:
     """The total LJ energy ``U(q) = sum_p U_LJ(q_i, q_j)`` on ``(R^dim)^N``, as a function of the flat ``q``.
 
-    The composite arrangement carries the forcing ``-dU``, not ``U`` (def:arr);
+    The composite arrangement carries the forcing ``-dU``, not ``U`` (def.arr);
     this is the potential written out, for the energy ``md_energy`` and for the
     tests that check the composite forcing against it.
     """
@@ -305,7 +305,7 @@ def md_energy(q: Array, xi: Array, mass: float, dt: float, U: Callable[[Array], 
     term equals ``(1/2) m |v|^2`` exactly, and ``U`` (``md_potential``) is the
     sum of LJ pair energies whose ``-d`` is the emergent forcing, so ``H`` is
     the physical total energy. The sharp lives inside the particle coalgebra's
-    step and the composite carries a forcing, not a potential (def:arr), so both
+    step and the composite carries a forcing, not a potential (def.arr), so both
     are passed here explicitly rather than read off the arrangement.
     """
     ke = 0.5 * (dt * dt / mass) * jnp.dot(xi, xi)

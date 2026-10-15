@@ -105,3 +105,34 @@ def test_closed_step_is_Phi_and_refuses_ports():
                          omega=a.omega, label="open")
     with pytest.raises(ValueError):
         closed_step(open_a)
+
+
+def test_open_step_is_Phi_and_refuses_M_ports():
+    """CHECKS THE IMPLEMENTATION: ``open_step`` is ``Phi``'s step on a system ``1 -> <N-|N+>`` told fixed input
+    values and a fixed output force, twenty steps out, and refuses an arrangement with ``M`` ports."""
+    import pytest
+    from arrangements.arrangement import Arrangement, exact
+    from arrangements.coalgebra import configuration as conf
+    from arrangements.functors import open_step
+    from arrangements.rvect import euclidean
+
+    k = lambda q, n: 0.5 * (q[0] - n[0]) ** 2 + 0.5 * (q[1] + q[0]) ** 2
+    a = Arrangement(P=conf(euclidean(2), jnp.array([1.0, 0.0])), in_dim_M=0, out_dim_M=0,
+                    in_dim_N=1, out_dim_N=1, out_f=lambda q, m: q[1:2],
+                    in_f=lambda q, m, n: jnp.zeros(0), omega=exact(lambda q, m, n: -0.1 * k(q, n)),
+                    label="tethered")
+    n_in, xi_out = jnp.array([2.0]), jnp.array([0.3])
+    O, step = Phi(a), open_step(a, n_in, xi_out, check=3)
+    s_phi = s_fast = a.P.init
+    for _ in range(20):
+        _, _, s_phi = O.with_state(s_phi).run_one(IN_POS, lambda _o: (xi_out, n_in))
+        s_fast = step(s_fast)
+    np.testing.assert_allclose(s_phi, s_fast, rtol=1e-12)
+    free, s_free = open_step(a, n_in, check=0), a.P.init
+    for _ in range(20):
+        s_free = free(s_free)
+    assert not np.allclose(s_free, s_fast)  # the force told at the output moves the system
+    with_M = Arrangement(P=a.P, in_dim_M=1, out_dim_M=0, in_dim_N=1, out_dim_N=1,
+                         out_f=a.out_f, in_f=a.in_f, omega=a.omega, label="with M")
+    with pytest.raises(ValueError):
+        open_step(with_M, n_in)

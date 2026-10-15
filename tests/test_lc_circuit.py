@@ -9,7 +9,7 @@ for the capacitor energy ``U(q) = q^2/(2C)``. The claims under audit:
   circuit oscillates at ``omega = 1/sqrt(LC)``.
 * ``configuration``: the same lens datum relaxes RC-style with no oscillation;
   the number in the sharp then functions as a resistance ``R := L`` (mobility
-  ``1/R``), not an inductance. Two arrangements, one datum (def:arr): the
+  ``1/R``), not an inductance. Two arrangements, one datum (def.arr): the
   integrator is the parameter, and ``Phi`` takes no integrator.
 * Coupled pair: two capacitor boxes wired through a stateless coupling box
   exhibit the two normal modes ``omega_+ = 1/sqrt(LC)`` and

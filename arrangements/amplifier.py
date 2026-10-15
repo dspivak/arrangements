@@ -9,7 +9,7 @@ gain would then be a statement about equilibria of the composite system."
 The construction
 ----------------
 
-**Stage** (``stage``): a ``<R^0|R^0> -> <R^1|R^1>`` arrangement (def:arr) with
+**Stage** (``stage``): a ``<R^0|R^0> -> <R^1|R^1>`` arrangement (def.arr) with
 parameter the configuration coalgebra (sec.matter) on ``Q = R^2``, state
 ``q = (v, w)``, reported output ``out_f(q) = v``, one input port carrying the
 drive voltage ``e``, forcing ``omega = -dU`` (sec.forcing) for the cost

@@ -3,7 +3,7 @@
 A harmonic surrogate of the system of M. S. Bull & S. Achour, *Machine learning with
 dynamics* (unconv.ai, 2026): a network of gyroscopes-on-rods coupled by springs,
 trained to classify handwriting. Each force of that physical system is mapped to one
-slot of the arrangement framework (def:arr) -- the forward dynamics is *exactly*
+slot of the arrangement framework (def.arr) -- the forward dynamics is *exactly*
 ``Phi`` (functors.py) applied to a single harmonic arrangement whose parameter is the
 ``gyro`` coalgebra (coalgebra.py):
 
@@ -299,7 +299,7 @@ def gyro_arrangement_on_cotangent(
     with the same cost ``U`` as ``gyro_arrangement`` (``gyro_potential``) and
     ``gyro_kick = -drag |v| v - gamma (J v)`` (coalgebra.py). The kick depends on the
     momentum, so this one-form is not ``dU'`` for any ``U'`` -- it is a genuinely
-    non-exact forcing, which def:arr allows and CDLM's potential-only arrangement did
+    non-exact forcing, which def.arr allows and CDLM's potential-only arrangement did
     not (hence the trick). For a constant sharp it agrees with ``gyro_arrangement``
     under ``gyro(Q, c, gamma, J, drag, gyro_block)`` step for step
     (tests/test_gyroscope.py); the readout and the input port are unchanged.

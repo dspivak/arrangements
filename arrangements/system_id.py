@@ -61,7 +61,7 @@ def oscillator(
     """A closed autonomous oscillator: base ``Q = R^dim`` (position), sharp
     ``(1/m) I``, on-site potential (a cost) ``U(q)``, forcing ``omega = -dU``.
 
-    The parameter is ``parameter(Q)``, by default the phase coalgebra (def:arr,
+    The parameter is ``parameter(Q)``, by default the phase coalgebra (def.arr,
     sec.matter); under ``Phi`` (sec.dynamics_functor) the arrangement is then
     the symplectic flow of the Hamiltonian ``H = |p|^2 / (2m) + U(q)``, with state
     ``(q, p)`` in ``R^dim x R^dim``. Quadratic ``U`` gives a linear flow; any other

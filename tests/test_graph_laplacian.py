@@ -14,7 +14,7 @@ per-vertex harmonic particles ``Part_v``. We check:
 * the same graph with *phase* vertex parameters is the discrete graph-wave
   equation (CDLM prop.graph_laplacian, eqn.graph_laplacian_dynamics) and with
   *configuration* parameters the graph-heat equation (CDLM rmk.graph_heat), both
-  against an independent Laplacian oracle -- one wiring, two arrangements (def:arr).
+  against an independent Laplacian oracle -- one wiring, two arrangements (def.arr).
 
 The test graph mixes in- and out-degrees and has a non-identity prism permutation,
 so it exercises the broadcast (``outp f_v``) and routing (``inpt f``) non-trivially.

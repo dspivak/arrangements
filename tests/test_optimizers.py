@@ -1,7 +1,7 @@
 """The parameter is the optimizer (coalgebra.damped).
 
 One convex forcing -- ``omega = -dk`` for the quadratic well ``k(q) = 1/2 q.A.q`` --
-carried by three arrangements that differ only in their parameter (def:arr: the
+carried by three arrangements that differ only in their parameter (def.arr: the
 integrator is part of the arrangement, so these are three *different* objects of
 ``arr``, not one object read three ways as in CDLM's ``Phiconf``/``Phiphase``/
 ``Phidamped``):

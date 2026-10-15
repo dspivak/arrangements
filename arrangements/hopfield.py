@@ -6,7 +6,7 @@ The claim under test: the continuous Hopfield network (Hopfield 1984, units
     u_i' = -u_i + sum_j W_ij g(u_j) + I_i,        g = tanh,  W symmetric,
 
 is the dynamics ``Phi`` (sec.dynamics_functor) of a closed arrangement with
-*configuration* parameters (def:arr, sec.matter), built by *genuine
+*configuration* parameters (def.arr, sec.matter), built by *genuine
 composition* in ``arr`` (no hand-written total forcing):
 
 * one **neuron box** per unit ``i``: parameter the configuration coalgebra on

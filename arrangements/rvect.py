@@ -10,7 +10,7 @@ we write ``sharp_q := sharp_Q(q) : Q^* -> Q`` for the value at ``q in Q``.
 The reaction is *constant* if ``sharp_q = sharp_0`` for all ``q``, and
 *nondegenerate* if every ``sharp_q`` is an isomorphism.
 
-In the book (def:arr, sec.matter) the response is not a component of an
+In the book (def.arr, sec.matter) the response is not a component of an
 arrangement: it lives inside the coalgebra ``u : S -> cot(Q)(S)`` that is the
 arrangement's parameter (STATUS.md §1, "the integrator is part of the
 parameter"). This module therefore keeps ``ReactiveVectorSpace`` only as the

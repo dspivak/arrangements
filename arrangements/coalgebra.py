@@ -7,7 +7,7 @@ base) and ``S`` (the state) with a ``cot(Q)``-coalgebra
 
 i.e. each state presents a base position ``q(s)`` and, on receiving a covector
 ``xi in T^*_{q(s)} Q``, moves to a new state. This is the book's *integrator*
-("u for update", NOTATION.md): in def:arr the coalgebra ``u``, and hence the
+("u for update", NOTATION.md): in def.arr the coalgebra ``u``, and hence the
 integrator, is part of an arrangement -- there is no separate integrator
 semantics to choose later, as there was in CDLM (``Phiconf``/``Phiphase``).
 The response ``sharp`` is not a separate field either; it lives inside ``step``.

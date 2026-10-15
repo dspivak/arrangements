@@ -6,7 +6,7 @@ game),
     x_i' = x_i ((A x)_i - x^T A x),
 
 is the dynamics of the closed arrangement (an ``arr``-scalar ``I -> I`` (CDLM's
-terms, cf. test_newton.py; def:arr) whose parameter is the configuration
+terms, cf. test_newton.py; def.arr) whose parameter is the configuration
 coalgebra ``configuration(Q)`` on the reactive vector space ``Q = R^n`` with the
 *state-dependent* Shahshahani sharp
 
@@ -208,7 +208,7 @@ def direct_replicator_arrangement(A: Array, dt: float = 1.0) -> Arrangement:
     back to the field and the configuration step ``x + sharp(omega)`` is the
     forward-Euler replicator step. ``omega`` is written by hand: it is not exact
     (not ``dU`` for any ``U``, even for symmetric ``A``), which the book's
-    arrangement permits (sec.forcing, def:arr) and CDLM's did not -- hence CDLM's
+    arrangement permits (sec.forcing, def.arr) and CDLM's did not -- hence CDLM's
     trick ``replicator_arrangement`` (Shahshahani sharp, potential ``(1/2) x^T A x``)
     and its scope limit to partnership games (module docstring). Here ``A`` may
     be any square payoff matrix, rock-paper-scissors included; for symmetric

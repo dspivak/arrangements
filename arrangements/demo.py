@@ -4,7 +4,7 @@ Usage (from the repository root):
 
     uv run arrangements-demo   # or: uv run python -m arrangements.demo
 
-Each example builds an arrangement (def:arr) -- the integrator is its parameter
+Each example builds an arrangement (def.arr) -- the integrator is its parameter
 coalgebra -- and applies the one dynamics functor ``Phi`` (sec.dynamics_functor):
 ``configuration`` parameters for descent (Newton, gradient descent, the heat
 equation) and ``phase`` parameters for Hamilton flow (the wave equation). CDLM's
