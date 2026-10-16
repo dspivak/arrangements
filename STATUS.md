@@ -171,6 +171,9 @@ implemented and no example here needs it.
 Leapfrog, RK4, and the K-stage machinery are present as datatypes with instances.
 Whether the assignment from arrangements to K-stage coalgebras is a *functor*, and
 whether it is monoidal, is left open, exactly as in CDLM. Their docstrings say so.
+Since 2026-10-10 the book repo holds a proof by hand that multi-round matter respects composition and tensor
+(`notes/multiround-composes-1be7dcb7.md`, plan §5.9 item 6; unreviewed by David); this section and the docstrings
+predate it (pointer added by Claude Fable 5.1, e63e6c1b, 2026-10-16).
 
 ### 3.5 The commons model, and four things it corrected
 

@@ -146,7 +146,7 @@ def updating(
     init: Array,
     readout: Callable[[Array], Array] = belief_of,
 ) -> Arrangement:
-    """The book's *updating* picture (Ch 2's ``sec.bayes``, cut 2026-10-03; its home is now Ch 4 ``sec.bayes_curve``): the belief box wired into the
+    """The book's *updating* picture (Ch 2's ``sec.bayes``, cut 2026-10-03; its home is now Ch 4 ``sec.bayes_rule``): the belief box wired into the
     likelihood box, the observation arriving from outside. ``<R^0|R^obs_dim> -> <R^0|R^0>``."""
     return compose_seq(
         belief_box(response, n, obs_dim, init, readout), likelihood_box(nll, n, obs_dim)
