@@ -1363,8 +1363,8 @@ session `8f53ae48`; every number unchanged); the townspeople's slot, formerly `'
 watt, the plant's revenue arriving as that push; every trajectory is (d)'s to 1e-12; the power
 port returns the price, the smoke port zero. No new finding; the book's sketches now match.
 **The book's town** (2026-09-29, `8f53ae48`): `eve_town()` is Eve's model from §1.6.1 (the two-dial plant,
-power to the townspeople), with a reader-facing module docstring; `Settings.liability` is the value on the
-liability wire at stage 1; `tests/test_town_story.py` checks each sentence of §1.6.1 the code stands behind
+power to the townspeople), with a reader-facing module docstring; its stage-1 plant has no liability port, as Ch 1 now draws it
+(2026-10-16, 936678d5, the `Settings.liability` knob and its one test removed); `tests/test_town_story.py` checks each sentence of §1.6.1 the code stands behind
 (7 passed; 32 town tests in all).
 
 ### 3.29 Active inference in three tests: precision by descent, policy choice, expected free energy

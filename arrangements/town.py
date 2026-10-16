@@ -1,13 +1,12 @@
 """The town of *Articulating Forms that Matter*, §1.6 ("Can we articulate forms that matter?").
 
-For a reader of the book. `eve_town()` builds Eve's model from §1.6.1: a plant (liability in;
-power and smoke out) and the townspeople (power and smoke in; coughing out), wired into a town.
+For a reader of the book. `eve_town()` builds Eve's model from §1.6.1: a plant (power and smoke
+out; from stage 2 on, also liability in, the wire she adds in §1.6.2) and the townspeople (power and smoke in; coughing out), wired into a town.
 The plant runs for profit: each watt is worth `benefit` to the townspeople who draw it, making
 more watts costs more (x^2/2), and filtering the smoke costs money (clean_cost*c^2/2) and earns
 nothing. Smoke s = (1-c)x starts people coughing (beta*s^2/2 a day); coughs pass at the rate
 `recovery`, so the more people cough, the more stop each day, and the coughing settles where
-starts equal stops. The knobs are the fields of `Settings`: `beta` is how harsh the smoke is,
-`liability` what comes in on the plant's liability wire (nothing, in the story). Her run:
+starts equal stops. The knobs are the fields of `Settings`; `beta` is how harsh the smoke is. Her run:
 
     from arrangements.town import eve_town, run, summary, Settings
     for beta in (.5, 2, 8):
@@ -29,8 +28,9 @@ system_id, insurance, and account; it does not reuse their example-specific boxe
 Stage (d), `clean=True` (notes/P29-D-PREDICTIONS-2026-09-28.md): the plant has two dials,
 output x and cleanliness c, descended together in its own coordinates. Power x is published
 (in (d) no box consumes it; (e) sends it to the residents); smoke s = (1-c)x reaches the residents and is what the records observe. The plant
-publishes power and smoke itself, so its interface is liability in, power and smoke out, as
-the book draws it (§1.6.1); its state (x, c) stays inside. Its cost adds the priced liability
+publishes power and smoke itself, so its interface is power and smoke out, with liability in
+from stage 2 on, as the book draws it (§1.6.1 without the liability wire, §1.6.2 with it); its
+state (x, c) stays inside. Its cost adds the priced liability
 on smoke and a cleaning cost clean_cost*c^2/2. With clean=False every stage is exactly the
 one-dial town above.
 
@@ -77,7 +77,6 @@ class Settings:
     delay_steps: int = 300
     clean_cost: float = 0.1
     clean0: float = 0.0
-    liability: float = 0.0   # the value on the liability wire at stage 1 (nothing, in the story)
 
 
 def own_cost(label, initial, inputs, cost, mobility, publish=None, push=None):
@@ -163,14 +162,21 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
     def at(m, name):
         return m[outs[name]]
 
+    # Eve's first plant (stage 1) has no liability port, as the book draws it (§1.6.1); the
+    # port, and the price that arrives on it, come from stage 2 on.
+    priced = stage >= 2
+
     def price(q):
-        if stage == 1:
-            return jnp.array([c.liability])
+        if not priced:
+            return EMPTY
         return at(q, 'premium' if stage >= 3 else 'assessed')
 
+    def rate(e):
+        return e[0] if priced else 0.0
+
     if clean:
-        add(own_cost('plant', [c.output0, c.clean0], 1,
-                     lambda q, e: .5*(1 + e[0]*(1-q[1])**2)*q[0]**2 - revenue*q[0]
+        add(own_cost('plant', [c.output0, c.clean0], int(priced),
+                     lambda q, e: .5*(1 + rate(e)*(1-q[1])**2)*q[0]**2 - revenue*q[0]
                      + .5*c.clean_cost*q[1]**2, c.dt,
                      publish=lambda q: jnp.array([q[0], (1-q[1])*q[0]])), price)
         slots['output'], slots['cleanliness'] = slice(0, 1), slice(1, 2)
@@ -185,8 +191,8 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
             x = at(m, 'output')
             return 1 - at(m, 'smoke')/jnp.where(x > 0, x, 1.0)
     else:
-        add(own_cost('output', [c.output0], 1,
-                     lambda q, e: .5 * (1 + e[0]) * q[0]**2 - c.benefit * q[0], c.dt), price)
+        add(own_cost('output', [c.output0], int(priced),
+                     lambda q, e: .5 * (1 + rate(e)) * q[0]**2 - c.benefit * q[0], c.dt), price)
 
         def smoke(m):
             return at(m, 'output')
@@ -275,7 +281,7 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
 def eve_town(stage=1, settings=Settings(), **options):
     """Eve's town from the book's §1.6.1: the two-dial plant and townspeople who draw its power.
 
-    Stage 1 is her first model, with nothing on the liability wire; stages 2-4 add the court,
+    Stage 1 is her first model, whose plant has no liability port; stages 2-4 add the court,
     the insurer and her account, as the book's later subsections do.
     """
     return build(stage, settings, clean=True, power_to_town=True, **options)

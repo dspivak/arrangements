@@ -1,11 +1,13 @@
 """The sentences of the book's §1.6.1 that Eve's model stands behind, one test each.
 
 Articulating Forms that Matter, §1.6.1, "This book is a calculus for working together": Eve
-models a plant (liability in; power and smoke out) and townspeople (power and smoke in;
+models a plant (power and smoke out) and townspeople (power and smoke in;
 coughing out), puts them into a town, and runs it. `eve_town()` is that model.
 David's re-edit of 2026-09-29 cut the settling sentences (the balance, dying away, climbing) in
 favour of "coughs also heal at some rate … left as an open parameter in her model"; the three
 tests that quoted them now check the model behind that parameter.
+Its liability test went on 2026-10-16: the book dropped the sentence it quoted, and Eve's first
+plant lost its liability port, which the book now adds in §1.6.2 (Claude Opus 5.5, 936678d5).
 """
 import jax
 jax.config.update("jax_enable_x64", True)
@@ -40,13 +42,6 @@ def test_filtering_earns_nothing_so_the_plant_never_filters():
     cleanliness = town.value(trajectory, 'cleanliness')[:, 0]
     assert np.all(np.diff(cleanliness) < 0)
     assert result['final_cleanliness'] < 1e-4
-
-
-def test_a_big_enough_liability_on_smoke_makes_it_filter():
-    # "A big enough liability coming in on its smoke would change that"
-    _, _, result = settled(Settings(liability=2.0))
-    assert result['final_cleanliness'] > .9
-    assert result['final_output'] > .99   # and it keeps its power
 
 
 def test_coughing_settles_where_starts_equal_stops():
