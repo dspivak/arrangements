@@ -32,7 +32,7 @@ def test_output_settles_where_the_next_watt_costs_what_it_brings_in():
 
 
 def test_filtering_earns_nothing_so_the_plant_never_filters():
-    # "cleaning costs money and brings in nothing of value to the plant, so its effort
+    # "cleaning costs money and doesn't bring in anything of value to the plant, so its effort
     # landscape never invites this activity": from no filtering it never starts, and a
     # plant that starts filtered stops
     _, _, result = settled(Settings())
@@ -45,8 +45,8 @@ def test_filtering_earns_nothing_so_the_plant_never_filters():
 
 
 def test_coughing_settles_where_starts_equal_stops():
-    # "Their coughing settles where the two drives balance each other: the number of people
-    # who stop coughing equals the number who start"
+    # The model behind "coughs also heal at some rate": coughing settles where the number
+    # who stop equals the number who start (the book's sentence saying so was cut 2026-09-29)
     s = Settings()
     town, trajectory, result = settled(s)
     smoke = result['final_smoke']
@@ -55,13 +55,16 @@ def test_coughing_settles_where_starts_equal_stops():
 
 
 def test_without_the_smoke_it_dies_away():
-    # "without the smoke it would die away to nothing"
+    # The model behind "coughs also heal at some rate": without the smoke coughing dies away
+    # (the book's sentence saying so was cut 2026-09-29)
     _, _, result = settled(Settings(beta=0.0, coughing0=1.0))
     assert result['final_coughing'] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_if_coughs_stopped_passing_it_would_climb_without_end():
-    # "if coughs stopped passing, it would climb without end"
+    # The model behind "it's unclear whether people are getting sicker at a faster rate than
+    # they're healing": with no healing coughing climbs without end (the book's sentence
+    # saying so was cut 2026-09-29)
     town, trajectory, _ = settled(Settings(recovery=0.0))
     coughing = town.value(trajectory, 'coughing')[:, 0]
     assert np.all(np.diff(coughing[100:]) > 0)
