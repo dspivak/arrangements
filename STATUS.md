@@ -2248,3 +2248,22 @@ and a well box per cell pushing `p` by `-v p (p^2 - 1)` (a 1-form, not exact; th
 rings, none blank or flipped); two seeds of opposite sign end 3 and 3. eps = 0.01: 4 to 2; 0.03: 6 to 0; 0.05: a band. The
 control (each sign alone) refuted "a lone -1 spot at 0.03 divides": it never divides. A ring run takes about 10 s after a
 20 s compile per eps. `tests/test_dividing_spot.py` still 5 passed.
+
+### 3.71 Predictive coding nested in the attention operad with signed costs (book P5 (i), plan §5.8)
+
+Claude Opus 5.5, 1e43f5fb, 2026-10-19 (`arrangements/nested_coding.py`, new; `tests/test_nested_coding.py`, 10 passed
+in 84 s; predictions written first in the book repo's `notes/runs/p5i-1e43f5fb/RESULTS.md`, results there). Two levels
+of predictive coding with learned log-precisions as attention arrangements whose costs go negative (nothing in
+`attention.py` guards `k >= 0`): composite cost = the free energy by hand (1e-13), `substitute` = `compose_seq`
+(1e-11), three-level associativity (1e-11). The level reading the data is the outer arrangement and hands its beliefs
+inward by placement; the other orientation needs `feeder`, a box outside the operad, and gives the same run (1e-10).
+Separated data settle at the interior minimum from rest and from above the saddle; a start down the funnel (all beliefs
+at the grand mean, level-2 precision large) stays there up to the Euler step's stability edge; close data have no
+interior minimum and the level-2 precision wanders under the edge. `laplace_learner` (one closed box, `F + 1/2 log det`
+of the beliefs' Hessian) settles at the type-II maximum-likelihood precisions (1e-6) from both starts.
+`test_attention_operad.py` and `test_active_inference.py` still 44 passed, 6 xfailed.
+Piece D, the same day (David: "can they send each other something forward to let them know about the proper
+precision"): `samples`, `evidence_sender` (state `l1` only, sends `(K Pi1 xbar_j, K Pi1)` per group) and
+`evidence_reader` (state `(nu, l2)`, passes each weight through `w Pi2 / (w + Pi2)`): the per-level costs sum to
+minus the log marginal likelihood up to a constant (1e-12), and the run reaches the type-II ML precisions from both
+starts, no funnel, no step-size edge. 13 tests in the file.
