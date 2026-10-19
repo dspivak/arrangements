@@ -2071,7 +2071,8 @@ it where it counts on a reliable speaker 78%, the closest 0.197.
 
 A part is told the duration first, shows its look-ahead (`CotCoalg.look_ahead`, `position_at`), and steps by
 `timed_step` (`step_over`); `Phi`, every `PCMorphism` composite, `closed_step`, `Phi2`, `PhiK` and the random step
-carry it, one duration shared; `None` is the unit step, the old path. Durations are positive (book Ch 3). Laws: pushes
+carry it, one duration shared; `None` is the unit step, the old path. Durations are `[0, inf)` since 2026-10-18 (book P59 (b)); the code was
+written for positive ones and has not been run at zero. Laws: pushes
 held for the duration (configuration, phase, damped, gyro, phase on T*Q, geared arm, phase_dt, belief); a data source,
 drum, copier and delay take one step per step; leapfrog and RK4 told the duration before round 1; Euler–Maruyama's kick
 by its square root; the finite random kick has none. A half-duration look-ahead is leapfrog in one round. Short steps of

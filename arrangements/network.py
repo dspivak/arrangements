@@ -72,7 +72,8 @@ def example_coalgebra(values: Array) -> CotCoalg:
     the next one? … They do 0.01, bam, bam, bam … we just show them 100 new data points per second"):
     the data source has no rate, and a run of short steps runs the examples fast. It has no limit as the
     duration shrinks, so no differential equation of its own; a learner fed by it does (full-batch gradient
-    flow, ``tests/test_duration.py``). Durations are positive (Ch 3).
+    flow, ``tests/test_duration.py``). Durations include zero (Ch 3), and at zero it still steps to the next
+    example, as the book's counter does, so it is an integrator that is not differentiable (Ch 4).
     """
     values = jnp.asarray(values, dtype=float)
     n, d = values.shape

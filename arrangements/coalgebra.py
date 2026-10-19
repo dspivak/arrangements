@@ -169,8 +169,8 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
     ``q - sharp(dk)`` is the same update after translating conventions.
 
     Held for a duration ``tau`` it is the Euler family of its tangent response
-    ``v_s(xi) = sharp_s(xi)`` (Ch 3 ``prop.duration_tangent``),
-    ``s |-> s + tau sharp_s(xi_Q)``: normalized (it tends to ``s`` as ``tau`` shrinks; durations are positive), and the
+    ``v_s(xi) = sharp_s(xi)`` (Ch 4 ``prop.duration_tangent``),
+    ``s |-> s + tau sharp_s(xi_Q)``: differentiable (at ``tau = 0`` it is ``s``; durations are ``[0, inf)``, Ch 3), and the
     unit step above at ``tau = 1``.
     """
 
