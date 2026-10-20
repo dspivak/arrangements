@@ -43,9 +43,15 @@ if [ ! -x "$PY" ]; then
   echo "Missing $PY; install the test environment first (README.md)." >&2
   exit 1
 fi
-if ! command -v timeout >/dev/null 2>&1; then
-  echo "The timeout command is required." >&2
-  exit 1
+# GNU timeout, else coreutils' gtimeout, else perl's alarm, which macOS always has (David's second machine has no
+# coreutils; notes/FEEDBACK.md in the book, 2026-10-19, three marks; the suggestion-box sweep, b2fea882). A run cut off
+# by the alarm exits 142, reported as timeout's 124.
+if command -v timeout >/dev/null 2>&1; then
+  limit() { timeout "$@"; }
+elif command -v gtimeout >/dev/null 2>&1; then
+  limit() { gtimeout "$@"; }
+else
+  limit() { perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$@"; local c=$?; [ "$c" -eq 142 ] && return 124; return "$c"; }
 fi
 LOGDIR=$(mktemp -d "${TMPDIR:-/tmp}/arrangements-tests.XXXXXX") || exit 1
 printf 'Full logs: %s\n' "$LOGDIR"
@@ -56,7 +62,7 @@ for selection in "$@"; do
   logfile="$LOGDIR/$index.log"
   start=$(date +%s)
   printf '\nSTART %s (limit %ss)\n' "$selection" "$LIMIT"
-  timeout "$LIMIT" "$PY" -u -m pytest "$selection" -v 2>&1 | tee "$logfile"
+  limit "$LIMIT" "$PY" -u -m pytest "$selection" -v 2>&1 | tee "$logfile"
   statuses=("${PIPESTATUS[@]}")
   code=${statuses[0]}
   secs=$(( $(date +%s) - start ))
