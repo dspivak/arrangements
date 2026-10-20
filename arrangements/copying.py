@@ -34,7 +34,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import configuration
+from .coalgebra import CotCoalg, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
 from .rvect import diagonal
@@ -275,3 +275,96 @@ def template_init(arr: Arrangement, a0, b0):
     vals = list(a0) + list(b0)
     new = [jnp.array([float(v)]) for v in vals] + leaves[len(vals):]
     return jax.tree_util.tree_unflatten(tree, new)
+
+
+# ---------------------------------------------------------------------------
+# A copy and its original: two voices of one interface, the copy coupled one way to the original (book Ch 3
+# ``ex.copying_learner``, David, 2026-10-19: "I don't want the two oscillators to learn each other … the copier is not
+# supposed to push back on the other one").
+# ---------------------------------------------------------------------------
+
+
+def oscillator(lam: float, eta: float, init) -> CotCoalg:
+    """The oscillator's matter (book Ch 3 ``ex.oscillator``, ``eqn.osc_integrator``): states ``(alpha, nu)``.
+
+    ``alpha`` is the angle, a point of the circle ``R / 2 pi Z`` (held here as a real number; only ``sin`` and ``cos``
+    of it are ever read), and ``nu`` the angular frequency in radians per unit of duration. The configuration space is
+    the circle: told a duration ``tau`` it reads out where its point is headed, the look-ahead ``alpha + tau nu``, as
+    the mass on ice reads out ``q + tau p / m``; told a force ``xi`` there it updates to
+    ``(alpha + tau nu + tau lam xi, nu + tau eta xi)``. Without any force a step of duration ``tau`` turns the angle by
+    ``tau nu``, so steps of any durations adding to ``t`` land where one step of ``t`` does (David, 2026-10-20: "what you
+    see when you do smaller time steps is just a more precise version"). The angle moves by ``lam`` times the force, as a
+    parameter does; the angular frequency gains ``eta`` times it, as the mass's momentum gains the impulse.
+    """
+    def timed_step(s, xi, tau):
+        alpha, nu = s[0], s[1]
+        return jnp.array([alpha + tau * nu + tau * lam * xi[0], nu + tau * eta * xi[0]])
+
+    return CotCoalg(
+        Q_dim=1,
+        init=jnp.asarray(init, dtype=float),
+        position=lambda s: jnp.reshape(s[0] + s[1], (1,)),
+        step=lambda s, xi: timed_step(s, xi, 1.0),
+        label="oscillator",
+        timed_step=timed_step,
+        look_ahead=lambda s, tau: jnp.reshape(s[0] + tau * s[1], (1,)),
+    )
+
+
+def osc(lam: float, eta: float, init, amp: float = 1.0) -> Arrangement:
+    """The system ``osc : I -> <0 | 1>`` (book Ch 3 ``ex.oscillator``): the oscillator's matter in the box of the static
+    arrangement whose forward map sends the configuration ``q`` on the circle to ``amp sin q``; effort field 0, so a
+    force ``xi`` at the output reaches the matter only by the transpose of that map's differential, ``xi amp cos q``."""
+    return Arrangement(
+        P=oscillator(lam, eta, init),
+        in_dim_M=0,
+        out_dim_M=0,
+        in_dim_N=0,
+        out_dim_N=1,
+        out_f=lambda q, m: jnp.reshape(amp * jnp.sin(q[0]), (1,)),
+        in_f=lambda q, m, n: jnp.zeros(0),
+        omega=zero_form,
+        label="osc",
+    )
+
+
+def copy_pair(eta_w: float, eta_theta: float, init_original, init_copy) -> Arrangement:
+    """``W = C . (V_orig (x) V_copy (x) id_1) : <0 | 1> -> I``; the external input is the coupling ``K``.
+
+    Two ``osc`` (book Ch 3 ``ex.oscillator``) of one kind, the same matter, started at different angular frequencies. The coupling ``C`` is
+    ``contact_one_way(1)`` on ``(x, y, K)``: the forcing ``K (x - y)`` on the copy's value ``y`` and nothing on the
+    original's ``x`` (Ch 2's waterfall), so the original receives no force and runs as a free oscillator; while
+    ``K = 1`` the copy's angular frequency is pulled to the original's, and at ``K = 0`` each runs on its own.
+    """
+    V = parallel_arrangements(osc(eta_w, eta_theta, init_original), osc(eta_w, eta_theta, init_copy))
+    return compose_seq(parallel_arrangements(V, identity(1)), contact_one_way(1.0))
+
+
+def copy_pair_q(arr: Arrangement, state):
+    """The original's and the copy's states ``(alpha, nu)``, read off ``W``'s state ``(((s_orig, s_copy), _), _)``."""
+    (s_orig, s_copy), _ = state[0]
+    return np.asarray(s_orig), np.asarray(s_copy)
+
+
+def couple_out() -> Arrangement:
+    """``contact_one_way(1)`` with the two values it receives also sent out: ``<0 | 3> -> <0 | 2>`` on ``(x, y, K)``.
+
+    Its forward map sends ``(x, y)`` to the external outputs, so the copier's original and copy can be heard from
+    outside (David, 2026-10-19: "neither of these two X's and Y's are exported out, so how am I even hearing any of
+    this stuff?"). Its effort field is the one-way contact's, ``K (x - y)`` on ``y`` and nothing on ``x`` or ``K``; a
+    force arriving at the outputs is passed back by the transpose of the forward map.
+    """
+    def omega(q, m, n_in):
+        return jnp.zeros_like(q), jnp.array([0.0, m[2] * (m[0] - m[1]), 0.0]), jnp.zeros_like(n_in)
+
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=3, in_dim_N=0, out_dim_N=2,
+        out_f=lambda q, m: m[:2], in_f=lambda q, m, n_in: jnp.zeros(0), omega=omega, label="couple",
+    )
+
+
+def copy_pair_out(eta_w: float, eta_theta: float, init_original, init_copy) -> Arrangement:
+    """``copy_pair`` with the original's value ``x`` and the copy's ``y`` exported: ``<0 | 1> -> <0 | 2>`` (book Ch 3
+    ``ex.copying_learner``, the system ``copier``). With the force ``0`` at its outputs it steps as ``copy_pair``."""
+    V = parallel_arrangements(osc(eta_w, eta_theta, init_original), osc(eta_w, eta_theta, init_copy))
+    return compose_seq(parallel_arrangements(V, identity(1)), couple_out())
