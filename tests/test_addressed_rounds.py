@@ -213,7 +213,11 @@ def token_sends(w, l, x):
 
 
 def head_means(w, l, x, heard):
-    """Each head's mean of what it heard plus the token's own term, which the zero diagonal leaves to the token."""
+    """Mean on nonnegative received weights, plus the positive self-term.
+
+    The restricted domain is essential: arbitrary real histories can cancel the
+    denominator. P53(j), b2b2dfd4, checks that pole and proves domain preservation.
+    """
     means = []
     for a in range(HEADS):
         k, p, v = kqv(w, l, a, x)

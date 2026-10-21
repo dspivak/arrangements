@@ -98,6 +98,10 @@ tests/test_file.py`; given as an argument it is refused, since pytest would read
 the whole suite.
 See `STATUS.md` §2 for what a passing test establishes and how tests share helpers.
 
+A script in `scripts/` that imports from `tests/` or plots needs the repo on the path and the plotting
+library, which is not a dependency: `PYTHONPATH=. uv run --with matplotlib python scripts/p53h_demo.py OUT`.
+A *demo* here is a viewer page under `viewer/`; a plot on one sheet is a plot, not a demo.
+
 ## The two ideas
 
 **Forcing, not potential.** A component's driving datum is a one-form `omega`, which need

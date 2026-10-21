@@ -65,7 +65,7 @@ lines = [f"data: SEPARATED (J={J} groups of K={K}, centers -3,-1,1,3, seed 0); W
          f"eta={eta}, steps={steps}; funnel start: every belief at {g:.6f}, Pi1=1/(W+B)={1/(W+B):.6f}, Pi2=40",
          f"marginal-likelihood precisions: Pi1={P1_ml:.6f}, Pi2={P2_ml:.6f}",
          f"plain F's interior minimum:     Pi1={P1_F:.6f}, Pi2={P2_F:.6f}",
-         f"predictive coding's stability edge in Pi2, 2/(eta (J+1)) = {2 / (eta * (J + 1)):.3f}"]
+         f"predictive coding's large-precision belief-stability estimate in Pi2, 2/(eta (J+1)) = {2 / (eta * (J + 1)):.3f}"]
 for name, r in runs.items():
     tail = r["P2"][-steps // 10:]
     lines.append(f"{name}: final Pi1={r['P1'][-1]:.6f}, Pi2={r['P2'][-1]:.6f}; "
@@ -85,7 +85,7 @@ for name, r in runs.items():
     ax.plot(n, r["P2"], color=c, ls=ls, lw=1.8, label=name)
 ax.axhline(P2_ml, color="0.2", lw=1, ls=":", label=f"marginal-likelihood precision {P2_ml:.4f}")
 ax.axhline(2 / (eta * (J + 1)), color="#c0392b", lw=0.8, ls=":", alpha=0.6,
-           label=f"predictive coding's stability edge, 2/(η(J+1)) = {2 / (eta * (J + 1)):.0f}")
+           label=f"predictive coding's approximate belief-stability threshold, 2/(η(J+1)) = {2 / (eta * (J + 1)):.0f}")
 ax.set_yscale("log")
 ax.set_xlabel("step of Φ")
 ax.set_ylabel("upper precision  $e^{l_2}$")

@@ -156,7 +156,7 @@ def test_gaussian_precision_terms_compose():
 
 
 def test_gaussian_precision_terms_associate():
-    """REPRODUCES associativity: ``(outer(middle))(inner)`` and ``outer(middle(inner))`` are one operation: placement,
+    """REPRODUCES unary-chain cost associativity, not ordered-list equality on branching trees. Terms are taken modulo permutations (P53(j), b2b2dfd4): placement,
     sending, receiving, cost and forcing."""
     a, c, d = g_outer(), g_middle(1), g_inner()
     left = ef_substitute(ef_substitute(a, [c]), [d])

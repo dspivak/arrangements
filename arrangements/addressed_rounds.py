@@ -20,6 +20,13 @@ parameter ``(q, its children's outputs)``.
 the arrangement that runs ``a``'s one-round sending and receiving maps round by round: at round ``l`` each child sends
 its strategy at what it heard before, and hears ``rho_a`` of those sends and of what the group hears from outside at
 round ``l``. The forcing is ``-dk_a`` at the last round's local interaction.
+
+Domain obligation (P53(j), b2b2dfd4): supplied strategies must be smooth on their declared
+history domain. The transformer token's normalization has a pole on unrestricted real
+weights. Its valid interpretation uses nonnegative message weights: all Addr transfers
+preserve them, and each token's positive self-weight keeps its denominator positive.
+The same rounds proof holds on these restricted smooth-set interfaces. Array shapes
+here do not enforce that mathematical domain.
 """
 
 from __future__ import annotations

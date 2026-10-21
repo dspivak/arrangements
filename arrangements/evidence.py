@@ -64,7 +64,7 @@ def down(link: Link, m: Array) -> Array:
 
 
 def disagreement(inputs: Sequence[Array]) -> Array:
-    """``sum A(iota) - A(sum iota)``: minus the log probability that the readings report one common value."""
+    """``sum A(iota) - A(sum iota)``: negative log overlap integral of normalized Gaussian densities, up to fixed constants."""
     total = inputs[0]
     for x in inputs[1:]:
         total = total + x

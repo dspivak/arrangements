@@ -1,12 +1,14 @@
 """Exponential-family operads as data (book P53 (h), continuing P5 (h2)).
 
 The mathematics is the book's ``notes/runs/p53h-82601336/RESULTS.md`` §1. An operation is attention data
-``(I, l, T)`` (``attention.py``, with zero cost) and a list of *terms* ``(A, T, theta, y)``: an exponential family
+``(I, l, T)`` (``attention.py``, with zero cost) and a finite multiset of *terms*, represented by a list ``(A, T, theta, y)``: an exponential family
 (log-partition ``A``, sufficient statistic ``T``), an *expectation* ``theta(q, m, e)`` in natural coordinates and an
 *observation* ``y(q, m, e)``. The cost is ``sum_t A_t(theta_t) - <theta_t, T_t(y_t)>``. ``substitute`` composes term
 lists by pulling each term back along its local interaction (the paper's eq:local-interactions), using only the
 constituents' sending and receiving maps; the attention operad's own ``substitute`` composes costs independently, and the
-two are compared in the tests.
+two are compared in the tests. Ordered concatenation is not associative on branching trees;
+the mathematical operad identifies term-index permutations, preserving multiplicity. This class stores
+representatives and does not implement quotient equality (P53(j), b2b2dfd4).
 
 ``gaussian_term`` is the Gaussian with a precision function: ``T(y) = (y, -1/2 y y^T)``, ``theta = (Pi mu, Pi)``,
 ``A(eta, Lam) = 1/2 eta^T Lam^{-1} eta - 1/2 log det Lam``, so the cost is
@@ -40,7 +42,7 @@ def term_cost(t: Term, q: Array, m: Array, e: Array) -> Array:
 
 @dataclass(frozen=True)
 class ExpFamilyOperation:
-    """Attention data ``base`` (its cost ignored) and a list of terms."""
+    """Attention data ``base`` and a list representing terms modulo permutations, with repetitions retained."""
 
     base: AttentionArrangement
     terms: List[Term]
