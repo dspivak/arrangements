@@ -530,7 +530,7 @@ def paper_part(n, seed):
 
 
 def test_the_papers_operad_is_inside_as_groups_that_speak_from_their_center():
-    """CHECKS A PROOF (RESULTS.md §4): ``from_paper`` preserves substitution. The composite here of
+    """CHECKS SUBSTITUTION ONLY (RESULTS.md §4): ``from_paper`` is nonunital; its image of the paper unit resets places (P53(j), b2b2dfd4). The composite here of
     the paper's arrangements equals the image of the paper's own composite (eq:composite-transfers):
     the hearing between every two children is the paper's ``T_{(i,j),(r,s)}``, the speaker's up and
     down are its ``T_{0,(i,j)}`` and ``T_{(i,j),0}``, and receiving and cost agree. Nested twice, uneven."""

@@ -26,7 +26,8 @@ A ``Shown`` slot has a place ``(key, query)(q; Z)``, sends ``sum_y up(q, y; Z) m
 hears down to slot ``x`` as ``down(q, x; Z)`` of it. Two special cases: ``forward(x)``, the member's
 own place, message and hearing passing the wall unchanged; ``speaker(...)``, a place the group sets
 from its configuration alone, speaking for its members (the paper's group is one speaker at its
-center, so the paper's operad sits inside). Anything between composes as well, e.g. a group speaking
+center). This center-speaker assignment preserves substitution but not the unit: it resets addresses and queries.
+The split-interface comparison is proved in the book's P53(j) audit, b2b2dfd4. Anything between composes as well, e.g. a group speaking
 from its members' mean place (``centroid_speaker``).
 
 **Substitution** (``substitute``): two members of different parts hear each other through every
