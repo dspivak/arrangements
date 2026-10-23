@@ -2307,3 +2307,47 @@ composite's count is the pieces' sum minus each glued interface's (10 boxes and 
 identity's count is not `0`, and its additive repair is the boundary term `c_wire (in Y - sum in X_i)`, `0` here.
 Judgment and the categorical reading: the book's `notes/runs/p71a-c3bdb524/RESULTS.md`.
 
+
+### 3.74 A price on the weight a part sends: one sender, one reader (book P71 (b))
+
+`tests/test_weight_price.py` (Claude Fable 5.1, fcfaae81, 2026-10-23). **What runs in `arr`.** A sender part filling
+`B` (matter its value and log-weight, readout `(e^lam v, e^lam)`, cost the price `c w` plus an anchor), a 0-ary
+attention arrangement as reader (matter its belief, cost the Gaussian code length of the arriving `(h, w)` read as
+`w` observations of `h/w` under `N(mu, 1/w_r)`, plus a prior), and a 2-ary group with one identity transfer; the
+reader substituted (`substitute`), the sender composed in (`compose_seq`), the whole run by `open_step` with the
+zero message at its external input. A 0-ary attention arrangement reads out the empty sum, so the sender is a part
+in `arr`, not an attention operation.
+
+**What the tests are evidence of.** Closed forms: the whole's forcing is `-d` of the three costs at the delivered
+points (`jax.grad` of the sum written by hand); substitution equals the lens composite in readout, forcing and
+trajectory, and the unit laws hold; the price paid by the sender equals the same price charged by the group on the
+message. Hand results checked by runs: with value and belief held, `1/w` grows at the rate
+`c + kappa_r + w_r/2 (v - mu)^2` (to 3%), so the sender always falls quiet, sooner the more the reader disagrees;
+under the other reading of weight (the sender's precision, `-log(w)/2` in the length) the weight rests at
+`1/(2c + (v - mu)^2)` (to 1e-3). Illustrations: the reader's belief moves while the message lasts and returns to its
+prior; a slow-to-quiet sender moves it further. The mechanism (exactness: the term that lets the weight pull the
+reader charges the sender per unit of weight in proportion to the disagreement) and the judgment: the book's
+`notes/runs/p71b-fcfaae81/RESULTS.md`.
+
+### 3.75 A sender that holds an estimate of its return (book P71 (b), second part)
+
+`tests/test_held_estimate.py` (Claude Fable 5.1, fcfaae81, 2026-10-23). **What runs in `arr`.** One exact arrangement,
+a system `1 -> <R | M>`: matter the log-weight and the estimate `pi = theta_0 + theta_1 w` of the return, cost the
+price `c w` plus the predicted shortfall `kappa/2 (want - pi)^2` plus the prediction error `1/2 (r - pi)^2`, run by a
+compiled step checked against `Phi.run_one`. Two integrators for the estimate: symmetric (descends the whole cost) and
+unilateral (shadow coordinates frozen at `0`, the prediction error written on `theta + phi`, the response moving
+`theta` by the covector on `phi`: the kernel condition of §3's amplifier stage). **What is the environment's.** The
+return schedule, the salt at step `t` a rule on the weight sent three steps earlier, computed between steps.
+
+**What the tests are evidence of.** Closed forms: the forcing is `-d` of the cost on all coordinates and the shadow
+never moves. Hand results checked by runs: symmetric, the estimate rests at the wishful `(kappa want + r)/(1+kappa)`
+and the weight falls under every schedule (believing instead of asking); unilateral, deaf: estimate `0`, weight falls;
+attentive: weight up by a factor `9` to where `kappa (want - r) theta_1 = c` with the estimate equal to the return;
+generous: estimate `1`, weight falls; withheld: a dip in the prediction error, the level relearned, and the asking
+persisting as a habit (`theta_1` unidentified at one operating point), which a weight decay `0.002 theta_1^2 / 2` on the
+slope lets fade while `0.02` stops the asking altogether. Judgment, the dopamine comparison and the two nesting
+questions put off to the book's P71 (c): `notes/runs/p71b-fcfaae81/RESULTS.md` §5.
+Added the same day (fcfaae81): `hearing_sender`, David's picture of what the sender holds, one number, its estimate
+`g` of how loudly the reader hears it (Ch 4's transfer `gamma`), want "arrive with weight HEARD", acknowledgment
+`r = gamma w`; rest `w* = HEARD/gamma - c/(kappa gamma^2)` and `g = gamma` (near, far, deaf, far then deaf, to 1%); the
+habit cannot form; the symmetric estimate believes it is heard. 10 checks pass, 42 s.
