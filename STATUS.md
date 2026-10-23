@@ -1838,7 +1838,7 @@ arrangement composed after what it reads, gray space rather than a box (correcte
 the diagram's forward-Euler step: the epidemic (susceptible, infected, recovered, the infected fraction an auxiliary)
 over 400 steps and 40 random diagrams (up to 5 stocks, 4 auxiliaries, 6 flows, shared auxiliaries, clouds) agree with
 `euler` to 4e-15; the epidemic's total is conserved and its forcing is not exact. What it does not establish: the
-continuous-time statement rests on the book's `prop.duration_tangent` and `prop.internalization_tangent`, which are
+continuous-time statement rests on the book's `prop.duration_tangent` and `prop.internalization_tangent_polynomial` (in `X-technical-holding.tex`), which are
 proof sketches; non-smooth rates (lookup tables, MIN, MAX, IF) are outside it.
 
 ### 3.47 A figurine as a net with ports that carry forces, its belief a market; a scene of two, the coordinator a market over the one-part-altered scenes; the runner runs both
