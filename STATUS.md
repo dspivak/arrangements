@@ -2286,3 +2286,24 @@ cost from 80 starts in `[-2,2]^5` reaches that rest exactly at `sigma^2` in (1.5
 descent jitters about it, person 5's mean distance 1-3% beyond (the step's bias). Predictions were written first, in
 the book's `notes/runs/p5k-b5cf8328/`. **Not established**: that starts spread wider reach it; there the softmin hears
 only the nearest and forces between distant groups are of order `exp(-distance^2 / 2)`.
+
+### 3.73 The description length of Ch 2's weight-decay network (book P71 (a))
+
+`tests/test_description_length.py` (6 tests, about 20 s). The training arrangement of the book's `sec.neural_network`
+built from `network.py`'s boxes with each parameter box given the forcing `-d(gamma/2 w^2)` of `exc.nn_decay`,
+composed by `compose_seq` and `tensor_arrangements`, run by `Phi`; and the same network as a two-input substitution,
+the first layer and the second weight filling two holes of an outer arrangement holding the label and the loss.
+
+**What the tests are evidence of.** Closed forms: the step is the exercise's `(1.1, -0.7, 1.8)`; the composite's
+forcing on its configuration is `-d` of the loss's cost plus the three parameters' lengths (`jax.grad` of the sum
+written independently), so the differential of the parameters' length is the regularization force; the nest's forcing
+is `-d` of the pieces' costs summed at the delivered points and equals the flat network's (`prop.exact_lenses` on a
+branching composite); an identity between layers changes nothing (the unit).
+
+**What is a count, not a run.** A length `c_box` per internal box and `c_wire` per wire (a wire a source port, the
+book's `def.wiring_diagram`) is read off the leaves and interfaces beside the arrangements. It is fixed by the
+interfaces alone, its differential is `0` (`Phi` never reads it), and it is not additive under substitution: the
+composite's count is the pieces' sum minus each glued interface's (10 boxes and 9 wires against 12 and 11), the
+identity's count is not `0`, and its additive repair is the boundary term `c_wire (in Y - sum in X_i)`, `0` here.
+Judgment and the categorical reading: the book's `notes/runs/p71a-c3bdb524/RESULTS.md`.
+
