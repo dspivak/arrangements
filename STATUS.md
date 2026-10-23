@@ -2267,3 +2267,22 @@ precision"): `samples`, `evidence_sender` (state `l1` only, sends `(K Pi1 xbar_j
 `evidence_reader` (state `(nu, l2)`, passes each weight through `w Pi2 / (w + Pi2)`): the per-level costs sum to
 minus the log marginal likelihood up to a constant (1e-12), and the run reaches the type-II ML precisions from both
 starts, no funnel, no step-size edge. 13 tests in the file.
+
+### 3.72 Five peers who move to hear one another better (book P5 (k), Ch 4 `ex.five_peers`)
+
+`arrangements/five_peers.py`, `tests/test_five_peers.py` (6 tests, about 100 s). An attention arrangement
+(`attention.py`) whose matter is five places on the line, its transfers the softmin hearing of `sec.messages`
+between persons and zero to and from the outside, its five internal boxes filled by person systems `I -> B` whose
+step ignores the force on their report and draws a fresh error (`rand.py`, §3.12), composed in `arr`, seeded, and
+run through `Phi` (`open_step`). Two parents on the one wiring: the averaged cost, the sum of each person's expected
+squared error with the variances as coefficients; and the realized cost, each person's heard value minus the number
+squared, the number read from the external input, no variance in it.
+
+**What the tests are evidence of.** Closed forms: the cost reads the value the delivery hands each person; the
+expected value of the realized cost and of its gradient equal the averaged ones, exactly, by the trace formula for a
+quadratic in the seed; the book's rest is a critical point of the averaged cost with one zero Hessian eigenvalue
+(translation); the number cancels. Illustration of what the book says it does not prove: descent on the averaged
+cost from 80 starts in `[-2,2]^5` reaches that rest exactly at `sigma^2` in (1.5, 3.7, 6, 10), and the realized
+descent jitters about it, person 5's mean distance 1-3% beyond (the step's bias). Predictions were written first, in
+the book's `notes/runs/p5k-b5cf8328/`. **Not established**: that starts spread wider reach it; there the softmin hears
+only the nearest and forces between distant groups are of order `exp(-distance^2 / 2)`.
