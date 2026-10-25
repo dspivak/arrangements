@@ -230,20 +230,28 @@ def test_a_start_down_the_funnel_stays_there_at_a_small_step():
 
 def test_close_data_level_two_precision_never_settles():
     """CHECKS prediction 7 (partly held): with no interior stationary point, the beliefs gather at
-    the grand mean and ``Pi1`` nears ``1/(W+B)``, while ``l2`` wanders below the step's stability
-    edge and does not settle; the edge rises as the step shrinks."""
+    the grand mean, while ``l2`` wanders below the step's stability edge and does not settle; the edge
+    rises as the step shrinks. ``Pi1`` swings with ``l2``'s sawtooth, jumping after each crash and falling
+    back as the beliefs regather (1.21-1.30 at eta = 0.005 against ``1/(W+B)`` = 1.214), so it is read over
+    the path, never at one instant: the swing stays above ``1/(W+B)`` less 1% and narrows as the step
+    shrinks, and at eta = 0.00125 every reading is within 1% of ``1/(W+B)`` (book P5 (l) stage B,
+    fcf80b7b: the instant at t = 200 fell after a crash and read 1.281)."""
     W, B = spreads(CLOSE)
     assert stationary(CLOSE) == []
-    tops = []
+    tops, swings = [], []
     for eta in (0.005, 0.00125):
-        f, path = settle(data_first(eta, CLOSE)[1], int(200 / eta), every=int(20 / eta))
-        l2s = np.array([float(unpack_df(s)[3]) for s in path[2:]])
+        f, path = settle(data_first(eta, CLOSE)[1], int(200 / eta), every=int(2 / eta))
+        l2s = np.array([float(unpack_df(s)[3]) for s in path[20::10]])   # t = 40, 60, ..., 200
+        pi1 = np.array([float(jnp.exp(unpack_df(s)[1])) for s in path[10:]])  # t = 20, 22, ..., 200
         mu, l1, nu, l2 = unpack_df(f)
         assert float(jnp.std(mu - nu)) < 0.15
-        np.testing.assert_allclose(jnp.exp(l1), 1 / (W + B), rtol=0.03)
+        assert pi1.min() > 0.99 / (W + B)
         assert l2s.max() < np.log(2 / (eta * (J + 1))) + 0.7
         assert l2s.max() - l2s.min() > 0.4          # it does not settle
         tops.append(l2s.max())
+        swings.append(pi1.max() - pi1.min())
+    np.testing.assert_allclose(pi1, 1 / (W + B), rtol=0.01)   # eta = 0.00125, every reading
+    assert swings[1] < 0.25 * swings[0]
     assert tops[1] > tops[0] + 0.5
 
 
