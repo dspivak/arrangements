@@ -289,9 +289,10 @@ def wired_identification(
     hidden: int = 32,
     eta: float = 1.5e-4,
     seed: int = 0,
+    init: Array = None,
 ) -> Arrangement:
     """The closed arrangement: a pendulum per start ``(q0, p0)``, two delays each, one parameter box
-    for the net's weights (response ``eta``), a copy of the net per pendulum predicting the pendulum's
+    for the net's weights (response ``eta``; initial weights ``init``, else drawn from ``seed``), a copy of the net per pendulum predicting the pendulum's
     presented position from the two delayed ones, and a one-way loss per pendulum.
 
     Leaves in order: per pendulum ``[pendulum, delay1, delay2]``, then the weights. Its position is
@@ -302,8 +303,8 @@ def wired_identification(
 
     K = len(starts)
     F, n = mlp(hidden, 2, 1)
-    rng = np.random.default_rng(seed)
-    init = 0.1 * jnp.asarray(rng.standard_normal(n))
+    if init is None:
+        init = 0.1 * jnp.asarray(np.random.default_rng(seed).standard_normal(n))
     weights = Arrangement(
         P=configuration(euclidean(n, eta), init=init), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=n,
         out_f=lambda q, m_out: q, in_f=lambda q, m_out, n_in: jnp.zeros(0),

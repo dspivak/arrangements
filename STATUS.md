@@ -2351,3 +2351,21 @@ Added the same day (fcfaae81): `hearing_sender`, David's picture of what the sen
 `g` of how loudly the reader hears it (Ch 4's transfer `gamma`), want "arrive with weight HEARD", acknowledgment
 `r = gamma w`; rest `w* = HEARD/gamma - c/(kappa gamma^2)` and `g = gamma` (near, far, deaf, far then deaf, to 1%); the
 habit cannot form; the symmetric estimate believes it is heard. 10 checks pass, 42 s.
+
+### 3.76 A two-layer attention predictor wired beside pendulums (book P5 (l) stage C)
+
+`arrangements/attention_beside_physics.py`, `tests/test_attention_beside_physics.py` (Claude Opus 5.5, a9e113da,
+2026-10-25). **What runs in `arr`.** One closed arrangement, `wired_attention`: per start a pendulum
+(`system_id.observed_oscillator`) and `h` delay boxes, one weights box, a static route, and per pendulum the predictor
+`ground . Phi_2(causal-softmax) . (token_0 (x) ... (x) token_{h-1})`, the two-layer causal block of
+`tests/test_addressed_rounds.py` with stateless tokens that hear the weights and one delayed position (embedding
+`obs e + pi_i` in the weights). The loss is the last token's cost, one-way: its 1-form is `-d` of the squared error in
+the weights, its observation and its round hearings, and `0` on the label it hears from the pendulum, since the answer
+is computed from what the token hears and no readout can carry it to a separate loss box. **What the tests are evidence
+of.** Exact: the pendulums equal the open runs (difference 0) and receive only their own `-sin a`; the effort field at
+the weights is minus the gradient of the plain causal transformer `predict` to 3e-17; the frozen-keys gap is 3.9e-6 at
+the initial weights (the prediction written before the run, > 1e-3, failed) and 1.2e-3 at the 3000-step weights.
+Learned, at the MLP's settings (40 pendulums, `h = 2`, rate 1.5e-4 per pendulum): held-out 0.203 at 3000 steps
+against the MLP's 0.045, 0.043 at 4000; both learners settle at 0.045, the best linear predictor's error
+(`a_t ~ 1.16 a_{t-1} - 0.99 a_{t-2}`), neither learning the `sin` term. Results, the plot and the judgment: the book's
+`notes/runs/p5lC-a9e113da/RESULTS.md`. 3 tests pass, 87 s.

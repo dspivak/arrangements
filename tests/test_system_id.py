@@ -37,7 +37,10 @@ def test_wired_pendulums_teach_their_learner():
     rate 1.5e-4 per pendulum (40 x 1.5e-4 = the recorded run's 6e-3): each pendulum's presented position
     equals the recorded run's ``q + p/m`` (the learner does not move it), and on eight held-out runs
     the one-step error is 0.045 against "no change"'s 0.56. **Could have come out otherwise**: online,
-    correlated data from forty orbits might not have fitted."""
+    correlated data from forty orbits might not have fitted. **What it learned** (book P5 (l) stage C, a9e113da,
+    2026-10-25): the best linear predictor, ``a_t ~ 1.16 a_{t-1} - 0.99 a_{t-2}`` (held-out 0.044), not the
+    ``sin`` term of the exact ``a_t = 2 a_{t-1} - a_{t-2} - sin a_{t-1}``; the net's gradient over ``[-1, 1]^2``
+    varies by 0.05, the error stays at 0.045 to 12000 steps and at a tenth of the rate."""
     K = 40
     rng = np.random.default_rng(1)
     starts = [tuple(rng.uniform(-1.0, 1.0, 2)) for _ in range(K)]
