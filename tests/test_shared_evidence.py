@@ -313,3 +313,64 @@ def test_5_copies():
     assert g_lik.sum() > 2.5 and abs(held(g_lik) - 5 / 9) < 0.02
     assert np.allclose(g_pred / g_pred.sum(), [0.25, 0.25, 0.5], atol=0.03)
     assert abs(held(g_pred) - 0.5) < 0.02
+
+
+# ---------------------------------------------------------------------------
+# Part 6: learning whom to trust by softmin lookup (book Ch 4 sec.learning_where).
+# ---------------------------------------------------------------------------
+
+
+def test_6_softmin_lookup_learns_inverse_variance():
+    """The trust example of sec.learning_where, before arrangements: Bob's query fixed at ``0``,
+    three sources at addresses ``k_i`` with softmin weights ``P = softmin(k^2 / 2)``, his cost the
+    average over the days of ``½ (P . y - z)^2``; gradient descent on the addresses. Prediction: the
+    weights settle at the least squares with ``sum P = 1``, close to the inverse average squared errors, normalized, and Bob's
+    average squared error falls below the best source's."""
+    z, Y = data()
+    cost = jax.jit(lambda k: 0.5 * jnp.mean((jax.nn.softmax(-0.5 * k ** 2) @ Y - z) ** 2))
+    g = jax.jit(jax.grad(cost))
+
+    @jax.jit
+    def many(k):
+        return jax.lax.fori_loop(0, 200000, lambda _, k: k - 2.0 * g(k), k)
+
+    k = many(jnp.array([1.0, 1.2, 1.4]))
+    P = np.asarray(jax.nn.softmax(-0.5 * k ** 2))
+    C, b = Y @ Y.T / K, Y @ z / K
+    Ci, one = np.linalg.inv(C), np.ones(3)
+    P_ls = Ci @ (b + (1 - one @ Ci @ b) / (one @ Ci @ one) * one)
+    err = np.mean((P @ Y - z) ** 2)
+    best = np.min(np.mean((Y - z) ** 2, axis=1))
+    print("addresses", np.asarray(k), "weights", P, "least squares", P_ls, "Bob's error", err, "best source", best)
+    assert np.allclose(P, P_ls, atol=1e-8)
+    # close to inverse average squared error in this sample (not the population sigmas: at K = 400 the
+    # sample's errors are slightly correlated, which is all that separates P from this)
+    prec = 1 / np.mean((Y - z) ** 2, axis=1)
+    assert np.allclose(P, prec / prec.sum(), atol=0.01)
+    assert err < best
+
+
+def test_6b_softmin_lookup_is_an_arrangement():
+    """Test 6's hand loop beside the arrangement it replaces: the hub of part 4 with loudness
+    ``exp(-k_i^2 / 2)`` at placement ``k_i`` and Bob's cost on the *value* of what it reads out, the
+    average over days of ``½ (h_d / w - z_d)^2`` (``w > 0`` throughout, every scout sending weight 1
+    and every loudness positive). Its value is the softmin average, so its gradient-descent steps are
+    test 6's; checked equal over 2000 steps at rate 2."""
+    z, Y = data()
+    n = len(Y)
+    loud = lambda q: jnp.exp(-q ** 2 / 2)
+
+    def cost(q, m_out, e):
+        ms = m_out.reshape(n, K + 1)
+        h = (loud(q)[:, None] * ms[:, :K]).sum(0)
+        w = (loud(q) * ms[:, K]).sum()
+        return 0.5 * jnp.mean((h / w - e[:K]) ** 2)
+
+    a = hub(n, K, loud, lambda q: q.reshape(n, 1), cost, 2.0, [1.0, 1.2, 1.4])
+    sysm = compose_seq(tensor_arrangements([scout(Y[i], f"s{i}") for i in range(n)]), a.arr())
+    e = make_input(message(jnp.asarray(z), 1.0), 0.0)
+    q_arr = run(sysm, e, 2000)[-3:]
+    g = jax.jit(jax.grad(lambda k: 0.5 * jnp.mean((jax.nn.softmax(-0.5 * k ** 2) @ Y - z) ** 2)))
+    k = jax.lax.fori_loop(0, 2000, lambda _, k: k - 2.0 * g(k), jnp.array([1.0, 1.2, 1.4]))
+    print("arrangement", q_arr, "hand loop", np.asarray(k), "label", sysm.label)
+    assert np.allclose(q_arr, np.asarray(k), atol=1e-10)
