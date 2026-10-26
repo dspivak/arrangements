@@ -346,25 +346,76 @@ def copy_pair_q(arr: Arrangement, state):
     return np.asarray(s_orig), np.asarray(s_copy)
 
 
-def couple_out() -> Arrangement:
-    """``contact_one_way(1)`` with the two values it receives also sent out: ``<0 | 3> -> <0 | 2>`` on ``(x, y, K)``.
+def couple() -> Arrangement:
+    """The system ``couple : I -> <3 | 0>`` (book Ch 3 ``ex.copying_learner``): stateless, inputs only, receiving the
+    original's value ``x``, the signal ``kappa`` and the copy's value ``y``, in that order.
 
-    Its forward map sends ``(x, y)`` to the external outputs, so the copier's original and copy can be heard from
-    outside (David, 2026-10-19: "neither of these two X's and Y's are exported out, so how am I even hearing any of
-    this stuff?"). Its effort field is the one-way contact's, ``K (x - y)`` on ``y`` and nothing on ``x`` or ``K``; a
-    force arriving at the outputs is passed back by the transpose of the forward map.
+    It pushes back ``kappa (x - y)`` at ``y`` and ``0`` at ``x`` and at ``kappa``: the forcing of ``contact_one_way(1)``,
+    with its three values arriving at inputs of its own.
     """
     def omega(q, m, n_in):
-        return jnp.zeros_like(q), jnp.array([0.0, m[2] * (m[0] - m[1]), 0.0]), jnp.zeros_like(n_in)
+        x, kappa, y = n_in
+        return jnp.zeros_like(q), jnp.zeros_like(m), jnp.array([0.0, 0.0, kappa * (x - y)])
 
     return Arrangement(
-        P=trivial_parameter(), in_dim_M=0, out_dim_M=3, in_dim_N=0, out_dim_N=2,
-        out_f=lambda q, m: m[:2], in_f=lambda q, m, n_in: jnp.zeros(0), omega=omega, label="couple",
+        P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=3, out_dim_N=0,
+        out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n_in: jnp.zeros(0), omega=omega, label="couple",
+    )
+
+
+def copier_wire() -> Arrangement:
+    """The copier's wiring, static: ``<3 | 2> -> <1 | 2>`` from the boxes ``osc``, ``osc`` and ``couple`` to the copier.
+
+    The original's value ``x`` and the copy's ``y`` split, each to an external output and to ``couple``, and the external
+    input ``kappa`` goes to ``couple``: forward ``(x, y) |-> (x, y)``, and ``couple``'s inputs ``(x, kappa, y)``.
+    """
+    return Arrangement(
+        P=trivial_parameter(), in_dim_M=3, out_dim_M=2, in_dim_N=1, out_dim_N=2,
+        out_f=lambda q, m: m, in_f=lambda q, m, n_in: jnp.array([m[0], n_in[0], m[1]]), omega=zero_form,
+        label="copier_wire",
     )
 
 
 def copy_pair_out(eta_w: float, eta_theta: float, init_original, init_copy) -> Arrangement:
-    """``copy_pair`` with the original's value ``x`` and the copy's ``y`` exported: ``<0 | 1> -> <0 | 2>`` (book Ch 3
-    ``ex.copying_learner``, the system ``copier``). With the force ``0`` at its outputs it steps as ``copy_pair``."""
-    V = parallel_arrangements(osc(eta_w, eta_theta, init_original), osc(eta_w, eta_theta, init_copy))
-    return compose_seq(parallel_arrangements(V, identity(1)), couple_out())
+    """The system ``copier : I -> <1 | 2>`` of book Ch 3 ``ex.copying_learner``: ``copier_wire`` with its boxes filled by
+    the original ``osc``, the copy ``osc`` and ``couple``. The signal ``kappa`` arrives at its external input, and the
+    original's value ``x`` and the copy's ``y`` are sent out (David, 2026-10-19: "neither of these two X's and Y's are
+    exported out, so how am I even hearing any of this stuff?"). With the force ``0`` at its outputs it steps as
+    ``copy_pair`` told ``K = kappa``."""
+    boxes = parallel_arrangements(
+        parallel_arrangements(osc(eta_w, eta_theta, init_original), osc(eta_w, eta_theta, init_copy)), couple())
+    return compose_seq(boxes, copier_wire())
+
+
+def copier_q(arr: Arrangement, state):
+    """The original's and the copy's states ``(alpha, nu)``, read off ``copier``'s state ``(((s_orig, s_copy), _), _)``."""
+    (s_orig, s_copy), _ = state[0]
+    return np.asarray(s_orig), np.asarray(s_copy)
+
+
+def copier_step(arr: Arrangement, check_inputs: Sequence = ()) -> Callable:
+    """One step of ``Phi(arr)`` for a system ``arr : I -> <n | m>`` told its input values and the force ``0`` at its
+    outputs, compiled, checked against ``Phi``, as ``driven_step`` is for ``<0 | m> -> I``.
+
+    With no ``M`` ports and no force at the outputs, the step is ``(s, n_in) |-> u(s, omega(q(s), (), n_in)|_Q)``. Each
+    input in ``check_inputs`` is also stepped through ``Phi(arr).run_one`` from the current state and the two compared.
+    """
+    if arr.in_dim_M or arr.out_dim_M:
+        raise ValueError("copier_step needs a system I -> <n | m>")
+    P, omega, z = arr.P, arr.omega, jnp.zeros(0)
+
+    @jax.jit
+    def step(s, n_in):
+        xi_q, _, _ = omega(P.position(s), z, n_in)
+        return P.step(s, xi_q)
+
+    O, s_phi = Phi(arr), P.init
+    for n_in in check_inputs:
+        n_in = jnp.asarray(n_in, dtype=float)
+        _, _, s_new = O.with_state(s_phi).run_one((z, trivial_omega(0)), lambda _o: (jnp.zeros(arr.out_dim_N), n_in))
+        s_fast = step(s_phi, n_in)
+        for a, b in zip(jax.tree_util.tree_leaves(s_new), jax.tree_util.tree_leaves(s_fast)):
+            if not np.allclose(np.asarray(a), np.asarray(b), atol=1e-12):
+                raise AssertionError("copier_step differs from Phi")
+        s_phi = s_new
+    return step

@@ -90,16 +90,38 @@ def test_the_exported_copier_sends_both_values_and_steps_as_the_closed_one():
 
     W = copy_pair(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
     Wo = copy_pair_out(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
+    assert (Wo.in_dim_M, Wo.out_dim_M, Wo.in_dim_N, Wo.out_dim_N) == (0, 0, 1, 2)
     step = driven_step(W)
     s, so = W.P.init, Wo.P.init
     for K in [1.0, 1.0, 0.5, 0.0, 1.0]:
         o, c = copy_pair_q(W, s)
         out, _, so = Phi(Wo).with_state(so).run_one(
-            (jnp.array([K]), trivial_omega(0)), lambda _o: (jnp.zeros(2), jnp.zeros(0)))
+            (jnp.zeros(0), trivial_omega(0)), lambda _o, K=K: (jnp.zeros(2), jnp.array([K])))
         s = step(s, jnp.array([K]))
         print("outputs", np.asarray(out[0]), "values", (_sent(o), _sent(c)))
         assert np.allclose(np.asarray(out[0]), [_sent(o), _sent(c)], atol=1e-12)
         assert np.allclose(np.asarray(Wo.P.position(so)), np.asarray(W.P.position(s)), atol=1e-12)
+
+
+def test_the_books_copier_steps_as_copy_pair_through_the_whole_run():
+    """Could fail: ``couple``'s pushback reaches the copy through the split of ``y`` and ``copier_wire``'s backward map, not
+    through a contact on the wire, so a wrong order of ``couple``'s inputs, or a split that dropped or doubled the force,
+    would move the copy elsewhere or touch the original (book Ch 3 ``ex.copying_learner``)."""
+    from arrangements.copying import copier_q, copier_step, copy_pair_out
+
+    Ks = [1.0] * 4000 + [0.0] * 3000
+    W = copy_pair(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
+    Wo = copy_pair_out(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
+    step = driven_step(W)
+    step_o = copier_step(Wo, check_inputs=[[1.0], [0.5], [0.0]])
+    s, so, gap = W.P.init, Wo.P.init, 0.0
+    for K in Ks:
+        s, so = step(s, jnp.array([K])), step_o(so, jnp.array([K]))
+        gap = max(gap, max(np.abs(a - b).max() for a, b in zip(copy_pair_q(W, s), copier_q(Wo, so))))
+    o, c = copier_q(Wo, so)
+    print("largest state difference over 7000 steps", gap, "copier's copy nu", c[1], "original nu", o[1])
+    assert gap < 1e-12
+    assert abs(c[1] - NU_ORIG) < 1e-6 and o[1] == NU_ORIG
 
 
 def test_osc_has_effort_field_zero_and_steps_as_the_book_says():
