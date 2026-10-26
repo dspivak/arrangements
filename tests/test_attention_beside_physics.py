@@ -87,3 +87,27 @@ def test_attention_learner_predicts_the_pendulums():
     err, base = held_out_error(BK, wired_weights(A, s, K, BK))
     print(f"held-out one-step error {err:.4f}, no change {base:.4f}")
     assert err < 0.15 and err < 0.25 * base
+
+
+def test_wider_block_learns_the_nonlinear_term():
+    """ILLUSTRATES (C2d). Bigger swings (``q0`` uniform in [-2.3, 2.3], ``p0`` in [-0.3, 0.3], seed 1; every orbit
+    librates), rate 1.5e-3 per pendulum, the block with a 32-unit tanh layer (433 weights), 12000 ``Phi`` steps: the
+    held-out error falls below half the best linear predictor's (0.157 on these runs; recorded 0.0214, the MLP 0.0355
+    at the same settings), and the learned slope in ``a_{t-1}`` follows the exact ``2 - cos a_{t-1}`` (recorded
+    correlation 0.974). With the 3-unit layer of ``Block()`` it stays near the linear floor (0.144, correlation
+    -0.10). The check against ``Phi`` is skipped (C1 runs it)."""
+    from arrangements.attention_beside_physics import held_out_error, predict
+
+    K, bk = 40, Block(d_mlp=32)
+    g = np.random.default_rng(1)
+    starts = [(g.uniform(-2.3, 2.3), g.uniform(-0.3, 0.3)) for _ in range(K)]
+    A = wired_attention(starts, bk, eta=1.5e-3, seed=1)
+    step = closed_step(A, check=0)
+    s = jax.jit(lambda s: jax.lax.fori_loop(0, 12000, lambda _i, x: step(x), s))(A.P.init)
+    W = wired_weights(A, s, K, bk)
+    err, base = held_out_error(bk, W, q_amp=2.3, p_amp=0.3)
+    xs = jnp.array([[0.0, v] for v in np.linspace(-2.0, 2.0, 21)])
+    slope = np.array([float(jax.grad(lambda x: predict(bk, W, x))(x)[1]) for x in xs])
+    corr = float(np.corrcoef(slope, 2 - np.cos(np.asarray(xs[:, 1])))[0, 1])
+    print(f"held-out {err:.4f}, no change {base:.4f}; slope correlation with 2 - cos a: {corr:.3f}")
+    assert err < 0.5 * 0.157 and corr > 0.8

@@ -2368,4 +2368,6 @@ the initial weights (the prediction written before the run, > 1e-3, failed) and 
 Learned, at the MLP's settings (40 pendulums, `h = 2`, rate 1.5e-4 per pendulum): held-out 0.203 at 3000 steps
 against the MLP's 0.045, 0.043 at 4000; both learners settle at 0.045, the best linear predictor's error
 (`a_t ~ 1.16 a_{t-1} - 0.99 a_{t-2}`), neither learning the `sin` term. Results, the plot and the judgment: the book's
-`notes/runs/p5lC-a9e113da/RESULTS.md`. 3 tests pass, 87 s.
+`notes/runs/p5lC-a9e113da/RESULTS.md`. On bigger swings (amplitude 2.3) at rate 1.5e-3, the block with a 32-unit tanh
+layer learns the nonlinear map (held-out 0.021 against the linear fit's 0.157; slope correlating 0.97 with
+`2 - cos a`), the 3-unit block does not (0.144). 4 tests pass, 172 s.

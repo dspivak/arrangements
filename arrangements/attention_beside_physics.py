@@ -287,10 +287,12 @@ def direct_loss(bk: Block, W: Array, windows: Array, labels: Array, freeze_keys:
     return 0.5 * jnp.sum((preds - labels) ** 2)
 
 
-def held_out_error(bk: Block, W: Array, *, n_traj: int = 8, T: int = 40, seed: int = 101, m: float = 1.0):
-    """Mean one-step error of the trained predictor on held-out runs of the open pendulum (starts uniform in
-    ``[-1, 1]^2``, ``seed``), and "no change"'s, as ``tests/test_system_id.py`` computes them for the MLP: an ordinary
-    calculation beside the arrangement."""
+def held_out_error(bk: Block, W: Array, *, n_traj: int = 8, T: int = 40, seed: int = 101, m: float = 1.0,
+                   q_amp: float = 1.0, p_amp: float = 1.0):
+    """Mean one-step error of the trained predictor on held-out runs of the open pendulum (starts ``q0`` uniform in
+    ``[-q_amp, q_amp]`` and ``p0`` in ``[-p_amp, p_amp]``, ``seed``; by default ``[-1, 1]^2``, as
+    ``tests/test_system_id.py`` computes them for the MLP), and "no change"'s: an ordinary calculation beside the
+    arrangement."""
     from .functors import Phi
     from .system_id import oscillator, trajectory
 
@@ -299,7 +301,7 @@ def held_out_error(bk: Block, W: Array, *, n_traj: int = 8, T: int = 40, seed: i
     f = jax.jit(lambda win: predict(bk, W, win))
     errs, base = [], []
     for _ in range(n_traj):
-        q0, p0 = rng.uniform(-1.0, 1.0, 2)
+        q0, p0 = rng.uniform(-q_amp, q_amp), rng.uniform(-p_amp, p_amp)
         a = [float(x[0] + x[1] / m) for x in trajectory(O, jnp.array([q0]), jnp.array([p0]), T)]
         for t in range(bk.h, len(a)):
             errs.append(abs(float(f(jnp.asarray(a[t - bk.h:t]))) - a[t]))
