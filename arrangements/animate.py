@@ -19,6 +19,8 @@ A scene says nothing about how the run was computed; it holds what the run did, 
   weight, how much the one counts on the other);
 * an ``event``: what crossed a wire on a step, drawn as a flash on the box that sent it and, if ``to`` is
   given, on the box that received it, at the link's strength on that step;
+* ``stride`` (optional): a recording that keeps one frame in every ``stride`` steps of the run says so, and
+  the page's clock counts the run's steps, not the frames;
 * ``ticks``: every how many steps a round begins, and the round's chip (``label``, ``color``) on the
   timeline, so a viewer sees the script the environment supplied.
 

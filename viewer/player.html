@@ -368,7 +368,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
     });
     $("scrub").value = String(t);
     const r = ticks.chips && ticks.chips[round];
-    $("clock").textContent = `step ${String(s).padStart(String(T - 1).length, " ")} / ${T - 1}` +
+    const k = scene.stride || 1;   // a recording may keep one frame in every k steps
+    $("clock").textContent = `step ${String(k * s).padStart(String(k * (T - 1)).length, " ")} / ${k * (T - 1)}` +
       (r ? ` · ${ticks.label || "round"} ${round + 1}: ${r.label}` : "");
     $("play").textContent = playing ? "Pause" : (t >= T - 1 ? "Replay" : "Play");
   }

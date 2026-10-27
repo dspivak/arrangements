@@ -135,4 +135,123 @@ def listener_live_scene() -> dict:
     }
 
 
-SCENES = {"listener": listener_live_scene, "listener-recorded": listener_scene}
+# ---------------------------------------------------------------------------
+# The joint readout (book plan P73 (b)): why the bad prime-finders break apart, and what breaking up does.
+# ---------------------------------------------------------------------------
+
+# Settings (book notes/runs/p73-b-56518228/RESULTS.md, "Settings"): the parts' states follow fast, the listener's
+# push is small (alpha), and the placements move slowly, so the run is near its slaved limit and has no oscillation.
+JR_TAU, JR_MOB, JR_K, JR_MS, JR_ALPHA, JR_STEPS, JR_STRIDE = 0.8, 0.05, 1.0, 0.25, 0.1, 8000, 16
+JR_STARTS = [0.3, 0.3, 0.3, 0.3]   # p75's start; spread out (0.2, 0.55, 0.9, 1.25) the 57- and 91-makers flee before
+# their parts pass half strength and keep reading 57 and 91 (RESULTS.md, P3)
+JR_VARIANTS = [
+    ("both", "Pushed away, and broken up", "outer",
+     [(5, 0.6, 5), (11, 0.6, 11), (57, 0.6, 57), (91, 0.6, 91)],
+     "Two prime-makers and two finders whose parts make a composite even together. The listener pushes the "
+     "composite-makers away along its line, and the same push drives each one's parts apart; apart, each reads "
+     "out a different composite."),
+    ("inplace", "Broken up in place", 0.0,
+     [(5, 0.6, 5), (11, 0.6, 11), (57, 0.6, 57), (91, 0.6, 91)],
+     "The same finders, with the listener's placements held still, so no finder can move away: the "
+     "composite-makers' parts come all the way apart."),
+    ("loose", "Loose parts: pulled together, or let go", "outer",
+     [(5, 0.6, 5), (13, 1.2, 13), (7, 1.45, 7), (11, 0.6, 11)],
+     "Four prime-makers. Two start with their parts 0.6 apart and read out primes. The 13-maker starts with its "
+     "parts 1.2 apart and reads out 12; the 7-maker starts 1.45 apart and reads out 6. The listener's pushback "
+     "on what the 13-maker reads out pulls its parts together until it reads out 13; the 7-maker is too far "
+     "gone, and is pushed away and broken up."),
+]
+
+
+def _jr_variant(spec, outer_mobility):
+    import jax.numpy as jnp
+    from . import joint_readout as jr
+    kab = lambda d: float(np.exp(-d ** 2 / (2 * JR_TAU)))
+    fs = []
+    for N, sep, _ in spec:
+        s0 = (N - 1) + kab(sep)
+        parts = [jr.piece_part(N - 1, s0, k=JR_K, mobility=JR_MS, label=f"{N}{x}") for x in "ab"]
+        fs.append(jr.finder(parts, tau=JR_TAU, placements=[sep / 2, -sep / 2], mobility=JR_MOB, label=f"{N}"))
+    S = jr.scene(fs, tau=JR_TAU, positions=JR_STARTS[:len(spec)], mobility=outer_mobility, alpha=JR_ALPHA)
+    qs = jr.trace(S, JR_STEPS)[::JR_STRIDE]
+    T = qs.shape[0]
+    reads = [jr.read(S, qs[t]) for t in range(T)]
+    k = lambda x: np.exp(-np.asarray(x) ** 2 / (2 * JR_TAU))
+    return S, reads, T, k
+
+
+def _word(n):
+    from .joint_readout import is_prime
+    return "a prime" if is_prime(n) else "not a prime"
+
+
+def disintegrate_scene() -> dict:
+    variants = []
+    for vid, name, outer, spec, note in JR_VARIANTS:
+        S, reads, T, k = _jr_variant(spec, JR_MOB if outer == "outer" else outer)
+        outer_x = np.array([[float(r["outer"][f]) for f in range(S.n)] for r in reads])
+        lanes = [{
+            "name": "On the listener's line",
+            "note": "Each finder moves along the listener's line; the listener hears it more loudly the nearer it is.",
+            "space": {"label": "the listener's line", "min": 0, "max": 4.0,
+                      "kernel": {"center": 0.0, "tau": JR_TAU, "shape": "bell"}},
+            "boxes": [{"id": "listener", "label": "the listener", "x": 0.0}] + [
+                {"id": f"f{f}", "label": f"{N}-maker", "x": series(outer_x[:, f])}
+                for f, (N, _, _) in enumerate(spec)],
+            "links": [{"from": f"f{f}", "to": "listener", "label": f"how loudly the listener hears the {N}-maker",
+                       "strength": series(k(outer_x[:, f]))} for f, (N, _, _) in enumerate(spec)],
+        }]
+        for f, (N, _, _) in enumerate(spec):
+            inner = np.array([[float(x) for x in r["inner"][f]] for r in reads])
+            sep = inner[:, 0] - inner[:, 1]
+            hear = k(sep)
+            v = np.array([float(r["readout"][f][0] / r["readout"][f][1]) for r in reads])
+            whole = np.rint(v).astype(int)
+            step = lambda t: t * JR_STRIDE
+            caps = [{"step": 0, "text": (
+                f"The parts sit {sep[0]:.2f} apart and hear each other at {hear[0]:.2f}. Each part's number is "
+                f"{N - 1} plus how loudly it hears the other, so the {N}-maker reads out {v[0]:.2f}; the nearest "
+                f"whole number is {whole[0]}, {_word(whole[0])}.")}]
+            for t in range(1, T):
+                if whole[t] != whole[t - 1]:
+                    caps.append({"step": t, "text": (
+                        f"Step {step(t)}. The parts are now {sep[t]:.2f} apart and hear each other at {hear[t]:.3f}, "
+                        f"{'more' if hear[t] > 0.5 else 'less'} than half strength: the {N}-maker reads out "
+                        f"{v[t]:.2f}, nearest whole number {whole[t]}, {_word(whole[t])}.")})
+            caps.append({"step": T - 1, "text": (
+                f"The run ends with the parts {sep[-1]:.2f} apart, hearing each other at {hear[-1]:.2f}; the "
+                f"{N}-maker reads out {v[-1]:.2f}, nearest whole number {whole[-1]}, {_word(whole[-1])}.")})
+            lanes.append({
+                "name": f"Inside the {N}-maker",
+                "note": f"Its two parts, and what it reads out: {N} when they hear each other well, {N - 1} apart.",
+                "space": {"label": f"inside the {N}-maker", "min": -4.5, "max": 4.5},
+                "boxes": [
+                    {"id": "r", "label": "reads out", "x": 0.0,
+                     "readout": {"kind": "meter", "title": f"what the {N}-maker reads out", "label": "value",
+                                 "min": N - 1.5, "max": N + 0.5, "values": series(v)},
+                     "sub": [f"{w}, {_word(w)}" for w in whole]},
+                    {"id": "a", "label": f"{N}a", "x": series(inner[:, 0])},
+                    {"id": "b", "label": f"{N}b", "x": series(inner[:, 1])},
+                ],
+                "links": [{"from": "a", "to": "b", "label": "how loudly the parts hear each other",
+                           "strength": series(hear)}],
+                "captions": caps,
+            })
+        variants.append({"id": vid, "name": name, "note": note, "lanes": lanes})
+    return {
+        "title": "Why the bad prime-finders break apart",
+        "description": ("A listener needs primes. Each finder's two parts make its number only together: each "
+                        "part's number is its piece plus how loudly it hears the other. A finder that reads out "
+                        "a composite is pushed away and broken up, and broken up it reads out another composite."),
+        "source": ("arrangements/joint_readout.py, run by Phi and recorded by arrangements/scenes.py "
+                   "(disintegrate_scene); book plan P73 (b), notes/runs/p73-b-56518228/."),
+        "steps": T,
+        "stride": JR_STRIDE,
+        "fps": 12,
+        "default_lane": -1,
+        "variants": variants,
+        "default_variant": "both",
+    }
+
+
+SCENES = {"listener": listener_live_scene, "listener-recorded": listener_scene, "disintegrate": disintegrate_scene}

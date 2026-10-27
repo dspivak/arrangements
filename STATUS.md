@@ -2371,3 +2371,19 @@ against the MLP's 0.045, 0.043 at 4000; both learners settle at 0.045, the best 
 `notes/runs/p5lC-a9e113da/RESULTS.md`. On bigger swings (amplitude 2.3) at rate 1.5e-3, the block with a 32-unit tanh
 layer learns the nonlinear map (held-out 0.021 against the linear fit's 0.157; slope correlating 0.97 with
 `2 - cos a`), the 3-unit block does not (0.144). 4 tests pass, 172 s.
+
+### 3.77 The joint readout: a prime-maker whose parts make its number only together (book P73 (b))
+
+`arrangements/joint_readout.py`, `tests/test_joint_readout.py`, scene `scenes.disintegrate_scene`, page
+`viewer/disintegrate.html` (Claude Opus 5.5, 56518228, 2026-10-26). **What runs in `arr`.** One composite per run,
+`(listener . ((finder_1 . (part_a || part_b)) || ...))`: each part a box with a state, its number its piece plus the
+weight with which it hears its partner; each finder an attention arrangement whose parts hear each other at the kernel
+of their separation; the listener an attention arrangement whose cost is how loudly it hears each finder times a smooth
+"not a prime" of that finder's value. Rounding a readout and testing it for primality is an observation beside the run.
+**What the tests are evidence of.** p75's lost model is recovered (redundant parts, its numbers to 0.01); a `P`-maker
+reads out `P - 1 + kappa(separation)`, prime iff its parts hear each other at over half strength; one part alone gives
+`P - 1`; under the listener's push the composite-makers break up and read out another composite, and a loose
+prime-maker is pulled back together below a separation of about 1.3 and let go above it, so under this listener no
+prime-maker flips to a composite. Settings and their sensitivity (the parts' lag drags their placements; the start on
+the listener's line decides whether a fleeing finder breaks up enough to change its number): the book's
+`notes/runs/p73-b-56518228/RESULTS.md`. 14 tests pass, 17 s.
