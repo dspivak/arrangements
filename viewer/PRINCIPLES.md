@@ -66,7 +66,9 @@ great." A page that departs from one says why in its own header comment.
 15. **The page's model is checked against the library.** Run the same arrangement in the library and compare
     numbers, then say on the page what was checked. The listener's test compares the page with
     `listener.run_script`. The tanks were checked against `tests/test_two_tanks.py`'s tanks with the book's linear
-    spout, for one-second steps.
+    spout, for one-second steps. A page whose scene is recorded from a run is recorded by a function in the library,
+    `arrangements/scenes.py`, and its `source` line names that function; the disintegration page's first builder
+    lived in `$TMPDIR`, and its source line named a file that never existed (book `notes/FEEDBACK.md`, 56518228).
 16. **The numbers behind the picture can be seen.** When a motion surprises, the viewer can open the run's numbers
     step by step ("I don't know if you can grab the data from the website. That'd be a cool feature, like a debug
     button"; asked on the listener, not yet built on either page).
