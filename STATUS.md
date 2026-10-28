@@ -582,9 +582,23 @@ cumulative product weights, so in the test's pair the order changes A's draw onl
 of probability 0.1 per step, and a 12-step run happened to show no difference at all. Nothing
 yet uses the asymmetry; any result that changes under the swap will show it here first.
 
+**Over durations, renamings, seeds, laws** (book plan P6 (d), Claude Opus 5.5, aa61c0a2, 2026-10-28;
+`tests/test_rand_durations.py`, 12 tests, predictions in the book's `notes/runs/p6d-aa61c0a2/RESULTS.md`).
+`CovGaussianRV` is `rand_N = sum_n PSD_n y^{R^n}`, the variance in the position, and `euler_maruyama_cov`
+its Euler--Maruyama step over a duration: smooth up to duration zero, where `euler_maruyama`'s
+`sqrt(duration)` is not (its difference quotient grows like `h^{-1/2}`), with the same law. Two parts
+step at one shared duration with block-sum covariance. The interchange law's two sides, `((a || b) . (x || y))`
+and `((a . x) || (b . y))`, draw their noise in two orders and agree only after renaming the seed (and
+on the nose when a middle part has no noise); `A (x) B` and `B (x) A` differ by the block swap. At laws
+all of this is the state map alone. The library's fair finite draw jumps in the demanded probability, so
+no smooth sampler is fair. A held direction's stationary variance at duration `tau` is
+`(T/a)/(1 - tau eta a/2)`, read off `Phi`'s kernel, tending to Gibbs's `T/a`. `CotCoalgR.position_at`
+was added so `Phi` can run a noisy part at a duration.
+
 **Not established.** Langevin stationary laws, escape rates, and the continuous-time limit
 are analytic theorems about these chains, not consequences of the construction. The
-symmetry-restoring quotient of `rand` is not implemented.
+symmetry-restoring quotient of `rand` is not implemented, and not needed: renamings as
+isomorphisms of matter restore symmetry (book plan §5.9 item 4).
 
 ### 3.13 The collective, and dispersal
 

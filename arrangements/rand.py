@@ -136,6 +136,40 @@ class GaussianRV:
         return GaussianRV(n + m, lambda z: k(self.ret(z[:n])).ret(z[n:]))
 
 
+@dataclass(frozen=True)
+class CovGaussianRV:
+    """An element ``(n, Sigma, f)`` of ``rand_N = sum_n PSD_n y^{R^n}``: the random
+    variable ``ret : R^n -> X`` on the centered normal law ``N(0, Sigma)``, ``Sigma``
+    positive semidefinite, degenerate allowed (plan P6 (d) (1)).
+
+    Here the measure's size sits in the position, as ``P`` does for ``rand``, so a
+    variance that grows with the duration is a smooth position; on ``rand_G`` it must
+    sit in the return map as ``sqrt(duration)``, which is not smooth at duration zero.
+    A monoid for the tensor by block sum, ``N(0, S (+) S') = N(0, S) (x) N(0, S')``.
+    No ``bind``: flattening a covariance that depends on an earlier sample needs its
+    square root, which is not smooth where it degenerates."""
+
+    n: int
+    cov: Array
+    ret: Callable[[Array], Any]
+
+    @property
+    def position(self):
+        """The demand ``(n, Sigma)``."""
+        return self.cov
+
+    @staticmethod
+    def unit(x) -> "CovGaussianRV":
+        """The unit ``y -> rand_N``: the certain random variable on ``R^0``."""
+        return CovGaussianRV(0, jnp.zeros((0, 0)), lambda z: x)
+
+    def tensor(self, other: "CovGaussianRV") -> "CovGaussianRV":
+        """Independent product on ``R^n x R^m = R^{n+m}``, covariance the block sum."""
+        n = self.n
+        cov = jax.scipy.linalg.block_diag(self.cov, other.cov) if n + other.n else jnp.zeros((0, 0))
+        return CovGaussianRV(n + other.n, cov, lambda z: (self.ret(z[:n]), other.ret(z[n:])))
+
+
 # ---------------------------------------------------------------------------
 # Stochastic parameters: (cot(Q) tri rand)-coalgebras.
 # ---------------------------------------------------------------------------
@@ -165,6 +199,10 @@ class CotCoalgR:
         if self.timed_step is None:
             raise TypeError(f"part {self.label or '?'} has no duration law (timed_step is None)")
         return self.timed_step(s, xi_Q, duration)
+
+    def position_at(self, s, duration=None):
+        """The look-ahead: deterministic, and here the same at every duration."""
+        return self.position(s)
 
     def tensor(self, other) -> "CotCoalgR":
         """The parallel product: base ``Q x Q'``, state a pair, and the independent
@@ -246,6 +284,25 @@ def euler_maruyama(Q: ReactiveVectorSpace, temperature: float, init: Array = Non
 
     return CotCoalgR(Q_dim=Q.dim, init=s0, position=lambda s: s, step=step,
                      kind=GaussianRV, label=f"EM(T={temperature:g})", timed_step=timed_step)
+
+
+def euler_maruyama_cov(Q: ReactiveVectorSpace, temperature: float, init: Array = None) -> CotCoalgR:
+    """Euler--Maruyama on ``rand_N``: over a duration ``tau`` the random variable
+    ``(d, 2 T tau sharp_s, z |-> s + tau sharp_s(xi_Q) + z)``.
+
+    The same law as ``euler_maruyama``'s timed step at every ``tau > 0``, but smooth
+    up to duration zero: the variance ``2 T tau sharp_s`` is linear in ``tau`` and sits
+    in the position, and the return map is affine (plan P6 (d) (1))."""
+    c = 2.0 * temperature
+    s0 = jnp.zeros(Q.dim) if init is None else jnp.asarray(init, dtype=float)
+
+    def timed_step(s, xi_Q, tau):
+        drift = s + tau * Q.apply_sharp(s, xi_Q)
+        return CovGaussianRV(Q.dim, c * tau * Q.sharp_at(s), lambda z: drift + z)
+
+    return CotCoalgR(Q_dim=Q.dim, init=s0, position=lambda s: s,
+                     step=lambda s, xi_Q: timed_step(s, xi_Q, 1.0),
+                     kind=CovGaussianRV, label=f"EMcov(T={temperature:g})", timed_step=timed_step)
 
 
 # ---------------------------------------------------------------------------
