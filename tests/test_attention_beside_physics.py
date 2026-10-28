@@ -111,3 +111,100 @@ def test_wider_block_learns_the_nonlinear_term():
     corr = float(np.corrcoef(slope, 2 - np.cos(np.asarray(xs[:, 1])))[0, 1])
     print(f"held-out {err:.4f}, no change {base:.4f}; slope correlation with 2 - cos a: {corr:.3f}")
     assert err < 0.5 * 0.157 and corr > 0.8
+
+
+# ---------------------------------------------------------------------------
+# C3: the selection condition (P5 (l) stage C3). The window mixes two pendulums' readings, only one
+# the target, permuted by a schedule; the block selects by tag, the MLP reads the flat window.
+# ---------------------------------------------------------------------------
+
+
+def _sel_starts(K, seed=1):
+    rng = np.random.default_rng(seed)
+    return [((rng.uniform(-1.0, 1.0), rng.uniform(-1.0, 1.0)), (rng.uniform(-1.0, 1.0), rng.uniform(-1.0, 1.0)))
+            for _ in range(K)]
+
+
+def test_selection_learner_does_not_move_the_pendulums():
+    """CHECKS (C3-1, prediction 1). Three pairs of pendulums, 50 ``Phi`` steps: each pendulum's presented position
+    equals the open run's ``q + p`` to 1e-9, and the effort field at each pendulum's configuration is its own ``-sin a``
+    (the label's share is 0, the delays pull nothing, the permutation counter ignores its force)."""
+    from arrangements.attention_beside_physics import (
+        SelectionBlock, draw_permutations, wired_attention_selection, wired_sel_presented, wired_sel_presented_B,
+    )
+
+    K, N = 3, 50
+    bk = SelectionBlock()
+    starts = _sel_starts(K)
+    perm = draw_permutations(N + 5, bk.ntokens, 0)
+    A = wired_attention_selection(starts, bk, eta=1.5e-4, seed=1, perm=perm)
+    s = _run(A, N)
+    O = Phi(oscillator(PENDULUM[0], 1, 1.0))
+    pa, pb = wired_sel_presented(A, s, K, bk), wired_sel_presented_B(A, s, K, bk)
+    for u in range(K):
+        (qA, pA), (qB, pB) = starts[u]
+        ta = trajectory(O, jnp.array([qA]), jnp.array([pA]), N)
+        tb = trajectory(O, jnp.array([qB]), jnp.array([pB]), N)
+        assert abs(float(pa[u]) - float(ta[-1][0] + ta[-1][1])) < 1e-9
+        assert abs(float(pb[u]) - float(tb[-1][0] + tb[-1][1])) < 1e-9
+    z = jnp.zeros(0)
+    force = A.omega(A.P.position(s), z, z)[0]
+    pu = 2 + 4 * bk.npend
+    a_pos = A.P.position(s)[:K * pu].reshape(K, pu)
+    np.testing.assert_allclose(force[:K * pu].reshape(K, pu)[:, 0], -jnp.sin(a_pos[:, 0]), atol=1e-14)
+    np.testing.assert_allclose(force[:K * pu].reshape(K, pu)[:, 1], -jnp.sin(a_pos[:, 1]), atol=1e-14)
+
+
+def test_selection_forces_at_the_weights_are_backpropagation():
+    """COMPARES with ``jax.grad`` of the plain evaluator (C3-1, prediction 2). The effort field at the weights equals
+    minus the gradient of the summed squared error over the permuted windows the tokens hear, to 1e-10; with layer 2's
+    keys and queries frozen the gradient differs by at least 1e6 times that (the selection path is carried)."""
+    from arrangements.attention_beside_physics import (
+        SelectionBlock, direct_loss_sel, draw_permutations, wired_attention_selection, wired_sel_presented,
+        wired_sel_perm, wired_sel_weights, wired_sel_windows,
+    )
+
+    K, N = 3, 50
+    bk = SelectionBlock()
+    starts = _sel_starts(K)
+    perm = draw_permutations(N + 5, bk.ntokens, 0)
+    A = wired_attention_selection(starts, bk, eta=1.5e-4, seed=1, perm=perm)
+    s = _run(A, N)
+    z = jnp.zeros(0)
+    force = A.omega(A.P.position(s), z, z)[0]
+    off = K * (2 + 4 * bk.npend) + bk.ntokens
+    fW = force[off:off + bk.n]
+    W = wired_sel_weights(A, s, K, bk)
+    win = wired_sel_windows(A, s, K, bk)
+    perm_cur = wired_sel_perm(A, s, K, bk)
+    win_heard = win[:, perm_cur]
+    tags = jnp.tile(perm_cur, (K, 1))
+    lab = wired_sel_presented(A, s, K, bk)
+    g = jax.grad(lambda W_: direct_loss_sel(bk, W_, win_heard, tags, lab))(W)
+    gf = jax.grad(lambda W_: direct_loss_sel(bk, W_, win_heard, tags, lab, freeze_keys=True))(W)
+    err, gap = float(jnp.max(jnp.abs(fW + g))), float(jnp.max(jnp.abs(fW + gf)))
+    print(f"max |force + grad| = {err:.3g}; max |force + frozen grad| = {gap:.4g}; "
+          f"max |force| = {float(jnp.max(jnp.abs(fW))):.4g}")
+    assert err < 1e-10
+    assert gap > 1e6 * max(err, 1e-16)
+
+
+def test_selection_learner_predicts_the_target():
+    """ILLUSTRATES (C3-2). Forty units (80 pendulums), the wide-embedding block (d=16) at the learning rate
+    (2.5e-3, so eta*K = 0.1), 5000 steps: the block's held-out one-step error on the target pendulum falls well below
+    "no change" (recorded 0.16 against 0.56). The default block (d=4) stays stuck; the matched MLP comparison and the
+    frozen-keys gap at trained weights are in ``notes/runs/p5lC3-<code>/RESULTS.md``."""
+    from arrangements.attention_beside_physics import (
+        SelectionBlock, draw_permutations, held_out_error_selection, wired_attention_selection, wired_sel_weights,
+    )
+
+    K = 40
+    bk = SelectionBlock(d=16)
+    starts = _sel_starts(K)
+    perm = draw_permutations(5005, bk.ntokens, 0)
+    A = wired_attention_selection(starts, bk, eta=2.5e-3, seed=1, perm=perm)
+    step = closed_step(A, check=0)
+    s = jax.jit(lambda s: jax.lax.fori_loop(0, 5000, lambda _i, x: step(x), s))(A.P.init)
+    err, base = held_out_error_selection(bk, wired_sel_weights(A, s, K, bk))
+    print(f"selection (d=16) held-out one-step error {err:.4f}, no change {base:.4f}")
+    assert err < 0.5 * base

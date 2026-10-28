@@ -37,9 +37,9 @@ from .addressed import AddressedArrangement, slot_output
 from .addressed_rounds import Color, ground, heard_dim, in_dim, out_dim, rounds
 from .arrangement import Arrangement, zero_form
 from .attention import Transfer, zero_transfer
-from .coalgebra import configuration
+from .coalgebra import CotCoalg, configuration
 from .rvect import euclidean, trivial
-from .system_id import PENDULUM, delay_box, observed_oscillator
+from .system_id import PENDULUM, delay_box, mlp, observed_oscillator, one_way_squared_error
 
 
 @dataclass(frozen=True)
@@ -305,5 +305,402 @@ def held_out_error(bk: Block, W: Array, *, n_traj: int = 8, T: int = 40, seed: i
         a = [float(x[0] + x[1] / m) for x in trajectory(O, jnp.array([q0]), jnp.array([p0]), T)]
         for t in range(bk.h, len(a)):
             errs.append(abs(float(f(jnp.asarray(a[t - bk.h:t]))) - a[t]))
+            base.append(abs(a[t] - a[t - 1]))
+    return float(np.mean(errs)), float(np.mean(base))
+
+
+# ---------------------------------------------------------------------------
+# C3: a selection condition where which input matters varies (P5 (l) stage C3).
+#
+# Two pendulums, A the target and B the distractor. The window is the last ``npend`` presented
+# positions of each, interleaved by a pre-drawn permutation the environment sets (a counter
+# reading permutations, as ``state_inference.noise_box`` reads samples), each reading tagged with
+# its identity; the target is A's next presented position. The block's tokens hear the reading's
+# value and tag (the tag in the embedding), so attention can select by tag; the MLP reads the same
+# window flat, value plus one-hot tag, and must learn a position-independent read.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SelectionBlock:
+    """The tag-selection predictor's sizes: ``npend`` positions per pendulum (two pendulums, so
+    ``ntokens = 2 * npend`` tokens), width ``d``, ``heads`` heads, ``d_mlp`` the hidden layer after layer 1."""
+
+    npend: int = 2
+    d: int = 4
+    heads: int = 2
+    dk: int = 2
+    dv: int = 2
+    d_mlp: int = 3
+
+    @property
+    def ntokens(self) -> int:
+        return 2 * self.npend
+
+    def shapes(self) -> List[Tuple[str, Tuple[int, ...]]]:
+        s = [("e", (self.d,)), ("e_tag", (self.ntokens, self.d))]
+        for l in range(2):
+            for a in range(self.heads):
+                s += [(f"Q{l}{a}", (self.dk, self.d)), (f"K{l}{a}", (self.dk, self.d)),
+                      (f"V{l}{a}", (self.dv, self.d)), (f"O{l}{a}", (self.d, self.dv))]
+        return s + [("W1", (self.d_mlp, self.d)), ("b1", (self.d_mlp,)), ("W2", (self.d, self.d_mlp)),
+                    ("U", (1, self.d)), ("c", (1,))]
+
+    @property
+    def n(self) -> int:
+        return sum(int(np.prod(sh)) for _, sh in self.shapes())
+
+    def unpack(self, W: Array) -> Dict[str, Array]:
+        out, c = {}, 0
+        for name, sh in self.shapes():
+            k = int(np.prod(sh))
+            out[name] = jnp.reshape(W[c:c + k], sh)
+            c += k
+        return out
+
+
+def embed_sel(w: Dict[str, Array], tag, value: Array) -> Array:
+    """``x0 = value * e + e_tag[tag]``: the reading's value times ``e`` plus its identity's embedding."""
+    return value * w["e"] + w["e_tag"][jnp.asarray(tag, jnp.int32)]
+
+
+def token_color_sel(bk: SelectionBlock) -> Color:
+    def strategy(s1, theta, l, H):
+        x0, w = theta[:bk.d], bk.unpack(theta[bk.d:])
+        return token_sends(bk, w, 1, layer_one(bk, w, x0, head_means(bk, w, 0, x0, H[0])))
+
+    return Color(bk.heads, bk.d + bk.n, strategy, label="token")
+
+
+def token_sel(bk: SelectionBlock, i: int) -> Arrangement:
+    """Token ``i`` as a stateless arrangement hearing the weights, its reading's value and tag (and the last, the
+    label ``a^A``); its embedding is ``embed_sel``. The last token's 1-form is ``-d`` of the squared error in the
+    weights, its value and its round hearings, and 0 on the tag and the label."""
+    c, n, last = token_color_sel(bk), bk.n, i == bk.ntokens - 1
+
+    def emit(q, m):
+        w = bk.unpack(m[:n])
+        x0 = embed_sel(w, m[n + 1], m[n])
+        return jnp.concatenate([token_sends(bk, w, 0, x0), x0, m[:n]])
+
+    def cost(W, val, tag, lab, e):
+        w = bk.unpack(W)
+        return 0.5 * (answer(bk, w, embed_sel(w, tag, val), e) - lab) ** 2
+
+    def omega(q, m, e):
+        gW, gval, ge = jax.grad(cost, argnums=(0, 1, 4))(m[:n], m[n], m[n + 1], m[n + 2], e)
+        return jnp.zeros_like(q), jnp.concatenate([-gW, -gval[None], jnp.zeros(1), jnp.zeros(1)]), -ge
+
+    return Arrangement(
+        P=configuration(trivial()), in_dim_M=0, out_dim_M=n + 2 + int(last),
+        in_dim_N=in_dim(c, 2, bk.dv, bk.dk), out_dim_N=out_dim(c, bk.dv, bk.dk),
+        out_f=emit, in_f=lambda q, m, e: jnp.zeros(0), omega=omega if last else zero_form,
+        label=f"token{i}" + ("+loss" if last else ""),
+    )
+
+
+def attention_group_sel(bk: SelectionBlock) -> AddressedArrangement:
+    """The causal-softmax group over ``bk.ntokens`` tokens (as ``attention_group``, ``bk.ntokens`` in place of ``bk.h``)."""
+
+    def hearing(q, x, y, Z):
+        if x[1] != y[1] or y[0] > x[0]:
+            return zero_transfer(bk.dv)
+        g = jnp.exp(jnp.dot(Z[x][1], Z[y][0]))
+        return Transfer(gamma=g, L=g * jnp.eye(bk.dv))
+
+    return AddressedArrangement(
+        slots=(bk.heads,) * bk.ntokens, exposure=(), dim_H=bk.dv, dim_P=bk.dk, P=configuration(trivial()),
+        placement=lambda q: jnp.zeros((bk.ntokens, bk.dk)), hearing=hearing, label="causal-softmax",
+    )
+
+
+def predictor_sel(bk: SelectionBlock) -> Arrangement:
+    """``ground . Phi_2(group) . (token_0 (x) ... (x) token_{ntokens-1})``."""
+    from .wiring import compose_seq, tensor_arrangements
+
+    c = token_color_sel(bk)
+    grp, cg = rounds(attention_group_sel(bk), [c] * bk.ntokens, 2)
+    toks = tensor_arrangements([token_sel(bk, i) for i in range(bk.ntokens)])
+    return compose_seq(compose_seq(toks, grp), ground(cg, 2, bk.dv, bk.dk))
+
+
+def predict_sel(bk: SelectionBlock, W: Array, window: Array, tags: Array, freeze_keys: bool = False) -> Array:
+    """The plain JAX evaluator of the block on one permuted window (``window[t]`` the value, ``tags[t]`` the identity)."""
+    w = bk.unpack(W)
+    mask = jnp.tril(jnp.ones((bk.ntokens, bk.ntokens)))
+    X0 = jnp.stack([embed_sel(w, tags[t], window[t]) for t in range(bk.ntokens)])
+
+    def attend(l, X, Xkq):
+        outs = []
+        for a in range(bk.heads):
+            K = jnp.stack([kqv(bk, w, l, a, x)[0] for x in Xkq])
+            Q = jnp.stack([kqv(bk, w, l, a, x)[1] for x in Xkq])
+            V = jnp.stack([kqv(bk, w, l, a, x)[2] for x in X])
+            S = jnp.where(mask > 0, Q @ K.T, -jnp.inf)
+            outs.append(jax.nn.softmax(S, axis=1) @ V)
+        return outs
+
+    o1 = attend(0, X0, X0)
+    X1 = jnp.stack([layer_one(bk, w, X0[t], [o1[a][t] for a in range(bk.heads)]) for t in range(bk.ntokens)])
+    o2 = attend(1, X1, jax.lax.stop_gradient(X1) if freeze_keys else X1)
+    x2 = X1[-1] + sum(w[f"O1{a}"] @ o2[a][-1] for a in range(bk.heads))
+    return (w["U"] @ x2 + w["c"])[0]
+
+
+def direct_loss_sel(bk: SelectionBlock, W: Array, windows: Array, tags: Array, labels: Array,
+                    freeze_keys: bool = False) -> Array:
+    """``sum_i (1/2)(predict(window_i, tags_i) - label_i)^2`` over the units."""
+    preds = jnp.stack([predict_sel(bk, W, windows[i], tags[i], freeze_keys) for i in range(windows.shape[0])])
+    return 0.5 * jnp.sum((preds - labels) ** 2)
+
+
+def draw_permutations(T: int, ntokens: int, seed: int) -> np.ndarray:
+    """A schedule of ``T`` pre-drawn permutations of ``ntokens`` reading slots."""
+    rng = np.random.default_rng(seed)
+    return np.stack([rng.permutation(ntokens) for _ in range(T)])
+
+
+def permutation_box(perm: np.ndarray) -> Arrangement:
+    """``<0|0> -> <0|ntokens>``: a counter reading out the pre-drawn permutation of the reading slots, advancing once
+    per step (duration 0 included), ignoring the force on what it presents (``state_inference.noise_box``'s pattern)."""
+    ntokens = perm.shape[1]
+    perms = jnp.asarray(perm, dtype=float)
+    P = CotCoalg(
+        Q_dim=ntokens, init=jnp.int32(0),
+        position=lambda c: perms[c],
+        step=lambda c, xi: c + 1,
+        timed_step=lambda c, xi, tau: c + 1,
+        label="counter",
+    )
+    return Arrangement(
+        P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=ntokens,
+        out_f=lambda q, m_out: q,
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=zero_form, label="permutation",
+    )
+
+
+def _reading_idx(npend: int) -> np.ndarray:
+    """Within-unit output index of reading id ``r`` (0..2·npend-1): A's ``a_{t-npend+r}`` for ``r < npend``, else
+    B's ``b_{t-2·npend+r}``. Within a unit the outputs are ``[a_A, a_B, A_d1..A_dn, B_d1..B_dn]``."""
+    return np.asarray([1 + npend - r if r < npend else 1 + 3 * npend - r for r in range(2 * npend)])
+
+
+def _pos_unit(npend: int) -> int:
+    """The position stride per unit: pend_A (1) + pend_B (1) + 2·npend delays (2 each)."""
+    return 2 + 4 * npend
+
+
+def _in_idx(K: int, npend: int) -> np.ndarray:
+    """Each delay's heard output index, per unit (d^A_1 hears a_A, d^A_k hears d^A_{k-1}; same for B)."""
+    idx = []
+    for u in range(K):
+        base = u * (2 + 2 * npend)
+        idx.append(base)
+        idx += [base + k for k in range(2, npend + 1)]
+        idx.append(base + 1)
+        idx += [base + npend + k for k in range(2, npend + 1)]
+    return jnp.asarray(idx, dtype=int)
+
+
+def wired_attention_selection(
+    starts: Sequence[Tuple[Tuple[float, float], Tuple[float, float]]],
+    bk: SelectionBlock = SelectionBlock(),
+    *,
+    potential: Callable[[Array], Array] = PENDULUM[0],
+    m: float = 1.0,
+    eta: float = 1.5e-4,
+    seed: int = 0,
+    perm: Array = None,
+    init: Array = None,
+) -> Arrangement:
+    """The closed selection arrangement: per unit a target pendulum A and a distractor B (each ``npend`` delays), one
+    shared permutation counter, one shared weights box, a route that delivers each token its reading's value and tag
+    (the last token also the label ``a^A``), and a predictor per unit. Leaves in order: per unit
+    ``[pend_A, pend_B, A_d1..A_dn, B_d1..B_dn]``, then the permutation counter, then the weights."""
+    from .wiring import compose_seq, tensor_arrangements, trivial_parameter
+
+    K, npend, ntokens, n = len(starts), bk.npend, bk.ntokens, bk.n
+    unit_dim = 2 + 2 * npend
+    W0 = init_weights(bk, seed) if init is None else jnp.asarray(init)
+    weights = Arrangement(
+        P=configuration(euclidean(n, eta), init=W0), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=n,
+        out_f=lambda q, m_out: q, in_f=lambda q, m_out, n_in: jnp.zeros(0), omega=zero_form, label="weights",
+    )
+    perm_box = permutation_box(np.asarray(perm))
+    leaves = []
+    for (qA, pA), (qB, pB) in starts:
+        leaves += [observed_oscillator(potential, m, qA, pA), observed_oscillator(potential, m, qB, pB)]
+        leaves += [delay_box() for _ in range(npend)] + [delay_box() for _ in range(npend)]
+    parts = tensor_arrangements(leaves + [perm_box, weights])
+    reading = jnp.asarray(_reading_idx(npend), dtype=int)
+    P_OFF, W_OFF = K * unit_dim, K * unit_dim + ntokens
+
+    def out_f(q, m_out):
+        parts_u = m_out[:P_OFF].reshape(K, unit_dim)
+        perm_f = m_out[P_OFF:P_OFF + ntokens]
+        perm = perm_f.astype(jnp.int32)
+        weights_v = m_out[W_OFF:W_OFF + n]
+        vals = parts_u[:, reading][:, perm]           # (K, ntokens): token i hears reading perm[i]
+        out = []
+        for u in range(K):
+            for i in range(ntokens):
+                out += [weights_v, vals[u, i:i + 1], perm_f[i:i + 1]]
+                if i == ntokens - 1:
+                    out += [parts_u[u, 0:1]]          # the label a^A
+        return jnp.concatenate(out)
+
+    route = Arrangement(
+        P=trivial_parameter(), in_dim_M=K * ntokens, out_dim_M=P_OFF + ntokens + n, in_dim_N=0,
+        out_dim_N=K * (ntokens * (n + 2) + 1),
+        out_f=out_f, in_f=lambda q, m_out, n_in: m_out[_in_idx(K, npend)],
+        omega=zero_form, label="route",
+    )
+    preds = tensor_arrangements([predictor_sel(bk) for _ in range(K)])
+    return compose_seq(compose_seq(parts, route), preds)
+
+
+def wired_sel_presented(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+    """A's presented positions, shape ``(K,)``."""
+    pu = _pos_unit(bk.npend)
+    return arr.P.position(state)[:K * pu].reshape(K, pu)[:, 0]
+
+
+def wired_sel_presented_B(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+    """B's presented positions, shape ``(K,)``."""
+    pu = _pos_unit(bk.npend)
+    return arr.P.position(state)[:K * pu].reshape(K, pu)[:, 1]
+
+
+def wired_sel_weights(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+    off = K * _pos_unit(bk.npend) + bk.ntokens
+    return arr.P.position(state)[off:off + bk.n]
+
+
+def wired_sel_windows(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+    """The reading values in id order, ``(K, ntokens)`` (A's older first, then B's)."""
+    pos = arr.P.position(state)
+    pu, npend, ntokens = _pos_unit(bk.npend), bk.npend, bk.ntokens
+    idx = [pu * u + (2 * npend - 2 * r if r < npend else 6 * npend - 2 * r)
+           for u in range(K) for r in range(ntokens)]
+    return pos[jnp.asarray(idx)].reshape(K, ntokens)
+
+
+def wired_sel_perm(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+    off = K * _pos_unit(bk.npend)
+    return arr.P.position(state)[off:off + bk.ntokens].astype(jnp.int32)
+
+
+def held_out_error_selection(bk: SelectionBlock, W: Array, *, n_traj: int = 8, T: int = 40, seed: int = 101,
+                             perm_seed: int = 102, m: float = 1.0, q_amp: float = 1.0, p_amp: float = 1.0):
+    """Mean one-step error of the trained block on held-out runs of both open pendulums (A the target): the window is
+    A's and B's last ``npend`` positions permuted by a held-out schedule, the target A's next position. "No change" is
+    ``a_t ~ a_{t-1}``. An ordinary calculation beside the arrangement."""
+    from .functors import Phi
+    from .system_id import oscillator, trajectory
+
+    O = Phi(oscillator(PENDULUM[0], 1, m))
+    rng = np.random.default_rng(seed)
+    prng = np.random.default_rng(perm_seed)
+    f = jax.jit(lambda win, tags: predict_sel(bk, W, win, tags))
+    errs, base = [], []
+    for _ in range(n_traj):
+        qA, pA = rng.uniform(-q_amp, q_amp), rng.uniform(-p_amp, p_amp)
+        qB, pB = rng.uniform(-q_amp, q_amp), rng.uniform(-p_amp, p_amp)
+        a = [x[0] + x[1] / m for x in trajectory(O, jnp.array([qA]), jnp.array([pA]), T)]
+        b = [x[0] + x[1] / m for x in trajectory(O, jnp.array([qB]), jnp.array([pB]), T)]
+        for t in range(bk.npend, len(a)):
+            readings = jnp.concatenate([jnp.asarray(a[t - bk.npend:t]), jnp.asarray(b[t - bk.npend:t])])
+            perm = prng.permutation(bk.ntokens)
+            errs.append(abs(float(f(readings[perm], perm)) - a[t]))
+            base.append(abs(a[t] - a[t - 1]))
+    return float(np.mean(errs)), float(np.mean(base))
+
+
+def wired_identification_selection(
+    starts: Sequence[Tuple[Tuple[float, float], Tuple[float, float]]],
+    *,
+    npend: int = 2,
+    potential: Callable[[Array], Array] = PENDULUM[0],
+    m: float = 1.0,
+    hidden: int = 32,
+    eta: float = 1.5e-4,
+    seed: int = 0,
+    perm: Array = None,
+    init: Array = None,
+) -> Arrangement:
+    """The MLP arm: the same two pendulums, delays and permutation counter, one MLP reading the flat window (each
+    reading its value and one-hot identity) and predicting A's next position, with a one-way loss."""
+    from .network import map_box
+    from .wiring import compose_seq, tensor_arrangements, trivial_parameter
+
+    K, ntokens = len(starts), 2 * npend
+    unit_dim = 2 + 2 * npend
+    in_dim = ntokens * (1 + ntokens)
+    F, n = mlp(hidden, in_dim, 1)
+    init = 0.1 * jnp.asarray(np.random.default_rng(seed).standard_normal(n)) if init is None else jnp.asarray(init)
+    weights = Arrangement(
+        P=configuration(euclidean(n, eta), init=init), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=n,
+        out_f=lambda q, m_out: q, in_f=lambda q, m_out, n_in: jnp.zeros(0), omega=zero_form, label="weights",
+    )
+    perm_box = permutation_box(np.asarray(perm))
+    leaves = []
+    for (qA, pA), (qB, pB) in starts:
+        leaves += [observed_oscillator(potential, m, qA, pA), observed_oscillator(potential, m, qB, pB)]
+        leaves += [delay_box() for _ in range(npend)] + [delay_box() for _ in range(npend)]
+    parts = tensor_arrangements(leaves + [perm_box, weights])
+    reading = jnp.asarray(_reading_idx(npend), dtype=int)
+    P_OFF, W_OFF = K * unit_dim, K * unit_dim + ntokens
+
+    def out_f(q, m_out):
+        parts_u = m_out[:P_OFF].reshape(K, unit_dim)
+        perm_f = m_out[P_OFF:P_OFF + ntokens]
+        perm = perm_f.astype(jnp.int32)
+        weights_v = m_out[W_OFF:W_OFF + n]
+        vals = parts_u[:, reading][:, perm]
+        onehot = jax.nn.one_hot(perm, ntokens)
+        out = []
+        for u in range(K):
+            out.append(weights_v)
+            for i in range(ntokens):
+                out += [vals[u, i:i + 1], onehot[i]]
+            out.append(parts_u[u, 0:1])                # the label a^A
+        return jnp.concatenate(out)
+
+    route = Arrangement(
+        P=trivial_parameter(), in_dim_M=K * ntokens, out_dim_M=P_OFF + ntokens + n, in_dim_N=0,
+        out_dim_N=K * (n + in_dim + 1),
+        out_f=out_f, in_f=lambda q, m_out, n_in: m_out[_in_idx(K, npend)],
+        omega=zero_form, label="route",
+    )
+    net = map_box(lambda v: F(v[:n], v[n:n + in_dim]), n + in_dim, 1, "net")
+    nets = tensor_arrangements([tensor_arrangements([net, map_box(lambda v: v, 1, 1, "id")]) for _ in range(K)])
+    losses = tensor_arrangements([one_way_squared_error(1) for _ in range(K)])
+    return compose_seq(compose_seq(compose_seq(parts, route), nets), losses)
+
+
+def held_out_error_mlp_selection(F, params: Array, *, npend: int = 2, n_traj: int = 8, T: int = 40,
+                                 seed: int = 101, perm_seed: int = 102, m: float = 1.0,
+                                 q_amp: float = 1.0, p_amp: float = 1.0):
+    """The MLP arm's held-out one-step error on the flat window; "no change" beside it."""
+    from .functors import Phi
+    from .system_id import oscillator, trajectory
+
+    O = Phi(oscillator(PENDULUM[0], 1, m))
+    rng = np.random.default_rng(seed)
+    prng = np.random.default_rng(perm_seed)
+    ntokens = 2 * npend
+    errs, base = [], []
+    for _ in range(n_traj):
+        qA, pA = rng.uniform(-q_amp, q_amp), rng.uniform(-p_amp, p_amp)
+        qB, pB = rng.uniform(-q_amp, q_amp), rng.uniform(-p_amp, p_amp)
+        a = [x[0] + x[1] / m for x in trajectory(O, jnp.array([qA]), jnp.array([pA]), T)]
+        b = [x[0] + x[1] / m for x in trajectory(O, jnp.array([qB]), jnp.array([pB]), T)]
+        for t in range(npend, len(a)):
+            readings = jnp.concatenate([jnp.asarray(a[t - npend:t]), jnp.asarray(b[t - npend:t])])
+            perm = prng.permutation(ntokens)
+            flat = jnp.concatenate([jnp.concatenate([readings[perm[i:i + 1]], jax.nn.one_hot(perm[i], ntokens)])
+                                    for i in range(ntokens)])
+            errs.append(abs(float(F(params, flat)[0]) - a[t]))
             base.append(abs(a[t] - a[t - 1]))
     return float(np.mean(errs)), float(np.mean(base))

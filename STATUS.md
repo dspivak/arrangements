@@ -2387,3 +2387,22 @@ prime-maker is pulled back together below a separation of about 1.3 and let go a
 prime-maker flips to a composite. Settings and their sensitivity (the parts' lag drags their placements; the start on
 the listener's line decides whether a fleeing finder breaks up enough to change its number): the book's
 `notes/runs/p73-b-56518228/RESULTS.md`. 14 tests pass, 17 s.
+
+### 3.78 A selection condition: two pendulums, a permuted tagged window (book P5 (l) stage C3)
+
+`arrangements/attention_beside_physics.py`, `tests/test_attention_beside_physics.py` (deepseek-v4-pro[1m], e2f6ff37,
+2026-10-28). **What runs in `arr`.** Two closed arrangements. `wired_attention_selection`: per unit a target pendulum A
+and a distractor B (each `npend` delays), one shared permutation counter (`permutation_box`, reading pre-drawn
+permutations of the reading slots as `state_inference.noise_box` reads samples), one weights box, a route that delivers
+each token its reading's value and tag (the last token also the label `a_A`), and per unit the predictor
+`ground . Phi_2(causal-softmax) . (token_0 (x) ... (x) token_3)`; a token's embedding is `value e + e_tag[tag]`, the tag
+in the embedding, so attention can select by tag. `wired_identification_selection`: the same leaves and permutation, one
+MLP reading the flat window (each reading its value and one-hot identity) and predicting A. **What the tests are
+evidence of.** Exact: both pendulums equal the open runs (difference 0) and receive only their own `-sin a`; the effort
+field at the weights is minus the gradient of the plain evaluator to 2e-16 (block) and 5.5e-17 (MLP). Learned: at C2's
+settings (rate 1.5e-4) neither learner selects (block 0.621, MLP 0.630, above "no change" 0.5625); at a learning rate
+(2.5e-3) the default block (d=4, 180 weights) stays stuck, the MLP (705) learns (0.129), and a wide-embedding block
+(d=16, 708) beats it (0.068), its frozen-keys gap 0.28 of the force (C2's ~0). The selection task needs the embedding
+wide enough to carry four identities plus the value. 2 tests pass (`test_selection_learner_does_not_move_the_pendulums`,
+`test_selection_forces_at_the_weights_are_backpropagation`); the third (`test_selection_learner_predicts_the_target`)
+is the learning run. Results, plot and judgment: the book's `notes/runs/p5lC3-e2f6ff37/RESULTS.md`.
