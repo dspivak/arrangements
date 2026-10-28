@@ -316,12 +316,12 @@ def test_5_copies():
 
 
 # ---------------------------------------------------------------------------
-# Part 6: learning whom to trust by softmin lookup (book Ch 4 sec.learning_where).
+# Part 6: learning whom to trust by softmin lookup (book Ch 4 sec.learning_where, cut 2026-10-28; the version with Bob's query fixed, which Ch 4 ex.learning_trust, rebuilt 2026-10-28, no longer is).
 # ---------------------------------------------------------------------------
 
 
 def test_6_softmin_lookup_learns_inverse_variance():
-    """The trust example of sec.learning_where, before arrangements: Bob's query fixed at ``0``,
+    """The trust example of sec.learning_where (cut 2026-10-28), before arrangements: Bob's query fixed at ``0``,
     three sources at addresses ``k_i`` with softmin weights ``P = softmin(k^2 / 2)``, his cost the
     average over the days of ``½ (P . y - z)^2``; gradient descent on the addresses. Prediction: the
     weights settle at the least squares with ``sum P = 1``, close to the inverse average squared errors, normalized, and Bob's

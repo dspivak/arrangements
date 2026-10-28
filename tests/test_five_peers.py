@@ -1,4 +1,4 @@
-"""Five peers who move to hear one another better (the book's Ch 4 ``ex.five_peers``, plan P5 (k)).
+"""Five peers who move to hear one another better (the book's Ch 4 ``ex.five_peers``, plan P5 (k); cut from the book 2026-10-24 by P5 (l)).
 
 The construction is ``arrangements/five_peers.py``: an attention arrangement whose matter is the five places,
 its internal boxes filled by five persons who report the number plus a fresh error each round, composed in

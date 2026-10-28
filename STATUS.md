@@ -2282,7 +2282,7 @@ precision"): `samples`, `evidence_sender` (state `l1` only, sends `(K Pi1 xbar_j
 minus the log marginal likelihood up to a constant (1e-12), and the run reaches the type-II ML precisions from both
 starts, no funnel, no step-size edge. 13 tests in the file.
 
-### 3.72 Five peers who move to hear one another better (book P5 (k), Ch 4 `ex.five_peers`)
+### 3.72 Five peers who move to hear one another better (book P5 (k), Ch 4 `ex.five_peers`, cut from the book 2026-10-24 by P5 (l))
 
 `arrangements/five_peers.py`, `tests/test_five_peers.py` (6 tests, about 100 s). An attention arrangement
 (`attention.py`) whose matter is five places on the line, its transfers the softmin hearing of `sec.messages`

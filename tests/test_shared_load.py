@@ -1,4 +1,4 @@
-"""A shared load on breakable bonds (book Ch 4, ``ex.shared_load`` and ``exc.load_tears``;
+"""A shared load on breakable bonds (book Ch 4, ``ex.shared_load`` and ``exc.load_tears``, cut from the book 2026-10-26, archived in its `notes/archive/ch4-shared-load-cut-2026-10-26.tex`;
 plan notes ``notes/runs/ch4-bond-970ef227/PREDICTIONS.md``, written before this file).
 
 **Every operation here runs in arr.** The holding is an attention arrangement of

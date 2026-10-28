@@ -1,4 +1,4 @@
-"""Five peers who move to hear one another better (the book's Ch 4 ``ex.five_peers``, plan P5 (k)).
+"""Five peers who move to hear one another better (the book's Ch 4 ``ex.five_peers``, plan P5 (k); cut from the book 2026-10-24 by P5 (l)).
 
 Five people stand on a line, ``P = R`` with divergence ``d(k, q) = (1/2)(k - q)^2``, and all want to know the
 same number ``x``. Each reports ``x`` plus their own error, independent of the others', of expected value ``0``;
