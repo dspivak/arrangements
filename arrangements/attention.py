@@ -239,6 +239,10 @@ TransferMatrix = Tuple[Tuple[Transfer, ...], ...]
 Transfers = Callable[[Array], TransferMatrix]
 Placement = Callable[[Array], Array]          # q |-> (n, dim_P), the l_i(q)
 Cost = Callable[[Array, Array, Array], Array]  # (q, m_out, n_in) |-> R_{>=0}
+# The voices (book P73 (c), 01e0eec3, 2026-10-27): ``q |-> (n+1, dim_H+1)``, row ``i`` the
+# message box ``i`` hears from the matter, a cone point (positive weight, or ``0_M``).
+# ``None`` is silence everywhere, the operad of the paper.
+Voices = Callable[[Array], Array]
 
 
 def zero_cost(q: Array, m_out: Array, n_in: Array) -> Array:
@@ -285,6 +289,7 @@ class AttentionArrangement:
     transfers: Transfers
     cost: Cost = zero_cost
     label: str = ""
+    voices: Optional[Voices] = None   # book P73 (c): the matter as one more sender; None = silent
 
     # ---- derived dimensions ----
 
@@ -298,24 +303,34 @@ class AttentionArrangement:
 
     # ---- the sending and receiving maps (eq:maps) ----
 
+    def voice(self, q: Array) -> Array:
+        """``v(q) : (n+1, dim_H+1)``, row ``i`` what box ``i`` hears from the matter
+        (book P73 (c)); all ``0_M`` when the arrangement is silent (``voices=None``)."""
+        if self.voices is None:
+            return jnp.zeros((self.n + 1, self.msg_dim))
+        return self.voices(q)
+
     def sigma(self, q: Array, m_out: Array) -> Array:
-        """``sigma_a(q, m) = sum_{j=1}^n T_{0j}(q) m_j`` (eq:maps); empty sum ``0_M``."""
+        """``sigma_a(q, m) = v_0(q) + sum_{j=1}^n T_{0j}(q) m_j`` (eq:maps, plus the
+        voice); empty sum ``0_M``."""
         T = self.transfers(q)
         ms = split_messages(m_out, self.n, self.dim_H)
-        out = zero_message(self.dim_H)
+        out = self.voice(q)[0]
         for j in range(1, self.n + 1):
             out = out + apply_transfer(T[0][j], ms[j - 1])
         return out
 
     def rho(self, q: Array, m_out: Array, n_in: Array) -> Array:
-        """``rho_a(q, m, (m_0, p_0))_i = (T_{i0} m_0 + sum_j T_{ij} m_j, p_0 + l_i(q))`` (eq:maps)."""
+        """``rho_a(q, m, (m_0, p_0))_i = (v_i(q) + T_{i0} m_0 + sum_j T_{ij} m_j, p_0 + l_i(q))``
+        (eq:maps, plus the voice)."""
         T = self.transfers(q)
         ms = split_messages(m_out, self.n, self.dim_H)
         m_0, p_0 = split_input(n_in, self.dim_H)
         ell = self.placement(q)
+        V = self.voice(q)
         parts = []
         for i in range(1, self.n + 1):
-            msg = apply_transfer(T[i][0], m_0)
+            msg = V[i] + apply_transfer(T[i][0], m_0)
             for j in range(1, self.n + 1):
                 msg = msg + apply_transfer(T[i][j], ms[j - 1])
             parts.append(make_input(msg, p_0 + ell[i - 1]))
@@ -372,6 +387,12 @@ def validate(a: AttentionArrangement, q: Optional[Array] = None) -> AttentionArr
                     raise ValueError(f"T_{i}{i} must be zero (def:arrangement)")
             elif not is_transfer(T[i][j]):
                 raise ValueError(f"T_{i}{j} is not a message transfer (eq:transfer)")
+    V = a.voice(q)
+    if jnp.shape(V) != (a.n + 1, a.msg_dim):
+        raise ValueError(f"voices must return ({a.n + 1}, {a.msg_dim}), got {jnp.shape(V)}")
+    for i in range(a.n + 1):
+        if not is_admissible(V[i]):
+            raise ValueError(f"voice to box {i} is not a message with positive weight or 0_M")
     ell = a.placement(q)
     if jnp.shape(ell) != (a.n, a.dim_P):
         raise ValueError(f"placement must return ({a.n}, {a.dim_P}), got {jnp.shape(ell)}")
@@ -519,11 +540,36 @@ def substitute(
             total = total + parts[i].cost(qs[i], locals_m[i], e_all[i * edim:(i + 1) * edim])
         return total
 
+    silent = a.voices is None and all(p.voices is None for p in parts)
+
+    def voices(q: Array) -> Array:
+        """The composite's voices (book P73 (c), STATEMENT.md "The voice"): to the
+        exterior, the parent's own plus each child's voice through the parent's
+        readout transfer; to a box ``(i, j)``, the child's own plus, through the
+        child's delivery transfer from its exterior, what the parent says to box
+        ``i`` and what the other children say through the parent's transfers."""
+        qs, qa = split_q(q)
+        Va = a.voice(qa)
+        Vi = [parts[i].voice(qs[i]) for i in range(n)]
+        Ta = a.transfers(qa)
+        Ti = [parts[i].transfers(qs[i]) for i in range(n)]
+        rows = [Va[0]]
+        for i in range(n):
+            rows[0] = rows[0] + apply_transfer(Ta[0][i + 1], Vi[i][0])
+        for i in range(n):
+            heard = Va[i + 1]                      # what the parent says to box i
+            for r in range(n):                     # what the other groups say, across the parent
+                heard = heard + apply_transfer(Ta[i + 1][r + 1], Vi[r][0])
+            for j in range(1, arities[i] + 1):
+                rows.append(Vi[i][j] + apply_transfer(Ti[i][j][0], heard))
+        return jnp.stack(rows)
+
     child_labels = ", ".join(p.label or "?" for p in parts)
     return AttentionArrangement(
         n=N, dim_H=dim_H, dim_P=dim_P, P=P,
         placement=placement, transfers=transfers, cost=cost,
         label=label or f"{a.label or 'a'}({child_labels})",
+        voices=None if silent else voices,
     )
 
 
@@ -563,8 +609,14 @@ def symmetric_action(a: AttentionArrangement, tau: Sequence[int]) -> AttentionAr
             relabeled[tau[i]] = ms[i]
         return a.cost(q, jnp.concatenate(relabeled), n_in)
 
+    voices = None
+    if a.voices is not None:
+        def voices(q: Array) -> Array:
+            V = a.voice(q)
+            return jnp.stack([V[t(i)] for i in range(n + 1)])
+
     return replace(
-        a, placement=placement, transfers=transfers, cost=cost,
+        a, placement=placement, transfers=transfers, cost=cost, voices=voices,
         label=f"{a.label or 'a'}.{tau}",
     )
 
