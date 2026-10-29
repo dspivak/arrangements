@@ -8,6 +8,10 @@ part can change whom it hears through its own outputs (the jump), as a transform
 queries do. The definition and its proof are in the book repository,
 ``notes/runs/p5g-f519e448/RESULTS.md``; everything here is the agents' and *proposed*.
 
+**Words.** A slot's *place* below (the field ``place``, the type ``Places``) is its (address, query); in a
+message to David, and in the book (Ch 4 ``sec.messages``), say *address and query*, never *place*, which he reads
+as the positions Ch 4 dropped (P77).
+
 **Colors and interfaces.** A color is a number ``r`` of *slots*. A slot sends an address
 ``k in P``, a query ``p in P`` and a message ``m = (h, w) in M = H x R``, and receives one message,
 what it hears. The interface of color ``r`` is ``B_r = <M^r x P | (P x P x M)^r>``: what each slot
