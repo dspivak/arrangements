@@ -16,6 +16,12 @@ Batch form: ``K`` trials sit in the coordinates of ``V = R^K``, each scout sendi
 reports with weight 1. The cost is the mean over trials of the per-trial cost, so gradient descent
 here is batch gradient descent on Ch 4's per-trial cost (the shared configuration is the
 stipulation, as in tests/test_fire.py part 4).
+
+Not the book's run (2026-10-29, Claude Opus 5.5, b0471e87): David called the batch form "seems like a total
+violation of the model. how could this be at all reasonable? the whole thing is a time-based physics. now you're
+cheating that? untenable.", since it runs an operation on the color ``R^K``, with one weight for all
+trials and no clock, not Ch 4's ``phi : R, R, R -> R``. Ch 4 ``ex.learning_trust`` now reports
+``tests/test_trust_in_time.py``, where a day lasts duration 1 and the reports arrive one day at a time.
 """
 
 import jax
