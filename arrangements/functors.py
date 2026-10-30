@@ -159,6 +159,17 @@ def Phi(arr: Arrangement) -> PCMorphism:
     existed (book P9.5).
     For a long run of a closed arrangement use ``closed_step`` below: the same
     step compiled, checked against this one on its first steps.
+
+    A position of the source box is a pair ``(out_m, omega_M)``: ``out_m`` in
+    ``R^{out_dim_M}``, the values the open boxes show, and ``omega_M``, their effort
+    field, a callable one-form on ``R^{in_dim_M}`` (``trivial_omega(arr.in_dim_M)``
+    from ``interpretation`` for none; one of another dimension fails inside the
+    VJP). So an arrangement whose open boxes hold given values steps by
+    ``Phi(arr).run_one((values, trivial_omega(arr.in_dim_M)), tell, duration)``,
+    ``tell`` sending the out-position to ``(xi_N, in_n)``, the force at the outputs
+    and the values at the inputs; it returns ``(out_pos, out_dir, new_state)``.
+    (The book's suggestion-box sweep, Claude Opus 5.5, 7d615468, 2026-10-30, from
+    b94c8c22's mark.)
     """
 
     P = arr.P
