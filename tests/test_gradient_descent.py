@@ -1,20 +1,40 @@
-"""Gradient descent and backpropagation via ``Phi`` (book sec.neural_network).
+"""A small neural network learning: backpropagation is the force passed back through the parts (book
+Chapter 2, ``sec.neural_network``; linked from the footnote after the paragraph on backpropagation).
 
-The book's run is the arrangement it draws (``network.drawn_network``; plan P43 (b) job 1): a white box
-per parameter, the datum's and the label's boxes stepping through a list of examples, gray ``x``, ``+``
-and ``tanh`` boxes, the wiring's copies, and the loss as a box, composed by ``compose_seq`` and
-``tensor_arrangements`` and run by ``Phi``. Nothing is computed outside it. Its checks:
-* the book's step, box by box: each box's own ``Phi`` passes the force back, and every wire of the
-  book's picture carries the force printed on it; the composite's ``Phi`` step is eqn.nn_step;
-* the drawn network's forces are minus the partial derivatives a standard library (``jax.grad``)
-  computes, and equal the one-box run's, for a two-layer network with several parameters per layer;
-* repeated ``Phi`` steps of the drawn network equal the one-box training loop step for step, and fit
-  the two-layer network to its examples.
+For a reader of the book. The network is run as the book draws it (``arrangements/network.py``): a
+white box for each parameter, the first weight ``w_1``, the bias ``w_2`` and the second weight ``w_3``,
+each holding its value as its state, reading it out unchanged, with no internal inclination and the
+learning rate ``eta`` as its response, so that one step is ``w_i' = w_i + eta xi_i`` (``eqn.nn_step``); a
+box for the datum ``x`` and one for the label ``l``, each stepping through a list of examples; gray
+boxes ``x``, ``+`` and ``tanh`` for the maps, each passing the force at its output back to its inputs by
+the transpose of its differential (``exc.nn_boxes``); the wiring's dots; and the loss, a part with the
+cost function ``(1/2)(y - l)^2`` on the answer ``y`` and the label. ``Phi`` runs the whole: values go
+forward along the wires and forces come back, so the force on each parameter is minus the partial
+derivative of the loss's cost at that parameter (``exc.nn_chain_rule``), which is backpropagation. The
+book's step (parameters ``(1, -1, 2)``, datum ``1``, label ``1``, learning rate ``1/10``, forces
+``(2, 2, 0)``, new parameters ``(1.2, -0.8, 2)``),
+run from the library's folder with it on the path, as the README's *Run it* says
+(``PYTHONPATH=. .venv/bin/python example.py``):
 
-The one-box run (``learning.parameterized_map`` of the whole map, its loss's covector computed in code
-by ``learning.train_by_port``) is kept as the check; its own tests follow, with the CDLM regression.
-``learning.train`` itself now runs the closed training arrangement, the learner wired to datum, label
-and loss boxes (P43 (b) job 5); ``test_train_is_the_port_fed_loop`` checks it equal to the old loop.
+    import jax.numpy as jnp
+    from arrangements.functors import Phi
+    from arrangements.interpretation import trivial_omega
+    from arrangements.network import drawn_network, parameters
+    A = drawn_network(1, 1, 1, [1.0, -1.0, 2.0], 0.1, [[1.0]], [[1.0]], out_bias=False)
+    _, _, s = Phi(A).run_one((jnp.zeros(0), trivial_omega(0)), lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+    print(parameters(A, s, 1, 3))   # [ 1.2 -0.8  2. ]
+
+What the tests check. ``test_book_step_box_by_box``: the book's step, each box run by its own ``Phi``
+and every wire of the picture carrying the force written on it, then the whole composite's step. A
+two-layer network with several parameters in each layer (``4`` hidden units, ``3`` inputs, ``2``
+outputs; a bias on the output too): the forces passed back are minus the partial derivatives a standard
+library (``jax.grad``) computes; each step is ``eqn.nn_step``; repeated steps fit the network to its
+examples, equal step for step to a training loop that keeps the whole network in one box. That one-box
+run (``arrangements/learning.py``) is kept as the check, with its own tests after.
+
+For agents: the drawn network replaced the one-box run as the book's run (P43 (b) jobs 1 and 5);
+``regress/gradient_descent.npz`` holds the CDLM recording this reproduces, covectors negated
+(STATUS.md §1). The file's earlier head is in ``notes/P31-B-CH2-HISTORY-2026-10-30.md``.
 """
 
 import jax

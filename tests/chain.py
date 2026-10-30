@@ -12,11 +12,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arrangements.arrangement import Arrangement, exact
+from arrangements.arrangement import Arrangement, exact, zero_form
 from arrangements.functors import closed_step
 from arrangements.interpretation import trivial_omega
 from arrangements.polynomial import nest_left, unnest_left
 from arrangements.rvect import diagonal
+from arrangements.wiring import boxes_and_couplers, trivial_parameter
 
 IN_POS = (jnp.zeros(0), trivial_omega(0))
 REGRESS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "regress")
@@ -42,6 +43,72 @@ def harmonic_particle(parameter, m, kappa) -> Arrangement:
         omega=exact(lambda q, m_out, n_in: -0.5 * kappa * (q[0] - n_in[0]) ** 2),
         label="Part",
     )
+
+
+# ---------------------------------------------------------------------------
+# The chain as the book draws it (Ch 2, sec.springs): boxes, a dot, springs as couplers.
+# ---------------------------------------------------------------------------
+
+
+def one_port_box(parameter, response: float, init, label: str) -> Arrangement:
+    """A part filling a box with one output port, as the book's tank, rod segment, mass and capacitor do.
+
+    Its state is ``parameter``'s on ``R`` (``configuration``: the state is the position it reads out;
+    ``phase``: a position and a momentum, and it reads out the position it is headed to, ``q + p/m``).
+    Its response function multiplies by ``response`` (``1/C`` for a segment of heat capacity ``C``,
+    ``1/m`` for a mass), it has no internal inclination beyond what ``parameter`` builds in (a mass's
+    kinetic energy), and the force that comes back along its port is its state's whole responsibility.
+    ``init`` is ``[q0]`` for ``configuration`` and ``([q0], [p0])`` for ``phase``.
+    """
+    return Arrangement(
+        P=parameter(diagonal(jnp.array([response])), init=init),
+        in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+        out_f=lambda q, m_out: q,
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=zero_form,
+        label=label,
+    )
+
+
+def spring(kappa: float, label: str = "spring") -> Arrangement:
+    """The book's spring (``eqn.spring_cost``), a joint of the rod or a resistor: a part without state
+    whose two input ports receive ``x_1`` and ``x_2`` and whose pushback is minus the differential of
+    the cost ``(kappa/2)(x_1 - x_2)^2``, so it returns ``kappa (x_2 - x_1)`` to the first end and
+    ``kappa (x_1 - x_2)`` to the second (``eqn.spring_pushback``)."""
+    return Arrangement(
+        P=trivial_parameter(),
+        in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, e: jnp.zeros(0),
+        in_f=lambda q, e, n_in: jnp.zeros(0),
+        omega=exact(lambda q, e, n_in: -0.5 * kappa * (e[0] - e[1]) ** 2),
+        label=f"{label}({kappa})",
+    )
+
+
+def book_chain(boxes, kappas) -> Arrangement:
+    """The chain of ``eqn.chain_wd``: ``K`` boxes in a row, consecutive ones joined by a spring of
+    constant ``kappas[i]``, the interior boxes' readouts copied to both their springs. The ends are
+    free, as in the book: the end boxes have one spring each, and the forces ``eqn.chain_forces`` sum
+    to zero, so what the chain carries (heat, momentum) is conserved."""
+    K = len(boxes)
+    if len(kappas) != K - 1:
+        raise ValueError(f"{K} boxes need {K - 1} spring constants, got {len(kappas)}")
+    return boxes_and_couplers(boxes, [(i, i + 1) for i in range(K - 1)], [spring(k) for k in kappas])
+
+
+def closed_run(arr: Arrangement, T: int):
+    """``T`` steps of ``Phi(arr)`` for a closed arrangement. Returns the list of the ``T + 1`` positions
+    ``arr.P.position(state)`` (for configuration boxes the states; for phase boxes the positions the
+    masses read out, ``q + p/m``) and the list of the ``T + 1`` states, the start first."""
+    from arrangements.functors import Phi
+    O = Phi(arr)
+    state = O.state
+    positions, states = [np.asarray(arr.P.position(state))], [state]
+    for _ in range(T):
+        _, _, state = O.with_state(state).run_one(IN_POS, lambda _o: (jnp.zeros(0), jnp.zeros(0)))
+        positions.append(np.asarray(arr.P.position(state)))
+        states.append(state)
+    return positions, states
 
 
 def conf_state(q):

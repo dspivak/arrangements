@@ -1,19 +1,47 @@
-"""The wave equation: the chain of harmonic particles with *phase* parameters (book sec.heat_waves).
+"""Waves along a chain of three masses, and the chain of any length with its ends held (book Chapter 2,
+``sec.waves`` in ``sec.heat_waves``; linked, with ``test_heat_equation.py``,
+from the footnote in ``sec.waves``
+on what makes the difference between heat and waves).
 
-The same chain wiring as test_heat_equation.py; the particles' parameter is
-``phase(Q)`` instead of ``configuration(Q)``, which makes a *different*
-arrangement (def.arr), and ``Phi`` of it is the conservative second-order
-discrete wave equation. References in CDLM: CDLM sec.spring_first_pass
-(the particle and wiring), eqn.potlens_composite_final (the state update),
-eqn.discrete_wave / eqn.wave_bc (pinned ends).
+For a reader of the book. The same wiring ``eqn.chain_wd`` as the rod's, filled with masses that slide
+without friction. A mass's state is a pair, its position ``q_i`` and its momentum ``p_i``; it reads out
+the position it is headed to, ``q_i + p_i/m_i`` (``eqn.mass_readout``), and that is what the springs
+receive. The force ``xi_i`` that comes back goes to both parts of the state, as ``(xi_i, xi_i/m_i)``; its
+internal inclination is minus the differential of its kinetic energy, ``(0, -p_i/m_i)``; and its response
+function ``eqn.wave_response`` sends the force into the momentum and the inclination into the position,
+so one step is ``q_i' = q_i + p_i/m_i``, ``p_i' = p_i + xi_i`` (``eqn.wave_step``, symplectic Euler). The
+springs are those of ``sec.springs``. In code (``tests/chain.py``) a mass is
+``one_port_box(phase, 1/m, ([q0], [p0]), "mass")``: the ``phase`` coalgebra holds ``(q, p)``, presents
+``q + p/m``, and steps as the book's response function does; a spring is ``spring(kappa)``; the chain is
+``book_chain(masses, [kappa_1, kappa_2])``, its ends free as in the book, so the total momentum stays
+put. The book's hand steps (unit masses, spring constants ``1/4``, from positions ``(8, 0, 0)`` at
+rest), run from the library's folder with it on the path, as the README's *Run it* says
+(``PYTHONPATH=. .venv/bin/python example.py``):
 
-The pinned runs hold their ends by boxes (plan P43 (b) job 4, Claude Opus 5.5, de71554a, 2026-10-10):
-``wiring.held_chain``, a held particle at ``0`` on each end, the right one joined to the last part by
-a spring, closed and run by ``Phi``. Until then the ends were held in code, ``q_prev = 0`` fed in and
-the pin's pull ``xi_N = -kappa * q~_K`` computed from the state each step; that run is kept and checked
-equal. The one-step tests feed given environment inputs through the open chain's ports, which is
-what they test. Environment covectors are forcings in the book's sign; the published field is
-``omega_N = pullback + omega|_N``, i.e. minus CDLM's ``dU``-based field (STATUS.md §1).
+    import jax.numpy as jnp
+    from arrangements.coalgebra import phase
+    from tests.chain import one_port_box, book_chain, closed_run, flat_state
+    masses = [one_port_box(phase, 1.0, (jnp.array([q]), jnp.zeros(1)), "mass") for q in (8.0, 0.0, 0.0)]
+    _, states = closed_run(book_chain(masses, [0.25, 0.25]), 3)
+    for s in states:
+        print(flat_state(s).reshape(3, 2).T)   # row 0 the positions, row 1 the momenta
+    # (8,0,0),(0,0,0); (8,0,0),(-2,2,0); (6,2,0),(-3,2.5,0.5); (3,4.5,0.5),(-2.625,1.125,1.5)
+
+What the tests check. ``test_book_chain_by_hand``: those steps; that the masses read out the position
+they are headed to; the total momentum ``0`` and the positions' sum ``8`` at every step
+(``exc.waves_sum``); every point of the plot ``eqn.wave_plot``; and that the masses do not settle, the
+middle one passing ``8/3``. The rest run the chain of ``K`` harmonic particles with both ends held at
+``0`` by walls (``wiring.held_chain``), each particle a box carrying its own spring to its left
+neighbour, as ``test_heat_equation.py`` does with ``configuration`` in place of ``phase``: the step is the
+book's; the recurrence ``m (q(t+1) - 2 q(t) + q(t-1)) = kappa Lap q(t)`` holds at every step; the open
+chain's one-step update and the one-form it presents at its left port are checked against the formulas
+of the paper this code grew from; and the same wiring filled two ways gives two arrangements with the
+same maps and different states (``test_heat_and_wave_are_two_arrangements_on_one_wiring``).
+
+For agents: ``regress/wave.npz`` holds the CDLM trajectories this reproduces (states identical,
+covectors negated: STATUS.md §1); the pinned ends once computed in code each step are kept as
+``_step_by_port`` and checked equal to the held chain. The file's earlier head is in
+``notes/P31-B-CH2-HISTORY-2026-10-30.md``.
 """
 
 import jax.numpy as jnp
@@ -23,7 +51,10 @@ from arrangements.coalgebra import configuration, phase
 from arrangements.functors import Phi
 from arrangements.wiring import compose_chain
 
-from tests.chain import IN_POS, HeldChain, harmonic_particle, load_regress, phase_flat, phase_state
+from tests.chain import (
+    IN_POS, HeldChain, book_chain, closed_run, flat_state, harmonic_particle, load_regress, one_port_box,
+    phase_flat, phase_state,
+)
 
 
 def _wave_chain(K, m, kappa):
@@ -66,6 +97,62 @@ def _run(O, q, p, xi_N, q_prev):
     out_pos, out_dir, new_state = O.with_state(phase_state(q, p)).run_one(
         IN_POS, lambda _o: (jnp.atleast_1d(xi_N), jnp.atleast_1d(q_prev)))
     return out_pos, out_dir, phase_flat(new_state, K)
+
+
+# ---------------------------------------------------------------------------
+# The chain as the book draws it (sec.waves): three masses, two springs, free ends.
+# ---------------------------------------------------------------------------
+
+
+def _masses(qs, kappas=(0.25, 0.25), m=1.0):
+    """Three masses ``m`` at the positions ``qs``, at rest, joined by springs of constants ``kappas``:
+    ``book_chain`` of ``one_port_box(phase, 1/m, ...)``."""
+    masses = [one_port_box(phase, 1.0 / m, (jnp.array([q]), jnp.zeros(1)), "mass") for q in qs]
+    return book_chain(masses, list(kappas))
+
+
+def _positions_and_momenta(states, K):
+    """The stored ``(q, p)`` of each mass at each state: arrays ``q[t, i]``, ``p[t, i]``."""
+    qp = np.stack([np.asarray(flat_state(s)).reshape(K, 2) for s in states])
+    return qp[:, :, 0], qp[:, :, 1]
+
+
+WAVE_PLOT = np.array([   # eqn.wave_plot: steps 0..24 of the first, middle and last mass, 3 decimals
+    [8, 0, 0], [8, 0, 0], [6, 2, 0], [3, 4.5, 0.5], [0.375, 5.625, 2], [-0.938, 4.531, 4.406],
+    [-0.883, 2.039, 6.844], [-0.098, 0.018, 8.08], [0.716, -0.017, 7.301], [1.347, 1.961, 4.692],
+    [2.131, 4.468, 1.401], [3.5, 5.624, -1.124], [5.399, 4.562, -1.961], [7.09, 2.078, -1.168],
+    [7.527, 0.036, 0.437], [6.092, -0.034, 1.942], [3.125, 1.922, 2.953], [-0.142, 4.436, 3.706],
+    [-2.265, 5.623, 4.642], [-2.416, 4.593, 5.823], [-0.814, 2.118, 6.697], [1.52, 0.054, 6.426],
+    [3.488, -0.05, 4.562], [4.571, 1.884, 1.545], [4.983, 4.404, -1.387],
+])
+
+
+def test_book_chain_by_hand():
+    """sec.waves' hand steps, unit masses and spring constants 1/4, from (8,0,0) at rest: the positions and
+    momenta go (8,0,0),(0,0,0) -> (8,0,0),(-2,2,0) -> (6,2,0),(-3,5/2,1/2) -> positions (3,4.5,0.5);
+    each mass reads out the position it is headed to (eqn.mass_readout); each step is eqn.wave_step with
+    the free-ended forces eqn.chain_forces at the read-out positions; the total momentum is 0 and the
+    positions sum to 8 at every step (exc.waves_sum); the plot eqn.wave_plot, point by point; and the
+    middle mass passes 8/3 and the chain never settles."""
+    K = 3
+    readouts, states = closed_run(_masses((8.0, 0.0, 0.0)), 24)
+    q, p = _positions_and_momenta(states, K)
+    np.testing.assert_allclose(q[:4], [[8, 0, 0], [8, 0, 0], [6, 2, 0], [3, 4.5, 0.5]], atol=1e-12)
+    np.testing.assert_allclose(p[:3], [[0, 0, 0], [-2, 2, 0], [-3, 2.5, 0.5]], atol=1e-12)
+    np.testing.assert_allclose(np.stack(readouts), q + p, atol=1e-12)          # unit masses: q + p/m
+    L = 0.25 * np.array([[-1.0, 1.0, 0.0], [1.0, -2.0, 1.0], [0.0, 1.0, -1.0]])   # the forces, free ends
+    for t in range(24):
+        np.testing.assert_allclose(q[t + 1], q[t] + p[t], atol=1e-12)
+        np.testing.assert_allclose(p[t + 1], p[t] + L @ q[t + 1], atol=1e-12)
+    np.testing.assert_allclose(p.sum(axis=1), 0.0, atol=1e-12)
+    np.testing.assert_allclose(q.sum(axis=1), 8.0, atol=1e-12)
+    np.testing.assert_allclose(q, WAVE_PLOT, atol=6e-4)
+    assert q[3, 1] > 8.0 / 3.0 and q[:, 1].min() < 0.0 and q[:, 1].max() > 5.0
+
+
+# ---------------------------------------------------------------------------
+# The chain of any length with its ends held by walls (wiring.held_chain), and the open chain.
+# ---------------------------------------------------------------------------
 
 
 def test_state_update_matches_composite_final():

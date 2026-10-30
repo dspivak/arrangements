@@ -314,6 +314,62 @@ def held_chain(parts: Sequence[Arrangement], kappa: float, parameter=configurati
 
 
 # ---------------------------------------------------------------------------
+# A wiring diagram as the book draws it: boxes, dots, couplers (book Ch 2, sec.springs).
+# ---------------------------------------------------------------------------
+
+
+def copy_wire(src_dim: int, picks: Sequence[int], label: str = "copy") -> Arrangement:
+    """The dots of a wiring diagram as one static arrangement ``<R^0|R^src_dim> -> <R^0|R^len(picks)>``,
+    ``m |-> m[picks]``.
+
+    A value copied to several ports comes back as the sum of the forces returned to them, since the
+    transpose of copying ``x |-> (x, x)`` is addition (book Ch 2, ``sec.springs``). That sum is produced
+    by ``compose_seq``'s pullback, not written here. Trivial parameter, zero forcing. (``commons.fan_wire``
+    and ``network.fan_box`` are the same wiring, written where they were first needed.)
+    """
+    idx = jnp.asarray(list(picks), dtype=int)
+    return Arrangement(
+        P=trivial_parameter(),
+        in_dim_M=0, out_dim_M=src_dim, in_dim_N=0, out_dim_N=len(idx),
+        out_f=lambda q, m_out: m_out[idx],
+        in_f=lambda q, m_out, n_in: jnp.zeros(0),
+        omega=zero_form,
+        label=label,
+    )
+
+
+def boxes_and_couplers(
+    boxes: Sequence[Arrangement], pairs: Sequence[Tuple[int, int]], couplers: Sequence[Arrangement]
+) -> Arrangement:
+    """The closed arrangement the book's Chapter 2 pictures draw: parts in boxes, each reading out one
+    value, wired through dots to two-port couplers (a pipe, a spring, a joint, a resistor) that return a
+    force to each end.
+
+    ``boxes[i]`` is a part ``<R^0|R^0> -> <R^0|R>`` (a tank, a rod segment, a mass, a capacitor);
+    ``couplers[j]`` is a stateless ``<R^0|R^2> -> <R^0|R^0>`` whose two ports receive the readouts of
+    ``boxes[pairs[j][0]]`` and ``boxes[pairs[j][1]]``. The composite is
+
+        compose_seq(compose_seq(tensor(boxes), copy_wire(picks)), tensor(couplers)),
+
+    so a box named in several pairs has its readout copied to each of those couplers and receives the
+    sum of the forces they return (``copy_wire``). Its state is the boxes' states in order.
+    Two tanks and a pipe: ``boxes_and_couplers([tank_1, tank_2], [(0, 1)], [pipe])``; the three-mass chain:
+    ``pairs = [(0, 1), (1, 2)]``; the triangle of ``exc.kcl_loop``: ``pairs = [(0, 1), (1, 2), (0, 2)]``.
+    """
+    if len(pairs) != len(couplers):
+        raise ValueError(f"{len(pairs)} pairs for {len(couplers)} couplers")
+    for i, b in enumerate(boxes):
+        if not (b.in_dim_M == 0 and b.out_dim_M == 0 and b.in_dim_N == 0 and b.out_dim_N == 1):
+            raise ValueError(f"box {i}: expected <R^0|R^0> -> <R^0|R>")
+    for j, c in enumerate(couplers):
+        if not (c.in_dim_M == 0 and c.out_dim_M == 2 and c.in_dim_N == 0 and c.out_dim_N == 0):
+            raise ValueError(f"coupler {j}: expected <R^0|R^2> -> <R^0|R^0>")
+    picks = [i for pair in pairs for i in pair]
+    wired = compose_seq(tensor_arrangements(list(boxes)), copy_wire(len(boxes), picks))
+    return compose_seq(wired, tensor_arrangements(list(couplers)))
+
+
+# ---------------------------------------------------------------------------
 # Graph wiring: the prism varphi_G and the vertex particle (CDLM sec.graph_laplacian).
 # ---------------------------------------------------------------------------
 

@@ -1,39 +1,43 @@
-"""A Kirchhoff node: the current law falls out of the wiring (P32 (e)).
+"""Capacitors joined by resistors, and Kirchhoff's current law from the wiring (book Chapter 2,
+``sec.kcl`` in ``sec.heat_waves``; linked from the footnote after the current law's paragraph).
 
-The derivation under test is the book repo's ``background/note-retroactivity.tex``
-l.94-103, *Kirchhoff's current law is the chain rule*: a circuit node is a capacitor
-component; the wiring COPIES its voltage to ``k`` element ports; the pullback of
-covectors along a copy is their SUM; hence ``q' = -sum_j I_j`` (CDLM's sign). In this
-library the step adds the forcing (STATUS.md §1), so the claim reads
-``Delta q = -dt sum_j I_j`` with ``I_j = (e_node - e_j)/R_j`` positive leaving the node.
+For a reader of the book. A capacitor is the tank of ``sec.one_tank`` with charge in place of water:
+its state is the charge on its plate, it reads out its voltage, charge over capacitance
+(``eqn.capacitor_voltage``), and the current that comes back is added to its charge
+(``eqn.circuit_step``). A resistor is the spring of ``sec.springs`` with voltages in place of positions:
+no state, the cost function ``(kappa/2)(q_1 - q_2)^2`` with ``kappa`` its conductance, so it returns
+``-kappa (q_1 - q_2)`` to its first end and ``+kappa (q_1 - q_2)`` to its second, the current through
+it. Where a capacitor's voltage is copied to several resistors, the dot's transpose adds the currents
+they return: that sum is Kirchhoff's current law, and no part in the wiring adds anything. Names: the
+book writes the charge ``s_i`` and the voltage ``q_i``; this file, following the tank, writes the charge
+``q`` and the voltage ``e``, and a resistor by its resistance ``R = 1/kappa`` with a step ``dt``, the book's
+being ``dt = 1``. In code: ``capacitor(C, q0)``, ``resistor(R, dt)``, ``source(E)`` (a part held at a fixed
+voltage, like the segment on a heater of ``exc.heat_held``: constant readout, response ``0``), and
+``network(boxes, pairs, resistors)``, which copies each box's voltage to the resistors its pairs name
+(``wiring.boxes_and_couplers``). The loop of ``exc.kcl_loop`` by hand (unit capacitances, conductances
+``1/4``, charges ``(8, 0, 0)``),
+run from the library's folder with it on the path, as the README's *Run it* says
+(``PYTHONPATH=. .venv/bin/python example.py``):
 
-Components, in the idiom of ``tests/test_two_tanks.py`` under the hydraulic-electrical
-dictionary (tank = capacitor, pressure = voltage, pipe = resistor):
+    from tests.test_kirchhoff_node import capacitor, resistor, network, run
+    caps = [capacitor(1.0, q) for q in (8.0, 0.0, 0.0)]
+    loop = network(caps, [(0, 1), (1, 2), (0, 2)], [resistor(4.0, 1.0) for _ in range(3)])
+    print(run(loop, 2))   # arrays [8, 0, 0], [4, 2, 2], [3, 2.5, 2.5]
 
-* capacitor ``C``: state the charge ``q``, response ``sharp = C``, output ``e = q/C``,
-  zero forcing; the port covector is pulled back by ``1/C`` and the response multiplies
-  by ``C``, so ``q' = q + F(e)``: the returned covector is the charge increment;
-* resistor ``R``: a stateless two-port coupler, ``omega = -dV``,
-  ``V = (dt/2R)(e_1 - e_2)^2``, so ``F = (-dt I, +dt I)``;
-* ideal source ``E``: trivial parameter, constant output; the vjp of a constant is zero,
-  so it absorbs any current;
-* copy: ``fan_wire`` (``arrangements/commons.py``), ``m |-> m[picks]``, zero forcing.
-  Nothing in any component sums over branches.
+What the tests check. ``test_book_circuits_by_hand``: the chain of ``sec.kcl`` steps as the rod did,
+``(8, 0, 0)`` to ``(6, 2, 0)`` to ``(5, 2.5, 0.5)`` to ``(4.375, 2.625, 1)``, and the loop as above. One
+capacitor copied to three resistors, their far ends held at fixed voltages: its charge changes by the
+sum of the three currents, produced by the composite and written in no part; two equal resistors to
+voltages the same distance above and below cancel exactly. The loop of three capacitors
+(``exc.kcl_loop``): the currents are the weighted graph Laplacian of the voltages; the total charge
+stays the same at every step while the voltages even out, to the capacitance-weighted mean. One
+capacitor between two sources through unequal resistors rests at the conductance-weighted mean of the
+two voltages, as nodal analysis says.
 
-Predictions (``notes/P32-E-PREDICTIONS-2026-09-29.md``, fixed before this file):
-
-1. one capacitor copied to three resistors to three sources: the ``Phi`` step's charge
-   increment is ``-dt sum_j (e - E_j)/R_j`` to ``rtol 1e-12``; the closed forcing on
-   ``Q`` is the same sum; two equal resistors to opposite offsets cancel exactly
-   (closed form);
-2. a triangle of three capacitors: the closed forcing is ``-dt L C^{-1} q`` with ``L``
-   the hand-written weighted Laplacian (closed form); total charge is constant to
-   ``rtol 1e-12`` at every step (discrete analogue); the voltages converge to the
-   capacitance-weighted mean of the initial voltages (closed form, ``atol 1e-8``);
-3. one capacitor to two sources through unequal resistors rests at the
-   conductance-weighted mean of the sources, the nodal-analysis result (closed form).
-
-What is guaranteed by construction and what is not is written in the predictions note.
+For agents: the derivation is ``background/note-retroactivity.tex`` l.94-103 (*Kirchhoff's current law
+is the chain rule*); the predictions fixed before this file are ``notes/P32-E-PREDICTIONS-2026-09-29.md``;
+the sign of forcings is STATUS.md §1. The file's earlier head is in
+``notes/P31-B-CH2-HISTORY-2026-10-30.md``.
 """
 
 import jax.numpy as jnp
@@ -41,10 +45,10 @@ import numpy as np
 
 from arrangements.arrangement import Arrangement, exact, zero_form
 from arrangements.coalgebra import configuration
-from arrangements.commons import EMPTY, fan_wire, stateless_coupler
+from arrangements.commons import EMPTY, stateless_coupler
 from arrangements.functors import Phi
 from arrangements.rvect import ReactiveVectorSpace
-from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
+from arrangements.wiring import boxes_and_couplers, trivial_parameter
 
 from tests.chain import IN_POS
 
@@ -57,7 +61,9 @@ _Z0 = jnp.zeros(0)
 
 
 def capacitor(C, q0, label="cap"):
-    """State ``q``, response ``sharp = C``, output ``e = q / C``, zero forcing."""
+    """A capacitor of capacitance ``C`` holding the charge ``q0``: state the charge ``q``, readout the
+    voltage ``e = q/C`` (eqn.capacitor_voltage), response ``C``, no internal inclination; one step adds the
+    current to the charge (eqn.circuit_step)."""
     Q = ReactiveVectorSpace(dim=1, sharp_fn=lambda q: jnp.array([[C]]))
     return Arrangement(
         P=configuration(Q, init=jnp.array([q0])),
@@ -70,7 +76,8 @@ def capacitor(C, q0, label="cap"):
 
 
 def source(E, label="src"):
-    """An ideal voltage source: no state, constant output ``E``."""
+    """A part held at the voltage ``E`` whatever current comes back: no state, constant readout, like the
+    ground of sec.kcl or the segment on a heater of exc.heat_held."""
     return Arrangement(
         P=trivial_parameter(),
         in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
@@ -82,17 +89,17 @@ def source(E, label="src"):
 
 
 def resistor(R, dt, label="R"):
-    """``omega = -dV``, ``V = (dt/2R)(e_1 - e_2)^2``: returns ``(-dt I, +dt I)``, ``I = (e_1 - e_2)/R``."""
+    """A resistor of resistance ``R`` (conductance ``kappa = 1/R``) for a step of length ``dt``: the cost
+    function ``(dt/2R)(e_1 - e_2)^2``, so it returns ``(-dt I, +dt I)`` with the current ``I = (e_1 - e_2)/R``
+    (sec.kcl; the book's step has ``dt = 1``)."""
     V = lambda e: 0.5 * dt / R * (e[0] - e[1]) ** 2
     return stateless_coupler(2, exact(lambda q, e, n: -V(e)), f"{label}({R})")
 
 
 def network(boxes, pairs, resistors):
-    """``compose_seq(compose_seq(tensor(boxes), copy), tensor(resistors))``: box ``i``'s output
-    is copied to one port of each resistor whose pair names ``i``. Closed."""
-    picks = [i for pair in pairs for i in pair]
-    wired = compose_seq(tensor_arrangements(boxes), fan_wire(len(boxes), picks))
-    return compose_seq(wired, tensor_arrangements(resistors))
+    """The circuit as the book draws it: box ``i``'s voltage is copied to one port of each resistor whose
+    pair names ``i``, and the currents they return add at the dot (``wiring.boxes_and_couplers``). Closed."""
+    return boxes_and_couplers(boxes, pairs, resistors)
 
 
 def run(arr, T):
@@ -111,6 +118,30 @@ def q_forcing(arr, q):
     xi_q, xi_m, xi_n = arr.omega(jnp.asarray(q), _Z0, _Z0)
     assert xi_m.shape == (0,) and xi_n.shape == (0,)
     return np.asarray(xi_q)
+
+
+PAIRS = [(0, 1), (1, 2), (0, 2)]   # the triangle of exc.kcl_loop: each capacitor joined to each other
+
+
+# ---------------------------------------------------------------------------
+# 0. The book's hand steps (sec.kcl, exc.kcl_loop).
+# ---------------------------------------------------------------------------
+
+
+def test_book_circuits_by_hand():
+    """Unit capacitances, conductances 1/4 (``R = 4``, ``dt = 1``), charges from (8, 0, 0). The chain of
+    sec.kcl steps as the rod of sec.heat did: (6,2,0), (5,2.5,0.5), (4.375,2.625,1), the total 8 at every
+    step. The loop of exc.kcl_loop, a third resistor joining the first and third capacitors: (4,2,2),
+    (3,2.5,2.5); the first capacitor's distance from 8/3 shrinks by 4 each step, faster than in the chain."""
+    caps = lambda: [capacitor(1.0, q, f"cap{i + 1}") for i, q in enumerate((8.0, 0.0, 0.0))]
+    chain = network(caps(), [(0, 1), (1, 2)], [resistor(4.0, 1.0, f"R{j}") for j in (1, 2)])
+    traj = np.stack(run(chain, 3))
+    np.testing.assert_allclose(traj, [[8, 0, 0], [6, 2, 0], [5, 2.5, 0.5], [4.375, 2.625, 1]], atol=1e-12)
+    np.testing.assert_allclose(traj.sum(axis=1), 8.0, atol=1e-12)
+    loop = network(caps(), PAIRS, [resistor(4.0, 1.0, f"R{i}{j}") for (i, j) in PAIRS])
+    traj = np.stack(run(loop, 2))
+    np.testing.assert_allclose(traj, [[8, 0, 0], [4, 2, 2], [3, 2.5, 2.5]], atol=1e-12)
+    np.testing.assert_allclose((traj[:, 0] - 8.0 / 3.0), [16.0 / 3.0, 4.0 / 3.0, 1.0 / 3.0], atol=1e-12)
 
 
 # ---------------------------------------------------------------------------
@@ -177,8 +208,6 @@ def test_equal_and_opposite_branches_cancel_at_the_node():
 # 2. A triangle of capacitors.
 # ---------------------------------------------------------------------------
 
-
-PAIRS = [(0, 1), (1, 2), (0, 2)]
 
 
 def _triangle(Cs, q0s, Rs, dt):
