@@ -1274,8 +1274,9 @@ idealization and should be said as one; it does NOT make non-exact forcings idea
 
 **What this does not establish.** Whether exactness is what forces reciprocity throughout the
 library, or only here -- the commons run's "a fixed-rule external enforcer is exact rather than
-unilateral" points the same way by a different mechanism, state-dependence, and joining them is
-P26's business. Nothing about noise at a
+unilateral" points the same way by a different mechanism, state-dependence, and joining them was
+P26's business: answered 2026-10-30, reciprocity is closedness of the one-form, so a one-way reader whose
+reading moves it is never exact (`notes/COMPOSITION-AUDIT.md` §0; the book's plan §5.2). Nothing about noise at a
 committed state, so nothing about a revisable commitment. Nothing for `n > 2`, a non-symmetric payoff,
 or a positive temperature under a push. Nothing about a **cycle**: pusher and chooser form a chain,
 not a loop, so a chooser whose own choice changes the push it receives is untested.

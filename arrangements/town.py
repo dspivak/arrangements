@@ -126,7 +126,7 @@ class Town:
 
 
 def build(stage, settings=Settings(), *, connect_report=True, informed=False, clean=False,
-          power_to_town=False, diligence=False):
+          power_to_town=False, diligence=False, extra=(), exact_plant=False):
     """Stages 1=no return, 2=law, 3=historical insurance, 4=her account.
 
     Informed control starts the liability estimator at the true coefficient.
@@ -136,6 +136,11 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
     power_to_town=True (stage (e), needs clean=True) sends the power to the residents,
     who push back on it at `benefit` per watt; the plant's revenue arrives that way.
     diligence=True (stage (f), stage 3 or 4) gives the insurer its books and its own claims fit.
+    extra=[(box, source), ...] wires further boxes into the town before it is closed (book P26 (b),
+    `tests/test_composition_audit.py`): `box` a system built like `node`'s, `source` the name of a
+    published value ('smoke', 'estimate', 'premium', ...) or a function of the published vector.
+    exact_plant=True gives the plant its cost's covector on the price it reads, so it pushes back on the
+    premium (a lobbying plant); the default plant is a price-taker, the declared one-way boundary.
     """
     if stage not in (1, 2, 3, 4) or settings.delay_steps < 0:
         raise ValueError('stage must be 1..4 and delay_steps nonnegative')
@@ -174,11 +179,18 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
     def rate(e):
         return e[0] if priced else 0.0
 
+    def pushback(cost):
+        # exact_plant: the covector -d_e cost on the price read, the push an exact reader returns
+        if not exact_plant:
+            return None
+        return lambda q, e: -jax.grad(cost, argnums=1)(q, e)
+
     if clean:
-        add(own_cost('plant', [c.output0, c.clean0], int(priced),
-                     lambda q, e: .5*(1 + rate(e)*(1-q[1])**2)*q[0]**2 - revenue*q[0]
-                     + .5*c.clean_cost*q[1]**2, c.dt,
-                     publish=lambda q: jnp.array([q[0], (1-q[1])*q[0]])), price)
+        plant_cost = (lambda q, e: .5*(1 + rate(e)*(1-q[1])**2)*q[0]**2 - revenue*q[0]
+                      + .5*c.clean_cost*q[1]**2)
+        add(own_cost('plant', [c.output0, c.clean0], int(priced), plant_cost, c.dt,
+                     publish=lambda q: jnp.array([q[0], (1-q[1])*q[0]]),
+                     push=pushback(plant_cost)), price)
         slots['output'], slots['cleanliness'] = slice(0, 1), slice(1, 2)
         outs['output'], outs['smoke'] = slice(0, 1), slice(1, 2)
         outs['power'] = outs['output']
@@ -191,8 +203,9 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
             x = at(m, 'output')
             return 1 - at(m, 'smoke')/jnp.where(x > 0, x, 1.0)
     else:
-        add(own_cost('output', [c.output0], int(priced),
-                     lambda q, e: .5 * (1 + rate(e)) * q[0]**2 - c.benefit * q[0], c.dt), price)
+        plant_cost = lambda q, e: .5 * (1 + rate(e)) * q[0]**2 - c.benefit * q[0]
+        add(own_cost('output', [c.output0], int(priced), plant_cost, c.dt,
+                     push=pushback(plant_cost)), price)
 
         def smoke(m):
             return at(m, 'output')
@@ -267,6 +280,9 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
             return jnp.array([operating-claims, 0.0, claims])
 
         add(node('money', [0., 0., 0.], 3, lambda q, e: e, c.dt), payments)
+
+    for box, source in extra:
+        add(box, (lambda m, name=source: at(m, name)) if isinstance(source, str) else source)
 
     inner = tensor_arrangements(boxes)
     outer = Arrangement(

@@ -6,26 +6,29 @@ file alone (`scripts/run_tests.sh`), on this machine. Ch 3's two files and Ch 2'
 
 ## 0. What composition can do to a claim, in $\arr$
 
+(Words: an arrangement's forward map is its *out-transfer* and its backward map its *in-transfer*, the book's
+terms since P88, 2026-10-30; *readout* is the matter's map $r\colon S \to Q$ only.)
+
 Composition in $\arr$ is the Kleisli composite for the writer monad $\Omega$ on forcings (DESIGN.md §2,
 `wiring.compose_seq`): the composite's one-form is $A^*\omega_g + B^*\omega_f$, each factor's one-form pulled back
 along the map that locates its point, then summed. The integrator (response, state, readout) of every box is
 untouched (one exception, multi-round tensors, §5.9 item 6 (e); no file here uses one). So an added part (an
 arrangement filling a new box) adds exactly one term to the forcing on the audited configuration $Q$, and there are two kinds:
 
-* **(U) an upstream push.** A part whose readout enters an input of the audited object. If the object's forcing
+* **(U) an upstream push.** A part whose out-transfer enters an input of the audited object. If the object's forcing
   reads that input (its cost has the input in it), the term is the change in $-\partial_q k(q, n)$ from the new
   input value. Every "received supply" cost in these files is linear in its input, so the term is a covector $b$
   on the coordinates the input reaches, constant in $q$. The dynamics changes by $\sharp b$: a hyperbolic rest
   moves by $-J^{-1}\sharp b$ (implicit function theorem), basins, thresholds and ratios move continuously, and the
   structure persists until a bifurcation (a saddle-node) removes a rest.
-* **(R) a downstream reader.** A part $R$ whose input value is the object's readout $m = o(q)$ and whose forcing
+* **(R) a downstream reader.** A part $R$ whose input value is the object's out-transfer $m = o(q)$ and whose forcing
   has a component $\xi_m(q_R, m)$ on that input. Pullback adds $(T_q o)^\top\,\xi_m(q_R, o(q))$ on $Q$. If
   $\xi_m \equiv 0$ the reader loads nothing (unilateral, the ideal voltmeter). If $R$ is exact with cost
   $k_R(q_R, m) = \tfrac{\kappa}{2}(m - m_R)^2$, the term is $-\kappa\,(o(q) - m_R)\,(T_q o)^\top$: a spring of
   stiffness $\kappa$ pulling the read value toward $m_R$. **An exact reader with a preference is a supply to, or a
   load on, what it reads.** That is item 30's tilt (`STATUS.md` §3.26) in general form. Cases checked by hand: `test_town_account.py`'s fourth test, where an exact
   reader with cost $\tfrac12(m-2)^2$ moves the fit's forcing from $.4$ to $2.0$ at $q = .4$, and the one-way reader
-  leaves it; the degenerate cases, $\kappa = 0$ and a constant readout $o$ (the frozen parts' mean), which add
+  leaves it; the degenerate cases, $\kappa = 0$ and a constant out-transfer $o$ (the frozen parts' mean), which add
   nothing. Not tried: a reader with a non-convex cost (it can add rests), and multi-round tensors.
 
 **Reciprocity is closedness** (the question P26 carries, "is exactness what forces reciprocity across the
@@ -92,7 +95,7 @@ exactly the pullback of $-d(\text{harm})$ along $s = (1-c)x$ (checked by `jax.gr
 insurance does it by a one-way wire, "but if it was perfected … it would become as though a force pushback."
 Corrected the same day: a first version here said the townspeople box made exact would be that reader; its cost
 $\tfrac r2 q^2 - q\beta s^2/2$ is a device that makes the coughing track $\beta s^2/2r$, and its smoke derivative
-pushes the other way, so it is not the harm. Part: the reader's $\xi_s$ pulled back along the plant's readout
+pushes the other way, so it is not the harm. Part: the reader's $\xi_s$ pulled back along the plant's out-transfer
 $s = (1-c)x$.
 
 **Verdict.** Survives (U); fails (R), by design and said in the book ("its one-way wire is the waterfall").
@@ -130,7 +133,7 @@ final estimate 1.674). An exact reader of the estimate with stiffness $\kappa$ a
 moves it to $(u^2\beta + \kappa\hat\beta_R)/(u^2 + \kappa)$: at $\kappa = u^2$, halfway. Test 4 is this at one
 point. **"Her estimate climbs to match the coughing" (l.809) holds while nothing exact reads it.** An exact plant
 (its cost differentiated in the premium) pushes the premium down by $\tfrac12 s^2$: a price-taker made a
-lobbyist. Part: the reader's $\xi_m$ pulled back along the identity readout of the fit box.
+lobbyist. Part: the reader's $\xi_m$ pulled back along the identity out-transfer of the fit box.
 
 **Verdict.** Narrowed: the account's numbers hold for one-way readers; any exact reader of the estimate with
 comparable stiffness bends it, which the file already shows (test 4).
@@ -159,10 +162,10 @@ threshold's value and the shares do not. A push past the dirty minimum's basin d
 informed plant out of its trap: hysteresis, as item 30. Part: the plant's two-dial cost, its Hessian.
 
 **(R) prediction.** An exact reader of smoke pushes both dials through $s = (1-c)x$ in the ratio $(1-c) : -x$,
-set by the readout's Jacobian, not by $k$: the split is then the reader's geometry and the plant's $k$ together,
+set by the out-transfer's Jacobian, not by $k$: the split is then the reader's geometry and the plant's $k$ together,
 and $k = 1$ is no longer the threshold. An exact reader of power with a nonlinear cost (diminishing returns)
 breaks the $x \leftrightarrow 1 - c$ symmetry the threshold rests on. Direction survives; the numbers do not.
-Part: the reader's $\xi_s$ or $\xi_x$ through the plant's readout.
+Part: the reader's $\xi_s$ or $\xi_x$ through the plant's out-transfer.
 
 **Verdict.** Survives in direction (cheap filtering → clean, dear → cut); every number (threshold $k = 1$,
 shares, 5%) is the one-way town's.
@@ -196,13 +199,13 @@ values, and is void once $b$ removes the shallow well (saddle-node): the reader 
 push on a subsidiary's $z_i$ acts on $g$ through $K = \tfrac12(g - (z_2 - z_1))^2$ once $z$ settles: the same
 tilt. Part: the parent's preference cost $\phi$.
 
-**(R) prediction.** The composite's readout is $\sigma = m_1 + m_2 = (z_1 + z_2, 2)$. An exact reader of it
+**(R) prediction.** The composite's out-transfer is $\sigma = m_1 + m_2 = (z_1 + z_2, 2)$. An exact reader of it
 constrains $z_1 + z_2$, a direction orthogonal to the one the cue acts through ($z_2 - z_1$): both $K = 0$ and
 the reader's minimum are reachable at every $g$, so the ridge is still $\epsilon$ above the rest and the deep well
 still $D$ below. **The energy accounting survives any exact reader of the output**; $W$ moves inside its band.
 An exact reader of the commitment $g$ itself (a hand tracking it, cost $\tfrac{\kappa}{2}(h - g)^2$, slow) is a
 load on $g$: the ridge of the joint landscape is higher by what it costs to drag the hand to it, the minimal cue
-grows, released$/W$ falls. Part: the reader's $\xi_g$ pulled back along the identity readout of $g$. Unilateral
+grows, released$/W$ falls. Part: the reader's $\xi_g$ pulled back along the identity out-transfer of $g$. Unilateral
 readers change nothing.
 
 **Verdict.** Survives readers of its output; narrowed by an exact reader of $g$ (the ridge includes the load).
@@ -267,12 +270,12 @@ along the $(n-1)$-dimensional family of minima for as long as the others can cov
 family's edge: a stronger form of (7) and (8). The claims are about pushes and survive. Part: the parent's
 rank-one cost.
 
-**(R) prediction.** The readout is $\sigma = (\sum_j\kappa_j, \sum_j\kappa_j)$. Any exact reader of it adds a
+**(R) prediction.** The out-transfer is $\sigma = (\sum_j\kappa_j, \sum_j\kappa_j)$. Any exact reader of it adds a
 term in the same rank-one direction $d(\sum_j\kappa_j)$: the family of minima stays $(n-1)$-dimensional (its
 level moves to the combined target), so the free directions, and (5)–(8) with them, **survive every exact reader
 of the output**. A reader of the mean readout reads a constant (frozen parts send $h = 1$). Only a reader of an
 individual placement, which the composite does not expose, could hold a part. (9) has no cost by premise. Part:
-the parent's readout, a symmetric function of the placements.
+the parent's out-transfer, a symmetric function of the placements.
 
 **Verdict.** Survives (U) and (R).
 
@@ -299,7 +302,7 @@ $\kappa(p) = e^{-p^2/2\tau}$ in the parent's cost.
 
 **(R) prediction.** As in 6–7: a reader of the output adds a term in the same direction; the coverage condition
 of (3) becomes "can the rest cover the combined demand," and (1), (2), (4) survive with the combined target.
-Part: the parent's readout.
+Part: the parent's out-transfer.
 
 **Verdict.** Survives (R); narrowed under (U): the need's pull is exponentially weak at a distance.
 
@@ -333,7 +336,7 @@ and (11) survive: leaving is the worker's ascent of supply, fading is its dissip
 cost and the fund's flow.
 
 **(R) prediction.** An exact buyer in place of the market, cost $\tfrac{\kappa}{2}(\text{product} - m_R)^2$,
-pulls back $\xi\,a_j\,\kappa'(p_j)$ onto each placement through the fund's pass-through readout and the
+pulls back $\xi\,a_j\,\kappa'(p_j)$ onto each placement through the fund's pass-through out-transfer and the
 collective's $\sigma$: **a buyer that needs the product pulls the workers home directly, bypassing the wage**.
 A part that "gets nothing from the collective" is then getting the buyer's pull, and the leaving threshold moves
 up by the pull's size; with a convex buyer the pull on an absent part grows as the others leave. **(10)'s
@@ -478,7 +481,7 @@ cost.
 marginal liability $\tfrac12 s^2 \approx .045$ after cleaning: the rate ends near $1.955$, outside the 2%
 (regulatory capture in one line). The books are read one-way by the rate; an exact reader of the books with a
 preference would corrupt the record (§0). Part: the plant's $\xi_p = -\tfrac12 s^2$ along the rate's identity
-readout.
+out-transfer.
 
 **Verdict.** Narrowed: the diligence mechanism survives; the 2% is the price-taker's.
 
@@ -502,7 +505,7 @@ tracking cost.
 **(R) prediction.** An exact reader of the quote with a preference moves the quote before the evidence arrives:
 **the claim "a quote cannot lead evidence it has not received" fails under an exact reader with a preference,
 and such a reader is exactly an earlier account** (Eve's role, by another wire). Part: the reader's $\xi_m$
-along the quote's identity readout.
+along the quote's identity out-transfer.
 
 **Verdict.** Survives (U) in its timing claim; fails (R), and the failing reader is the book's next step.
 
@@ -555,3 +558,285 @@ ten-minute files are the cascade and the ratchet, as `tests/durations.tsv` alrea
    statement about a ring nothing else reaches, which "needs only its neighbor" says.
 7. The dispersal and scattering claims (6, 7) survive every reader of their output: what is read is a symmetric
    function of the placements, so the free directions stay free.
+
+## 17. Stage (b) for Ch 1: the composites built and run
+
+David, 2026-10-30 (5266b8d9): "let's not leave something for later. finish it. do the work." So the (R) composites
+the entries name are built in `tests/test_composition_audit.py` and run, each with its unilateral control (the same
+reader with its input covector zeroed, which must leave the file's own numbers to $10^{-12}$). **Predictions fixed
+here before any composite ran** (closed forms by hand, 2026-10-30, the arithmetic in this file's history). Each can
+fail. A (U) push on a coordinate the ports do not expose (a placement, a dial) is not composition and is not run.
+
+| entry | composite | prediction |
+|---|---|---|
+| 1, 3 | `build(1, clean=True)` plus an exact reader of the smoke, cost $\kappa s^2/2$, $\kappa = 2$ | the plant's path $(x, c)$ equals the informed stage-2 plant's at $p = 2$ pathwise to $10^{-9}$ (the identity of §4.4); rest $(x, c) = (.99541, .95196)$; the unilateral control keeps $c = 0$ |
+| 2 | `build(4)` (one dial) plus an exact reader of her estimate, $\kappa = .05$, preference $0$ | the fit rests where $u^2(\hat\beta - \beta) + \kappa\hat\beta = 0$ with $u = x^2/2$, $x = 1/(1 + \hat\beta)$: self-consistently $\hat\beta^* = .72$; predicted final estimate in $(.5, .9)$ and final premium below $1$; revised before the run from "the premium never reaches 1": while the smoke is still thick $u^2 = 1/4 \gg \kappa$, so the fit first climbs toward $1.67$ and the premium crosses $1$ early, then both fall back as the plant cuts; harm reduction against stage 3 below the file's 55%, the number recorded; control equal to `build(4)` on every coordinate to $10^{-12}$ |
+| 4 | the tilted-cue composite plus an exact reader of its output signal $z_1 + z_2$, $\kappa = 1$, preference $1$ (the rest's value) | the minimal $T = .2$ cue at $D = 16$, $\epsilon = .25$, re-bisected, meets `_check_minimal_brief` with $V$ including the reader's term; $V(0) - V(\text{end}) = D$ to $10^{-9}$; the control's run at the file's amplitude equals the file's to $10^{-12}$ |
+| 5 | the hierarchy, the hand's wire fanned to level 1 and to an exact reader of $h$, $\kappa = 1$, preference $0$ | rest $(h, \mu_1, \mu_2) = (.4, .6, .8)$ to $10^{-8}$ (linear solve); with preference $.5$: $(.55, .7, .85)$; control $(.5714, .7143, .8571)$ |
+| 6, 8 | the dispersal collective plus an exact reader of the onward signal, $\kappa = 1$, preference $\nu$ | $n = 3$, $\delta = .05$: the displaced part recovers $1/3$ within 5%, the others move in $\delta/3$, onward $\to \nu$; the far part ($d = 3$, $n = 3$) stays past $.9d$ for 20,000 steps; with preference $1.1\nu$ the onward signal settles at $(\nu + \kappa\cdot 1.1\nu)/(1 + \kappa)$ to $10^{-6}$ |
+| 6 | the momentum collective (damped) plus the same reader | the push lands the configuration at $\mu\xi_0/c\,(1 - 1/n)$ and $-\mu\xi_0/c/n$ within 5%, $n = 3$: the free direction is still free |
+| 9, 10 | the one-level cascade with an exact buyer in the market's place: pays $r\times$product as before and has cost $\tfrac{\kappa}{2}(\text{product} - m_R)^2$, $\kappa = 2$, $m_R$ twice the one-way equilibrium product | after the one-way run's above-threshold drain ($1.05\,S_c$), every worker's placement stays below $1$ and the fund ends above $0$ (the one-way run: all past $2$, fund $-18.4$). (R3) at equal balance and amplitudes, the force toward home on a worker at the source is larger when all four are at the source than when three are home, by more than $10^{-3}$; with the one-way market the two forces are equal to $10^{-12}$ |
+| 11 | the carving reader with a third part, held at $q_R = 0$ (mobility $0$), and an exact coupling $\tfrac{\kappa}{2}(q - q_R)^2$ | **corrected before the run** (the entry said $\kappa > 1/2$): the slaved slow rest solves $(w - \kappa)/2 = \gamma(w - w_0) + \beta(w - w_0)^3$, whose two roots merge at $\kappa_c = .0196$; so $\kappa = .05$: a 4000-step note leaves $|q| < .01$ after 40,000 steps of silence; $\kappa = .01$: it leaves $(q, w) = (.6712, .4605)$ within $.01$; control $(.7051, .4972)$ |
+| 12 | the ring, $n = 5$, $s = 4$, part 0's supply cut, plus an exact reader of part 0, $\kappa = .5$ | preference $1$: every part held, $q = (.3333, 1.0, 3.0, 3.6667, 3.7273)$ within $10^{-3}$ (the cut part at $\kappa q_R/(b + \kappa)$, then $q_{i+1} = (\alpha s q_i - bK)/(b q_i)$); preference $0$: every part dies, $\max q < 10^{-3}$ |
+| 13 | `eve_town(4, diligence=True)` with an exact plant (its cost differentiated in the premium it reads) | **corrected before the run** (the entry said the rate ends near $1.955$): the plant's push is $-\tfrac12 s^2$ and the clean plant's $s \approx .05$, so the final premium moves by less than $.005$ and stays within 2% of $\beta$: the diligence claim survives an exact plant, which has cleaned away what it would lobby with |
+| 14 | `build(3)` plus an exact reader of the premium, $\kappa = 1$, preference $2.5$ | before any evidence the premium rests at $\kappa p_R/(1 + \kappa) = 1.25 > 1$, so it reaches $1$ before $t = 2$ and before the court's fit does: "a quote cannot lead evidence it has not received" fails; the control lags as the file says |
+
+Not run: a reader of the commitment $g$ (entry 4's narrowing), since the composite does not expose $g$; the (U)
+pushes on placements and dials.
+
+### 17.1 What the composites showed (run 2026-10-30, `tests/test_composition_audit.py`, 13 tests)
+
+| entry | result | verdict |
+|---|---|---|
+| 1, 3 | the stage-1 town with the exact smoke reader follows the informed plant at $p = 2$ to $10^{-9}$ pathwise; rest $(.995406, .951962)$; the control never cleans | **held**: the perfected premium and an exact reader of the smoke are one forcing |
+| 2 | final estimate $.7235$ (predicted $.72$), final premium $.72$, harm reduction against stage 3 $-15.8\%$ (the plain account's $+55.3\%$): the lobbied account does worse than no account; the premium crossed $1$ early and fell back; control identical to $10^{-12}$ | **held**, and the number says more than predicted: an exact reader of her estimate with stiffness $.05$ turns the account into a harm |
+| 4 | with the output reader the minimal cue's work is $.4639$ against the file's $.464$; released $16.26$; ridge work $.4627$; $V(0) - V(\text{end}) = 16$; the control equals the file's run | **held**: the reader constrains $z_1 + z_2$, orthogonal to the cue's direction |
+| 5 | rests $(.4, .6, .8)$ and $(.55, .7, .85)$ to $10^{-8}$; control $(4/7, 5/7, 6/7)$ | **held** |
+| 6, 8 | recovered fraction $.3264$ ($1/3$), the others in $.01668$ ($\delta/3$), onward $= \nu$; the far part stays at $> .9d$; preference $1.1\nu$ puts the signal at the combined target to $10^{-6}$; control equals the file's | **held**: the flat directions stay flat under any reader of the total |
+| 6 | the damped push lands at $(.03345, -.01657, -.01657)$ against $(.03333, -.01667, -.01667)$ | **held** |
+| 9, 10 | one-way: threshold $20.22$, the drain kills the fund ($-18.39$) and sends all four to $2.5$. Exact buyer: equilibrium balance $87.6$ (placements $.036$, amplitudes $1.87$); the same drain is absorbed; **a drain of three times the balance is absorbed too**, the fund back at $87.6$ within a few hundred steps with every worker home. (R3) force toward home on the absent worker: one-way $-.1197$ in both states; buyer $-1.091$ all out against $-.723$ three home | **held, and the run's own second prediction refuted**: the buyer's covector on the product pulls back onto the amplitudes (a worker sends $(0, a, 1)$), so the buyer's need drives production with no wage, income persists and the fund refills; the collective is held together by what is needed of it. (The leak term pays into a negative balance too, a feature of the model's fund, present in the one-way run's rest at $-18.4$.) |
+| 11 | $\kappa = 0$: $(.70711, .50000)$, the file's; $\kappa = .01$: $(.67123, .46055)$ against $(.6712, .4605)$; $\kappa = .05$: $q = 10^{-233}$, $w = -.473$ | **held** with the corrected threshold: the saddle-node at $\kappa_c = .0196$, not $1/2$ |
+| 12 | $(.3333, 1.0, 3.0, 3.6667, 3.7273)$ exactly; preference $0$ and the control: every part dead | **held** |
+| 13 | price-taker $1.99994$, exact plant $1.99882$, final smoke $.0478$ ($s^2/2 = .00114$) | **held**: the clean plant lobbies by a thousandth |
+| 14 | the premium reaches $1$ at $t = .4$, the court at $8.42$; control $7.48$ after $7.06$ | **held**: an exact reader with a preference is an earlier account |
+
+**What the stage adds to §0.** The rule held in every case, and twice it reached further than the entry had reasoned:
+a reader's covector lands on *every* coordinate the out-transfer depends on, so an exact buyer of a product drives the
+amplitudes that make it (entry 9), and a reader of a fit held by $u^2 = (s^2/2)^2$ can turn the account against its
+purpose (entry 2). Two entries' numbers were corrected by hand before their runs (11, 13) and one prediction was
+refuted by its run (9's second block); all three are recorded where they stand. No book sentence changes: each
+failing claim was a claim about one-way readers, and the book's sentences carry their own scope.
+
+## 18. Ch 3's two linked files (stage (a), predictions before any composite ran, 2026-10-30)
+
+### 18.1 `tests/test_pendulum.py` (Ch 3 l.2525)
+
+**Links.** `sec.arr`: "the bars vibrate along their length about a thousand times a second, while the pendulum
+swings about once every two seconds, and a step has to follow the vibration: steps of a tenth of a millisecond run
+well, and steps three times as long make the run blow up. [The companion code builds the $n$-fold pendulum by
+nesting links, runs it, and compares it with the rigid one.]"
+
+**Object.** `drop . link^2 . pivot`: a closed composite built by nesting; each link a bob (phase integrator, mass in
+the plane) whose cost is the bar from its support to it, $\tfrac{\kappa}{8\ell^2}(|q - x|^2 - \ell^2)^2$, plus
+gravity $mgq_y$; the link reads out its bob's position to the next link. All exact; one potential, the sum.
+
+**Claim.** (1) The nested composite is the flat pendulum (one cost, symplectic Euler by hand) to $10^{-10}$. (2) As
+the bars stiffen to steel's $2\times10^7$ the lower bob comes within 1 mm of the rigid double pendulum over 1 s,
+stretching under 10 µm. (3) The bar sets the step: at steel $10^{-3}$ s blows up, $10^{-4}$ keeps the energy within
+0.1%.
+
+**Reader exact?** Everything; nothing reads the pendulum (`drop`).
+
+**(U) prediction.** A standing force on a bob (wind, a potential $-F\cdot q$ by a part) tilts the rest and the
+swing; (1) survives by functoriality (the nested and the flat pendulum with the same force agree), (3) survives since
+the step is set by the bar's stiffness, which a soft push does not touch; (2) survives only against a rigid reference
+given the same force. Part: the link's cost, and the bob's phase integrator.
+
+**(R) prediction.** An exact reader of the lower bob's position with cost $\tfrac{\kappa_r}{2}|q - x_R|^2$ is one
+more spring, from the bob to a fixed point. (1) survives: the composite with the reader equals the flat computation
+with the spring's potential added, to $10^{-10}$. (3) survives for $\kappa_r \ll \kappa$: the fastest mode is still the
+bar's. (2) survives against the rigid pendulum with the same spring added to its Lagrangian. The claim's words do
+not change. Part: the reader's spring on the bob through the link's identity out-transfer.
+
+**Verdict.** Survives (U) and (R); the pendulum is the one file here whose every claim is about an exact object and
+reads as such.
+
+**Time.** 5 s wall, 3 passed (pytest 3.8 s), one clean run alone, 2026-10-30.
+
+### 18.2 `tests/test_copy_pair.py` (Ch 3 l.3104)
+
+**Links.** `ex.copying_learner`: "With $\kappa = 1$ for 4000 steps, the copy comes to send what the original sends:
+its angular frequency is 0.3 … Then with $\kappa = 0$ … it goes on sending angular frequency 0.3, while the original
+sends the same free sine wave throughout. With $\kappa = 0$ from the start, nothing is copied." And: "which one is
+the original is set only by which way `couple` pulls."
+
+**Object.** `copy_pair`: two `osc` (matter the oscillator on the circle, states (angle, angular frequency), effort
+field zero) and `contact_one_way(1)` on $(x, y, K)$: the forcing $K(x - y)$ on the copy's value and nothing on the
+original's. Open: $\langle 0|1\rangle \to I$, the coupling $K$ its exterior value. The coupler is **non-exact by
+design** (Ch 2's waterfall): the copy reads the original one-way.
+
+**Claim.** The copy locks to the original's angular frequency (to $10^{-6}$; values to $10^{-9}$) and keeps it when
+the coupling is cut; the original is untouched; uncoupled nothing is copied; without the angle rate nothing locks.
+
+**Reader exact?** No: the whole point is a one-way reader, and the book says so ("set only by which way `couple`
+pulls").
+
+**(U) prediction.** A standing force on the copy's angle shifts its phase; it still locks in angular frequency, with
+a phase lag, so "its value differs from the original's by less than $10^{-13}$" fails and "its angular frequency is
+0.3" survives. Part: the oscillator's update, angle and frequency both moved by the force.
+
+**(R) prediction.** Make the coupling exact, `contact(1)` with cost $\tfrac{K}{2}(x - y)^2$ returned to both: the
+original is pushed too. **"The original is untouched" fails, and with it "which one is the original"**: the two lock
+to a common angular frequency strictly between $.22$ and $.3$, and keep it when $K$ goes to 0. The book's clause
+names exactly this: the asymmetry is the coupler's. Part: the exact coupler's covector on $x$, pulled back along the
+original's out-transfer $\sin$ onto its matter.
+
+**Verdict.** Survives (U) in the frequency claim; fails (R), as the book's own clause says.
+
+**Time.** 3 s wall, 9 passed (pytest 2.2 s), one clean run alone, 2026-10-30.
+
+## 19. Ch 2's five linked files (stage (a), predictions before any composite ran, 2026-10-30)
+
+These are the ported physics, each a closed composite of the book's own parts wired by `boxes_and_couplers`
+(one-port parts, two-port couplers). **One observation covers all five**: an exact reader of a part's read-out value
+with stiffness $\kappa_r$ and preference $e_R$ is, in the book's own terms, *one more part through one more
+coupler*: a reservoir at pressure $e_R$ through a pipe, a heater at $T_R$ through a joint, a wall at $x_R$
+through a spring, a source at $E_R$ through a resistor, a weight decay on a parameter. So the (R) composite for each
+is built with the chapter's own pieces, and what it changes is the chapter's own conservation law, since a source
+is not inside the sum.
+
+### 19.1 `tests/test_two_tanks.py` (Ch 2 l.734)
+
+**Links.** `sec.pump`: "no cost function can give influence that goes one way only, as over the waterfall. [The
+companion code runs the pipe, the waterfall, and the pump …; it checks each one's update, that the pipe evens out the
+levels, and that the pipe's two sensitivities agree while the waterfall's do not.]"
+
+**Object.** Two tanks (state the volume, out-transfer the pressure, response the cross-section) and a coupler (pipe:
+exact, cost $\tfrac{\kappa}{2}(e_1 - e_2)^2$; waterfall and pump: non-exact), closed by `boxes_and_couplers`.
+
+**Claim.** The hand steps; the pipe evens out the levels; the pipe's sensitivities agree and the waterfall's do not
+(`prop.closed`); water is conserved when the two flows are opposite; composition agrees with dynamics for the
+waterfall.
+
+**(U) prediction.** A pump into one tank: the levels rest with a steady pipe flow $I_0$ and a gap $I_0/\kappa$;
+"the pipe evens out the levels" fails under any standing inflow; the sensitivities (a property of the coupler's
+one-form alone) are untouched. Part: the pipe's cost.
+
+**(R) prediction.** An exact reader of tank 1's pressure, preference $e_R$, is a reservoir at $e_R$ through a pipe
+of conductance $\kappa_r$. At rest the pipe's flow is zero (tank 2 still) and the reservoir's flow is zero (tank
+1 still), so **both levels go to $e_R$**, whatever the two tanks held: "the pipe evens out the levels" survives, at
+the reader's level; **"the total water is conserved" fails**, the reader being a source. Part: the reader's covector
+on $e_1$ through the tank's out-transfer.
+
+**Verdict.** Survives (R) in the evening-out, fails in conservation; the book claims conservation for the two tanks
+alone and says the pump is one-way, so no sentence changes.
+
+**Time.** 10 s wall, 10 passed (pytest 10.0 s), one clean run alone, 2026-10-30.
+
+### 19.2 `tests/test_heat_equation.py` and 19.3 `tests/test_wave_equation.py` (Ch 2 l.1188)
+
+**Links.** `sec.waves`: "the rod's temperatures settle at $\tfrac83$, while the wave's masses go past it … and never
+settle. What makes the difference between them is the momentum. [The companion code builds both chains by filling
+the same wiring pattern in two ways …; without momentum the masses update exactly as the rod's temperatures do and
+come to rest at $\tfrac83$, and with momentum each update is the one worked here.]"
+
+**Object.** `book_chain`: three one-port parts (segments: configuration; masses: phase, reading out $q + p/m$) joined
+by two exact springs (joints), free ends, closed. Also the held chains of any length.
+
+**Claim.** Heat: the hand steps, the sum 8 conserved, all three to $8/3$. Waves: the hand steps, momentum 0 and
+positions' sum 8 conserved, the middle mass passes $8/3$ and nothing settles.
+
+**(U) prediction.** A standing heat input to one free-ended segment raises every temperature without bound (no
+rest); a standing force on a mass accelerates the chain's centre. Both chapters' conservation claims fail under a
+push, as they must: the sums are conserved because the forces of a free chain sum to zero. Part: the chain's
+springs, whose forces cancel in pairs.
+
+**(R) prediction.** An exact reader of the middle segment's temperature, preference $T_R$, is a heater at $T_R$
+through a joint of conductance $\kappa_r$ (`exc.heat_held`): **all three temperatures go to $T_R$**, the sum is not
+conserved; the rod still settles. An exact reader of the middle mass's position is a wall at $x_R$ through a
+spring: the chain **still never settles** (no friction anywhere), the positions' sum is no longer conserved, the
+energy including the wall's spring stays bounded. **"What makes the difference between them is the momentum"
+survives the reader**: with the same reader on both, the rod settles and the chain does not. Part: the reader's
+spring on the read-out value.
+
+**Verdict.** Survives (R) in the claim the book makes (the difference is the momentum); the free chains'
+conservation laws are the free chains'.
+
+**Time.** `test_heat_equation.py` 35 s wall, 6 passed (pytest 34.3 s); `test_wave_equation.py` 10 s wall, 7 passed (pytest 9.4 s); one clean run alone each, 2026-10-30.
+
+### 19.4 `tests/test_kirchhoff_node.py` (Ch 2 l.1357)
+
+**Links.** `sec.kcl`: "the dot copies the middle capacitor's voltage forward to both resistors, and the transpose of
+copying adds the currents they send back. [The companion code copies one capacitor's voltage to three resistors,
+without any part that adds currents, and checks that its charge changes by the sum of the three currents. It also
+runs a loop of three capacitors … and checks that the total charge stays the same while the voltages even out.]"
+
+**Object.** Capacitors (state the charge, out-transfer the voltage, response $C$), resistors (exact, the spring with
+voltages), sources (constant out-transfer, zero response), wired by `boxes_and_couplers`; closed.
+
+**Claim.** KCL at a node is the transpose of copying: the charge changes by the sum of the branch currents, produced
+by the composite and written in no part; the loop conserves total charge and evens the voltages to the
+capacitance-weighted mean; the rest voltage between two sources is the conductance-weighted mean.
+
+**(U) prediction.** A current source into a node: KCL survives (one more term in the sum), the loop's total charge
+grows, the voltages even out around a rising mean. Part: the dot's transpose.
+
+**(R) prediction.** An exact reader of a capacitor's voltage, preference $E_R$, is a resistor to a source at
+$E_R$, the file's own `_star`. **KCL survives** (the node's charge changes by the sum of four currents, the reader's
+one of them), **"the total charge stays the same" fails** (charge flows to the source), and the loop's voltages even
+out at $E_R$, not at the weighted mean. Part: the copy wire's transpose, summing the reader's current with the rest.
+
+**Verdict.** The law the book states (KCL is the transpose of copying) survives any reader, since the reader is
+one more branch; the loop's conservation is the loop's.
+
+**Time.** 21 s wall, 7 passed (pytest 20.2 s), one clean run alone, 2026-10-30.
+
+### 19.5 `tests/test_gradient_descent.py` (Ch 2 l.1696)
+
+**Links.** `sec.neural_network`: "the force on each parameter is $\xi_i = -\partial_{w_i}(\text{cost}(w_3\tanh(w_1x +
+w_2), \ell))$ … Passing the force backwards through the parts, one part at a time, is backpropagation … That it
+gives each parameter exactly this force, in any network, is the chain rule."
+
+**Object.** The network as drawn: a parameter box per weight (state the weight, out-transfer it, response the
+learning rate), example boxes, gray boxes (static arrangements, forces back by the transpose Jacobian), the loss (a
+part with cost $\tfrac12(y - \ell)^2$); closed, by `compose_seq` and `tensor_arrangements`.
+
+**Claim.** The book's step box by box, $(2, 2, 0)$ then $(1.2, -.8, 2)$; the forces are minus the partials of the
+loss (autodiff); the drawn network trains as the one-box loop does.
+
+**(U) prediction.** The upstream push is the example: a different datum or label changes every force by the chain
+rule; nothing else is upstream of a closed network. Part: the loss's cost at the new example.
+
+**(R) prediction.** An exact reader of a parameter with preference 0 and stiffness $\kappa_r$ is **weight decay**:
+the force on $w_1$ becomes $2 - \kappa_r w_1$, so the book's step gives $w_1' = 1 + .1(2 - .5) = 1.15$ at
+$\kappa_r = .5$ (the others unchanged). "The force on each parameter is minus the partial derivative of the loss's
+cost" **fails as worded and survives as the chain rule**: the force is minus the partial of the *composite's* cost,
+loss plus the reader's. An exact reader of the answer $y$ with a preference is a second loss, the same way. Part:
+the reader's spring on the weight through the parameter box's identity out-transfer.
+
+**Verdict.** Survives as the chain rule, which is what the book says the mechanism is; the word "loss" in "the
+loss's cost" is the one-loss network's.
+
+**Time.** 37 s wall, 9 passed (pytest 37.0 s), one clean run alone, 2026-10-30.
+
+## 20. Stage (b) for Chs 3 and 2: the composites, predictions fixed before they ran (2026-10-30)
+
+| entry | composite | prediction |
+|---|---|---|
+| 18.1 | `reader . link^2 . pivot`, the reader a spring $\kappa_r = 1$ from the lower bob to $x_R$ (its start shifted by $.1$ in $x$) | nested equals the flat computation with the spring added, to $10^{-10}$ over 500 steps at $\kappa = 10^4$; at steel ($2\times10^7$, step $10^{-4}$) the energy including the spring is within 0.1% over 10,000 steps; the stiff pendulum with the spring is within 1 mm of the rigid pendulum with the same spring over 1 s |
+| 18.2 | `copy_pair` with `contact(1)` in place of `contact_one_way(1)` | after 4000 steps at $K = 1$ the two angular frequencies agree to $10^{-6}$ and lie strictly inside $(.22, .3)$ (the original moved by more than $10^{-3}$); after 3000 more at $K = 0$ both keep that value; the one-way control leaves the original at $.3$ exactly |
+| 19.1 | two unit cylinders from $(4, 0)$, pipe $\kappa = 1/4$, plus a source at $e_R = 3$ through a pipe $\kappa_r = .1$ to tank 1 | both pressures within $10^{-6}$ of $3$ after 400 steps; total water $6$, not $4$; the plain pair rests at $(2, 2)$ |
+| 19.2 | the rod $(8, 0, 0)$, joints $1/4$, plus a heater at $T_R = 5$ through a joint $\kappa_r = .1$ to the middle segment | all three temperatures within $10^{-6}$ of $5$ after 600 steps; the sum ends near $15$ |
+| 19.3 | the three masses from $(8, 0, 0)$ at rest, springs $1/4$, plus a wall at $x_R = 8/3$ through a spring $\kappa_r = .1$ to the middle mass | over 400 steps the middle mass's position ranges by more than $2$ in the last 100 steps (never settles); the positions' sum varies by more than $.5$ over the run; the energy, kinetic plus all four springs' potentials, stays within 10% of its start |
+| 19.4 | the triangle of unit capacitors from $(8, 0, 0)$, conductances $1/4$, plus a resistor $R_r = 4$ from capacitor 1 to a source at $E_R = 1$ | at the first step capacitor 1's charge changes by $-\sum$ of its four branch currents to $10^{-12}$; the total charge after 400 steps is within $10^{-6}$ of $3$ (every voltage at $1$), not $8$ |
+| 19.5 | the book's network, $w_1$'s wire fanned to a weight-decay reader $\kappa_r = .5$, preference $0$ | one step: $(1.15, -.8, 2.0)$ to $10^{-12}$; the control (reader one-way): $(1.2, -.8, 2.0)$ |
+
+### 20.1 What the composites showed (run 2026-10-30; 7 tests, all passed; one prediction refuted)
+
+| entry | result | verdict |
+|---|---|---|
+| 18.1 | nested with the spring equals the flat computation with the spring to $10^{-10}$; energy with the spring within 0.1% at steel, step $10^{-4}$; the stiff pendulum with the spring within $5.7\times10^{-5}$ m of the rigid one with the same spring | **held** |
+| 18.2 | exact contact: both angular frequencies $.25581$ after 4000 steps (the original moved from $.30$, the copy from $.22$), kept at $K = 0$; one-way control: the original at $.30$ exactly | **held**: an exact coupling has no original, as the book's clause says |
+| 19.1 | both pressures $3.000000$, water $6.000000$ (from 4); the plain pair $(2, 2)$, water 4 | **held**: the reader is a reservoir through a pipe |
+| 19.2 | all three temperatures $5.000000$, sum $15$ | **held** |
+| 19.3 | the middle mass ranges by $6.4$ in the last 100 steps, the positions' sum by $1.4$; **the energy prediction refuted**: kinetic plus the four springs' potentials swings by 84% of its start over the run (bounded, below twice its start) | **held** in the claim ("never settles"); the energy line was the run's own error: the book's step is coarse and symplectic Euler conserves a modified energy, not this one, and the book claims the exact invariants (momentum, the positions' sum), never this energy |
+| 19.4 | capacitor 1's first change is minus the sum of its four currents to $10^{-12}$; total charge $3.0000000$ after 400 steps, every voltage $1$ | **held**: the reader is one more branch |
+| 19.5 | $(1.15, -.8, 2.0)$; control $(1.2, -.8, 2.0)$ | **held**: weight decay is an exact reader of a weight |
+
+**What the stage adds to §0.** In the ported physics an exact reader is one of the chapter's own parts through one of
+its own couplers, and what it changes is the free system's conservation law, never the law the chapter states about
+the wiring (the transpose of copying, the chain rule, the pipe's reciprocity, the difference between heat and waves).
+Ch 3's two: the pendulum reads as what it is, one potential, and a spring on it is one more term; the copy pair's
+"original" is the coupler's one-wayness, and the book says so in the sentence that links the file.
+
+## 21. The project's question, answered for every file the book links (Chs 1–3, 21 files)
+
+Every linked file's claim was predicted under an added push and an added exact reader (§§1–14, 18, 19), and each
+reader was then built by composition and run against the prediction (§§17, 20): 20 tests, every one passed, three
+predictions of this run's own corrected by hand before their runs (11, 13, 18.2's "mean") and two refuted by their
+runs and recorded (9's second block; 19.3's energy). The rule of §0 held in every case. No book sentence changed for
+composition's sake; one number left Ch 1 at David's word (l.853). The question P26 carried, whether exactness is
+what forces reciprocity, is answered in §0: they are one condition, closedness of the one-form (Ch 2 `prop.closed`).
+What this does not establish: the (U) pushes on coordinates the ports do not expose (a placement, a dial), and a
+reader of the cue composite's commitment $g$, which its output does not carry; each is predicted in its entry and
+not run.

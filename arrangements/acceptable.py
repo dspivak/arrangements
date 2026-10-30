@@ -255,16 +255,18 @@ def drain(rho: float) -> Arrangement:
     return _force_coupling(2, lambda m: jnp.array([0.0, -rho * gate(m[0])]), f"drain({rho:g})")
 
 
-BURST = dict(a=1.0, c=3.0, ell=1.0, sigma=0.5, lam=0.0125, theta=30.0, kappa=26.0, eta_y=50.0, rho=100.0, G=0.15)
+BURST = dict(a=1.0, c=3.0, ell=1.0, sigma=0.5, lam=0.0125, theta=30.0, kappa=26.0, eta_y=50.0, rho=100.0, G=0.15,
+             eta_w=1.0)
 
 
 def burst_room(q=(-2.5, 2.5), w=(-2.5, 2.5), z0=0.0, y0=-1.43, **kw) -> Arrangement:
-    """``I -> <1|0>``: the burst room (module docstring). Position ``(q1, q2, w1, w2, z, y)``."""
+    """``I -> <1|0>``: the burst room (module docstring). Position ``(q1, q2, w1, w2, z, y)``. ``eta_w`` is the chairs'
+    response; ``eta_w=0`` holds them where they are (plan P41 (f): the people's transit with the chairs held)."""
     p = {**BURST, **kw}
     parts = tensor_arrangements([
         person(q[0], 5), person(q[1], 5),
-        matter(configuration(euclidean(1, 1.0), init=jnp.array([w[0]])), 3, "chair"),
-        matter(configuration(euclidean(1, 1.0), init=jnp.array([w[1]])), 3, "chair"),
+        matter(configuration(euclidean(1, p["eta_w"]), init=jnp.array([w[0]])), 3, "chair"),
+        matter(configuration(euclidean(1, p["eta_w"]), init=jnp.array([w[1]])), 3, "chair"),
         matter(configuration(euclidean(1, 1.0), init=jnp.array([z0])), 4, "store"),
         matter(configuration(euclidean(1, p["eta_y"]), init=jnp.array([y0])), 4, "switch"),
     ])
