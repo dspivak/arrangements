@@ -7,8 +7,8 @@ cheating that? untenable." Then "yes please" to rebuilding it in time (Claude Op
 
 **The arrangement, as the book draws it.** Bob is ``phi : R, R, R -> R`` of the attention operad: three internal boxes
 of color ``R``, transfers ``T_0i(q) = gamma_i C(id)`` with ``gamma_i = exp(-q_i^2 / 2)``, the rest zero; matter
-``Q = R^3`` with no internal inclination, responding by the learning rate ``mu``; cost the private prediction
-(``eqn.private_prediction``) on one day, ``(1/2)(z - sum_i gamma_i y_i)^2 + (1/2)(1 - sum_i gamma_i)^2``.
+``Q = R^3`` with no internal inclination, responding by the learning rate ``mu``; cost the book's one-day
+cost in ``ex.learning_trust`` (``eqn.trust_day_cost``), ``(1/2)(z - sum_i gamma_i y_i)^2 + (1/2)(1 - sum_i gamma_i)^2``.
 
 **Time.** A day lasts duration ``1``. Each member's box is filled by a part whose state is a clock ``t``, stepping
 ``t + duration``, that reads out ``msg(y_i[floor t])``, that day's report, and ignores the force that comes back. The
@@ -98,7 +98,7 @@ def world(truth, bob):
 
 
 def per_day_cost(q, m_out, e):
-    """``eqn.private_prediction`` on one day, as ``test_shared_evidence.trust_system`` writes it with one trial."""
+    """``eqn.trust_day_cost`` (``ex.learning_trust``) on one day, as ``test_shared_evidence.trust_system`` writes it with one trial."""
     ms = m_out.reshape(3, 2)
     pred = (jnp.exp(-q ** 2 / 2)[:, None] * ms).sum(0)
     d = e[:2] - pred
