@@ -14,7 +14,8 @@ and a message. No position is received.
 **Operations** (``AddrOp``): an integrator; and, at each configuration ``q`` and each list ``Z`` of every member slot's
 sent ``(k, p)``, the data ``OpData``: for each shown slot ``u`` a place, transfers up ``U[(u, y)]`` and the matter's
 message out ``Uv[u]``; for each member slot ``x`` transfers down ``D[(x, u)]``, a hearing ``T[(x, y)]`` for *every*
-member slot ``y`` (its own member's and itself included) and the matter's message to it ``Tv[x]``; and a cost. A
+member slot ``y`` (its own member's and itself included) and the matter's message to it ``Tv[x]``; and a cost, or
+any effort field ``omega`` in its place (``AddrOp.effort``). A
 transfer from slot ``y`` to slot ``x`` is a cone map, a ``(d_x+1, d_y+1)`` matrix with last row ``(0, ..., 0, gamma)``,
 ``gamma > 0``, or zero. A missing key is the zero map.
 
@@ -28,8 +29,9 @@ lens ``p : B_(V) -> <M(V) | M(V)>`` that relates the two maps into ``arr``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
+import jax
 import jax.numpy as jnp
 from jax import Array
 
@@ -78,6 +80,14 @@ class AddrOp:
     data: Callable[[Array, Places], OpData]
     cost: Callable[[Array, Array, Array], Array] = zero_cost
     label: str = ""
+    omega: Optional[Callable] = None
+
+    def effort(self) -> Callable:
+        """The effort field on ``Q x M^+ x N^-``: ``omega`` if given (any 1-form, Ch 4 ``def.addressed_arrangement``
+        since 2026-10-30, David: "yah there's no reason to restrict to exact effort fields"), else ``-d cost``."""
+        if self.omega is not None:
+            return self.omega
+        return exact(lambda q, m_out, n_in: -self.cost(q, m_out, n_in))
 
     @property
     def slots(self) -> List[Slot]:
@@ -153,7 +163,7 @@ class AddrOp:
             P=self.P, in_dim_M=self.in_dim_M(), out_dim_M=self.out_dim_M(),
             in_dim_N=self.in_dim_N(), out_dim_N=self.out_dim_N(),
             out_f=self.sigma, in_f=self.rho,
-            omega=exact(lambda q, m_out, n_in: -self.cost(q, m_out, n_in)),
+            omega=self.effort(),
             label=self.label or f"addr{self.members}->{self.shown}",
         )
 
@@ -275,8 +285,30 @@ def substitute(a: AddrOp, parts: Sequence[AddrOp], label: str = "", old_rule: bo
             total = total + parts[i].cost(qs[i], locs[i], e[ecuts[i]:ecuts[i + 1]])
         return total
 
+    omega = None
+    if a.omega is not None or any(c.omega is not None for c in parts):
+        def points(q, m_out, n_in):
+            qs, qa = split_q(q)
+            cuts = [0]
+            for c in parts:
+                cuts.append(cuts[-1] + c.out_dim_M())
+            locs = [m_out[cuts[i]:cuts[i + 1]] for i in range(len(parts))]
+            tilde = jnp.concatenate([parts[i].sigma(qs[i], locs[i]) for i in range(len(parts))]) \
+                if parts else jnp.zeros(0)
+            e = a.rho(qa, tilde, n_in)
+            ecuts = [0]
+            for c in parts:
+                ecuts.append(ecuts[-1] + c.in_dim_N())
+            return [(qa, tilde, n_in)] + [(qs[i], locs[i], e[ecuts[i]:ecuts[i + 1]]) for i in range(len(parts))]
+
+        def omega(q, m_out, n_in):
+            """Each constituent's effort field at what it reads and receives, pulled back and summed."""
+            pts, pull = jax.vjp(points, q, m_out, n_in)
+            covs = [tuple(a.effort()(*pts[0]))] + [tuple(parts[i].effort()(*pts[i + 1])) for i in range(len(parts))]
+            return pull(covs)
+
     return AddrOp(members=members, shown=a.shown, dim_P=P_, P=Pint, data=data, cost=cost,
-                  label=label or f"{a.label}({', '.join(c.label for c in parts)})")
+                  label=label or f"{a.label}({', '.join(c.label for c in parts)})", omega=omega)
 
 
 # ---------------------------------------------------------------------------
