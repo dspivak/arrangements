@@ -227,7 +227,7 @@ def trust_system(cost_kind, Y, mu, init):
     n = len(Y)
     if cost_kind == "prediction":
         # Ch 4's eqn.private_prediction, per trial ½|(z,1,p_0) - (sum_i g_i (y_i, 1), 0)|^2,
-        # averaged over trials; loudness Gaussian in the placement (ex.gaussian_attention)
+        # averaged over trials; loudness Gaussian in the placement (ex.attenuation_kinds, its Gaussian case)
         loud = lambda q: jnp.exp(-q ** 2 / (2 * TAU))
         place = lambda q: q.reshape(n, 1)
 
