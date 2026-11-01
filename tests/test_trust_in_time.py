@@ -6,7 +6,7 @@ violation of the model. how could this be at all reasonable? the whole thing is 
 cheating that? untenable." Then "yes please" to rebuilding it in time (Claude Opus 5.5, b0471e87).
 
 **The arrangement, as the book draws it.** Bob is ``phi : R, R, R -> R`` of the attention operad: three internal boxes
-of color ``R``, transfers ``T_0i(q) = gamma_i C(id)`` with ``gamma_i = exp(-q_i^2 / 2)``, the rest zero; matter
+of object ``R``, transfers ``T_0i(q) = gamma_i C(id)`` with ``gamma_i = exp(-q_i^2 / 2)``, the rest zero; matter
 ``Q = R^3`` with no internal inclination, responding by the learning rate ``mu``; cost the book's one-day
 cost in ``ex.learning_trust`` (``eqn.trust_day_cost``), ``(1/2)(z - sum_i gamma_i y_i)^2 + (1/2)(1 - sum_i gamma_i)^2``.
 

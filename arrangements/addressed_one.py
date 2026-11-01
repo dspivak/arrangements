@@ -7,7 +7,7 @@ positions); a box may hear itself through the arrangement (``T_ii``); and the ma
 is the addressed operad with all three, as proposed in the book repository's ``notes/runs/p79-b430b0e2/RESULTS.md`` §2;
 everything here is the agents' and *proposed*.
 
-**Colors** are lists of value dimensions ``(d_1, ..., d_r)``, one per slot. The interface of a color has, per slot,
+**Objects** are lists of value dimensions ``(d_1, ..., d_r)``, one per slot. The interface of an object has, per slot,
 input the heard message ``(h, w)`` in ``R^{d+1}`` and output ``(k, p, h, w)``: an address and a query in ``P = R^dim_P``
 and a message. No position is received.
 

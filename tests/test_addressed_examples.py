@@ -85,7 +85,7 @@ def ear(u, v):
 
 
 def part(name, p):
-    """A nullary addressed arrangement of color ((R^2, R)): its matter stores a position ``p``,
+    """A nullary addressed arrangement of object ((R^2, R)): its matter stores a position ``p``,
     which does not move, and a number ``x``; it sends ``(p, p)`` and ``msg(x) = (x, 1)``, hears ``(h, w)``, and its
     effort field is ``((lam - 1) x + k h) dx`` (enthusiast) or ``(-(lam + 1) x - k h) dx`` (skeptic), none on what it
     hears: not exact, since its exterior derivative is ``+-k dh ^ dx``."""

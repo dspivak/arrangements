@@ -159,7 +159,7 @@ def token(bk: Block, i: int) -> Arrangement:
 
 
 def attention_group(bk: Block) -> AddressedArrangement:
-    """One operation of ``Addr``: ``h`` children of color ``heads``, no placement, nothing shown; head ``a`` of token
+    """One operation of ``Addr``: ``h`` children of object ``heads``, no placement, nothing shown; head ``a`` of token
     ``x`` hears head ``a`` of every earlier token ``y`` by ``exp <p_x, k_y>`` (the causal mask and the heads are fixed
     zeros of the hearing; a token never hears itself through the group)."""
 

@@ -211,7 +211,7 @@ def permute_blocks(q, sizes, order):
     return jnp.concatenate([q[cut[i]:cut[i + 1]] for i in order])
 
 
-# The two-input nest of prediction 1: a parent of two members, colors (1,) and (2, 1); part 1 shows (1,), part 2
+# The two-input nest of prediction 1: a parent of two members, objects (1,) and (2, 1); part 1 shows (1,), part 2
 # shows (2, 1), one slot forwarded and one a speaker.
 def two_input_nest(seed=1):
     a = random_addr([(1,), (2, 1)], (2, 1), seed, forwards={1: (1, 1)}, label="a")
@@ -484,7 +484,7 @@ def test_eye_composes_with_any_kernel():
 
 
 def test_at_a_point_the_addressed_operad_is_attention():
-    """Chapter order (P79 (b)): with address space R^0 and one-slot colors, an addressed operation's data is an attention
+    """Chapter order (P79 (b)): with address space R^0 and one-slot objects, an addressed operation's data is an attention
     arrangement's (one shown slot, the external box), and substitution is eqn.attention_substitution: j at dim_P = 0 is
     the identification, its composite equal to the attention composite in every datum and as arrangements in arr."""
     phi = random_att((1, 2, 1, 1), 101, label="phi")

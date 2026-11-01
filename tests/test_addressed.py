@@ -165,8 +165,8 @@ def test_substitution_is_composition_in_arr():
     components of its forcing, and the two run identically through ``Phi``. Hidden slots, a
     reordered exposure and an uneven nest are included."""
     a = random_op((2, 1), [(0, 1), (1, 0)], 1)                       # child 0's slot 0 hidden
-    a1 = random_op((1, 2), [(1, 0), (0, 0)], 2)                      # color 2, order reversed
-    a2 = random_op((1, 1), [(1, 0)], 3)                              # color 1
+    a1 = random_op((1, 2), [(1, 0), (0, 0)], 2)                      # object 2, order reversed
+    a2 = random_op((1, 1), [(1, 0)], 3)                              # object 1
     b = substitute(a, [a1, a2])
     explicit = b.arr()
     composite = compose_seq(tensor_arrangements([a1.arr(), a2.arr()]), a.arr())
@@ -473,8 +473,8 @@ def test_speakers_substitution_is_composition_and_associative():
     explicit composite is the composite in ``arr`` (sending, receiving, forcing, a ``Phi`` run), and
     the two bracketings of a three-level nest agree."""
     a = random_op((2, 2), [(0, 1)], 51, speakers=1)                  # shows a member and a speaker
-    a1 = random_op((1, 2), [(1, 0)], 52, speakers=1)                 # color 2: member, speaker
-    a2 = random_op((1, 1), [], 53, speakers=2)                       # color 2: two speakers
+    a1 = random_op((1, 2), [(1, 0)], 52, speakers=1)                 # object 2: member, speaker
+    a2 = random_op((1, 1), [], 53, speakers=2)                       # object 2: two speakers
     b = substitute(a, [a1, a2])
     explicit = b.arr()
     composite = compose_seq(tensor_arrangements([a1.arr(), a2.arr()]), a.arr())

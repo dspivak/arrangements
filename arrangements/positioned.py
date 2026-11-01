@@ -7,9 +7,9 @@ Fix a position space ``Pos = R^e``. A position is sent as a *message* of ``Pos``
 times position and the mass, so that positions add as messages and the value of a sum is the centre of mass (Ch 4
 ``prop.positive_messages`` (c)).
 
-**Colors** are value dimensions ``d``. The interface of a box of color ``d`` receives a message in ``R^{d+1}`` and sends
+**Colors** are value dimensions ``d``. The interface of a box of object ``d`` receives a message in ``R^{d+1}`` and sends
 its position message in ``R^{e+1}`` and a message in ``R^{d+1}``. This is the addressed operad of ``addressed_one.py``
-at one place per slot, the place being the position (``iota`` below), on one-slot colors.
+at one place per slot, the place being the position (``iota`` below), on one-slot objects.
 
 **Operations** (``PosOp``) ``d_1, ..., d_n -> d_0``: an integrator; a position readout ``place(q, Z)``, where ``Z`` lists
 the members' sent position messages; transfers ``T_ij(q, Z)`` for ``i, j`` in ``0..n`` (``T_00 = 0``) and the matter's
@@ -142,7 +142,7 @@ def substitute(phi: PosOp, psis: Sequence[PosOp], label: str = "") -> PosOp:
         raise ValueError("arity")
     for i, p in enumerate(psis):
         if p.dims[0] != phi.dims[i + 1] or p.e != phi.e:
-            raise ValueError("colors")
+            raise ValueError("objects")
     boxes = [(i, ii) for i in range(n) for ii in range(1, psis[i].n + 1)]
     dims = (phi.dims[0],) + tuple(psis[i].dims[ii] for i, ii in boxes)
     qd = [p.P.Q_dim for p in psis]

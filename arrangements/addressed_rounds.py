@@ -5,7 +5,7 @@ keys/queries", and "a box's output kind of can depend on its input. What you do 
 output as the output. … an (A,B) mealy machine is a coalgebra on (B^A)y^A." The definitions and the proof are in the
 book repository, ``notes/runs/p53g-53d025a9/RESULTS.md``; everything here is the agents' and *proposed*.
 
-**Rounds.** A pass has rounds ``1, ..., L``. A box of color ``r`` sends at round 1 its slots' outputs ``s^1`` (as in
+**Rounds.** A pass has rounds ``1, ..., L``. A box of object ``r`` sends at round 1 its slots' outputs ``s^1`` (as in
 ``addressed.py``) and at round ``l`` a function of everything its ``r`` slots heard at rounds ``1, ..., l - 1``: its
 *strategy*. The interface ``B^L_r`` has input side ``(M^r)^L x P`` (what each slot hears at each round, then the
 reference position) and output side ``S_r x prod_l C^oo((M^r)^{l-1}, S_r)``.
@@ -111,10 +111,10 @@ def realize(a: AddressedArrangement, colors: Sequence[Color], q: Array, m_out: A
 
 
 def rounds(a: AddressedArrangement, colors: Sequence[Color], L: int, label: str = "") -> Tuple[Arrangement, Color]:
-    """``Phi_L(a)``: the arrangement ``B^L_{c_1} (x) ... (x) B^L_{c_n} -> B^L_c`` and its output color ``c``."""
+    """``Phi_L(a)``: the arrangement ``B^L_{c_1} (x) ... (x) B^L_{c_n} -> B^L_c`` and its output object ``c``."""
     colors = tuple(colors)
     if tuple(c.r for c in colors) != a.slots:
-        raise ValueError(f"rounds: colors {[c.r for c in colors]} do not match the operation's slots {a.slots}")
+        raise ValueError(f"rounds: objects {[c.r for c in colors]} do not match the operation's slots {a.slots}")
     dH, dP, r = a.dim_H, a.dim_P, a.r
     hd = heard_dim(r, dH)
     Qd = a.P.Q_dim
@@ -200,9 +200,9 @@ def iota(r: int, L: int, dim_H: int, dim_P: int) -> Arrangement:
 
 
 def ground(c: Color, L: int, dim_H: int, dim_P: int) -> Arrangement:
-    """``B^L_c -> I`` for a color with no slots: drops its parameter, gives the reference position ``0``."""
+    """``B^L_c -> I`` for an object with no slots: drops its parameter, gives the reference position ``0``."""
     if c.r != 0:
-        raise ValueError("ground: the color shows slots")
+        raise ValueError("ground: the object shows slots")
     return Arrangement(
         P=configuration(trivial()), in_dim_M=dim_P, out_dim_M=out_dim(c, dim_H, dim_P), in_dim_N=0, out_dim_N=0,
         out_f=lambda q, m_out: jnp.zeros(0), in_f=lambda q, m_out, n_in: jnp.zeros(dim_P),

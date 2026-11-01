@@ -35,7 +35,7 @@ SD, HD = slot_dim(DH, DP), DH + 1
 
 
 def mealy(r, seed, theta_dim=3, L_max=3):
-    """A color of ``r`` slots whose round-``l`` sends are a smooth function of its parameter and of everything its
+    """An object of ``r`` slots whose round-``l`` sends are a smooth function of its parameter and of everything its
     slots heard before: ``s1 / 2 + tanh(B_l [theta, H] + c_l)``."""
     g = np.random.default_rng(seed)
     B = {l: jnp.asarray(g.standard_normal((r * SD, theta_dim + (l - 1) * r * HD)) * 0.4) for l in range(2, L_max + 1)}
@@ -123,7 +123,7 @@ def test_substitution_is_composition_over_rounds():
 
 
 def test_units_over_rounds():
-    """CHECKS A PROOF (prediction 1, units). ``Phi_L`` of the unit of color ``r`` is the identity on ``B^L_c``: the
+    """CHECKS A PROOF (prediction 1, units). ``Phi_L`` of the unit of object ``r`` is the identity on ``B^L_c``: the
     same sends at every round, what it hears passed through, the position ``p_0 + 0``, no force."""
     from arrangements.addressed import unit
     for L, c in [(2, mealy(2, 91)), (3, mealy(1, 92))]:
@@ -262,7 +262,7 @@ def token(c, x0, y, mobility=0.1):
 
 
 def attention_group():
-    """One operation of ``Addr``: ``N_TOK`` children of color ``HEADS``, no placement, nothing shown; head ``a`` of
+    """One operation of ``Addr``: ``N_TOK`` children of object ``HEADS``, no placement, nothing shown; head ``a`` of
     token ``x`` hears head ``a`` of every earlier token ``y`` by ``exp <p_x, k_y>`` (the causal mask and the heads are
     fixed zeros of the hearing)."""
 

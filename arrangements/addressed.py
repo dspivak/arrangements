@@ -12,9 +12,9 @@ queries do. The definition and its proof are in the book repository,
 message to David, and in the book (Ch 4 ``sec.messages``), say *address and query*, never *place*, which he reads
 as the positions Ch 4 dropped (P77).
 
-**Colors and interfaces.** A color is a number ``r`` of *slots*. A slot sends an address
+**Objects and interfaces.** An object is a number ``r`` of *slots*. A slot sends an address
 ``k in P``, a query ``p in P`` and a message ``m = (h, w) in M = H x R``, and receives one message,
-what it hears. The interface of color ``r`` is ``B_r = <M^r x P | (P x P x M)^r>``: what each slot
+what it hears. The interface of object ``r`` is ``B_r = <M^r x P | (P x P x M)^r>``: what each slot
 hears and a reference position, over what each slot sends. Coordinates: a slot's output is
 ``[k..., p..., h..., w]`` (length ``2 dim_P + dim_H + 1``); the input is the ``r`` heard messages,
 then the position.
@@ -226,7 +226,7 @@ class AddressedArrangement:
 
 
 def unit(r: int, dim_H: int, dim_P: int) -> AddressedArrangement:
-    """The unit of color ``r``: one child, every slot forwarded in order, no placement, no cost."""
+    """The unit of object ``r``: one child, every slot forwarded in order, no placement, no cost."""
     return AddressedArrangement(
         slots=(r,), exposure=tuple((0, a) for a in range(r)), dim_H=dim_H, dim_P=dim_P,
         P=configuration(trivial()), placement=lambda q: jnp.zeros((1, dim_P)),
@@ -247,7 +247,7 @@ def substitute(a: AddressedArrangement, parts: Sequence[AddressedArrangement],
         raise ValueError(f"substitute: arity {a.n}, got {len(parts)} parts")
     for i, c in enumerate(parts):
         if c.r != a.slots[i]:
-            raise ValueError(f"part {i} has color {c.r}, the parent's child {i} has {a.slots[i]}")
+            raise ValueError(f"part {i} has object {c.r}, the parent's child {i} has {a.slots[i]}")
         if (c.dim_H, c.dim_P) != (a.dim_H, a.dim_P):
             raise ValueError(f"part {i}: signal/place spaces differ from the parent's")
     dH, dP = a.dim_H, a.dim_P
@@ -389,7 +389,7 @@ def dot(scale: float = 1.0) -> Callable[[Array, Array], Array]:
 
 
 # ---------------------------------------------------------------------------
-# Systems that fill a box of color r, and the ground that closes a group.
+# Systems that fill a box of object r, and the ground that closes a group.
 # ---------------------------------------------------------------------------
 
 
