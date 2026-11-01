@@ -1,4 +1,4 @@
-"""The n-fold pendulum by nesting one link in itself (book Ch 3 ``sec.arr``, ``eqn.link``).
+"""The n-fold pendulum by nesting one link in itself (book Ch 3 ``sec.grpng``, ``eqn.link``).
 
 A *link* is a 1-ary arrangement ``<0|2> -> <0|2>``, a bar hanging from a support with a bob at its bottom:
 its matter is the bob, a mass ``m`` in the plane (``phase``, symplectic Euler with its look-ahead); its open

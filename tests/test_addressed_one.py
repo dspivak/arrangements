@@ -307,7 +307,7 @@ def test_the_old_rule_misses_the_composite_in_arr():
 
 
 def test_book_attention_substitution_is_composition_in_arr():
-    """Prediction 4: ``eqn.attention_substitution`` is the composite in ``arr`` of ``eqn.attention_arrangement``,
+    """Prediction 4: ``eqn.attention_substitution`` is the composite in ``arr`` of ``eqn.attention_grouping``,
     with voices and ``T_ii`` nonzero, uneven, with a nullary part; and the unit laws."""
     phi = random_att((1, 2, 1, 1), 41, label="phi")
     psis = [random_att((2, 1, 1), 42, label="psi1"), random_att((1,), 43, label="psi2"),

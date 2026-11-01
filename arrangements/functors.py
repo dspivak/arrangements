@@ -1,7 +1,7 @@
 """The cotangent functor and the dynamics functor ``Phi : arr -> pc`` (sec.dynamics_functor).
 
 There is **one** dynamics functor (NOTATION.md "Dynamics functor"): the
-integrator is the coalgebra ``u`` inside the arrangement's parameter (def.arr),
+integrator is the coalgebra ``u`` inside the arrangement's parameter (def.grpng),
 so ``Phi`` takes no integrator argument. CDLM's ``Phiconf`` and ``Phiphase`` are
 ``Phi`` applied to arrangements whose parameter is ``coalgebra.configuration(Q)``
 or ``coalgebra.phase(Q)``; they are different arrangements, not two readings of

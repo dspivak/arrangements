@@ -13,7 +13,7 @@ at one place per slot, the place being the position (``iota`` below), on one-slo
 
 **Operations** (``PosOp``) ``d_1, ..., d_n -> d_0``: an integrator; a position readout ``place(q, Z)``, where ``Z`` lists
 the members' sent position messages; transfers ``T_ij(q, Z)`` for ``i, j`` in ``0..n`` (``T_00 = 0``) and the matter's
-messages ``T_iV(q, Z)``, cone maps as in Ch 4 ``def.attention_arrangement``, here also reading ``Z``; a cost.
+messages ``T_iV(q, Z)``, cone maps as in Ch 4 ``def.attention_grouping``, here also reading ``Z``; a cost.
 
 **Substitution** (``substitute``) is ``eqn.attention_substitution`` row by row, each part's data read at its own
 members' position messages and the parent's at the positions its parts send.

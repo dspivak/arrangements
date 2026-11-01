@@ -611,7 +611,7 @@ failing claim was a claim about one-way readers, and the book's sentences carry 
 
 ### 18.1 `tests/test_pendulum.py` (Ch 3 l.2525)
 
-**Links.** `sec.arr`: "the bars vibrate along their length about a thousand times a second, while the pendulum
+**Links.** `sec.grpng`: "the bars vibrate along their length about a thousand times a second, while the pendulum
 swings about once every two seconds, and a step has to follow the vibration: steps of a tenth of a millisecond run
 well, and steps three times as long make the run blow up. [The companion code builds the $n$-fold pendulum by
 nesting links, runs it, and compares it with the rigid one.]"
