@@ -131,7 +131,7 @@ def test_book_chain_by_hand():
     """sec.waves' hand steps, unit masses and spring constants 1/4, from (8,0,0) at rest: the positions and
     momenta go (8,0,0),(0,0,0) -> (8,0,0),(-2,2,0) -> (6,2,0),(-3,5/2,1/2) -> positions (3,4.5,0.5);
     each mass reads out the position it is headed to (eqn.mass_readout); each step is eqn.wave_step with
-    the free-ended forces eqn.chain_forces at the read-out positions; the total momentum is 0 and the
+    the free-ended forces eqn.chain_loads at the read-out positions; the total momentum is 0 and the
     positions sum to 8 at every step (exc.waves_sum); the plot eqn.wave_plot, point by point; and the
     middle mass passes 8/3 and the chain never settles."""
     K = 3

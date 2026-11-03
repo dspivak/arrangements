@@ -10,13 +10,16 @@ update
 Two systems ``1 -> <0|msg(Y)>`` transferring out the prediction, run by ``Phi`` at any duration, with nothing
 computed between steps (book Ch 4 ``sec.predictor_active``):
 
+The system reads out ``q`` and is observed by its own map ``g``, which need not be the predictor's ``o``
+(Friston et al. 2009, Methods, "Active inference," eqs. (7)-(8)); the tests pass the same map for both.
+
 * ``one_way``: the predictor hears the system through the book's sensor (``sensor`` below; the book says only
-  that it stores a reading and reports it while ignoring every force on its report), a part storing a
-  reading and a report, load-free and unilateral (Ch 3 ``def.load_free_unilateral``), so the system never feels the
-  predictor.
-* ``active``: the sensor is removed; the wiring sends ``x`` to the message ``(o(x), 1)``. The predictor's force on
-  that message comes back along the wire, pulled back through ``o``, so the system receives
-  ``(T_x o)^T (o(xhat) - o(x))``: active inference (Friston et al. 2009, Results, "Active inference").
+  that it takes a snapshot of ``g(q)`` and reads it out while ignoring every force on its readout), a part storing
+  a reading and a report, load-free and unilateral (Ch 3 ``def.load_free_unilateral``), so the system never feels
+  the predictor.
+* ``active``: the sensor is removed; the wiring sends ``q`` to the message ``(g(q), 1)``. The predictor's force on
+  that message comes back along the wire, pulled back through ``g``, so the system receives
+  ``(T_q g)^T (o(xhat) - g(q))``: active inference (Friston et al. 2009, Methods, "Active inference," eq. (9)).
 
 Book plan P84 (g), Claude Opus 5.5, session 4eacd80b; *proposed*. Tests: ``tests/test_predictor.py``.
 """
@@ -85,10 +88,10 @@ def predictor(f: Model, o: Callable[[Array], Array], G: Array, eta: float, mu0, 
     )
 
 
-def sensor(o: Callable[[Array], Array], k: float, dx: int, dy: int, y0=None) -> Arrangement:
+def sensor(g: Callable[[Array], Array], k: float, dx: int, dy: int, y0=None) -> Arrangement:
     """The book's sensor ``<0|0> -> <dy+1|dx>``: stores a reading ``z`` and a report ``y``, reads out ``msg(y)``.
 
-    Its effort field is ``o(x) - z`` on the reading and ``0`` on the report and on ``x`` (load-free); its update uses
+    Its effort field is ``g(q) - z`` on the reading and ``0`` on the report and on ``q`` (load-free); its update uses
     only the reading's component (unilateral): ``z' = z + k tau xi_z``, ``y' = y + k tau (z' - y)``."""
     s0 = jnp.zeros(2 * dy) if y0 is None else jnp.concatenate([jnp.asarray(y0, float)] * 2)
 
@@ -103,7 +106,7 @@ def sensor(o: Callable[[Array], Array], k: float, dx: int, dy: int, y0=None) -> 
     )
 
     def omega(q, m_out, n_in):
-        return (jnp.concatenate([jnp.zeros(dy), o(n_in) - q[dy:]]), jnp.zeros_like(m_out), jnp.zeros_like(n_in))
+        return (jnp.concatenate([jnp.zeros(dy), g(n_in) - q[dy:]]), jnp.zeros_like(m_out), jnp.zeros_like(n_in))
 
     return Arrangement(
         P=P, in_dim_M=0, out_dim_M=0, in_dim_N=dx, out_dim_N=dy + 1,
@@ -131,12 +134,12 @@ def one_way(sys: Arrangement, sense: Arrangement, pred: Arrangement) -> Arrangem
     return compose_seq(parts, _route(n, n + dy + 1, lambda m: m[:n], dy))
 
 
-def active(sys: Arrangement, pred: Arrangement, o: Callable[[Array], Array]) -> Arrangement:
-    """The sensor removed: the wiring sends ``x`` to ``(o(x), 1)`` on the predictor's input, and the prediction is
-    transferred out. State: ``((sys, predictor), route)``."""
+def active(sys: Arrangement, pred: Arrangement, g: Callable[[Array], Array]) -> Arrangement:
+    """The sensor removed: the wiring's in-transfer ``msg o g`` sends ``q`` to ``(g(q), 1)`` on the predictor's
+    input, and the prediction is transferred out. State: ``((sys, predictor), route)``."""
     dx, dy = sys.out_dim_N, pred.in_dim_N - 1
     parts = tensor_arrangements([sys, pred])
-    return compose_seq(parts, _route(dy + 1, dx + dy + 1, lambda m: jnp.concatenate([o(m[:dx]), jnp.ones(1)]), dy))
+    return compose_seq(parts, _route(dy + 1, dx + dy + 1, lambda m: jnp.concatenate([g(m[:dx]), jnp.ones(1)]), dy))
 
 
 _IN = (jnp.zeros(0), trivial_omega(0))

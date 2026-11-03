@@ -88,7 +88,7 @@ def spring(kappa: float, label: str = "spring") -> Arrangement:
 def book_chain(boxes, kappas) -> Arrangement:
     """The chain of ``eqn.chain_wd``: ``K`` boxes in a row, consecutive ones joined by a spring of
     constant ``kappas[i]``, the interior boxes' readouts copied to both their springs. The ends are
-    free, as in the book: the end boxes have one spring each, and the forces ``eqn.chain_forces`` sum
+    free, as in the book: the end boxes have one spring each, and the forces ``eqn.chain_loads`` sum
     to zero, so what the chain carries (heat, momentum) is conserved."""
     K = len(boxes)
     if len(kappas) != K - 1:

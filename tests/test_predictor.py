@@ -22,12 +22,14 @@ def decay(theta, tau, mu):          # f(theta, tau, mu) = e^{-theta tau} mu, f(t
 ident = lambda x: x
 
 
-def pair(kind, *, o=ident, q0=1.0, p0=0.0, mu0=1.0, eta=0.0):
+def pair(kind, *, o=ident, g=None, q0=1.0, p0=0.0, mu0=1.0, eta=0.0):
+    """The predictor observes by ``o``; the system is observed by ``g``, the predictor's ``o`` unless given."""
+    g = o if g is None else g
     sys = free_mass(1.0, q0, p0)
     pred = predictor(decay, o, jnp.eye(1), eta, mu0, 1.0, dy=1)
     if kind == "active":
-        return active(sys, pred, o)
-    return one_way(sys, sensor(o, 1.0, 1, 1, y0=[q0]), pred)
+        return active(sys, pred, g)
+    return one_way(sys, sensor(g, 1.0, 1, 1, y0=[q0]), pred)
 
 
 def mass_of(kind, s):               # (q, p) of the mass
@@ -64,6 +66,18 @@ def test_force_on_system_is_the_prediction_error_pulled_back():
     x = q0 + tau * p0                       # the mass's look-ahead
     xhat = jnp.exp(-tau) * mu0              # the predictor's forecast
     force = jnp.cos(x) * (jnp.sin(xhat) - jnp.sin(x))
+    assert jnp.allclose(mass_of("active", s)[1][0], p0 + tau * force, atol=1e-6)
+
+
+def test_force_with_two_observation_maps():
+    """The system observed by its own g, the predictor by its o (book sec.predictor_active, eqn.active_load):
+    one active step gives the mass's momentum tau (T_q g)^T (o(xhat) - g(q))."""
+    o, g = jnp.sin, lambda q: 2.0 * q + q ** 3
+    q0, p0, mu0, tau = 0.7, 0.3, 0.2, 0.1
+    s = run(pair("active", o=o, g=g, q0=q0, p0=p0, mu0=mu0), tau, 1)
+    q = q0 + tau * p0                       # the mass's look-ahead
+    xhat = jnp.exp(-tau) * mu0              # the predictor's forecast
+    force = (2.0 + 3.0 * q ** 2) * (jnp.sin(xhat) - g(q))
     assert jnp.allclose(mass_of("active", s)[1][0], p0 + tau * force, atol=1e-6)
 
 

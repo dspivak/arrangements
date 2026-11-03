@@ -1,4 +1,4 @@
-"""Composition and wiring constructors in ``arr`` (def.grpng, sec.forces).
+"""Composition and wiring constructors in ``arr`` (def.grpng, sec.loads).
 
 Provides:
 

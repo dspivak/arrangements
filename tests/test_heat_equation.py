@@ -9,7 +9,7 @@ its heat capacity's inverse, so one step is ``theta_i' = theta_i + xi_i / C_i`` 
 joint between two segments is the spring of ``sec.springs`` with temperatures in place of positions,
 Fourier's law as the cost function ``(kappa/2)(theta_1 - theta_2)^2`` with ``kappa`` its conductance;
 the dot copies the middle temperature to both joints and the flows they return add, giving the forces
-``eqn.chain_forces``. In code (``tests/chain.py``) a segment is
+``eqn.chain_loads``. In code (``tests/chain.py``) a segment is
 ``one_port_box(configuration, 1/C, [theta0], "segment")``, a joint is ``spring(kappa)``, and the rod is
 ``book_chain(segments, [kappa_1, kappa_2])``, its ends free as in the book, so the total heat stays
 put. The book's hand steps (unit heat capacities, conductances ``1/4``, from ``(8, 0, 0)``),
@@ -90,7 +90,7 @@ HEAT_PLOT = np.array([   # eqn.heat_plot: steps 0..12 of the first, middle and l
 
 def test_book_rod_by_hand():
     """sec.heat's hand steps, unit heat capacities and conductances 1/4: (8,0,0) -> (6,2,0) -> (5,2.5,0.5)
-    -> (4.375,2.625,1); each step is eqn.heat_step with the free-ended forces eqn.chain_forces; the sum
+    -> (4.375,2.625,1); each step is eqn.heat_step with the free-ended forces eqn.chain_loads; the sum
     stays 8; all three approach 8/3 (exc.heat_middle); the plot eqn.heat_plot, point by point; and with
     conductances 1 the step overshoots, (8,0,0) -> (0,8,0) -> (8,-8,8) (exc.heat_long_step)."""
     temperatures, _ = closed_run(_rod((8.0, 0.0, 0.0)), 80)
