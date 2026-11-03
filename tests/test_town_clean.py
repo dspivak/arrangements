@@ -18,9 +18,21 @@ import json
 import jax
 import jax.numpy as jnp
 import numpy as np
-from arrangements.town import Settings, build, run, summary, smoke
+from arrangements.town import Settings, account_town, build, eve_town, run, summary, smoke
 
 SMALL, MODERATE, LARGE = .1, 1.0, 10.0
+
+
+def test_book_filtering_cheap_the_plant_cleans_filtering_dear_it_shrinks():
+    """``sec.cost_later``, in the town as drawn (``account_town``): "filtering the smoke is cheaper than
+    cutting power, so the plant cleans up rather than reducing its output", and the footnote's "when one
+    makes filtering cost more than cutting power, the plant output shrinks instead"."""
+    no_return = eve_town(1)
+    power = summary(no_return, run(no_return))['power']
+    cheap, dear = (summary(t, run(t)) for t in (account_town(Settings(clean_cost=SMALL)),
+                                                account_town(Settings(clean_cost=LARGE))))
+    assert cheap['final_cleanliness'] > .9 and cheap['final_output'] > .95 and cheap['power'] > .95*power
+    assert dear['final_cleanliness'] < .1 and dear['final_output'] < .5 and dear['power'] < .5*power
 
 
 def plant_cost(x, c, p, k, benefit=1.0):

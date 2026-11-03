@@ -203,7 +203,7 @@ def sensor(h0: float) -> Arrangement:
 def belief_cost(P: np.ndarray, m: float) -> Callable[[Array, Array, Array], Array]:
     """The belief's cost on ``q = (mu, mu_p, k_hat, lambda)`` and the input ``e = (h, w)``:
     ``1/2 e^lambda (h - H mu)^2 + 1/2 (w - 1)^2 - 1/2 lambda + 1/2 (mu - F_{k_hat} mu_p)' P^{-1} (mu - F_{k_hat} mu_p)``
-    (``eqn.private_prediction`` with prediction ``(H mu, 1)`` in the inner product ``e^lambda (+) 1`` on the
+    (Ch 4's ``eqn.private_prediction``, cut from the book 2026-10-29 in af41f84, with prediction ``(H mu, 1)`` in the inner product ``e^lambda (+) 1`` on the
     message space, plus terms of the configuration alone; degree two in ``e``)."""
     Pinv = jnp.asarray(np.linalg.inv(P))
     H = jnp.asarray(observation_row(m))

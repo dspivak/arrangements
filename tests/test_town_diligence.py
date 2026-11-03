@@ -110,6 +110,17 @@ def test_with_her_report_disconnected_harm_is_no_worse_than_stage_three():
     check_clean_money(town, trajectory)
 
 
+def test_diligence_on_the_estimator_as_drawn():
+    """The same books on the book's own estimator (``fit_coughing``, ``account_town``'s fit), whose estimate
+    needs no rescue: the rate still ends within 2% of beta, and the insurer's own fit is beta exactly."""
+    town = eve_town(4, diligence=True, fit_coughing=True)
+    trajectory = run(town)
+    result = summary(town, trajectory)
+    print('drawn estimator: final premium', result['final_premium'], 'own fit', result['final_own_fit'])
+    assert result['final_premium'] == pytest.approx(town.settings.beta, rel=.02)
+    assert result['final_own_fit'] == pytest.approx(town.settings.beta, rel=1e-9)
+
+
 def test_diligence_needs_an_insurer():
     """Construction check: no insurer before stage 3."""
     for stage in (1, 2):

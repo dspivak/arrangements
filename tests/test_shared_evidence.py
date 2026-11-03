@@ -82,7 +82,7 @@ def test_1_messages_are_gaussian_evidence():
     whenever ``a != 0``; a constant ``g`` has no such reading; in ``R^2`` a non-conformal linear part
     has none either."""
     x = np.linspace(-6, 6, 241)
-    m1, m2 = (3 * 4.0, 3.0), (8.0, 1.0)            # 3 msg(4), msg(8) (exc.message_weight)
+    m1, m2 = (3 * 4.0, 3.0), (8.0, 1.0)            # 3 msg(4), msg(8) (Ch 4's exc.message_weight, cut 2026-10-30 in 1204e25)
     s = (m1[0] + m2[0], m1[1] + m2[1])
     # sum = product of likelihoods; the product is the bell curve with mean = value, precision = weight
     assert same_up_to_constant(loglik(s, x), loglik(m1, x) + loglik(m2, x))
@@ -226,7 +226,7 @@ def test_3_echo_counts_a_report_twice():
 def trust_system(cost_kind, Y, mu, init):
     n = len(Y)
     if cost_kind == "prediction":
-        # Ch 4's eqn.private_prediction, per trial ½|(z,1,p_0) - (sum_i g_i (y_i, 1), 0)|^2,
+        # Ch 4's eqn.private_prediction (cut 2026-10-29 in af41f84), per trial ½|(z,1,p_0) - (sum_i g_i (y_i, 1), 0)|^2,
         # averaged over trials; loudness Gaussian in the placement (ex.attenuation_kinds, its Gaussian case)
         loud = lambda q: jnp.exp(-q ** 2 / (2 * TAU))
         place = lambda q: q.reshape(n, 1)

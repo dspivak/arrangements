@@ -126,7 +126,7 @@ class Town:
 
 
 def build(stage, settings=Settings(), *, connect_report=True, informed=False, clean=False,
-          power_to_town=False, diligence=False, extra=(), exact_plant=False):
+          power_to_town=False, diligence=False, extra=(), exact_plant=False, fit_coughing=False):
     """Stages 1=no return, 2=law, 3=historical insurance, 4=her account.
 
     Informed control starts the liability estimator at the true coefficient.
@@ -141,6 +141,8 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
     published value ('smoke', 'estimate', 'premium', ...) or a function of the published vector.
     exact_plant=True gives the plant its cost's covector on the price it reads, so it pushes back on the
     premium (a lobbying plant); the default plant is a price-taker, the declared one-way boundary.
+    fit_coughing=True (stage 4) has the estimate read the smoke and the coughing directly, as `account_town`'s
+    estimator does, in place of the delayed-by-one-step new coughing it reads through the memory box.
     """
     if stage not in (1, 2, 3, 4) or settings.delay_steps < 0:
         raise ValueError('stage must be 1..4 and delay_steps nonnegative')
@@ -155,10 +157,11 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
 
     # slots index the configurations (what Town.value reads); outs index what each box
     # publishes (what the wiring reads). They differ only for the two-dial plant.
-    def add(box, source):
+    def add(box, source, name=None):
         nonlocal offset, sent
-        slots[box.label] = slice(offset, offset + box.P.Q_dim)
-        outs[box.label] = slice(sent, sent + box.out_dim_N)
+        name = name or box.label
+        slots[name] = slice(offset, offset + box.P.Q_dim)
+        outs[name] = slice(sent, sent + box.out_dim_N)
         offset += box.P.Q_dim
         sent += box.out_dim_N
         boxes.append(box)
@@ -211,11 +214,11 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
             return at(m, 'output')
     if power_to_town:
         # inputs (power, smoke): each watt drawn is worth `benefit`, pushed back up the power
-        # wire; smoke returns nothing
-        add(own_cost('coughing', [c.coughing0], 2,
+        # wire; smoke returns nothing. The box is the book's townspeople; its state is their coughing.
+        add(own_cost('townspeople', [c.coughing0], 2,
                      lambda q, e: .5*c.recovery*q[0]**2 - q[0]*c.beta*e[1]**2/2, c.dt,
                      push=lambda q, e: jnp.array([c.benefit, 0.0])),
-            lambda m: jnp.concatenate([at(m, 'power'), smoke(m)]))
+            lambda m: jnp.concatenate([at(m, 'power'), smoke(m)]), name='coughing')
     else:
         add(own_cost('coughing', [c.coughing0], 1,
                      lambda q, e: .5*c.recovery*q[0]**2 - q[0]*c.beta*e[0]**2/2, c.dt),
@@ -260,7 +263,10 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
                              lambda q, e: .5*(q[0]-e[0])**2, c.dt*c.quote_rate),
                     lambda q: at(q, prior))
         if stage == 4:
-            add(own_cost('estimate', [0.0], 2, fit_cost, c.dt*c.learn_rate), observed)
+            reads = observed
+            if fit_coughing:
+                reads = lambda q: jnp.concatenate([smoke(q)**2/2, c.recovery*at(q, 'coughing')])
+            add(own_cost('estimate', [0.0], 2, fit_cost, c.dt*c.learn_rate), reads)
         if diligence:
             # inputs (u, y) of the claim settled now and u of the exposure written, a step back
             # so that its claim settles exactly one delay later
@@ -301,6 +307,41 @@ def eve_town(stage=1, settings=Settings(), **options):
     the insurer and her account, as the book's later subsections do.
     """
     return build(stage, settings, clean=True, power_to_town=True, **options)
+
+
+def account_boxes(settings=Settings()):
+    """The four systems of the book's ``eqn.account_systems`` and ``eqn.town_account``, each a box with the
+    ports the book draws: plant (premium in; power, smoke out), townspeople (power, smoke in; coughing out),
+    estimator (coughing, smoke in; estimate out), insurer (estimate in; premium out)."""
+    c = settings
+    plant = own_cost('plant', [c.output0, c.clean0], 1,
+                     lambda q, e: .5*(1 + e[0]*(1-q[1])**2)*q[0]**2 + .5*c.clean_cost*q[1]**2, c.dt,
+                     publish=lambda q: jnp.array([q[0], (1-q[1])*q[0]]))
+    townspeople = own_cost('townspeople', [c.coughing0], 2,
+                           lambda q, e: .5*c.recovery*q[0]**2 - q[0]*c.beta*e[1]**2/2, c.dt,
+                           push=lambda q, e: jnp.array([c.benefit, 0.0]))
+    estimator = own_cost('estimator', [0.0], 2,
+                         lambda q, e: .5*(q[0]*e[1]**2/2 - c.recovery*e[0])**2, c.dt*c.learn_rate)
+    insurer = own_cost('insurer', [0.0], 1, lambda q, e: .5*(q[0]-e[0])**2, c.dt*c.quote_rate)
+    return [plant, townspeople, estimator, insurer]
+
+
+def account_town(settings=Settings()):
+    """The town of the book's ``eqn.town_account``, exactly as drawn: the four boxes of `account_boxes` and
+    the wires between them, the smoke copied at its dot, nothing else in the composite. A `Town`, so `run`,
+    `summary` and `smoke` take it; slots 'output', 'cleanliness', 'coughing', 'estimate', 'premium'."""
+    boxes = account_boxes(settings)
+    power, smoke_, coughing, estimate, premium = range(5)     # what the boxes publish, in order
+    feeds = jnp.array([premium, power, smoke_, coughing, smoke_, estimate])
+    wiring = Arrangement(
+        P=trivial_parameter(), in_dim_M=sum(b.in_dim_N for b in boxes), out_dim_M=5,
+        in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m: EMPTY,
+        in_f=lambda q, m, e: m[feeds],
+        omega=zero_form, label='town wiring')
+    slots = {'output': slice(0, 1), 'cleanliness': slice(1, 2), 'coughing': slice(2, 3),
+             'estimate': slice(3, 4), 'premium': slice(4, 5)}
+    return Town(compose_seq(tensor_arrangements(boxes), wiring), slots, settings, 4, True)
 
 
 def run(town, duration=30.0):

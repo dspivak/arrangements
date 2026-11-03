@@ -70,7 +70,7 @@ def variances(sigma2: float) -> jnp.ndarray:
 
 
 def divergence(k: jnp.ndarray, q: jnp.ndarray) -> jnp.ndarray:
-    """``d(k, q) = (1/2)(k - q)^2`` (Ch 4 ``sec.simplices_divergences``)."""
+    """``d(k, q) = (1/2)(k - q)^2`` (Ch 4's ``sec.simplices_divergences``, cut 2026-10-30 in 1204e25)."""
     return 0.5 * (k - q) ** 2
 
 
