@@ -17,7 +17,7 @@ composition* in ``arr`` (no hand-written total forcing):
   (positive-definite everywhere since ``g' = sech^2 > 0``; the same species of
   position-dependent reaction as ``rvect.inverse_hessian``). Output map the
   diagonal broadcast of the *reported activation* ``V_i = g(u_i)`` to the
-  ``deg(i)`` incident synapse ports; input map vacuous; forcing (sec.forcing)
+  ``deg(i)`` incident synapse ports; input map vacuous; forcing (sec.effort_fields)
   exact, ``omega_i = -dU_i`` for the leak-and-bias cost
 
       U_i(u) = u * g(u) - log cosh(u) - I_i * g(u),
@@ -42,7 +42,7 @@ forcing ``omega = -dU`` for the cost
            - sum_{i<j} W_ij g(u_i) g(u_j)
 
 *emerges* from ``compose_seq``'s pullback-and-sum (the Kleisli composition of
-the writer monad ``Omega``, sec.forcing). Then, since the composite is closed,
+the writer monad ``Omega``, sec.effort_fields). Then, since the composite is closed,
 the parameter covector is ``xi_Q = -dU/du`` and one ``Phi`` step (the
 configuration coalgebra *adds* ``sharp(xi_Q)``, sec.differential_equations) is
 

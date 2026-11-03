@@ -23,7 +23,7 @@ and the cost
     U(q, eG, eD, eS) = (kappa/2) (vgs - q0 - q1)^2 + W(q0, vds),
 
 where ``vgs = eG - eS`` and ``vds = eD - eS``, the forcing is ``omega = -dU``
-(sec.forcing; STATUS.md §1) and the configuration step *adds* ``sharp(omega)``
+(sec.effort_fields; STATUS.md §1) and the configuration step *adds* ``sharp(omega)``
 (sec.differential_equations), so
 
     dq_0 = (sharpR omega)_0 = -dU/dq1 = kappa (vgs - q0 - q1),
@@ -46,7 +46,7 @@ non-reciprocity here.
 **The DIRECT realization** (``mosfet_direct``; STATUS.md §2, trick vs direct).  CDLM had to
 route the non-reciprocity through the sharp because its arrangement carried only
 a potential.  The book's arrangement carries a *forcing* that need not be exact
-(sec.forcing), so the same device is written with the plain parameter
+(sec.effort_fields), so the same device is written with the plain parameter
 ``configuration(Q)`` on the Euclidean ``Q = R^2`` and the hand-written one-form
 
     omega(q, e)|_Q     = ( kappa (vgs - q0 - q1),  0 ),

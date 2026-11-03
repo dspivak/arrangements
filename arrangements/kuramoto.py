@@ -27,7 +27,7 @@ built by *genuine composition* in ``arr`` (no hand-written total forcing):
   oscillator's broadcast out-ports bijectively onto the edge boxes' in-ports.
 
 ``kuramoto_arrangement`` is ``compose_seq(tensor(boxes), wire)``; the total
-forcing above *emerges* from ``compose_seq``'s pullback-and-sum (sec.forcing).
+forcing above *emerges* from ``compose_seq``'s pullback-and-sum (sec.effort_fields).
 Because the integrator is part of the arrangement (def.grpng), the Kuramoto and
 the swing-equation systems are two *different* arrangements on the same boxes,
 selected by the ``parameter`` keyword -- there is no second dynamics functor.

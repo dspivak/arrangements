@@ -29,7 +29,7 @@ the ``compose_graph`` pattern of CDLM sec.graph_laplacian) is a 0-ary arrangemen
 
     omega(q) = -d sum_{pairs p = (i,j)} U_LJ(q_i, q_j)
 
-*emerges* from the composition (pullback-and-sum, sec.forcing) -- it is not
+*emerges* from the composition (pullback-and-sum, sec.effort_fields) -- it is not
 written by hand. The potential it is exact for, ``md_potential``, is written out
 here only to define the total energy; the tests check that the composite forcing
 is its negative differential.

@@ -4,7 +4,7 @@ Provides:
 
 * ``compose_seq(f, g)``    -- sequential composition ``g . f`` in ``arr``: lens
   composition on the maps, **pullback-and-sum** on the forcings (Kleisli
-  composition for the writer monad ``Omega``, sec.forcing), tensor on the
+  composition for the writer monad ``Omega``, sec.effort_fields), tensor on the
   parameters.
 * ``parallel_arrangements(p1, p2)`` / ``tensor_arrangements(parts)`` -- the
   monoidal product in ``arr``: direct sum of forcings, tensor of parameters.
@@ -43,7 +43,7 @@ def trivial_parameter() -> CotCoalg:
 
 
 # ---------------------------------------------------------------------------
-# Sequential composition in arr: pullback-and-sum (sec.forcing, notes/DESIGN.md §2).
+# Sequential composition in arr: pullback-and-sum (sec.effort_fields, notes/DESIGN.md §2).
 # ---------------------------------------------------------------------------
 
 

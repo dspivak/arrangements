@@ -7,7 +7,7 @@ Audit of the claim (see ``hopfield.py``): the continuous Hopfield network
 
 is the dynamics (sec.dynamics_functor) of the closed arrangement whose
 parameters are configuration coalgebras (sec.matter) and whose total
-forcing is ``-dU`` (sec.forcing) for the cost
+forcing is ``-dU`` (sec.effort_fields) for the cost
 
     U(u) = sum_i [u_i g(u_i) - log cosh(u_i) - I_i g(u_i)]
            - sum_{i<j} W_ij g(u_i) g(u_j),

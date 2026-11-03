@@ -76,7 +76,7 @@ THE VERIFIED FRONTIER.
 
        U(x) = sum_r (w_r / 2) (x_i/x_eq_i - x_j/x_eq_j)^2,
 
-   emerges from pullback-and-sum (sec.forcing, notes/DESIGN.md §2), written nowhere
+   emerges from pullback-and-sum (sec.effort_fields, notes/DESIGN.md §2), written nowhere
    by hand. One ``Phi`` step is again EXACTLY the forward-Euler mass-action
    step: the covector reaction ``r`` returns to species ``i`` is ``-+ w_r (a_i
    - a_j) / x_eq_i`` (the ``1/x_eq_i`` from the readout's pullback), and the
@@ -214,7 +214,7 @@ THE VERIFIED FRONTIER.
    orthant at ``dt > 1/rate`` while the log tick ``x e^{-rate dt}`` is
    positive, monotone, and stable at every ``dt``.
 
-6. DIRECT, any network (the book's non-exact forcing, def.grpng, sec.forcing;
+6. DIRECT, any network (the book's non-exact forcing, def.grpng, sec.effort_fields;
    STATUS.md §2, trick vs direct). An arrangement's forcing need not be exact, so the
    mass-action field itself is admissible as a one-form.
    ``mass_action_arrangement`` is the closed one-box arrangement whose
@@ -1121,7 +1121,7 @@ def mass_action_arrangement(
 
     with NO potential: it is exact iff ``DV`` is symmetric, which already
     ``A + B <-> C`` violates (module docstring, 3 and 6), and in general it is
-    a genuinely non-exact forcing (def.grpng, sec.forcing). One ``Phi`` step is
+    a genuinely non-exact forcing (def.grpng, sec.effort_fields). One ``Phi`` step is
     ``x + dt * V(x)`` for ANY network -- no detailed balance, reversibility or
     molecularity hypothesis, so it runs what ``crn_arrangement`` (the TRICK,
     module docstring 1) rejects; on a detailed-balanced network the two agree

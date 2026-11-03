@@ -10,7 +10,7 @@ The claims audited here (see dc_motor.py for the full verdict). Everything
 runs through the one dynamics functor ``Phi`` (sec.dynamics_functor) applied to
 arrangements whose parameter is the configuration coalgebra (sec.matter) --
 CDLM's ``Phiconf`` -- with each cell's cost ``U`` entering as the forcing
-``omega = -dU`` (sec.forcing, STATUS.md §1):
+``omega = -dU`` (sec.effort_fields, STATUS.md §1):
 
 1-2.  MONOLITHIC control: one closed box, sharp dt*[[R,K],[-K,b]], cost U = H
       plus the source term c.q with c = -A^{-1}(V,-tau).  One ``Phi`` step is

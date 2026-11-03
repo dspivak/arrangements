@@ -160,7 +160,7 @@ def test_phase_oscillates_about_setpoint_at_sqrt_k_over_m():
 def test_setpoint_port_receives_equal_and_opposite_covector():
     """The composite EMITS, in its outer position, the one-form
     ``omega_N(s) = omega_c|_{N^-} = k(q_eval - s)`` on the setpoint port
-    (sec.forcing; CDLM eqn.omegaprime negated, STATUS.md §1) -- equal and
+    (sec.effort_fields; CDLM eqn.omegaprime negated, STATUS.md §1) -- equal and
     opposite to the parameter covector ``xi_Q = -k(q_eval - s)`` the coalgebra
     consumes, because both are components of the one shared exact forcing
     (Newton's third law of the virtual spring). ``q_eval`` is the coalgebra's

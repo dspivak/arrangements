@@ -30,7 +30,7 @@ input.
 
 Boundary accounting: the composite's outer *position* also emits the one-form
 ``omega_N(s) = omega_c|_{N^-} = +k(q_rep - s)`` on the setpoint port
-(sec.forcing; CDLM eqn.omegaprime with the sign of STATUS.md §1) -- the reaction
+(sec.effort_fields; CDLM eqn.omegaprime with the sign of STATUS.md §1) -- the reaction
 of the virtual spring on whoever holds its far end. It is equal and opposite to
 the covector ``xi_Q = -k(q_rep - s)`` that drives the plant, because the spring's
 cost depends only on the difference ``q_rep - s`` (exactness alone gives
@@ -154,7 +154,7 @@ def impedance_arrangement(
     The composite parameter is the plant's coalgebra tensored with the trivial
     ones of the controller and the wiring (the controller and wiring contribute
     no state), on base ``Q (+) R^0 (+) R^0 = Q``, and the composite forcing
-    *emerges* from ``compose_seq`` (pullback-and-sum, sec.forcing) as
+    *emerges* from ``compose_seq`` (pullback-and-sum, sec.effort_fields) as
     ``omega = -d (k/2)|q - s|^2`` -- it is not written by hand. The outer input
     port carries the setpoint ``s``; the outer output port reports the plant
     position (at whichever parameter position the coalgebra presents: ``q`` for

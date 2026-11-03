@@ -103,7 +103,7 @@ def coupling_capacitor(C_c: float) -> Arrangement:
     the pair. Its forcing is exact, ``-d`` of the coupling capacitor's energy
     ``(m_1 - m_2)^2/(2 C_c)`` read off the two charges presented at its input
     ports; ``compose_seq`` pulls it back and adds it to the cells' own forcings
-    (pullback-and-sum, sec.forcing), and the interpretation's cotangent pullback
+    (pullback-and-sum, sec.effort_fields), and the interpretation's cotangent pullback
     (CDLM eqn.bigtheta) routes it back to both cells' parameter covectors.
     """
     return Arrangement(

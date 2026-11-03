@@ -33,7 +33,7 @@ def test_output_settles_where_the_next_watt_costs_what_it_brings_in():
 
 def test_filtering_earns_nothing_so_the_plant_never_filters():
     # "cleaning costs money and doesn't bring in anything of value to the plant, so its effort
-    # landscape never invites this activity": from no filtering it never starts, and a
+    # field never invites this activity": from no filtering it never starts, and a
     # plant that starts filtered stops
     _, _, result = settled(Settings())
     assert result['final_cleanliness'] == 0.0

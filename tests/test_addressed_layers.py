@@ -3,9 +3,11 @@
 Claude Opus 5.5, 2fb1d833, 2026-11-02; everything here is the agents' and *proposed* until David's answer is recorded
 in P92's block. The construction (book repository, ``notes/runs/p92-2fb1d833/CONSTRUCTION.md``):
 
-* A token *just speaks*: at round ``l`` it sends its residual stream ``x^l`` as the place of each head slot and
-  ``msg(x^l) = (x^l, 1)`` as that slot's message; its rule slot (place the point) sends ``msg(0)``. Its parameter is its
-  initial embedding ``x^0`` alone: it holds no weight.
+* A token *just speaks*: at round ``l`` it sends its residual stream ``x^l`` as its address and
+  ``msg(x^l) = (x^l, 1)`` as its one message, and it receives one message per head and a rule message; the grouping
+  reads both the key and the query off the address. (Book Ch 4 ``sec.addressed_messages`` since 2026-11-03, 586b6a53:
+  an object is an address space with a list of vector spaces sent in and a list received in, no slots.) Its parameter
+  is its initial embedding ``x^0`` alone: it holds no weight.
 * The grouping's configuration ``q`` holds every layer's weights. Round ``l``'s transfer maps read layer ``l``'s
   factor of ``q`` only (rounds are a power of the base category, so each round has its own lens on one matter):
   head ``a`` of token ``i`` hears head ``a`` of every token ``j`` (``j = i`` included) by
@@ -104,15 +106,12 @@ def ref_loss(q, X, Y):
 # The token: what it sends, and its strategy (the fixed architecture, no weights of its own).
 # ---------------------------------------------------------------------------
 
-HSLOT = M + (M + 1)          # a head slot's send: place x, message (x, 1)
-RSLOT = RHO + 1              # the rule slot's send: message (0, 1); its place is the point
-SEND = HEADS * HSLOT + RSLOT
-HEAR = HEADS * (M + 1) + (RHO + 1)   # per round: each head slot's message, the rule slot's message
+SEND = M + (M + 1)           # the token's send: address x, message (x, 1)
+HEAR = HEADS * (M + 1) + (RHO + 1)   # per round: each head message, the rule message
 
 
 def sends_of(x):
-    one = jnp.ones(1)
-    return jnp.concatenate([jnp.concatenate([x, x, one]) for _ in range(HEADS)] + [jnp.zeros(RHO), one])
+    return jnp.concatenate([x, x, jnp.ones(1)])
 
 
 def val(m):
@@ -144,8 +143,8 @@ def hear_round(q, l, S, rho_copies=None):
     """Round ``l``'s in-transfer: what each token's slots hear from the round-``l`` sends ``S`` (rows = tokens).
     ``rho_copies`` (rows = tokens), when given, replaces the one ``rho^l`` by a copy per token, untying them."""
     w, rho = layer_of(q, l)
-    places = [[S[j, a * HSLOT:a * HSLOT + M] for a in range(HEADS)] for j in range(N)]
-    msgs = [[S[j, a * HSLOT + M:(a + 1) * HSLOT] for a in range(HEADS)] for j in range(N)]
+    addrs = [S[j, :M] for j in range(N)]                      # each token's address
+    msgs = [S[j, M:SEND] for j in range(N)]                   # each token's message
     out = []
     for i in range(N):
         e = []
@@ -153,8 +152,8 @@ def hear_round(q, l, S, rho_copies=None):
             WOV = w[f"O{a}"] @ w[f"V{a}"]
             heard = jnp.zeros(M + 1)
             for j in range(N):
-                score = jnp.exp(jnp.dot(w[f"Q{a}"] @ places[i][a], w[f"K{a}"] @ places[j][a]) / jnp.sqrt(DK))
-                h, wt = msgs[j][a][:M], msgs[j][a][M:]
+                score = jnp.exp(jnp.dot(w[f"Q{a}"] @ addrs[i], w[f"K{a}"] @ addrs[j]) / jnp.sqrt(DK))
+                h, wt = msgs[j][:M], msgs[j][M:]
                 heard = heard + score * jnp.concatenate([WOV @ h, wt])      # msgfun(W_O W_V), a map of cones
             e.append(heard)
         r_i = rho if rho_copies is None else rho_copies[i]

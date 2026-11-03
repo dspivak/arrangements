@@ -4,12 +4,12 @@ Book plan P26 (a), Ch 1's fourteen linked files (Claude Fable 5.1, 5266b8d9, 202
 Predictions written before any run of this session; the timings were taken after, from one clean run of each
 file alone (`scripts/run_tests.sh`), on this machine. Ch 3's two files and Ch 2's five are later stages.
 
-## 0. What composition can do to a claim, in $\arr$
+## 0. What composition can do to a claim, in $\mg$
 
 (Words: an arrangement's forward map is its *out-transfer* and its backward map its *in-transfer*, the book's
 terms since P88, 2026-10-30; *readout* is the matter's map $r\colon S \to Q$ only.)
 
-Composition in $\arr$ is the Kleisli composite for the writer monad $\Omega$ on forcings (DESIGN.md §2,
+Composition in $\mg$ is the Kleisli composite for the writer monad $\Omega$ on forcings (DESIGN.md §2,
 `wiring.compose_seq`): the composite's one-form is $A^*\omega_g + B^*\omega_f$, each factor's one-form pulled back
 along the map that locates its point, then summed. The integrator (response, state, readout) of every box is
 untouched (one exception, multi-round tensors, §5.9 item 6 (e); no file here uses one). So an added part (an
