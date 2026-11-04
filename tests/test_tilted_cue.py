@@ -1,71 +1,41 @@
-"""A weak cue over a low ridge releases a large potential: the tilted double well.
+"""A weak cue over a low ridge releases a large potential (book Chapter 1, ``sec.check_claims``: "as pushes they are
+very weak"; to be worked in ``sec.cue_commitment``).
 
-**Question.** The book's Ch 1 (``sec.check_claims``) says of cues and words that "as pushes
-they are very weak", yet a few words organize a lot of activity. The model cited for it is the
-attention paper's capture example, ``tests/test_cue.py``, whose preference cost
-``phi_lambda(g) = (lambda/4) g^2 (1 - g)^2`` has two *equal* wells. There the energy goes the
-other way: the paper's cue does work ``W = 11.6`` on the context and the composite releases
-``0.38`` after it ends (the domain check of 2026-09-29, Group E2 entry 3). With equal wells it
-cannot go the other way: the composite starts and ends at ``V = 0``, so what it releases after
-the cue is at most what the cue put in. Is a cue that is weak *in energy*, next to what follows
-it, in the model at all?
+For a reader of the book. The footnote says that a brief cue moves a reader into a basin that it then descends on its
+own, and that when the reader is poised, "resting just below a low ridge beside a much deeper well, the weakest cue that works pays only to
+cross the ridge, at which point the reader's own potential pays for the rest of its fall". Here the reader is a material
+grouping of three parts: a parent holding a commitment ``g``, and two subsidiaries it places. ``phi(g)``, in
+``tilted(D, eps)``, is the preference cost: wells at ``g = 1``, the resting state, and ``g = 0``, ``D`` deeper, with a
+ridge at ``c`` only ``eps`` above the resting state. So ``eps`` is the low ridge, and ``D`` is the potential gain: the
+reader feels only the slope where it stands, and how far it leads down is ``D``. The cue is a bump ``u(t)`` of duration
+``T`` on the reader's input, and its only effect on the state is a force ``u`` on ``g``; its work ``W`` sums ``u`` times
+the moves of ``g``. ``minimal_cue(D, eps, T)`` finds the smallest bump that carries the reader over and runs it.
 
-**Model.** The composite of ``test_cue.py`` unchanged -- the rendezvous parent with the context
-coordinate ``g``, two subsidiaries, composed by ``compose_seq`` in the library, cost the sum of
-the constituents' -- except the preference cost, which is tilted by an exact change:
+Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-    phi'(g) = A g (g - c)(g - 1),   phi(g) = A (g^4/4 - (1 + c) g^3/3 + c g^2/2).
+    import jax; jax.config.update("jax_enable_x64", True)
+    from tests.test_tilted_cue import minimal_cue
+    out = minimal_cue(16.0, 0.25, 0.2)
+    print({k: round(out[k], 3) for k in ('W', 'W_cross', 'released', 'gend')}, round(out['V0'] - out['Vend'], 3))
+    # {'W': 0.464, 'W_cross': 0.463, 'released': 16.261, 'gend': 0.0} 16.0
 
-The wells stay at ``g = 0`` (meet) and ``g = 1`` (keep the separation, the resting state) and the
-ridge is at ``c``; ``phi(1) - phi(0) = A (2c - 1)/12 = D`` and
-``phi(c) - phi(1) = A (1 - c)^3 (1 + c)/12 = eps``, so ``(A, c)`` is solved from ``(D, eps)``. The
-resting state sits in a *shallow* well, ``eps`` below a ridge, beside a well ``D`` deeper. Since
-the coupling ``K`` can be zero at every ``g``, the lowest ridge of the whole ``V`` between the two
-rests is exactly ``eps`` above the resting state. The cue is the paper's shape,
-``u(t) = a b_0(t/T)``; its only effect on the state is the force ``+u`` on ``g`` (checked
-below), so its work is ``W = sum_k u_k (g_{k+1} - g_k)``, and what the composite releases after
-the cue is ``V(T) - V(end)``. Step ``h = 0.001`` (the numbers agree to four digits at ``h = 0.002``
-and ``0.0005``); all five mobilities equal ``h``, as in ``test_cue.py``.
+A cue whose whole work is .464 crosses a ridge of height .25, and the reader then releases 16.26 on its own, ending in
+the deep well, a net fall of exactly ``D = 16``. Nearly all of the cue's work (.463) is done by the crossing.
 
-**Prediction** (written before any run, `notes/ch1-tests-2026-09-29/tilted-cue.md` in the book
-repo): the cue's work scales with the barrier ``eps``, the release with ``D``, so
-``released / W`` grows like ``D / eps``; the cue only lifts the state over the ridge, and the fall
-is paid by the composite's own potential.
+What the tests check. The well has the stated depths, the cue acts only as that force, and the shallow well holds without
+a cue. Beside equal wells the cue pays more than comes back. For the minimal cue the work lies between ``eps`` and
+``3.5 eps``, and the release is ``D + eps`` plus a small excess.
 
-**Result.** For the *minimal* cue -- the amplitude bisected to where capture just happens -- of
-duration ``T = 0.2``, the prediction holds in direction, with two corrections. The release after
-the cue is ``D + eps`` plus a small coupling excess (``4.27, 16.26, 64.25`` for ``D = 4, 16, 64`` at
-``eps = 0.25``); ``W`` is between ``1.36 eps`` and ``3.0 eps`` and never below ``eps``; the ratio is
-``5.7, 35, 188``. (i) At fixed ``D = 16``, ``W`` grows like ``eps^0.8`` rather than ``eps``
-(``0.160, 0.464, 1.445`` for ``eps = 1/16, 1/4, 1``): a brief push dissipates, and the ridge's
-distance from the resting state shrinks with ``eps``. (ii) At fixed ``eps``, ``W`` *falls* as
-``D`` grows (``0.744, 0.464, 0.341``), since the ridge moves nearer the current well; so the ratio
-grows faster than ``D / eps``. The briefer the cue, the more work it takes: at ``D = 16``,
-``eps = 0.25`` the work done by the time ``g`` crosses the ridge is ``1.11, 0.46, 0.34, 0.30`` for
-``T = 0.05, 0.2, 0.5, 1``, falling toward ``eps = 0.25``, the energy bound. The control: the
-paper's untilted example gives ``W = 11.63``, released ``0.385``; its minimal ``T = 0.2`` cue
-gives ``W = 2.88``, released ``1.09``: released below ``W``, as it must be.
+**"Pays only to cross" is the minimal cue's**, and that ratio is a knife-edge. A bump one percent larger is still on when
+the state crosses, keeps pushing along the fall, and does more work (1.30 at ``D = 64``). What holds for every capturing
+cue tried is the work up to the ridge crossing, between ``eps`` and ``5 eps``, and the net fall ``D``.
 
-**But that ratio is a knife-edge** (found after the prediction, when a first version of the
-last test failed). The release *after* the cue is large only when the cue ends before the state
-falls, and for the paper's fixed bump that holds within about ``1%`` of the minimal amplitude: at
-``D = 64``, ``T = 0.2``, ``1.01`` times the minimal cue crosses the ridge while still on, keeps
-pushing along the steep fall, does ``W = 1.30`` and leaves ``0.44`` after it. What is robust:
-the cue's work up to the ridge crossing, between ``eps`` and ``5 eps`` for every cue tried
-(``T >= 0.05``, up to ``1.5`` times minimal); the composite's own net release
-``V(0) - V(end) = D`` for every capturing cue; and so the ratio of that release to *all* the
-cue's work, ``D / W = 1.1, 3.5, 11`` for ``D = 4, 16, 64`` at ``1.5`` times minimal, which grows
-with ``D``, sub-linearly, and exceeds ``1`` only once ``D`` is well past the few units a
-fixed-shape cue spends riding the fall.
+What it does not show. A cue that stopped at the crossing is not modeled; the bump cannot stop there. The tilt is
+supplied by hand: nothing here says how a reader comes to be poised. The release is energy dissipated by the reader's
+own descent, not activity in the book's wider sense. Every number is of the explicit step at ``h = 0.001``.
 
-**What it does not show.** (1) A cue that stopped at the crossing would do only the work to the
-ridge; the paper's bump cannot stop there, and nothing here models a cue that responds to where
-the reader is. (2) The tilt, like the paper's wells, is supplied by hand: nothing here says how a
-reader comes to be poised, one ``eps`` from a well ``D`` deeper. (3) Released potential is
-dissipated by the composite's own descent; it is energy, not "activity" in the book's wider
-sense, and nothing here measures how much the parts do beyond the positions moving. (4) The
-discrete run is checked, not proved: every number here is of the explicit Euler map at the
-stated step.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``.
 """
 
 import functools

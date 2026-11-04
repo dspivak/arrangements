@@ -1,16 +1,49 @@
-"""P29 stage 4: learned harm sent forward to an insurer, with ablations.
+"""Her account: a cost that would arrive later counts now (book Chapter 1, ``sec.cost_later``; linked from the
+footnotes there and in ``sec.check_claims``).
 
-Prediction 4 in the pre-code design. Reasonable: earlier data can change a priced
-choice before settlement. Artificial: known recovery, noiseless observations,
-correct one-parameter model, and automatic adoption of her estimate. No modeling
-of understanding a book, constructing a wire, litigation or ethical care. A body
-or cell may share the feedback mechanism; no money/court interpretation is made.
+For a reader of the book. ``account_town()`` (``arrangements/town.py``) is the town of ``eqn.town_account``, four boxes
+as drawn, with the smoke copied at its dot:
 
-Result (2026-09-28): all 4 checks passed. Harm falls 55.2813% over 30 units
-and 55.1688% at half dt. Her quote reaches 1 at t=1.56 before first claim t=6.04.
-Ablation, nonzero-observation secrecy check and retroactivity comparison pass. Prediction 4 held.
-Positive final cash .143891 is below unpaid claims .672598: no solvency result.
-Full results: notes/P29-TOWN-RESULTS.md.
+* ``plant``: premium in, power and smoke out. It pays the premium ``p s^2/2`` on its smoke ``s``, where ``p`` is the
+  number arriving on the wire, and reads it one way: it takes the price as given.
+* ``townspeople``: power and smoke in, coughing out, as in ``eqn.town_system``.
+* ``estimator``: coughing and smoke in, the estimate out. Its state is one number, her estimate of how much the smoke
+  drives new coughing, and its cost is the gap between what that number predicts, ``estimate s^2/2`` new coughs a
+  day, and what she measures, ``recovery coughing``, squared, so the number moves as the evidence comes in. It
+  pushes nothing back against the coughing.
+* ``insurer``: the estimate in, the premium out. Its state is one number, the rate ``p``, and it moves that number
+  toward the estimate, which makes the premium ``p s^2/2`` exactly cover the claims she estimates the smoke will bring.
+  It pushes nothing back on her account.
+
+Run it, run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
+
+    import jax; jax.config.update("jax_enable_x64", True)
+    from arrangements.town import account_town, run, summary
+    town = account_town()
+    r = summary(town, run(town))
+    print({k: round(r[k], 3) for k in ('estimate_reaches_1', 'premium_reaches_1', 'final_estimate',
+                                       'final_output', 'final_cleanliness', 'final_coughing')})
+    # {'estimate_reaches_1': 1.76, 'premium_reaches_1': 2.24, 'final_estimate': 2.033, 'final_output': 0.995, 'final_cleanliness': 0.953, 'final_coughing': 0.002}
+
+Her estimate climbs to match the coughing (the true coefficient is ``beta = 2``), the premium climbs behind it, the
+plant cleans up, and the townspeople keep nearly all their power and cough far less: from a coughing of 1 with no
+return route to about .002.
+
+What the tests check. The ``test_book_*`` tests: the composite is those four boxes with those ports, and only the
+power wire pushes back; ``run`` is the dynamics functor's run; the sentences above; and beside the four boxes, a court,
+a claims delay and a ledger read one way and change nothing on them, step for step, while the first paid claim comes
+long after the premium has climbed. The other tests run the earlier, fuller town with a plant of one dial (``build``),
+whose estimate reads new coughing through a memory box: at two step sizes the premium precedes the first claim and the
+harm falls; a report wired to nothing changes nothing; the fit sees no secret coefficient, only records; and an exact
+reader of the fit bends it, where a one-way reader does not.
+
+Artificial: known recovery, noiseless records, a correct one-coefficient model, and an insurer who adopts her estimate
+automatically. Nothing here models litigation or anyone's reading of a book. Once the plant has cleaned there is little
+smoke to learn from, so the estimate stops moving wherever it is then: near ``beta`` at the book's settings, far from it
+at ``beta = 8`` (4.48).
+
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; results in ``notes/P29-TOWN-RESULTS.md``.
 """
 from dataclasses import replace
 import json

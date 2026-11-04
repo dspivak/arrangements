@@ -1,181 +1,41 @@
-"""The ratchet: shock, disperse, re-form, shock again -- does re-forming remember?
+"""The wage that brings parts back is several times the wage at which they left (book Chapter 1, ``sec.check_claims``: "In
+a town, where parts do not feel each other's push directly, the collective's pull has to reach a part as what it offers").
 
-The book plan's P21 (AGENTDOCPLAN.md §8.2 in the book repository), from David, 2026-09-26:
-"shocks can break things apart but then they can come back together if the pieces sustain and
-if they attract again ... or often they'll reform in a different way". Everything here runs on
-``arrangements/cascade.py`` as it stands (the collective of §3.13, the fund layer of §3.14);
-this file adds no mechanism to it.
-
-**What re-forming is, settled with David before the run.** After the collapse of the cascade
-run (§5.9 item 19) the fund is dead and stays dead: with no worker in reach it earns 0.16
-against an overhead of 2 and sits at -18.4 forever, paying no wage; a worker is drawn to
-supply, so nothing draws the parts back on its own. The pieces do sustain -- they hold
-amplitude 1.0 at the source. So re-forming comes from the experimenter, by (a) a sum added to
-the fund's balance by hand (``add_f``), with (b) the source box's offer set lower for a window
-of steps and set back (``window``) as the second route; a "shock" is the balance reduced by
-hand (``collapsed``). Every phase is one run from the previous run's end state with one such
-change; none of these words names an event in a run (STATUS.md §2, "Not evidence of an
-event"). Parts attracting
-*each other* is not this model: supply and product ride separate channels precisely so that
-workers do not feed one another.
-
-**The landscape, derived by hand before the run.** A worker's placement ``p`` feels only its
-own cost ``(b/2)a^2 - (alpha a + beta) h_1``, so it ascends the supply it receives,
+For a reader of the book. This is the collective of ``tests/test_cascade.py``: workers, a fund paying a wage ``g``, and a
+source offering ``s`` at distance ``d``. A worker's placement ``p`` climbs the supply it receives,
 
     h_1(p) = g kappa(p) + s kappa(p - d),     kappa(x) = exp(-x^2 / 2 tau),
 
-with ``g = g(f)`` the fund's wage at the origin and ``s`` the source's offer at distance ``d``.
-The amplitude ``a`` enters only as a positive rate ``(alpha a + beta)``, so the *stationary
-placements are exactly the stationary points of* ``h_1``, independent of ``a`` and of the other
-workers (they send on the product channel, which the cost does not read). Writing
-``rho = g / s``, a stationary point solves ``rho = phi(p)`` with
+and no other worker enters this: supply and product travel on separate channels, so the parts feel each other only
+through what the fund can pay. That is the paragraph's "do not feel each other's push directly". With the wage ratio
+``rho = g / s``, ``h_1`` has a rest at ``p`` where ``rho = phi(p) = ((d - p) / p) exp(d (2p - d) / 2 tau)``. Between
+``phi``'s local minimum and maximum, ``phi_min < rho < phi_max``, both home and the source are rests. So a worker at
+home leaves only when the wage falls to ``phi_min s``, and one at the source returns only when it rises to
+``phi_max s``. The two wages differ, and their ratio is the "several times". Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-    phi(p) = ((d - p) / p) exp(d (2p - d) / 2 tau).
+    import jax; jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from tests.test_ratchet import critical_wages, phi_bounds
+    print(np.round(phi_bounds(), 4))                       # the turning points, and phi_min, phi_max in closed form
+    g_out, g_in = critical_wages(1, 2.5, 0.8)              # measured in the run, about 40 seconds
+    print(round(g_out, 3), round(g_in, 3), round(g_in / g_out, 2))
+    # [0.3768 2.1232 0.368  2.7177]
+    # 0.368 2.717 7.38
 
-``log phi`` turns at ``p (d - p) = tau``, whose roots ``p_1 < p_2`` (``p_1 + p_2 = d``,
-``p_1 p_2 = tau``) give a local minimum and a local maximum of ``phi``:
+The ratio is one geometry's, not a fact about towns: it depends on ``d^2 / tau`` alone, from 1 at ``d^2 / tau = 4``, below
+which there is no such band, to about 5,400 at 16 (``notes/COMPOSITION-AUDIT.md``, entry 10).
 
-    phi_min = (p_2/p_1) exp(-d (p_2 - p_1) / 2 tau),  phi_max = (p_1/p_2) exp(d (p_2 - p_1) / 2 tau).
+What the tests check. R1: a fund that cannot pay more than the outside offer cannot call anyone back, whatever is paid in.
+R2: the two wages match the closed form, in two geometries. R3: they are the same for one worker and four, so parts do not
+call each other back. R4, R5: where the fund can outbid the offer the whole loop closes, and a collective re-formed whole
+is the original, remembering nothing. R6: if it re-forms short of a part it is weaker, a scar and not a ratchet. R7:
+lowering the offer and raising the wage are one condition.
 
-For ``rho`` between them the landscape is bistable (home, ridge, source); above ``phi_max`` only
-home survives; below ``phi_min`` only the source does. At ``d = 2.5``, ``tau = 0.8``:
-``p_1 = 0.376788``, ``p_2 = 2.123212``, ``phi_min = 0.36790``, ``phi_max = 2.71797``, and their
-ratio is ``7.3877``. At ``d = 2.0``, ``tau = 0.5``: ``0.34453``, ``2.90277``, ratio ``8.4254``.
+Re-forming comes from outside the run: money added to the balance by hand, or the offer lowered by hand. This collective is
+held together by what it is paid; its parts do not supply one another. The file takes about eleven minutes.
 
-**The predictions, fixed here before any construction code in this file existed. Each must be
-able to fail.** The quantities above are hand-derived and quasi-static (they hold ``g`` fixed
-while ``p`` moves); the runs are the coupled system, where the balance moves too.
-
-(R1) *Money cannot outbid the elsewhere.* With the wage capped at the outside offer
-(``wmax = s = 1``), no injection into the collapsed fund re-forms anything: at injections of
-10, 100, 1000 and 10000, after 10^5 steps every placement is still past 2.0. Because
-``g(f) < wmax = s`` for every balance, so ``rho < 1 < phi_max`` always. Fails if any worker
-returns at any injection.
-
-(R2) *One ratio decides it, and the geometry fixes the ratio.* With the fund's balance clamped
-(mobility 0, so the wage is a dial), the wage at which a worker at home leaves is
-``g_out = phi_min s`` and the wage at which a worker at the source returns is
-``g_in = phi_max s``, each within 2% of the closed form, in both geometries above. Their ratio
-is the hysteresis: **the wage that brings them back is 7.39 times the wage at which they
-left**, within 2%. Fails if either critical wage misses by more than 2%, or if there is no
-bistable band.
-
-(R3) *Parts do not call each other back.* The two critical wages are the same for ``n = 1`` and
-``n = 4`` workers, to 1%: a part at the source is held there by the landscape alone, and the
-others' presence at home does not pull it in. Fails if the critical wages move with ``n`` --
-which they would if the parts attracted one another.
-
-(R4) *The loop closes when the fund can outbid the elsewhere.* At ``wmax = 4 s`` the whole cycle
-runs: the collective equilibrates, a drain above the threshold ``S_c`` collapses it and sends
-every worker to the source, and an injection above ``R_c`` brings them all home again. The
-critical injection is set by the landscape: ``R_c`` puts the balance at ``f_in`` with
-``g(f_in) = phi_max s``, within 20% (the balance falls while they walk home, so the run may need
-more, not less). Fails if no injection re-forms it, or if ``R_c`` misses by more than 20%.
-
-(R5) *A fixed point forgets.* When every worker returns, the re-formed collective is the
-original: each placement, each amplitude and the balance agree with the first equilibrium to
-1e-4, and the second break threshold equals the first to 0.5%. So re-forming by itself leaves
-no memory. Fails if the re-formed collective's threshold differs by more than 0.5% with the
-same membership.
-
-(R6) *What re-forming can carry is membership, and it is a scar, not a ratchet.* Give the
-workers different placement mobilities (0.2, 0.1, 0.05, 0.025) so that they walk home at
-different speeds, and re-form them through a window that closes on its own -- the injected
-balance decays while they walk, and the wage falls back below ``g_in`` -- or, in the second
-route, through a window of ``W`` steps during which the source's offer drops. Then some come
-home and some do not. Prediction: (i) there is a band of injections (and a band of ``W``) at
-which the collective re-forms *short a part*; (ii) the re-formed collective is weaker, not
-stronger: its threshold is more than 1% *below* the original's, and the loss tracks the
-balance it can hold, not the margin above it (the cascade run's (12): the balance rises with
-the number of workers, the margin does not). Fails if the band is empty -- all or none even at
-different speeds -- or if a collective re-formed short a part withstands a *larger* shock,
-which would be a ratchet.
-
-(R7) *Both routes are the same condition.* The collective re-forms through the second route --
-the fund refilled and the source's offer dropped to ``s_low`` for a while -- exactly when
-``g / s_low > phi_max``, with the critical ``s_low`` within 5% of ``g / phi_max`` for the wage
-the refilled fund pays. Fails if the critical offer misses by more than 5%, or if the two
-routes need different ratios.
-
-**What happened** (2026-09-26, written after the runs; the predictions above untouched).
-
-The whole file takes about thirteen minutes: the walks are slow near a fold, and every number
-here is a transition found by repeated runs.
-
-*Two things found while building, before any prediction was tested.* (i) At a wage cap of 4 the
-placement update with the cascade run's mobility 0.1 is **numerically unstable**: it settles into
-a 2-cycle, -0.3606 <-> +0.4131, which reads as two different equilibria and would have been
-reported as a memory. The stiffness of the placement grows with the wage, so the high-wage runs
-use mobility 0.02 (0.05 also converges; 0.1 does not), and every equilibrium reported here is
-guarded by ``one_step_move``, the largest coordinate change in one further step, which is below 1e-9
-at every state below. (ii) An injection into a fund with nobody in reach **drains away**:
-after 10^5 steps the balance is back at -18.391 whether 10 or 10000 was paid in, because the
-overhead and the leak spend it and no product arrives.
-
-(R1) **Held.** At injections of 10, 100, 1000 and 10000 no placement moves off the source
-(2.4999995) and no amplitude off 1.0.
-
-(R2) **Held**, to 0.03% rather than the 2% allowed: ``g_out = 0.36800`` against
-``phi_min = 0.36796`` and ``g_in = 2.71711`` against ``phi_max = 2.71770`` at ``d = 2.5,
-tau = 0.8``, so the measured hysteresis ratio is 7.3836 against 7.3859; at ``d = 2.0, tau = 0.5``
-it is 0.34449 and 2.90237 against 0.34449 and 2.90281, ratio 8.4250 against 8.4263. The residual
-is the grid the transition is found on. (The prediction's hand-rounded 0.36790 / 2.71797 / 7.3877
-were arithmetic slips of mine in the fourth digit; the closed forms are what was tested.)
-
-(R3) **Held** exactly: the same two critical wages for ``n = 1`` and ``n = 4``, to every digit
-printed. A part at the source is held there by the landscape alone.
-
-(R4) **Held in the loop, refuted in the number.** At ``wmax = 4`` the cycle runs: equilibrium at
-balance 140.4942 with every placement at 0.013123 (the landscape root to five decimals), a drain
-above ``S_c = 152.9624`` sends all four to the source, and an injection above ``R_c`` brings them
-all home. But ``R_c = 38.8623`` against the quasi-static 20.5101, **+89.5%**, far outside the 20%
-allowed. The reason is in the model and is the same shape as the cascade run's depth finding: the
-injected balance decays while the parts walk, so the wage must be high enough *for long enough*.
-Walking 2.5 times faster (mobility 0.05 instead of 0.02) drops the critical injection to 27.8760,
-which is what that explanation predicts.
-
-(R5) **Held, exactly.** When all four return the re-formed collective *is* the original: balance
-140.494190, placements 0.013123 and amplitudes 3.992258, each agreeing to every digit printed, and
-the second break threshold is 152.9624, the first to every digit. A fixed point forgets. The same
-holds in the second route: at a window long enough for everyone the collective returns to 19.7396
-and 0.0627, its first equilibrium.
-
-(R6) **(i) Refuted through the injection route, held through the window.** With mobilities spread
-8-fold (0.04 to 0.005) the injection route is still all-or-none: over injections from 20 to 95,
-0/4 through 27.5 and 4/4 from 35.0, with no band between. The reason, run separately: **the first ones home hold the door open.** At
-``wmax = 4`` a collective of any size pays a wage above ``g_in`` (3.7932, 3.9339, 3.9604, 3.9717
-at m = 1, 2, 3, 4), so the landscape stays open for the stragglers, and a worker made 20 times
-slower than the rest (mobility 0.001 against 0.02) still walks home. The door closes only where a
-surviving collective *cannot* pay ``g_in``: at ``wmax = 1`` the wage is 0.8873 at m = 3 and the
-fund is dead at m = 2 and m = 1. There the window gives the band: with the offer dropped to 0.2
-and mobilities 0.2, 0.1, 0.05, 0.025, the returns are 0/4 at W = 100, **3/4 at W = 200 and 300**,
-4/4 from W = 400 on -- the slowest is left at 2.448, and stays there.
-**(ii) Held, and by far more than the 1% predicted.** The collective re-formed short one part
-breaks at 6.6559 against 20.2192, **-67.08%**, and it has lost its buffer as well as its money:
-the four-member fund must be overdrawn to fall (threshold 0.4795 *above* its balance), while the
-three-member fund dies from a drain that leaves 1.6412 in it. No ratchet: nothing re-formed here
-withstands more than the original.
-
-(R7) **Held.** Dropping the source's offer with the fund refilled re-forms the collective exactly
-below ``s* = 0.36673``, against ``g / phi_max = 0.36795``: **-0.33%**. The two routes are one
-condition, and the offer must fall by the same factor 7.39 below the wage that the parts left at.
-
-*What this run is not about* (David, 2026-09-26, on the results): "don't the parts know that they
-are actually getting stuff they need from each other? like i can only do my job if i get what i
-need from you. is that not in there?" In the cascade it is not: supply and product ride separate
-channels, so every part is supplied by the fund and by the elsewhere and never by another part.
-The parts depend on one another only through the paymaster, one hop -- a part that leaves lowers
-the balance and so everyone's wage, which is what makes the scar -- so everything below is about a
-collective **held together by what it is paid**. The same cycle on a collective whose parts supply
-each other is the book plan's P21 stage (b).
-
-*What it says* (the agent's, *proposed*, for a paid collective): re-forming leaves no memory of the
-break. The one thing it can carry is **who did not come back**, and even that sticks only where the
-door closes behind
-them -- where what re-formed cannot pay enough to call the rest home. What a break leaves is a
-scar and never a ratchet: the same shock breaks the re-formed collective sooner. And the part left
-out is not gone: it still sends its product in from the source, which is why the three that came
-home hold 8.2971 where three who never left hold 7.8722.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``.
 """
 
 import jax

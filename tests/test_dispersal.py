@@ -1,59 +1,39 @@
-"""Dispersal: can a collective's parts be driven out of the relations, and do they come back?
+"""A part the collective needs is pulled back by that need (book Chapter 1, ``sec.check_claims``: "without it, the others
+send on less than the collective's cost asks for, and only bringing the part back makes up the difference, so that is
+where the collective settles").
 
-The book plan's P17 (AGENTDOCPLAN.md §8.2 in the book repository), David, 2026-09-26: "in
-a ratchet, i want the click to be the sound of energy spreading irrecoverably through the
-handle of the ratchet. is that testable? if so would it handle the destruction idea?", and
-§1.4's "the destruction of a building is just a dis-integration": no matter disappears, it
-stops being in the relations. Here a part is in the relations while the parent's kernel
-reaches it, and the collective is ``arrangements.collective``: ``n`` frozen contributors,
-each sending ``(SIG, WGT)``, on a spatial parent whose cost is on the total it sends onward,
-``(1/2)(nu - h~)^2`` with ``h~ = SIG sum_j kappa_j``, and whose only mobile coordinates are
-the placements. A part is displaced by starting it displaced; nothing else is done to it.
+For a reader of the book. The collective is ``arrangements/collective.py``: ``n`` parts, each sending the same signal ``1``, placed on a line
+under a parent. A part counts for ``kappa(p) = exp(-p^2 / 2 tau)`` by its placement ``p``, so one placed far away is out
+of reach, and the parent's cost is the gap between the total it sends onward and what the collective needs, ``nu``:
+``(nu - sum_j kappa_j)^2 / 2``. Only the placements move. A part is displaced by starting it displaced, at distance 3, far out of reach. With
+need 1.5, the one other part of a pair sends at most 1, so the cost stays unmet and pulls the far part back; two others
+can cover the need, so nothing asks for the far part, and it stays out. Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-**The predictions, fixed in advance and written here before the collective module or any
-construction existed. Each must be able to fail.**
+    import jax; jax.config.update("jax_enable_x64", True)
+    from arrangements.collective import split
+    from tests.test_dispersal import build, distance, onward, settled
+    for n, steps in ((2, 20000), (3, 100000)):
+        C = build([3.0] + [distance(1.5 / n)] * (n - 1), 1.5)
+        q = settled(C, steps)
+        print(n, round(float(split(C, q)[1][0]), 3), round(onward(C, q), 6))   # n, far part's placement, signal sent onward
+    # 2 1.053 1.5
+    # 3 2.992 1.5
 
-(1) *The collective's message returns.* After one part is displaced, small or far, the
-onward signal returns to ``nu`` whenever the other parts can supply it. Fails if descent
-stalls short of ``nu`` with the others able to supply it.
+Either way the collective sends on what it needs. In the pair, that took bringing the part back.
 
-(2) *Its configuration does not, and what stays out is shared evenly.* With all parts at one
-equilibrium distance, a small outward displacement ``delta`` of one part is recovered by
-that part only in the fraction ``1/n``; each other part moves ``delta/n`` inward, and nothing
-further happens however long the run. This is a theorem in the linear regime, not a
-discovery: the cost sees only the total, its minima form an ``(n-1)``-dimensional family,
-and descent from a displaced point moves along the single direction the cost sees,
-``(kappa'_1, ..., kappa'_n)``, which is uniform here, so it removes the displacement's
-projection on that direction, ``delta/n`` in each coordinate, and never touches the rest.
-What the run checks is that the nonlinear kernel and the discrete step keep it (fraction
-within 5% of ``1/n`` at ``delta = 0.05``), and it fails if they do not. It refutes the plan's
-earlier guess that return *time* grows with the number of parts: for ``n >= 2`` the
-configuration never returns at all, and for ``n = 1`` it returns completely. So the
-irreversibility here is not slowness; it is displacement in directions the cost cannot see.
+The pull is weak at a distance: it is the unmet need times the slope of ``kappa``, about .007 at distance 3, so a standing
+push of that order would hold the part out (``notes/COMPOSITION-AUDIT.md``, entry 8).
 
-(3) *Whether a far part is called back is decided by whether the rest can cover it.* With
-``nu = 1.5`` and a part displaced to ``d = 3`` (kernel ``~ 0.004``): for ``n = 2`` the other
-part alone sends at most ``SIG = 1 < nu``, a residual persists, and the far part is pulled
-all the way back; for ``n = 3`` the other two can send ``1.5``, the residual vanishes, and
-the far part stays out, within 10% of ``d``, for ``10^5`` steps. Fails if the ``n = 3`` part
-returns or the ``n = 2`` part does not.
+What the tests check. Test 1: the signal returns to ``nu`` whenever the others can supply it. Test 2: a small displacement
+is recovered only in the fraction ``1/n``, since the cost sees only the total, and the configuration keeps the rest. Test
+3: the runs above. Test 4: a whole collective displaced comes back, in a time set by the distance, growing like
+``exp(d^2 / 2 tau)``, and not by the number of parts.
 
-(4) *Total dispersal comes back, at a rate set by distance and not by the number of parts.*
-All ``n`` parts displaced together to ``d``: the onward signal falls to ``n kappa(d)``, near
-zero, and returns to within 1% of ``nu``. Far out ``kappa`` is small and each part moves as a
-lone part would, ``dp/dt = -(mu nu / tau) p kappa(p)``, so the return time is the quadrature
-``(tau / mu nu) int e^{p^2 / 2 tau} / p dp``, which grows like ``e^{d^2 / 2 tau}``. The
-measured return time agrees with that quadrature within 15% at the largest ``d``, and the
-times for ``n = 1, 2, 4`` agree with each other within 15% there. Fails if the time depends
-on ``n`` at large ``d``, or does not track the quadrature.
+Nothing here drives a part out; every run starts displaced. ``tests/test_dispersal_momentum.py`` is the run in which a
+pushed part leaves by the motion itself.
 
-If (2)-(4) hold, the answer to P17 in this model is: a part started far from a collective that
-can do without it stays out for good, deterministically, and the configuration keeps the
-displacement the cost cannot see; a collective started far out as a whole comes back as long
-as the need persists, at a time exponential in distance squared. Nothing here drives a part
-out: every run starts from the displaced state (``test_dispersal_momentum.py`` is the run in
-which a pushed part coasts out by the dynamics). Irrecoverable dispersal needs
-redundancy, not noise.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``.
 """
 
 import jax

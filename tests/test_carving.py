@@ -1,98 +1,65 @@
-"""A form played long enough carves a rest that was not there.
+"""A form held long enough carves a place to rest (book Chapter 1, ``sec.held_form`` and the footnote in
+``sec.check_claims``).
 
-The claim is David's (2026-09-28: "i think a new form can start to carve out a new capacity. is
-that not something we've imagined yet? this is how memory works, and how river beds work"), and
-this file is its first run. The predictions were fixed before any of this code existed, in
-``notes/CARVING-PREDICTIONS-2026-09-28.md``; the book's plan holds them as open-mathematics item 8a.
-**Every docstring below says whether its test could have come out otherwise**; the ones that could
-not are closed-form checks of the machinery, and only the others are results.
+For a reader of the book. ``carving.reader`` is the code's name, not the book's word: this model does not run or pay, and it is not
+poised, so it is not a reader in the sense of ``sec.held_form``, and the book's footnote says "two parts". It is a material
+grouping of a quick part and a slow part, as ``sec.held_form`` has it: "where the slower parts sit sets out the shape that decides where the quick ones can settle". The quick part has
+state ``q``, one degree of freedom, and cost ``q^4/4 - u q``, where ``u`` is the note arriving on the reader's port. The
+slow part, the tuning, has state ``w``, twenty-five times slower, and cost ``gamma (w - w0)^2/2 + beta (w - w0)^4/4``. A
+stateless coupling with cost ``-w q^2/2`` joins them. So ``w`` is the curvature of the quick part's landscape at 0: for
+``w < 0`` the quick part has one rest, ``q = 0``, and for ``w > 0`` two, ``q = +-sqrt(w)``. Activity deepens the tuning
+and disuse lets it decay. The reader starts at ``w0 = -1/2``, with one rest. Hold the note, then stop, run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-**The run is composed** (plan P43 (b) job 3, Claude Opus 5.5, de71554a, 2026-10-10): every result below
-is ``Phi`` of ``carving.reader``, a quick part (state ``q``, cost ``q^4/4 - u q``, hearing the note), a
-slow part, the tuning (state ``w``, cost ``gamma (w - w0)^2/2 + beta (w - w0)^4/4``), and a stateless
-coupling between them with cost ``-w q^2/2``, wired, with the note on the reader's port. Until then the
-reader was one box holding both coordinates under one cost (P43 (a)); that box and the hand loop
-``by_hand`` are kept beside the composite and checked equal to it, at the runs' settings. The
-non-reciprocal arm is a coupling with a 1-form and no cost (``carving.nonreciprocal_coupling``).
+    import jax; jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from tests.test_carving import is_carved, outcome
+    for hold in (1336, 1337):
+        state = outcome(hold)                      # (q, w) after the note has stopped and everything has settled
+        print(hold, np.round(state, 4), is_carved(state))
+    # 1336 [ 0.     -0.4016] False
+    # 1337 [0.7051 0.4972] True
 
-The one-box reader was one component ``I -> <R^2 | R^2>`` whose state is a fast coordinate ``q`` and a slow
-one ``w``, its response the diagonal sharp ``diag(eta_q, eta_w)`` with ``eta_w << eta_q``. The cost,
-with the note ``u`` arriving on the exterior input, is
+One step decides. Held for 1337 steps the note leaves the quick part a rest away from 0, which it keeps with no note
+playing. A step less, and it leaves only a mark on the tuning, which fades.
 
-    k(q, w; u) = q^4/4 - w q^2/2 - u q + gamma (w - w0)^2 / 2 + beta (w - w0)^4 / 4,
+**A new capacity is a newly available one.** The whole reader's rests are fixed by its arrangement: the carved rest was
+already a rest of the quick and slow parts together before any note played (the test
+``test_the_carved_rest_is_a_joint_fixed_point``). What the note changes is which rests are *available*, meaning rests of
+the quick part with the tuning held where it now sits: only ``q = 0`` at ``w = -1/2``, and ``q = +-sqrt(w)`` once ``w > 0``.
+Settling moves among the rests available at one ``w``; carving moves ``w`` so that another is. A rest can be available and
+not kept: the note of 1336 steps stops at ``w = .211``, where ``q = +-sqrt(w)`` are available, and the tuning falls back and
+closes them again; "long enough" is the tuning passing the point, near ``w = .212``, from which its own motion keeps them
+open (``test_a_rest_can_be_available_and_not_kept``).
 
-so ``w`` is the curvature of the fast landscape at the origin: for ``w < 0`` the reader has one rest,
-``q = 0``; for ``w > 0`` it has two, ``q = +- sqrt(w)``. Both coordinates descend this one cost, so
-the slow rule is ``w' = w + eta_w (q^2/2 - gamma (w - w0) - beta (w - w0)^3)``: activity deepens,
-disuse decays. The reader starts at ``w0 = -1/2``, one rest and no memory.
+What the tests check, and each test's docstring says whether it could have come out otherwise. The composed reader equals
+the one-box reader and the step by hand. There is a sharp hold threshold. The curvature flips sign, and the carved rest
+holds against a kick. The joint cost never rises along a run, so the accounting survives the landscape moving. Rain decides
+by its rate and not its duration, and spacing does not act monotonically. A tuning that does not descend the same cost
+makes the joint cost rise: it is not accountable.
 
-**A finding from the construction, before any prediction was tested.** The first cost had no quartic
-term in ``w``, only ``gamma (w - w0)^2 / 2``. With a quadratic deepening against a linear decay there
-is no stable memory at all: for ``gamma > 1/2`` the only rest is the blank one, and for
-``gamma < 1/2`` the carved rest exists but is unstable, since on the slaved branch ``q^2 = w`` the
-slow flow has ``d/dw [q^2/2 - gamma(w - w0)] = 1/2 - gamma > 0``, and ``w`` ran away to overflow. So a
-carved memory needs the deepening to saturate; the quartic is the least that does it. With
-``beta (w - w0)^4 / 4`` added, the slaved slow flow ``g(w) = -w/2 + gamma(w - w0) + beta(w - w0)^3``
-has a stable carved rest at ``w* = 1/2``, ``q* = +- sqrt(1/2)``, whenever ``gamma + beta = 1/4`` and
-``gamma + 3 beta > 1/2``; this file takes ``beta = 1/5``, ``gamma = 1/20``. The blank rest
-``(0, w0)`` stays stable, and an unstable rest near ``w = 0.22`` separates the two basins.
+The tests above feed the note as a schedule, ordinary code on the port. The last three do not: the note comes from a part, a
+finger, and the whole is one closed composite of the book's category of material groupings. How long the note lasts is how
+slowly the finger lets go; one box of states traps for every note; and it survives a two-way spring to a partner in the
+same box, and fails for a partner outside it.
 
-Results, against the five predictions (Claude Opus 5 (1M), session 1a70010f, 2026-09-28):
+Artificial: the sharpness of one step comes from one dimension and no noise; with noise the threshold would be a
+probability. The deepening had to saturate, hence the quartic, or there would be no stable memory at all.
 
-1. **Held.** The hold threshold is 1337 steps and is sharp to one: a note held 1336 steps leaves the
-   reader at the blank rest, 1337 leaves it at the carved one, ``(0.7051, 0.4972)`` against the
-   predicted ``(sqrt(1/2), 1/2)``, and it stays. **Unpredicted, and a result:** below the threshold
-   the tuning is not left untouched but holding a *fading* trace — ``w = -0.402`` where it started at
-   ``-0.5`` — which goes back on the tuning's own decay time, ``1/(eta_w gamma) = 10^4`` steps. So a
-   note too short to carve still leaves a mark that has to wear off, and what the threshold decides
-   is whether the mark holds itself up.
-2. **Held.** The fast landscape's curvature at ``q = 0`` flips sign, so the reader ends with a rest
-   where it had none, and a kick that does not cross ``q = 0`` decays back into it.
-3. **Closed form, as predicted.** The carved rest is a joint fixed point at ``u = 0`` and was one
-   before the note played. Carving is basin selection at the joint level; what is new is the fast
-   landscape at the slow coordinate's new value. The book must say it that way.
-4. **Held.** The joint cost never rises along a run, with the note on or off, so dissipation stays
-   non-negative and the accounting is unharmed by the tuning moving.
-5. **Held, and it is the warning.** A tuning driven by ``q`` rather than ``q^2 / 2`` is non-reciprocal
-   and no longer descends the cost: the joint cost rises on 2915 of 8000 steps, by as much as 1.0e-4
-   (recorded as 0.80 until P43 (b) job 3, which found the figure matched no run),
-   and the reader ends at ``(1.10, 1.22)``, at no rest of the exact model. So a carving tuning is
-   accountable only while it descends the same cost its fast coordinate does.
-
-6. **Held.** With the note arriving as rain rather than held once — on for a percentage of each
-   period — what decides the outcome is the percentage, not the elapsed time: 9% carves and 8% does
-   not, at periods 100 and 200 alike. (David, 2026-09-28, asked for this: "should have been something
-   like a weekly rainfall … if you get to a certain amount, then something happens.")
-7. **Refuted in both halves, and the refutation is the better statement.** I predicted bursts would
-   beat drizzle at short periods, the deepening being convex, and drizzle would beat bursts at long
-   ones, the tuning decaying between. At a fixed 9%: drizzle carves at periods 100 and 200, the same
-   water in bigger helpings every 2000 steps does not, and every 20000 steps it carves again —
-   because a single 1800-step burst is longer than the held threshold of 1337 and carves on its own.
-   So spacing does not act monotonically, and the long-period win is the held note rather than
-   burstiness. For the book: regular light rain keeps a channel that the same water in occasional
-   storms does not, unless one storm is big enough to cut the channel by itself.
-
-**Weirdness, read at each scale** (the agent's judgment, not evidence). A cell: a self-holding mark
-that needs no rehearsal is ordinary, a bistable circuit or a methylation kept by its own feedback,
-and the saturation the construction forced is what any real deepening has. A body: a habit that
-sticks only after enough repetition, and a shorter run that fades over its own timescale, is
-reasonable; what is weird is the sharpness, one step deciding, which is an artifact of one
-dimension and no noise — with noise the threshold would become a probability, as in
-``test_spells.py``. A society: the same shape is a practice that becomes self-funding once enough
-of the town holds it, which is the commons runs' territory, and the weird part there is that
-nothing in this file's cost is anybody's, so the "supply" is implicit. Across all three, the
-non-reciprocal case is the warning that a tuning which carves by its own rule, rather than by the
-cost the parts pay, cannot be billed to anybody.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; predictions in ``notes/CARVING-PREDICTIONS-2026-09-28.md``.
 """
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
 from arrangements import carving
-from arrangements.arrangement import Arrangement, exact
+from arrangements.arrangement import Arrangement, exact, zero_form
 from arrangements.coalgebra import configuration
 from arrangements.functors import Phi
-from arrangements.rvect import diagonal
+from arrangements.interpretation import trivial_omega
+from arrangements.rvect import diagonal, euclidean
+from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 from tests.chain import IN_POS
 
@@ -220,12 +187,24 @@ def test_the_hand_step_is_Phi():
 def test_the_carved_rest_is_a_joint_fixed_point():
     """Prediction 3, closed form: the carved rest solves both fixed-point equations at ``u = 0``,
     so it was a rest of the joint dynamics before any note played. Cannot come out otherwise; it is
-    why the book says carving is basin selection at the joint level and a new landscape at the fast
-    one."""
+    why a new capacity here is a newly available one: what the note changes is not the whole reader's
+    rests but which of them are available with the tuning where it sits."""
     assert abs(dk_q(Q_CARVED, W_CARVED, 0.0)) < 1e-12
     assert abs(dk_w(Q_CARVED, W_CARVED)) < 1e-12
     step = fast(np.zeros(1), q0=Q_CARVED, w0=W_CARVED)[-1]
     assert np.allclose(step, [Q_CARVED, W_CARVED], atol=1e-12)
+
+
+def test_a_rest_can_be_available_and_not_kept():
+    """With the tuning held at ``w > 0`` the quick part has rests at ``q = +-sqrt(w)``: they are available.
+    Started on such a rest with no note and the tuning free, the reader keeps it only if the tuning's own motion
+    keeps it open: from ``w = .2`` the tuning falls back and the rest closes, from ``w = .25`` it stays. So
+    availability opens at ``w = 0``, and the hold threshold is the later point, near ``w = .212``, past which it
+    is kept. **Could have come out otherwise**: every available rest might have been kept."""
+    for w, kept in ((.05, False), (.1, False), (.2, False), (.25, True), (.3, True)):
+        assert abs(dk_q(np.sqrt(w), w, 0.0)) < 1e-12              # a rest of the quick part at this w
+        assert is_carved(fast(np.zeros(60000), q0=np.sqrt(w), w0=w)[-1]) == kept, w
+    assert fast(schedule(1336, 1))[1335, 1] > 0                    # the note too short still opened it
 
 
 # ---------------------------------------------------------------------------
@@ -349,3 +328,100 @@ def test_non_reciprocal_tuning_is_not_accountable():
     assert rises, "the mismatched tuning still descended the cost"
     assert 2900 < len(rises) < 2930
     np.testing.assert_allclose(path[-1], [1.10481607, 1.2206185], atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# No schedule: the note comes from a part, and the whole is one closed composite.
+# ---------------------------------------------------------------------------
+
+LAM = 10.0                                    # the finger's stiffness
+K_Q, K_W, K_F = (0.54, 1.4), (0.3, 1.2), (-0.001, 1.01)   # the one box: every note in [0, .606]
+_EMPTY = jnp.zeros(0)
+
+
+def _finger(eta_f, f0=1.0):
+    """State ``f``, cost ``LAM f^2/2``, its out-transfer the note ``U f``. It closes the port, and the quick part pushes back on it."""
+    return Arrangement(P=configuration(euclidean(1, eta_f), init=jnp.array([float(f0)])),
+                       in_dim_M=1, out_dim_M=0, in_dim_N=0, out_dim_N=0,
+                       out_f=lambda q, m: _EMPTY, in_f=lambda q, m, e: U * q,
+                       omega=exact(lambda q, m, e: -0.5 * LAM * q[0] ** 2), label="finger")
+
+
+def _one(eta_f):
+    r = carving.reader([carving.tuning_box(ETA_W, W0, W0, GAMMA, BETA)], [carving.curvature_coupling()], 0.0, ETA_Q)
+    return compose_seq(r, _finger(eta_f))
+
+
+def _spring(kappa):
+    return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=0,
+                       out_f=lambda q, m: _EMPTY, in_f=lambda q, m, e: _EMPTY,
+                       omega=exact(lambda s, m, n: -0.5 * kappa * (m[0] - m[1]) ** 2), label=f"spring({kappa:g})")
+
+
+def _two(kappa, eta_f):
+    """Two quick parts, two tunings, two curvature couplings, a spring between the quick parts, the note copied to both."""
+    parts = tensor_arrangements([carving.quick_box(ETA_Q, 0.0, 2), carving.tuning_box(ETA_W, W0, W0, GAMMA, BETA),
+                                 carving.quick_box(ETA_Q, 0.0, 2), carving.tuning_box(ETA_W, W0, W0, GAMMA, BETA)])
+    idx = jnp.array([0, 2, 3, 5, 1, 4])       # wires out q1, q1, w1, q2, q2, w2; the couplings hear (q1,w1), (q2,w2), (q1,q2)
+    route = Arrangement(P=trivial_parameter(), in_dim_M=2, out_dim_M=6, in_dim_N=1, out_dim_N=6,
+                        out_f=lambda q, m: m[idx], in_f=lambda q, m, e: jnp.array([e[0], e[0]]),
+                        omega=zero_form, label="route, the note copied")
+    wired = compose_seq(compose_seq(parts, route),
+                        tensor_arrangements([carving.curvature_coupling(), carving.curvature_coupling(), _spring(kappa), carving._port()]))
+    return compose_seq(wired, _finger(eta_f))
+
+
+def _end(arr, steps):
+    P, omega = arr.P, arr.omega
+    s = jax.lax.fori_loop(0, steps, lambda i, x: P.step(x, omega(P.position(x), _EMPTY, _EMPTY)[0]), P.init)
+    return np.asarray(P.position(s), dtype=float)
+
+
+def _violations(arr, boxes, n=20000, seed=0):
+    """How many sampled states of the box, half of them on a face, step out of its interior."""
+    P, omega = arr.P, arr.omega
+    leaves, treedef = jax.tree_util.tree_flatten(P.init)
+    sizes = [int(jnp.size(l)) for l in leaves]
+    where = np.cumsum([0] + sizes)
+
+    def one(y):
+        s = jax.tree_util.tree_unflatten(treedef, [y[where[i]:where[i] + sizes[i]] for i in range(len(leaves))])
+        return P.position(P.step(s, omega(P.position(s), _EMPTY, _EMPTY)[0]))
+    rng = np.random.default_rng(seed)
+    lo, hi = np.array([b[0] for b in boxes]), np.array([b[1] for b in boxes])
+    pts = lo + (hi - lo) * rng.random((n, len(boxes)))
+    for i in range(n // 2):
+        j = rng.integers(len(boxes))
+        pts[i, j] = boxes[j][rng.integers(2)]
+    after = np.asarray(jax.jit(jax.vmap(one))(jnp.asarray(pts)))
+    return int((np.minimum(after - lo, hi - after).min(axis=1) <= 0).sum())
+
+
+def test_the_finger_is_a_part_and_no_schedule_is_needed():
+    """One closed composite, equal to ``Phi``. How long the note lasts is how slowly the finger lets go. Could fail: the finger
+    pushed back on by the quick part might never let go, or let go too fast either way."""
+    arr = _one(1 / (LAM * 3000))
+    assert arr.label.startswith("(finger .")
+    P, omega = arr.P, arr.omega
+    s, s_phi, O = P.init, P.init, Phi(arr)
+    for _ in range(5):
+        _, _, s_phi = O.with_state(s_phi).run_one((_EMPTY, trivial_omega(0)), lambda _o: (_EMPTY, _EMPTY))
+        s = P.step(s, omega(P.position(s), _EMPTY, _EMPTY)[0])
+    np.testing.assert_allclose(P.position(s), P.position(s_phi), atol=1e-12)
+    np.testing.assert_allclose(_end(_one(1 / (LAM * 300)), 80000), [0.0, W0, 0.0], atol=1e-3)
+    e = _end(arr, 80000)
+    assert K_Q[0] < e[0] < K_Q[1] and K_W[0] < e[1] < K_W[1]
+
+
+def test_one_box_traps_for_every_note():
+    """A single certificate replaces a note-on map and a note-off map: the product of three intervals steps into itself, the
+    finger included. Could fail on a face; the faces are checked by hand in ``notes/runs/p31b-ch1-d477d422/CARVING-IN-MG.md``, in the book's repository."""
+    assert _violations(_one(1e-3), [K_Q, K_W, K_F]) == 0
+
+
+def test_the_box_survives_a_two_way_spring_and_fails_for_a_partner_outside_it():
+    """Two readers, a spring. In the same box, the spring only helps at each face, at every stiffness tried. A partner in the
+    mirror box breaks it. So what is kept is kept under a contract on the partner. Could fail either way."""
+    for kappa in (0.1, 1.0, 10.0):
+        assert _violations(_two(kappa, 1e-3), [K_Q, K_W, K_Q, K_W, K_F]) == 0
+        assert _violations(_two(kappa, 1e-3), [K_Q, K_W, (-1.4, -0.54), K_W, K_F]) > 0

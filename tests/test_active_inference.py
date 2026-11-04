@@ -1,30 +1,40 @@
-"""Active inference: three tests (book ``AGENTDOCPLAN.md`` §8.2 P5 (b)).
+"""Moving by predicting: a goal at the top moves the hand (book Chapter 1, ``sec.check_claims``; to be worked in
+``sec.active_inference``).
 
-Predictions fixed in writing, with their numbers, before this file or
-``arrangements/active_inference.py`` existed: ``notes/ACTIVE-INFERENCE-TESTS.md`` §§1-3. Each test
-below asserts a prediction at the tolerance it was stated with; a failure is a refuted
-prediction, reported in that note's §4, not repaired here.
+For a reader of the book. The footnote says that a level whose cost is the gap between its prediction and what arrives
+pushes the level below toward that prediction, "so that a goal at the top level moves the hand without any separate
+command sent down". That composite is ``ai.hierarchy``, the tests ``test_C*`` at the end of this file. Three parts are
+nested, each reading out its state to the one above:
 
-WHAT THE RUN FOUND (verdicts and numbers in the note, §§4-6). Test (i) held in all four parts:
-precision settles at the inverse ML variance, collapses to zero without the log-det term, learns
-the inverse covariance in 2-D, and the learned precisions of two sources are the weights on the
-mean. Test (ii): the chooser's cost is the policy free energy (held), but the chooser does NOT
-settle on the policy posterior (refuted, strict xfail): with values ``-G`` the log-partition is
-below 1, the simplex repels at the factor ``1 - dt T (log Z - 1)`` per step, and the state goes to
-the unnormalized Gibbs weights. Addendum A, written after that failure and before further code:
-a constant shift of the values, which leaves the logit unchanged, restores it. Test (iii): the
-rollout by ``Phi`` equals the closed form and the information gain is the book note's term
-(held); with the unshifted chooser the choices are refuted by the same drift (strict xfail);
-shifted, the switch from looking to pushing sits where the closed form puts it, and exact wiring
-bends the belief 0.384 toward the preferred outcome while unilateral wiring leaves it on the
-evidence (held).
+* the hand, state ``h``, with a spring of stiffness ``kappa`` holding it at 0;
+* level 1, state ``mu_1``, its prediction, with cost ``(Pi_1/2)(m - mu_1)^2`` on what arrives, ``m = h``;
+* level 2, the top, state ``mu_2``, with cost ``(Pi_2/2)(m - mu_2)^2`` on what arrives, ``m = mu_1``, and
+  ``(pi_g/2)(mu_2 - g)^2`` pulling it toward the goal ``g``.
 
-G BY PARTS (plan P43 (b) job 6, Claude Opus 5.5, de71554a, 2026-10-10, at David's "A seems much better …
-is the looking part using figurines? Can we do it that way?"). Every look-to-push run now composes
-``ai.figurine_planner``: the belief box, copied to a figurine of the world per policy (the world's own step
-from the belief under the policy's push), a score box per step (risk plus ambiguity), and the chooser.
-Until then the planner was one box running those futures in its sending map, and the look-to-push
-switch fed it ``G`` computed in test code. The one-box agent is kept and checked equal (``one_box_agent``).
+No wire carries a command down. Each wire carries a value forward and a load back, and the load on the hand comes from
+the gap between it and what level 1 predicts. Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
+
+    import jax; jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from tests.test_active_inference import settle_hierarchy
+    print(np.round(settle_hierarchy(1.0), 3))                # hand, level 1, top; the goal is at 1
+    print(np.round(settle_hierarchy(1.0, push1=False), 3))   # level 1 does not push back on what it reads
+    # [0.571 0.714 0.857]
+    # [0.    0.333 0.667]
+
+The hand comes to rest partway to the goal, where the springs balance. If level 1 only reads what arrives, the same
+predictions form above it and the hand never moves.
+
+What the tests check. ``test_C1_C2``: the rest is the spring chain's, in order ``0 < h < mu_1 < mu_2 < g``, to ``1e-10``.
+``test_C3``: each level must push the one below. ``test_C4``: only the ratio of the precisions to the hand's stiffness
+counts. The rest of the file is not linked from the footnote: precision learned by descent, a chooser whose cost is the
+policy free energy, and a look-or-push agent built with figurines; some of those predictions were refuted and are kept as
+strict expected failures.
+
+Artificial: a linear chain with one quadratic spring at each joint. Nothing here is a body.
+
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; the verdicts in ``notes/ACTIVE-INFERENCE-TESTS.md``.
 """
 
 import jax.numpy as jnp

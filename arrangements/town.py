@@ -1,54 +1,52 @@
-"""The town of *Articulating Forms that Matter*, §1.6 ("Can we articulate forms that matter?").
+"""The town of *Articulating Forms that Matter*, Chapter 1 (``sec.calculus_working``, ``sec.better``,
+``sec.cost_later``; linked from the footnotes in ``sec.calculus_working`` and ``sec.check_claims``).
 
-For a reader of the book. `eve_town()` builds Eve's model from §1.6.1: a plant (power and smoke
-out; from stage 2 on, also liability in, the wire she adds in §1.6.2) and the townspeople (power and smoke in; coughing out), wired into a town.
-The plant runs for profit: each watt is worth `benefit` to the townspeople who draw it, making
-more watts costs more (x^2/2), and filtering the smoke costs money (clean_cost*c^2/2) and earns
-nothing. Smoke s = (1-c)x starts people coughing (beta*s^2/2 a day); coughs pass at the rate
-`recovery`, so the more people cough, the more stop each day, and the coughing settles where
-starts equal stops. The knobs are the fields of `Settings`; `beta` is how harsh the smoke is. Her run:
+For a reader of the book. Eve draws her town as a material grouping of two systems (``eqn.town_system``), and
+``eve_town()`` builds it, a composite of two boxes and their wires:
 
+* The *plant*, with power and smoke out. It is run for profit. Its state is its output ``x`` and its cleanliness
+  ``c``, and its smoke is ``s = (1-c) x``. Each watt sells for ``benefit``, more watts cost more to make
+  (``x^2/2``), and filtering costs money (``clean_cost c^2/2``) and brings in nothing, so its effort field invites
+  output up to where the next watt costs what it brings in, and never invites filtering.
+* The *townspeople*, with power and smoke in and coughing out. Their state is how much they cough (the slot
+  ``coughing``). Smoke starts coughs, ``beta s^2/2`` a day, and coughs heal at the rate ``recovery``, so the
+  coughing settles where starts equal stops.
+* The power wire pushes back: the townspeople draw each watt and pay ``benefit`` for it, and that is how the plant's
+  revenue reaches it. The smoke wire does not push back; it is the waterfall of ``sec.waterfall``. In ``own_cost``
+  and ``node``, ``push`` is what a box returns up its input wires, and its default, zero, is that one-way wire.
+
+The knobs are the fields of ``Settings``; ``beta`` is how harsh the smoke is. Her run, run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
+
+    import jax; jax.config.update("jax_enable_x64", True)
     from arrangements.town import eve_town, run, summary, Settings
     for beta in (.5, 2, 8):
         town = eve_town(settings=Settings(beta=beta))
-        print(beta, summary(town, run(town)))
+        r = summary(town, run(town))
+        print(beta, round(r['final_output'], 3), r['final_cleanliness'], round(r['final_coughing'], 3))
+    # 0.5 1.0 0.0 0.25
+    # 2 1.0 0.0 1.0
+    # 8 1.0 0.0 4.0
 
-Whatever beta is, the plant keeps making the same power and never filters its smoke.
-`tests/test_town_story.py` checks each sentence of §1.6.1 that this code stands behind.
+With milder smoke they cough less, with harsher smoke more, and either way the plant keeps making the same power
+and never filters. ``tests/test_town_story.py`` checks each sentence of that story.
 
-For agents (P29): composed from systems with one-way observation and payment records.
+Her account is ``account_town()``, the town of ``eqn.town_account`` exactly as drawn: plant, townspeople, estimator
+and insurer, and nothing else in the composite (``tests/test_town_account.py`` says how to run it).
 
-Model choices and predictions: notes/P29-TOWN-PREDICTIONS-2026-09-28.md.
-A profit maximizer uses a quadratic expected-liability/premium schedule. A court
-learns its coefficient from delayed health observations; an insurer reads that
-estimate or the mathematician's earlier estimate. Forecasts never create money.
-This is a new composite using the same Arrangement/CotCoalg primitives as
-system_id, insurance, and account; it does not reuse their example-specific boxes.
+``eve_town(stage)`` is the same town with what the book talks about and does not draw: stage 2 a court that fits
+claims arriving after a delay, its assessment on the plant's liability wire (``eqn.town_liability`` draws that wire
+arriving from outside the town and does not run it); stage 3 an insurer who reads the court; stage 4 her estimate as
+well, read through a box that remembers yesterday, so its state is not the one number of ``account_town``'s
+estimator. Beside these are records (``memory``, ``delay``, ``money``, and with ``diligence=True`` the insurer's
+``books``). ``build`` is the general constructor, with a plant of one dial for the earlier runs. Every town is a
+closed composite; ``run`` takes its effort field and integrator step by step, checked equal to the dynamics functor
+``Phi`` in ``tests/test_town_smoke.py`` and ``tests/test_town_account.py``.
 
-Stage (d), `clean=True` (notes/P29-D-PREDICTIONS-2026-09-28.md): the plant has two dials,
-output x and cleanliness c, descended together in its own coordinates. Power x is published
-(in (d) no box consumes it; (e) sends it to the residents); smoke s = (1-c)x reaches the residents and is what the records observe. The plant
-publishes power and smoke itself, so its interface is power and smoke out, with liability in
-from stage 2 on, as the book draws it (§1.6.1 without the liability wire, §1.6.2 with it); its
-state (x, c) stays inside. Its cost adds the priced liability
-on smoke and a cleaning cost clean_cost*c^2/2. With clean=False every stage is exactly the
-one-dial town above.
+Artificial, on purpose: one coefficient, known recovery, noiseless records, instant smoke-to-coughing. The model
+does not say what a real court or insurer would do.
 
-Stage (e), `power_to_town=True` with `clean=True` (notes/P29-E-PREDICTIONS-2026-09-29.md):
-the residents take power as well as smoke. They draw each watt and it is worth `benefit` to
-them, so their one-form on the power input is the constant `benefit`: that wire pushes back
-(retroactivity), while their one-form on smoke stays zero (an insulator). The plant's cost
-loses its revenue term, which now reaches it as that push, pulled back through its power
-output. Every trajectory is (d)'s.
-
-Stage (f), `diligence=True` at stage 3 or 4 (notes/P29-F-PREDICTIONS-2026-09-29.md): the insurer
-does its own due diligence. A record node 'books' keeps three running sums: S_uy = sum u*y and
-C = sum u^2 over the claims it has paid (the delayed records, u = s^2/2, y = incidence), and
-E = sum u^2 over the exposure it has written (known at once). Its own fit is least squares over
-every claim so far, own = S_uy/C, and its rate descends (rate - target)^2/2 with
-target = est + (C/E)*(own - est): its own fit carries the share of the exposure's evidence whose
-claims have arrived, her estimate (or the court's fit, report disconnected) the rest. With
-diligence=False every stage is unchanged.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; the model's choices in ``notes/P29-TOWN-PREDICTIONS-2026-09-28.md``.
 """
 from dataclasses import dataclass
 

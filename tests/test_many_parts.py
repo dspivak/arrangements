@@ -1,37 +1,43 @@
-"""Many parts that keep one another whole: a ring and an all-to-all of parts in mutual need.
+"""Many parts that keep one another whole: a ring and an all-to-all (book Chapter 1, ``sec.check_claims``; the body's
+heart and lungs are in ``sec.collective``, and the footnote's words are "collectives of two to eight parts, each needing
+what others send").
 
-The book plan's P30 stage (e) (AGENTDOCPLAN.md §8.2 in the book repository; David,
-2026-09-29, on §1.7's footnote "larger collectives are still being worked out": "then we
-should do it now. we are at the point where we need to know"). The baseline is
-``tests/test_mutual_need.py`` (§5.9 item 12): two parts, each a driven steady state whose
-held form is supplied by the other through a gate, one supply entering from outside.
+For a reader of the book. ``collective(n, wiring, q0, s)`` is ``n`` parts and one supply box holding ``s``, in a closed
+composite. A part's state is its amplitude ``q_i``, the form it holds, which dissipates at rate ``b``. Beside each part is
+a stateless *need box*, which returns to the part
 
-**The predictions, fixed before any construction code in
-``notes/MANY-PARTS-PREDICTIONS-2026-09-29.md``.** The plan's three: (1) both wirings hold
-together under the same supply condition as the pair; (2) cutting one part's supply ends
-the ring, every part in turn, while all-to-all loses only that part and settles lower;
-(3) the ring's collapse runs around it at a speed set by the parts' settling time. The
-run's own, E1-E5, are in the note and are quoted in the docstrings below.
+    F_i = alpha (s g(r_i, q_i) + beta r_i),     g(r, q) = r q / (K + r q),
 
-**The construction.** ``n`` parts, each item 12's part (``mn.part``): a configuration
-coalgebra on its amplitude ``q_i`` with mobility ``h``, publishing ``q_i``, carrying its
-own dissipation ``-d (b/2) q_i^2``. One supply box holding ``s`` (zero response). The
-three are tensored and closed by a stateless coupler on the ports ``e = (q_1..q_n, s)``
-returning
+where ``r_i`` is what part ``i`` receives from the parts it needs. In the *ring*, ``r_i = q_{i-1}``, its neighbor. In
+*all-to-all*, ``r_i`` is the total from all the others divided by how many they are (with a literal total, ``receive``,
+the cut has the same outcome above that wiring's own, lower, threshold). The gate ``g`` is the need: with nothing arriving, the supply does not reach the part.
+At ``beta = 0``, which is the book's case, nothing else does either. The need box returns nothing to the senders or the
+supply, so the need is one way. A cut (``s_mask``, or ``out_mask`` for a part's outgoing wire) puts a box presenting 0 in
+place of the wire. Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-    F_i(e) = alpha ( s m_i g(r_i, q_i) + beta r_i ),     g(r, q) = r q / (K + r q),
+    import jax; jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from tests.test_many_parts import cut_supply
+    for n, wiring, s in ((5, 'ring', 4.0), (5, 'all', 4.0), (3, 'all', 2.5)):
+        print(n, wiring, s, np.round(cut_supply(n, wiring, s), 3))    # part 0's supply cut, from the settled collective
+    # 5 ring 4.0 [0. 0. 0. 0. 0.]
+    # 5 all 4.0 [0.    3.633 3.633 3.633 3.633]
+    # 3 all 2.5 [0. 0. 0.]
 
-where ``r_i`` is what part ``i`` receives from the parts it needs -- *ring*:
-``r_i = q_{i-1}``; *all-to-all*: ``r_i = mean_{j != i} q_j`` -- and ``m_i`` is the supply
-mask (a cut wire delivers ``0``, item 12's reading). With ``beta = 0`` a part with nothing
-arriving has no drive at all, item 12's condition that no ungated path reach a part;
-``beta > 0`` is that run's ungated internal coupling, run here as a control. The composite
-forcing on ``Q = R^{n+1}`` is ``xi_i = F_i - b q_i``, ``xi_S = 0``, and one step is
-``q + h xi``. Fixed points do not depend on ``h``.
+The ring dies from the one cut, part by part. The all-to-all loses the part that was cut and holds the rest, a little
+lower, except in dire poverty: the third line is a supply below ``s'_* = 2 sqrt(K (n-1)/(n-2))``, here 2.83. Two parts have
+one wiring, ring and all-to-all being the same, and the pair dies from a cut, so the second half of the footnote begins at
+three.
 
-Every docstring below says which of three things its test does (STATUS.md §3.7):
-reproduce a closed form derived in the docstring, check a discrete analogue, or correct a
-claim made on paper. The numbers: ``notes/MANY-PARTS-RESULTS.md``.
+What the tests check, each saying whether it reproduces a closed form, checks a discrete analogue or corrects a claim. Test
+0: the runs are the dynamics functor's, and the parts equal one coupler holding the wiring. Test 1: both wirings hold above
+the pair's threshold ``s_* = 2``, at ``n = 2, 3, 5, 8``. Test 2: the cuts above; with ``beta = 0.5``, an ungated path, the
+ring holds with that part degraded, so "dies from a single cut" is a statement about a ring nothing else reaches, which is
+what "needs only its neighbor" says. Test 3: the collapse goes round the ring as a front. Test 4: the origin is stable, and
+a saddle is the threshold for restarting.
+
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; the predictions and numbers in ``notes/MANY-PARTS-PREDICTIONS-2026-09-29.md``, ``notes/MANY-PARTS-RESULTS.md``.
 """
 
 import jax

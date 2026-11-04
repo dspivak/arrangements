@@ -1,25 +1,34 @@
-"""P29 stage (f): the insurer's due diligence.
+"""The insurer's own check (book Chapter 1, ``sec.cost_later``: "She knows they'll do their own due diligence from
+there, because it's their money on the line"; linked from the footnote in ``sec.check_claims``).
 
-Articulating Forms that Matter, §1.6.3: "They'll do their own due diligence from there, because
-it's their money on the line." In `eve_town(4)` the insurer's rate follows her estimate, whose
-one-step fit stalls at 1.674 against beta = 2, so the insurer underprices for good. With
-`diligence=True` the insurer keeps books (paid claims and written exposure) and fits the harm
-rate by least squares on every claim it has paid; its rate moves from her estimate toward its
-own fit by the share of the exposure's evidence whose claims have arrived.
+For a reader of the book. ``eve_town(4, diligence=True)`` gives the insurer its books, a record of the claims it has
+paid and the exposure it has written, and its own fit of how much smoke drives coughing, by least squares over every
+claim paid so far. Its rate moves from her estimate toward its own fit by the share of the exposure's evidence whose
+claims have arrived. So at first it prices by her account, and as its own money comes back to it, by its own evidence.
+These books are not in ``eqn.town_account``: there the insurer's state is one number; here its check is added beside it.
 
-Predictions fixed before code: notes/P29-F-PREDICTIONS-2026-09-29.md; results and the weirdness
-check: notes/P29-F-RESULTS-2026-09-29.md. Claude Opus 5.5 (1M), subagent of 16311c9d. Every test
-checks the discrete model against predictions fixed in advance; none reproduces a closed form
-except the least-squares identity (prediction 5), which is exact on noiseless records.
-Reasonable: an insurer that prices from an outside estimate until its own losses develop.
+Run it, run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
+
+    import jax; jax.config.update("jax_enable_x64", True)
+    from arrangements.town import eve_town, run, summary
+    town = eve_town(4, diligence=True)
+    r = summary(town, run(town))
+    print(round(r['first_claim_time'], 2), round(r['final_own_fit'], 3), round(r['final_premium'], 3), round(r['final_estimate'], 3))
+    # 6.04 2.0 2.0 1.674
+
+The first claim is paid at ``t = 6.04``, the insurer's own fit is the true ``beta = 2`` from then on, and its rate ends
+there. Her estimate in this fuller town, read through a memory box, stalls at 1.674: once the plant has cleaned there is
+little smoke to learn from. So in this town the check corrects her.
+
+What the tests check. Until the first claim the town is stage 4's, step for step. The fit on paid claims is ``beta``
+exactly, on noiseless records, and the rate ends within 2% of it. The court is not repaired by this, and the money lost
+early is not recouped. With her report disconnected the harm is no worse than without her account. And on the estimator
+as drawn (``fit_coughing=True``), which needs no rescue, the rate still ends within 2% of ``beta``.
+
 Artificial: noiseless records, known recovery, one coefficient, unlimited credit.
 
-Result (2026-09-29): all eight predictions held, 5 tests. Stage 4's trajectory to 1e-12 until
-the first claim (t = 6.04); harm .7954 -> .7753; final rate 1.99994 (stage 4: 1.67438), within 2%
-of beta from t = 8.74; the fund's change over the last claims delay -4e-7 (stage 4: -3.1e-3);
-final fund -.4163 (stage 4: -.4224); court still 1.674; report disconnected, harm 6.1288 <= 6.1337.
-Found: most of the -.42 is the start-up (claims on exposure written while her estimate climbed
-from 0), not the stall; diligence removes the slope, not the level.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; results in ``notes/P29-F-RESULTS-2026-09-29.md``.
 """
 import jax
 jax.config.update("jax_enable_x64", True)

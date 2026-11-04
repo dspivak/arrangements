@@ -1,100 +1,46 @@
-"""The cascade: a fund that pays its parts, a shock, and how deep the damage runs.
+"""A part that gets nothing moves to where it can get something (book Chapter 1, ``sec.check_claims``: "a part that doesn't
+get anything from the collective moves away to wherever it can get something").
 
-The book plan's P19 (a) (AGENTDOCPLAN.md §8.2 in the book repository), from David's reading of
-ruin (2026-09-26): "it's an account *connected to disintegration* that falls below 0. as the
-shockwave hits the parts, they come apart. their own integrity forces them to leave the
-collective", and, of the depth, "let's try several depths and see if your thing works". The
-pieces are ``arrangements/cascade.py`` on ``arrangements/collective.py``:
+For a reader of the book. The pieces are in ``arrangements/cascade.py``:
 
-* a **worker** holds an amplitude ``a`` (its held form) on the supply it receives, with the
-  cost ``(b/2) a^2 - (alpha a + beta) h_1`` on the supply channel ``h_1`` of its input, so its
-  amplitude settles at ``alpha h_1 / b`` and its placement moves toward whatever supplies it
-  (``beta`` is a standing want, so an unsupplied part still looks for supply);
-* a **source** is a fixed part off to the side, supplying ``s`` on the same channel: the
-  elsewhere a worker can go;
-* a **fund layer** turns a collective into a unit ``I -> B``: its balance ``f`` pays every
-  part in reach the wage ``g(f)`` through a smooth gate, is paid what arrives on the unit's own
-  supply channel, and pays a fixed overhead ``c_0``; it passes the collective's product up;
-* at the top, a **market** pays ``r`` times the product (one level), or a fixed supply
-  arrives (the nested runs).
+* a *worker* holds an amplitude ``a`` on the supply ``h_1`` it receives, with cost ``(b/2) a^2 - (alpha a + beta) h_1``, so
+  it settles at ``alpha h_1 / b``, and its placement moves toward whatever supplies it (``beta`` is a standing want, so
+  a part with no supply still looks for it);
+* a *source* is a fixed part off to the side, offering supply: the elsewhere a worker can go;
+* a *fund* pays every part in reach a wage set by its balance, is paid what arrives, and pays a fixed overhead, without
+  which nothing could tip; it is a record, read one way;
+* a *market* pays for the product. In the nested runs, a fixed supply arrives instead.
 
-A *shock* or *drain* below is the fund's balance reduced by ``S`` by hand, the run from there
-(``shocker``, ``depth_runner``); the top supply is an exterior input (``supplied``), so its cut
-is the environment's schedule; neither is an event in a run (STATUS.md §2, "Not evidence of an
-event").
+Each is a box. ``one_level()`` wires four workers, a source, a fund and a market into a closed composite. A shock is the
+balance reduced by hand and the run taken from there; nothing in the run produces it. Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-**Three choices, said as choices, because they decide what can happen.** (i) Supply and
-product travel on two channels (``dim H = 2``), or the workers would supply each other. (ii)
-The fund pays a fixed overhead: without one, income and wages both scale with the wage and
-nothing can tip, so the overhead is what makes a threshold possible at all. (iii) The fund's
-flow is not a gradient; it is a record, one-way (``tests/test_insurance.py``).
+    import jax; jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from tests.test_cascade import one_level, outcome, shocker
+    u, arr = one_level()
+    settled, after = shocker(u, arr)
+    print(round(outcome(u, arr, settled)[0], 2), np.round(outcome(u, arr, settled)[1], 2))    # balance, placements
+    for shock in (19.0, 21.0):
+        balance, placements, amplitudes = outcome(u, arr, after(shock))
+        print(shock, round(balance, 2), np.round(placements, 2), np.round(amplitudes, 2))
+    # 19.74 [0.06 0.06 0.06 0.06]
+    # 19.0 19.74 [0.06 0.06 0.06 0.06] [0.97 0.97 0.97 0.97]
+    # 21.0 -18.39 [2.5 2.5 2.5 2.5] [1. 1. 1. 1.]
 
-**The predictions, fixed in advance and written here before ``cascade.py`` or any
-construction code existed. Each must be able to fail.**
+Below the threshold, about 20.22, the fund recovers and everyone stays. Above it the fund dies, no wage arrives, and every
+worker walks to the source, where it keeps holding its form.
 
-One level (P19 (a); its three predictions, sharpened, not softened):
+What the tests check. Tests 10 and 11: the threshold, and with no source the same shock moves no one; the workers fade
+where they are. Test 12: more workers raise the threshold only by raising the balance; the margin stays flat. Tests 13
+and 14, nested, one to four levels: a permanent cut in the top's supply runs to every depth, and a passing shock is
+filtered by funds that hold reserves. One retroactivity test: with an exact wage wire the workers' want pulls back on the
+balance, and the threshold rises.
 
-(10) *A threshold, all or none.* There is a shock size below which the fund recovers and
-every worker stays in reach, and above which the fund collapses and the workers leave for the
-source. The existence of a threshold is built in by the overhead and the revenue feedback (the
-fund's balance has an unstable fixed point); what can fail is the rest: that the workers
-actually leave rather than fade in place, and that the number who leave jumps from none to all
-within a band of shock sizes 10% wide. Fails if the response is graded.
+All-or-none here is forced by symmetry: a worker's leaving depends only on the wage against the outside offer, the same
+for each. The file takes about ten minutes; the example above takes seconds.
 
-(11) *Nowhere to go.* With the source removed, the same above-threshold shock disperses
-nothing: the workers' amplitudes fall to near zero and their placements move less than 0.1.
-Fails if they disperse with no elsewhere to go.
-
-(12) *Redundancy buys margin?* P19's prediction: at fixed total output the threshold rises
-with the number of workers. The agent's counter-guess, fixed here too: with identical wiring
-the fund sees only totals, so the threshold is the same for ``n = 2, 4, 8`` within 10%, and
-P19's (3) fails. One of the two must fail.
-
-Nested (depth ``D = 1..4``, each unit a collective of two sub-units and a fund, workers and
-their sources at the bottom, a fixed supply into the top fund):
-
-(13) *A permanent loss runs to every depth.* Cut the top supply below the top's overhead and
-the workers leave at every depth tested. Fails if some depth holds.
-
-(14) *A transient shock is filtered by the funds between.* Drain the top fund once and let it
-recover. Each fund below is a first-order filter on the wage it passes down. With **fast**
-funds the dip reaches the bottom nearly whole (the bottom's lowest wage within 10% of the
-top's at every depth) and the workers leave at every depth; with **slow** funds (reserves) the
-bottom's lowest wage rises with every level added, and from some depth ``D <= 4`` on no worker
-leaves. So a shock the top survives runs only to a limited depth where the levels hold
-reserves, and to any depth where they do not. Fails if slow funds do not stop it, or fast
-funds do.
-
-**What happened** (2026-09-26, recorded after the runs; the predictions above untouched).
-
-*Two things found while building, before any prediction was tested.* A fund in surplus grew
-without bound, so a ``leak`` (the fraction of its balance it spends) was added to give it an
-equilibrium to shock. And exact composition made the fund *not* a record: the wage depends on
-the balance, so the workers' want is pulled back through the wage wire onto the balance, at
-``g'(f)(alpha sum kappa a + beta sum kappa)`` -- the needy prop up the purse (retroactivity).
-The runs below use the one-way wire (``record``), which cancels exactly that term; the exact
-wire is kept as its own test, and it raises the threshold from 20.22 to 21.78. A placement
-mobility of 0.5 was also found unstable at two workers (a 2-cycle) and lowered to 0.1.
-
-(10) Held, with a caveat: at balance 19.74 the threshold is 20.22; below it every worker
-stays, above it the fund falls to -18.4 and all four go to the source, where they hold their
-form (amplitude 1.0). But all-or-none is forced by symmetry here -- a worker's leaving depends
-only on the wage against the outside offer, the same for every worker -- so it was not tested.
-(11) Held: with no source the threshold is 18.05 and above it the workers stay where they were
-and fade to amplitude 0. (12) P19's rise holds in letter (19.12, 20.22, 21.86 at n = 2, 4, 8)
-and the agent's flat counter-guess fails; but the rise is the balance's (18.80, 19.74, 21.53,
-from the source-supplied product of more workers), the margin stays flat (0.32, 0.48, 0.33),
-and without a source the threshold is 18.045 at every n. Neither prediction's mechanism, so
-redundancy buys no margin here.
-(13) Held: a permanent cut to 30% of the top supply sends the workers to their sources at
-every depth, fast funds or slow. (14) Held for a shock that stops the top's wage (four times
-its reserve): through fast funds the bottom's lowest wage is 0.025 of equilibrium at depth 4
-and the workers leave at every depth; through slow funds the first level below the top absorbs
-it (0.78) and no worker leaves from depth 2 on, the bottom's lowest wage rising 0.78, 0.92, 0.95.
-**Refuted in part:** a moderate shock (95% of the top's reserve) is attenuated level by level
-even through fast funds (0.26, 0.39, 0.48, 0.55 at depth 4) and moves no worker anywhere. How
-deep a shock runs depends on how long it stops the wage against how fast the funds between
-respond, not on speed alone.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``.
 """
 
 import jax

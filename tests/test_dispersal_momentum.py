@@ -1,48 +1,35 @@
-"""Dispersal with momentum: does a push's energy spread irrecoverably through a collective?
+"""A push carries off a part the others can do without (book Chapter 1, ``sec.check_claims``: "a part the others can do
+without is barely held onto: a push carries it off for good").
 
-The second half of the book plan's P17 (AGENTDOCPLAN.md §8.2 in the book repository), in
-David's words (2026-09-26): "in a ratchet, i want the click to be the sound of energy
-spreading irrecoverably through the handle of the ratchet", and "if it remained right
-there, the spring would bounce back up and the ratchet would go backwards".
-``tests/test_dispersal.py`` ran the same collective under descent, where a displacement
-carries no energy. Here the parent's integrator is the phase coalgebra (and its damped
-variant): each placement carries a momentum, and a part is *pushed* by starting it with
-momentum ``xi_0`` outward at a common equilibrium. Nothing else changes: frozen parts
-sending ``(1, 1)``, the parent's cost ``(1/2)(nu - sum_j kappa_j)^2`` on the total it sends.
+For a reader of the book. The collective is ``arrangements/collective.py``: ``n`` parts, each sending the same signal ``1``, placed on a line
+under a parent. A part counts for ``kappa(p) = exp(-p^2 / 2 tau)`` by its placement ``p``, so one placed far away is out
+of reach, and the parent's cost is the gap between the total it sends onward and what the collective needs, ``nu``:
+``(nu - sum_j kappa_j)^2 / 2``. Only the placements move. Here each placement also carries a momentum, and a part is pushed by starting it
+with momentum outward. With need ``nu = 1.5`` and three parts, any two can supply it, so the third can be done without;
+with two parts the other sends at most 1, so it cannot. Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-**The predictions, fixed in advance and written here before any construction code for this
-file existed. Each must be able to fail.**
+    import jax; jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from tests.test_dispersal_momentum import build, distance, parent_state, trace
+    nu, push = 1.5, 0.05
+    for n in (3, 2):
+        C = build([distance(nu / n)] * n, nu, push)
+        _, p = trace(C, 5000, lambda s: parent_state(C, s)[0][0])
+        print(n, round(float(p[-1]), 3), round(float(np.max(np.asarray(p))), 3))   # n, where it is, farthest it got
+    # 3 109.075 109.075
+    # 2 -0.682 1.09
 
-Linear analysis first. Near a common equilibrium the cost is ``(1/2) g^2 (sum_j x_j)^2``
-with ``g = kappa'(p*)``: its Hessian has rank one. The one direction it sees, the total,
-is a spring; the other ``n - 1`` directions are free. A push ``xi_0`` on part 0 splits into
-``xi_0 / n`` on every part along the spring and a free remainder, ``xi_0 (1 - 1/n)`` on
-part 0 and ``-xi_0 / n`` on each other part; the free remainder carries the fraction
-``1 - 1/n`` of the push's kinetic energy.
+Of three, the pushed part coasts away for good. Of two, it is turned back, and in 100,000 steps gets no farther than 1.2.
 
-(5) *Undamped, a small push: the spring's share comes back and the rest never does.* Over
-many oscillations each part's momentum averages to its free share: ``xi_0 (1 - 1/n)`` for
-the pushed part, ``-xi_0 / n`` for each other, within 5%; for ``n = 1`` it averages to zero.
-So the fraction ``1 - 1/n`` of the energy put in spreads into motions the cost cannot see
-and does not return to the spring. Fails if the averages differ from the free shares.
+Why: the cost sees only the total, so near a common rest it is a spring in one direction, the total, and free in the other
+``n - 1``. A push splits accordingly. The spring's share, ``1/n``, comes back; the rest does not.
 
-(6) *Damped, a small push lands the configuration somewhere new.* With the damped phase
-integrator (a fraction ``c`` of momentum removed per step), the spring's share rings down
-and returns, and the free share coasts a distance ``mu xi_0 / c`` before it stops: the pushed
-part ends displaced by ``(mu xi_0 / c)(1 - 1/n)`` and each other by ``-(mu xi_0 / c) / n``,
-within 5%, with the onward message back at ``nu``; for ``n = 1`` it ends where it started.
-This is the click in this model: the push's energy is gone, dissipated, and the
-configuration keeps the part of the push the cost could not see.
+What the tests check. Test 5, with no damping: time-averaged momenta are the free shares, ``1 - 1/n`` of the push's energy
+never returning. Test 6, damped: the configuration comes to rest somewhere new, with the onward signal back at ``nu``.
+Test 7: the runs above.
 
-(7) *Undamped, redundancy decides whether a small push loses a part.* At target
-``nu = 1.5`` and push ``xi_0 = 0.05`` (kinetic energy ``~6e-4``): with ``n = 3`` (the other
-two can cover 1.5) the pushed part coasts out of reach, past distance 5 within 5000 steps,
-and does not come back; with ``n = 2`` (the other can send at most 1) it moves along the
-one-dimensional family of minima until the other part reaches the kernel's peak, turns, and
-never gets past distance 1.2 in 100,000 steps. This goes beyond the linear analysis, which
-says only that the free share coasts; whether the others compensate fast enough for the
-pushed part to leave, and whether the ``n = 2`` part is turned back rather than escaping, are
-the nonlinear run's. Fails if the ``n = 3`` part is turned back or the ``n = 2`` part escapes.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``.
 """
 
 import jax.numpy as jnp

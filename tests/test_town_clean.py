@@ -1,18 +1,35 @@
-"""P29 stage (d): smoke per watt. The plant gets a second dial, cleanliness.
+"""Filtering or cutting: which way the plant responds (book Chapter 1, ``sec.cost_later``; linked from the footnote
+"The runs are ... when one makes filtering cost more than cutting power, the plant output shrinks instead").
 
-Predictions fixed before code: notes/P29-D-PREDICTIONS-2026-09-28.md. Results and the
-weirdness check: notes/P29-D-RESULTS.md. Claude Opus 5.5, subagent of 8f53ae48, 2026-09-28.
-Reasonable: a priced smoke liability makes a plant clean when cleaning is cheap relative to
-output, and shrink when it is dear. Artificial: power consumed by nobody, quadratic cleaning
-cost (the first bit of cleaning is free), instant smoke-to-illness, noiseless records.
+For a reader of the book. The plant has two dials, its output ``x`` and its cleanliness ``c``, and the premium makes
+smoke ``s = (1-c) x`` cost it money. So it can cut smoke either way. ``clean_cost`` is what filtering costs, the ``k``
+in the plant's cost ``(1 + p (1-c)^2) x^2/2 - benefit x + k c^2/2``. In the town as drawn, run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-Result (2026-09-28): all four predictions held. At p = 0 the plant never cleans (c = 0
-exactly) at beta .5, 2, 8. At p = 2, k = .1: c = .952, x = .995, cleaning's share of the
-harm reduction .998 (log) / .995 (Shapley). The threshold is k = 1 exactly, where the cost is
-symmetric in x and 1-c. Her account: c reaches half its final value by t = 2.58 (k = .1),
-first claim t = 6.04. Power over 30 units falls 3.4% (k = .1) against 63.5% one-dial.
-Found: cleaning starves her fit (final estimate 1.674, not 2); at beta = 8 the informed
-plant is trapped in a dearer minimum that the town's own path avoids.
+    import jax; jax.config.update("jax_enable_x64", True)
+    from arrangements.town import Settings, account_town, run, summary
+    for k in (.1, 10.):
+        town = account_town(Settings(clean_cost=k))
+        r = summary(town, run(town))
+        print(k, round(r['final_output'], 3), round(r['final_cleanliness'], 3), round(r['final_coughing'], 3))
+    # 0.1 0.995 0.953 0.002
+    # 10.0 0.34 0.023 0.11
+
+With filtering cheap the plant cleans up rather than reducing its output, and with filtering dear its output shrinks
+instead. Either way the coughing falls from 1, the town's rest with no return route.
+
+What the tests check. ``test_book_*``: the two outcomes above, in ``account_town``. The other tests run ``build(stage,
+clean=True)``, the town with the plant's revenue written inside its own cost, which gives the same motion as the power
+wire pushing it back (``tests/test_town_power.py``). With nothing priced the plant never cleans, whatever ``beta``, and
+its effort field does not read the townspeople at all. Priced at ``p = beta = 2`` it rests at a true minimum, and the
+split between cleaning and cutting turns at ``k = 1`` exactly, where the cost is symmetric in ``x`` and ``1 - c``. Her
+account makes the plant clean before the first claim. At ``beta = 8``, ``k = .8`` the plant's cost has two minima: a
+plant told ``p = 8`` from the start is trapped in the dearer one, and the town, whose ``p`` climbs from 0, reaches the
+cheaper.
+
+Artificial: the first bit of cleaning is free, since the cost is quadratic, and the records are noiseless.
+
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; results in ``notes/P29-D-RESULTS.md``.
 """
 import json
 import jax

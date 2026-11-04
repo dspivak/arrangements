@@ -1,13 +1,30 @@
-"""P29 stage 3: an insurer reads only past claims through their assessor.
+"""The same town without her account (book Chapter 1, ``sec.check_claims``; ``sec.cost_later`` tells the town with it).
 
-Prediction 3 in the pre-code design. Reasonable: a quote cannot lead evidence it
-has not received. Artificial: quadratic policy pricing, no reserves requirement,
-no competition, exclusions or default. A negative fund means borrowed money,
-not successful risk bearing. No quarter-turn claim from the older insurer test.
+For a reader of the book. ``eve_town(3)`` has the insurer and no estimator. The insurer reads only what a court has
+fitted from paid claims, and a claim is paid some time after the smoke that caused it (``delay_steps``), so a quote
+cannot lead evidence it has not received. Run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-Result (2026-09-28): both checks passed. Quote reaches 1 at t=7.48 after
-assessor t=7.06; harm 8.681451. Fund ends -5.244528 under unlimited credit. Prediction 3 held.
-Full results: notes/P29-TOWN-RESULTS.md.
+    import jax; jax.config.update("jax_enable_x64", True)
+    from arrangements.town import eve_town, run, summary
+    town = eve_town(3)
+    r = summary(town, run(town))
+    print(round(r['assessed_reaches_1'], 2), round(r['premium_reaches_1'], 2), round(r['harm'], 2))
+    # 7.06 7.48 6.13
+
+The court's fit reaches 1 at ``t = 7.06`` and the premium at ``t = 7.48``, after the first claim at ``t = 6.04``. With
+her account the premium reaches 1 at ``t = 2.24`` (``tests/test_town_account.py``), and the harm over the run is about a
+sixth of this.
+
+What the tests check. ``test_book_the_same_town_without_her_account``: the premium is zero until the first claim, and
+reaches 1 after it where hers reaches 1 before; the harm is more than five times the harm with her account, and both
+towns end up clean. The others, on the plant of one dial: the quote alone moves as its declared response says, it lags
+its evidence, and the money balances.
+
+Artificial: quadratic policy pricing, no reserves, no competition, exclusions or default. A negative fund means borrowed
+money, not risk borne well.
+
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; results in ``notes/P29-TOWN-RESULTS.md``.
 """
 import json
 import jax.numpy as jnp

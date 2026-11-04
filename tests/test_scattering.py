@@ -1,49 +1,33 @@
-"""Scattering: random kicks on a collective's placements.
+"""Noise can carry a part away (book Chapter 1, ``sec.check_claims``: "and even a random noise can carry it away").
 
-The book plan's P6 stage (c) (AGENTDOCPLAN.md §8.2 in the book repository; David,
-2026-09-25, "if it can, then maybe we should include that test too?"), whose claim, Claude's
-and *proposed*, was: "with the supply cut, a bounded finite random kick carries parts out of
-kernel reach, where kernel and gradient both vanish so nothing returns them." The collective
-is ``tests/test_dispersal.py``'s (frozen parts sending ``(1, 1)`` on a spatial parent with
-the total cost), and the parent's integrator is ``rand.kicked_configuration``: the descent
-step, then an independent kick of ``+a`` or ``-a`` on every placement, each with probability
-1/2. It is paired with a pseudo-random sampler by ``rand.seed``; many runs are one ``vmap``
-over seeds. A part is *in reach* while ``kappa > 0.05``, i.e. ``|p| < r = 2.19``.
+For a reader of the book. The collective is ``arrangements/collective.py``: ``n`` parts, each sending the same signal ``1``, placed on a line
+under a parent. A part counts for ``kappa(p) = exp(-p^2 / 2 tau)`` by its placement ``p``, so one placed far away is out
+of reach, and the parent's cost is the gap between the total it sends onward and what the collective needs, ``nu``:
+``(nu - sum_j kappa_j)^2 / 2``. Only the placements move. Here, at each step, every placement also gets a kick of ``+a`` or ``-a`` at random
+(``rand.kicked_configuration``). With three parts and need 1.5 the kicks drive a random walk along the placements that
+keep the total, and nothing stops that walk from losing a part; with two parts those placements are bounded. A part is
+out of reach once ``kappa < 0.05``, ``|p| > R``. Fifty runs of each, run from the library's folder with it on the path (``PYTHONPATH=. .venv/bin/python example.py``):
 
-**The predictions, fixed in advance and written here before any construction code for this
-file existed. Each must be able to fail.**
+    import jax; jax.config.update("jax_enable_x64", True)
+    import numpy as np
+    from tests.test_scattering import R, TAU, advance, build, distance, many, placements
+    from arrangements.collective import total_cost
+    for n in (3, 2):
+        C = build([distance(1.5 / n)] * n, total_cost(n, TAU, 1.5))
+        p = placements(C, advance(C, many(C, 50), 20000))
+        print(n, float((np.abs(p) > R).any(axis=1).mean()), round(float(np.abs(p).max()), 3))   # n, share of runs out of reach, farthest
+    # 3 0.82 16.62
+    # 2 0.0 1.219
 
-(8) *With the need present, noise does what a push does: redundancy decides.* Target 1.5,
-kick ``a = 0.05``, 50 runs of 20,000 steps. With ``n = 3`` (any two can cover the target)
-the kicks drive a random walk along the family of minima, which is unbounded in the
-direction of losing a part, and at least 80% of runs end with a part out of reach. With
-``n = 2`` (the other can send at most 1) the family is bounded, and no part in any run ever
-passes ``|p| = 1.5``. Fails if the ``n = 3`` collective keeps its parts or the ``n = 2``
-one loses one.
+In 82% of the runs with three parts a part ends out of reach; with two, never.
 
-(9) *With nothing holding them, scattered parts do come back -- ever more rarely.* This
-corrects the plan's "nothing returns them". With the parent's cost removed (the supply cut),
-each placement is a simple random walk: no gradient returns a part, but a walk on the line
-is recurrent and returns by itself. The probability that a part is in reach at step ``t`` is
-exactly the binomial ``P(|p_0 + a (2B - t)| < r)``, ``B ~ Bin(t, 1/2)``; the fraction of
-runs with the part in reach matches it within three standard errors at ``t = 100, 1000,
-10000``, and between ``t = 1000`` and ``10000`` it falls by ``sqrt(10) ~ 3.16`` within 15%.
-Fails if the frequencies miss the binomial or the decay is not ``t^{-1/2}``. On a plane the
-walk is still recurrent, only more slowly; in three or more dimensions it is transient and a
-scattered part would, with positive probability, never return. The collective module places
-parts on a line, so that case is not run.
+What the tests check. Test 8: at least 80% against none. That is a narrow pass of the bar fixed in advance, and a count of
+one model's runs, not a rate of anything in the world. Test 9: with the cost removed, nothing holds the parts, and each is
+a plain random walk: it does come back, more and more rarely, as the exact binomial says, so "carried away" here means
+out of reach at the time looked at, not gone forever.
 
-**What happened** (2026-09-26, recorded after the run, the predictions above untouched).
-(8) held, narrowly: 82% of ``n = 3`` runs lost a part (threshold 80%); the farthest any
-``n = 2`` part got was 1.319. (9) held in its first half -- the frequencies match the
-binomial at every ``t`` -- and was **refuted in its second as stated**: from ``t = 1000`` to
-``10000`` the fraction in reach fell by 2.145, not 3.16. The error was the window, not the
-law: at ``t = 1000`` the walk's spread ``a sqrt(t) = 1.6`` is still inside the reach
-``r = 2.19``, so the ``t^{-1/2}`` tail has not set in; the exact binomial itself falls by 2.24
-there, by 3.02 from ``10^4`` to ``10^5``, and by 3.15 from ``10^5`` to ``10^6``. The test below
-asserts the corrected claim, added after the result: the runs match the binomial through
-``t = 10^5``, and between ``10^4`` and ``10^5``, where ``a sqrt(t) >> r``, they fall by
-``sqrt(10)`` within 15%.
+For agents: the file's earlier head, with the predictions fixed before the code, what happened and the
+weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``.
 """
 
 import itertools
