@@ -3,7 +3,7 @@
 
 For a reader of the book. ``carving.reader`` is the code's name, not the book's word: this model does not run or pay, and it is not
 poised, so it is not a reader in the sense of ``sec.held_form``, and the book's footnote says "two parts". It is a material
-linkage of a quick part and a slow part, as ``sec.held_form`` has it: "where the slower parts sit sets out the shape that decides where the quick ones can settle". The quick part has
+arrangement of a quick part and a slow part, as ``sec.held_form`` has it: "where the slower parts sit sets out the shape that decides where the quick ones can settle". The quick part has
 state ``q``, one degree of freedom, and cost ``q^4/4 - u q``, where ``u`` is the note arriving on the reader's port. The
 slow part, the tuning, has state ``w``, twenty-five times slower, and cost ``gamma (w - w0)^2/2 + beta (w - w0)^4/4``. A
 stateless coupling with cost ``-w q^2/2`` joins them. So ``w`` is the curvature of the quick part's landscape at 0: for
@@ -38,7 +38,7 @@ by its rate and not its duration, and spacing does not act monotonically. A tuni
 makes the joint cost rise: it is not accountable.
 
 The tests above feed the note as a schedule, ordinary code on the port. The last three do not: the note comes from a part, a
-finger, and the whole is one closed composite of the book's category of linkages. How long the note lasts is how
+finger, and the whole is one closed composite of the book's category of arrangements. How long the note lasts is how
 slowly the finger lets go; one box of states traps for every note; and it survives a two-way spring to a partner in the
 same box, and fails for a partner outside it.
 

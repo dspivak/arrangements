@@ -1,6 +1,6 @@
 """The addressed operad after the matter's own messages and P77, and the book's attention operad (book plan P79 (b)).
 
-The book's Ch 4 attention operad (``def.attention_linkage``, ``eqn.attention_substitution``, 2026-10-29) differs
+The book's Ch 4 attention operad (``def.attention_arrangement``, ``eqn.attention_substitution``, 2026-10-29) differs
 from the paper's operad of ``attention.py`` in three ways: a box's interface carries messages only (P77, no
 positions); a box may hear itself through the arrangement (``T_ii``); and the matter sends messages of its own
 (``T_{i voice}``, P73 (c)). ``addressed.py`` was built against the paper's operad, so it has none of these. This module
@@ -83,7 +83,7 @@ class AddrOp:
     omega: Optional[Callable] = None
 
     def effort(self) -> Callable:
-        """The effort field on ``Q x M^+ x N^-``: ``omega`` if given (any 1-form, Ch 4 ``def.addressed_linkage``
+        """The effort field on ``Q x M^+ x N^-``: ``omega`` if given (any 1-form, Ch 4 ``def.addressed_arrangement``
         since 2026-10-30, David: "yah there's no reason to restrict to exact effort fields"), else ``-d cost``."""
         if self.omega is not None:
             return self.omega
@@ -312,10 +312,10 @@ def substitute(a: AddrOp, parts: Sequence[AddrOp], label: str = "", old_rule: bo
 
 
 # ---------------------------------------------------------------------------
-# The book's attention operad (Ch 4 def.attention_linkage, eqn.attention_linkage,
+# The book's attention operad (Ch 4 def.attention_arrangement, eqn.attention_arrangement,
 # eqn.attention_substitution): no positions, self-hearing allowed, the matter's own messages.
-# Its exact-effort linkages only: since 2026-11-02 (d1fbc71b, David: "please drop exactness") the book's
-# def.attention_linkage takes any effort field; ``AttOp`` takes a cost, ``AddrOp`` takes any ``omega``.
+# Its exact-effort arrangements only: since 2026-11-02 (d1fbc71b, David: "please drop exactness") the book's
+# def.attention_arrangement takes any effort field; ``AttOp`` takes a cost, ``AddrOp`` takes any ``omega``.
 # ---------------------------------------------------------------------------
 
 

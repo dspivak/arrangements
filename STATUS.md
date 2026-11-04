@@ -2191,7 +2191,7 @@ limitation, not a fact about people. Book evidence and predictions:
 - Everything ported from CDLM cites CDLM's own labels (`ex.`, `prop.`, `sec.`) in its
   docstring, so a reader with that draft can find the statement being implemented.
 
-### 3.65 The n-fold pendulum by nesting links (book Ch 3 `sec.lnk`, §5.9 item 77)
+### 3.65 The n-fold pendulum by nesting links (book Ch 3 `sec.arr`, §5.9 item 77)
 
 Claude Opus 5.5, fa95b8ae, 2026-10-14. `pendulum.py`, `tests/test_pendulum.py`: 3 passed in 3.85 s.
 `drop . link^n . pivot` (each link a rod from its support with a bob at its bottom; first drafted upside down as `pivot . link^(n-1) . end`, same costs), one bob of matter per level, rods smooth stiff springs. The composite equals the

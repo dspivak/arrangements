@@ -1,7 +1,7 @@
 """Book Ch 5 ``sec.solutions``: ``ex.waiting_rod_mass``, ``exc.decay_growth`` and the composition law of
 ``prop.solutions_functor`` (Claude Opus 5.5, c9fce825, 2026-11-03).
 
-The library has no tangent linkages, so a solution is approached by running a linkage at shrinking
+The library has no tangent arrangements, so a solution is approached by running an arrangement at shrinking
 durations: each arrangement here is built in ``arr`` and run by the dynamics functor ``Phi`` (``closed_step`` is
 ``Phi``'s step, checked against it). The composition law is checked exactly at each duration, one step at a time,
 which is the law of ``prop.solutions_functor`` before the limit: a run of the composite is a pair of runs of the parts

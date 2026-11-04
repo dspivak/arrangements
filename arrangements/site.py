@@ -41,7 +41,7 @@ PAGES = (
          "Two tanks joined by a pipe or a waterfall, run at a step length you set.", "sec.two_tanks"),
     Page("pendulum", "Pendulum of links",
          "Up to five links hung from a pivot: set the bars' stiffness and the step, drag a bob, and press Play.",
-         "sec.lnk"),
+         "sec.arr"),
     Page("listener", "The listener",
          "A listener decides how much to count on a source from what it believes about the source.", None,
          scene="listener"),

@@ -26,7 +26,7 @@ the reader does. *Unilateral* (``unilateral=True``, the default): the estimate's
 ``phi``, frozen at ``0``, the prediction error is written on ``theta + phi``, and the response moves ``theta`` by the
 covector on ``phi`` (the kernel condition of ``amplifier.py``'s stage and ``logic.py``'s MOSFET), so the estimate
 takes a load-induced inclination from the prediction error alone; the want's push on it lands in the kernel. The forcing is still
-``-d`` of one cost; only the response is not symmetric, which the book's integrator allows (Ch 3 ``def.linkage``,
+``-d`` of one cost; only the response is not symmetric, which the book's integrator allows (Ch 3 ``def.arrangement``,
 and the glossary's *Unilateral*). This is the actor and critic of reinforcement learning, the critic kept apart.
 
 **What is the environment's.** The return schedule: the salt arriving at step ``t`` is a rule applied to the weight

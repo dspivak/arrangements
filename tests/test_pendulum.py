@@ -1,4 +1,4 @@
-"""The n-fold pendulum by nesting links (book Ch 3 ``sec.lnk``; ``arrangements/pendulum.py``).
+"""The n-fold pendulum by nesting links (book Ch 3 ``sec.arr``; ``arrangements/pendulum.py``).
 
 The pendulum is ``drop . link^2 . pivot``, each link a bar from its support with a bob at its bottom
 (turned right side up from the first draft's ``pivot . link . end``, same costs, at David's "yes," 2026-10-14).
