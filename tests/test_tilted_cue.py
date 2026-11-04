@@ -4,7 +4,7 @@ very weak"; to be worked in ``sec.cue_commitment``).
 For a reader of the book. The footnote says that a brief cue moves a reader into a basin that it then descends on its
 own, and that when the reader is poised, "resting just below a low ridge beside a much deeper well, the weakest cue that works pays only to
 cross the ridge, at which point the reader's own potential pays for the rest of its fall". Here the reader is a material
-grouping of three parts: a parent holding a commitment ``g``, and two subsidiaries it places. ``phi(g)``, in
+linkage of three parts: a parent holding a commitment ``g``, and two subsidiaries it places. ``phi(g)``, in
 ``tilted(D, eps)``, is the preference cost: wells at ``g = 1``, the resting state, and ``g = 0``, ``D`` deeper, with a
 ridge at ``c`` only ``eps`` above the resting state. So ``eps`` is the low ridge, and ``D`` is the potential gain: the
 reader feels only the slope where it stands, and how far it leads down is ``D``. The cue is a bump ``u(t)`` of duration

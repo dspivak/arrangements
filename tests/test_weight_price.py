@@ -1,6 +1,6 @@
 """A price on the weight a part sends: one sender, one reader, one exact attention arrangement (book plan P71 (b)).
 
-The book's Ch 4 ``def.attention_grouping`` lets a cost function push on the messages the internal boxes send. P71 (b)
+The book's Ch 4 ``def.attention_linkage`` lets a cost function push on the messages the internal boxes send. P71 (b)
 asks what happens when a reader pays the Gaussian code length of what arrives and the sender pays a price on the
 weight it sends: does the sender fall quiet when the reader already expects its value, and speak up when it does not?
 

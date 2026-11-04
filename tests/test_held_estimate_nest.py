@@ -512,7 +512,7 @@ def test_a_price_charged_above_reaches_a_sender_scaled_by_the_gammas_between():
     same forcing on the whole when ``c = c_G gamma_j = c_O gamma_j`` for each sender ``j``: the price pulls back along
     the transfers the message passed through to the sender's matter, which is what moves (``prop.exact_lenses``). The
     outer level's own ``gamma_o`` does not enter: a cost function is of the messages the internal boxes send, before
-    that level's transfers act (``def.attention_grouping``), so ``c_O = c_G``, not ``c_G / gamma_o`` as this run
+    that level's transfers act (``def.attention_linkage``), so ``c_O = c_G``, not ``c_G / gamma_o`` as this run
     first wrote. With unequal ``gamma_j`` one price above is unequal prices below."""
     rd, rng = acknowledging_reader(), np.random.default_rng(9)
     g1, g2 = GAMMAS

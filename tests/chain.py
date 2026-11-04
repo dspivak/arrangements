@@ -33,7 +33,7 @@ def harmonic_particle(parameter, m, kappa) -> Arrangement:
     ``parameter(Q)``, ``Q = R`` with ``sharp(p) = p/m``; ``out_f = id``, ``in_f``
     vacuous, forcing ``omega = -dk`` for the spring cost ``k(q, y) = (kappa/2)(q - y)^2``.
     The *same* particle data with ``configuration`` or ``phase`` are two different
-    arrangements (def.grpng): heat and wave.
+    arrangements (def.lnk): heat and wave.
     """
     return Arrangement(
         P=parameter(diagonal(jnp.array([1.0 / m]))),
@@ -57,7 +57,7 @@ def one_port_box(parameter, response: float, init, label: str) -> Arrangement:
     ``phase``: a position and a momentum, and it reads out the position it is headed to, ``q + p/m``).
     Its response function multiplies by ``response`` (``1/C`` for a segment of heat capacity ``C``,
     ``1/m`` for a mass), it has no internal inclination beyond what ``parameter`` builds in (a mass's
-    kinetic energy), and the force that comes back along its port is its state's whole responsibility.
+    kinetic energy), and the force that comes back along its port is its state's whole load-induced inclination.
     ``init`` is ``[q0]`` for ``configuration`` and ``([q0], [p0])`` for ``phase``.
     """
     return Arrangement(

@@ -1,4 +1,8 @@
-"""A reader with a quick part and slow parts, each its own box (book Ch 1 ``sec.held_form``; plan P43 (b) job 3).
+"""A quick part and slow parts, each its own box (book Ch 1 ``sec.held_form``; plan P43 (b) job 3).
+
+``reader`` is this file's name for their composite and not the book's word: Ch 1's reader is already running and
+paying, and poised so that a small signal releases what is ready, and this composite is neither. Say "the quick and
+slow parts" when reporting a run (plan §5.9 item 34; David, 2026-11-04: "is that reader in my sense of ch1?").
 
 Ch 1 says "a reader has slow parts as well as quick ones, and where the slower parts sit sets out the
 shape that decides where the quick ones can settle." ``tests/test_carving.py`` and

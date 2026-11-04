@@ -14,7 +14,7 @@ number coming to light after each round and the errors drawn fresh, comes to the
 variance. ``tests/test_five_peers.py`` checks both; its predictions were written first, in the book repository,
 ``notes/runs/p5k-b5cf8328/PREDICTIONS.md``.
 
-**It is an attention arrangement** (Ch 4 ``def.attention_grouping``; ``attention.py``), run through ``Phi``,
+**It is an attention arrangement** (Ch 4 ``def.attention_linkage``; ``attention.py``), run through ``Phi``,
 not plain descent. ``n = 5``, ``H = P = R``. Its matter is the five places, ``Q = R^5``, a configuration
 integrator with Euclidean response ``eta * I``; the placement is ``l_j(q) = k_j``; the transfer from person ``i`` to
 person ``j`` is ``T_{gamma, gamma id}`` with ``gamma = exp(-d(k_i, k_j))``, the hearing of Ch 4 ``sec.messages``;
@@ -33,7 +33,7 @@ Two parents on this one wiring, differing only in the cost function:
   ``h_0`` the value of the message that comes in from outside, the number revealed after the round. It uses no
   variance. The term in parentheses is person ``j``'s heard value minus the number. It is written with ``q``'s
   weights ``P_ji(q)``, not as the value ``h / w`` of the message the delivery hands person ``j``, so that the
-  cost function is a polynomial in the messages (``def.attention_grouping`` (iv)); the two agree whenever every
+  cost function is a polynomial in the messages (``def.attention_linkage`` (iv)); the two agree whenever every
   person sends weight ``1``, as each does, and a test checks that they do.
 
 The realized cost's expected value over the errors is the expected cost, exactly, since ``h_i - x = eps_i`` and the

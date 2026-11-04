@@ -119,7 +119,7 @@ def blame_report(sc: CF.Scenario, theta: np.ndarray, p: np.ndarray, xi_theta: np
         lines.append(
             f"  the {name} figurine guessed {g[j]:.3f} for an actual {sc.truth[j]:.2f}: wrong by {wrong:+.3f}; "
             f"its contribution (invitation {k[j]:.3f} times the run's sensitivity {dg[j]:+.3f}) is "
-            f"{k[j] * dg[j]:+.3f}; its responsibility, the push times its contribution, is "
+            f"{k[j] * dg[j]:+.3f}; its load-induced inclination, the push times its contribution, is "
             f"{xi_theta[j]:+.3f}; it moves its state by {sc.mu_theta * xi_theta[j]:+.4f}")
     return "\n".join(lines)
 

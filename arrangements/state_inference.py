@@ -231,7 +231,7 @@ def belief(
     eta_lambda: float = 0.0,
     label: str = "belief",
 ) -> AttentionArrangement:
-    """The belief as a 0-ary attention arrangement (``def.attention_grouping`` with ``I = 0``): no
+    """The belief as a 0-ary attention arrangement (``def.attention_linkage`` with ``I = 0``): no
     placement, the one transfer ``T_00 = 0``, readout the zero message, cost ``belief_cost``.
 
     Integrator on ``Q = S = R^6``, ``(mu, mu_p, k_hat, lambda)``, update at duration ``tau`` given ``xi``:

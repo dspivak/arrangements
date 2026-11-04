@@ -220,7 +220,7 @@ def test_prediction_2_the_grids_numbers_converge_to_the_curves():
 def test_prediction_3_the_response_alone_has_no_limit_and_the_step_does():
     """Window 8, ``n = 65, ..., 1025``. The smallest entry of ``diag(1 / q)`` times ``h`` tends to
     ``1 / max_z q(z)`` (within 1% at ``n = 1025`` of its value at ``n = 513``) and the largest
-    exceeds ``1e25`` at every ``n``; the largest entry of the responsibility
+    exceeds ``1e25`` at every ``n``; the largest entry of the load-induced inclination
     ``q (xi - <q, xi>)`` halves, within 5%, each time ``n - 1`` doubles; the step ``l' - l``
     equals ``xi - <q, xi>`` to ``1e-10`` and its largest entry is the same at every ``n`` to 1%."""
     rows = []
@@ -240,7 +240,7 @@ def test_prediction_3_the_response_alone_has_no_limit_and_the_step_does():
         rows.append((n, h, sharp.min() * h, sharp.max(), np.max(np.abs(resp)),
                      float(np.max(np.abs(step - (xi - c)))), float(np.max(np.abs(step)))))
         print(f"\nP3 n={n}: h*min(1/q) = {rows[-1][2]:.6f}, max(1/q) = {rows[-1][3]:.3e}, "
-              f"max|responsibility| = {rows[-1][4]:.6e}, step err = {rows[-1][5]:.2e}, "
+              f"max|load-induced inclination| = {rows[-1][4]:.6e}, step err = {rows[-1][5]:.2e}, "
               f"max|step| = {rows[-1][6]:.6f}")
     qmax = float(np.exp(np.max(log_q_G(np.linspace(-8, 8, 200001)))))
     print(f"P3 1 / max q = {1.0 / qmax:.6f}")

@@ -1,14 +1,14 @@
-"""P92 (book plan §8.2), *The grouping does the addressing*: a transformer whose every weight is the grouping's.
+"""P92 (book plan §8.2), *The grouping does the addressing*: a transformer whose every weight is the linkage's.
 
 Claude Opus 5.5, 2fb1d833, 2026-11-02; everything here is the agents' and *proposed* until David's answer is recorded
 in P92's block. The construction (book repository, ``notes/runs/p92-2fb1d833/CONSTRUCTION.md``):
 
 * A token *just speaks*: at round ``l`` it sends its residual stream ``x^l`` as its address and
-  ``msg(x^l) = (x^l, 1)`` as its one message, and it receives one message per head and a rule message; the grouping
+  ``msg(x^l) = (x^l, 1)`` as its one message, and it receives one message per head and a rule message; the linkage
   reads both the key and the query off the address. (Book Ch 4 ``sec.addressed_messages`` since 2026-11-03, 586b6a53:
   an object is an address space with a list of vector spaces sent in and a list received in, no slots.) Its parameter
   is its initial embedding ``x^0`` alone: it holds no weight.
-* The grouping's configuration ``q`` holds every layer's weights. Round ``l``'s transfer maps read layer ``l``'s
+* The linkage's configuration ``q`` holds every layer's weights. Round ``l``'s transfer maps read layer ``l``'s
   factor of ``q`` only (rounds are a power of the base category, so each round has its own lens on one matter):
   head ``a`` of token ``i`` hears head ``a`` of every token ``j`` (``j = i`` included) by
   ``exp(<W_Q^{la} x_i, W_K^{la} x_j> / sqrt(d)) . msgfun(W_O^{la} W_V^{la})``; and from the matter's voice the rule slot

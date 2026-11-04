@@ -7,7 +7,7 @@ boxes are its stocks and its flows, and whose gray space computes its auxiliarie
              configuration coalgebra with sharp ``dt`` (``euclidean(1, dt)``), so it moves by ``dt``
              times the force on it.
   auxiliary  not a box but gray space: a static arrangement (trivial parameter, zero forcing), like the
-             book's ``tanh`` (Ch 3 ``sec.static_groupings``), composed after what it reads; its one
+             book's ``tanh`` (Ch 3 ``sec.static_linkages``), composed after what it reads; its one
              internal box shows the values it reads, and its output is a smooth function of them.
   flow       trivial parameter; reads its links and its pipe ends; forcing ``-rate`` on the port of
              the stock it drains, ``+rate`` on the stock it fills, ``0`` on every other port. A cloud end

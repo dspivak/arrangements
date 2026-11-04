@@ -1,4 +1,4 @@
-"""Book Ch 5 ``sec.groupings_at_rest``, the paragraph after ``def.rest_relation``: why the load at an output port is
+"""Book Ch 5 ``sec.linkages_at_rest``, the paragraph after ``def.rest_relation``: why the load at an output port is
 recorded with a minus (Claude Opus 5.5, ccc7e1fe, 2026-11-04).
 
 Every system here is an arrangement run by the dynamics functor: ``open_step`` is ``Phi``'s step, checked against it.

@@ -37,7 +37,7 @@ enough to hold a curve's tails, heights underflow and ``diag(1 / q)`` is ``inf``
 step itself, ``xi - <q, xi>``, is finite. ``belief_coalgebra`` is the same integrator with the
 BELIEF as its configuration and the log-heights as its state (an integrator's state need not be
 its configuration, ``def.duration_integrator``): it presents ``softmax(l)`` and its update is the
-response after the responsibility, ``l |-> l + tau (xi - <softmax(l), xi>)``, with no division.
+response after the load-induced inclination, ``l |-> l + tau (xi - <softmax(l), xi>)``, with no division.
 ``updating_on_beliefs`` wires it into the same likelihood box.
 """
 
@@ -182,7 +182,7 @@ def belief_coalgebra(n: int, init: Array, tau: float = 1.0) -> CotCoalg:
 
     The state ``l in R^n`` presents the belief ``softmax(l)``; on a covector ``xi`` at that
     belief (a force on the belief, read up to a constant) it moves by the response after the
-    responsibility,
+    load-induced inclination,
 
         l |-> l + tau (xi - <softmax(l), xi>),
 

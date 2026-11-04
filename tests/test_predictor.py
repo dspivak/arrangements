@@ -50,7 +50,7 @@ def test_predictor_sends_its_prediction():
 
 @pytest.mark.parametrize("kind", ["one_way", "active"])
 def test_grouping_transfers_out_the_prediction(kind):
-    """Both material groupings transfer out the predictor's prediction msg(o(xhat))."""
+    """Both linkages transfer out the predictor's prediction msg(o(xhat))."""
     arr, tau = pair(kind, o=jnp.sin, mu0=0.4), 0.1
     tell = lambda _o: (jnp.zeros(arr.out_dim_N), jnp.zeros(arr.in_dim_N))
     out_pos = Phi(arr).with_state(arr.P.init).run_one(_IN, tell, tau)[0]
