@@ -1,10 +1,32 @@
 """The standard ``cot(Q)``-coalgebras and their tensor (sec.matter)."""
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arrangements.coalgebra import configuration, phase
+from arrangements.coalgebra import as_two_stage, configuration, iterate, phase
 from arrangements.rvect import diagonal
+
+
+def test_plain_part_on_the_left_of_a_many_round_part():
+    """P (x) M lifts P as M (x) P already did: reads concatenate left then right, and both factors advance."""
+    P = phase(diagonal(jnp.array([0.5])))
+    C = configuration(diagonal(jnp.array([2.0])))
+    s = ((jnp.array([1.0]), jnp.array([2.0])), jnp.array([3.0]))
+    xi = jnp.array([-0.5, 1.0])
+
+    two = as_two_stage(C)
+    got, want = P.tensor(two), as_two_stage(P).tensor(two)
+    assert got.Q_dim == 2
+    np.testing.assert_allclose(got.read1(s), want.read1(s))
+    np.testing.assert_allclose(got.read1(s), jnp.array([2.0, 3.0]))
+    for a, b in zip(jax.tree_util.tree_leaves(got.advance(s, xi)), jax.tree_util.tree_leaves(want.advance(s, xi))):
+        np.testing.assert_allclose(a, b)
+
+    three = iterate(C, 3)
+    got3 = P.tensor(three)
+    assert got3.K == 3 and got3.Q_dim == 2
+    np.testing.assert_allclose(got3.reads[0](s), iterate(P, 3).tensor(three).reads[0](s))
 
 
 def test_configuration_adds_the_forcing():
