@@ -1,5 +1,6 @@
-"""Book Ch 5 ``sec.arrangements_at_rest``, the paragraph after ``def.rest_relation``: why the load at an output port is
-recorded with a minus (Claude Opus 5.5, ccc7e1fe, 2026-11-04).
+"""Book Ch 5 ``sec.arrangements_at_rest``, the paragraph after ``def.rest_relation``: why the load at an input port is
+recorded with a minus and the load at an output port without one (Claude Opus 5.5, ccc7e1fe, 2026-11-04; the book's
+outward loads became inward loads on 2026-11-05, 3f86af4b, and these predictions were negated with them).
 
 Every system here is an arrangement run by the dynamics functor: ``open_step`` is ``Phi``'s step, checked against it.
 The two beads are built with ``parallel_arrangements`` and ``compose_seq`` from a wiring lens. A state is at rest when a
@@ -8,9 +9,9 @@ Jacobian of the rest map beside those runs.
 
 Predictions, written before the first run: (a) a bead with input x, output y and stiffness k is at rest with zero
 momentum exactly when the load it receives at its output is k(y - x), and it then pushes back the same k(y - x); (b) its
-outward pair (pushback, minus received) is -dC for C = k/2 (x-y)^2 and is closed, while the received pair is not;
-(c) two beads of stiffness 1 and 3, ends 0 and 1, wired output to input, rest with y = 3/4 and one load 3/4 on all
-three wires, the outward loads on the inner wire cancelling; (d) their port data (0, 1, 3/4, -3/4) equal those of two
+inward pair (minus pushback, received) is dC for C = k/2 (x-y)^2 and is closed, while the pair (pushback, received) is
+not; (c) two beads of stiffness 1 and 3, ends 0 and 1, wired output to input, rest with y = 3/4 and one load 3/4 on all
+three wires, the inward loads on the inner wire cancelling; (d) their port data (0, 1, -3/4, 3/4) equal those of two
 springs joined at a mass with both ends inputs, though the far end is an output in one and an input in the other.
 """
 
@@ -74,25 +75,25 @@ def test_one_bead_receives_what_it_pushes_back():
     assert np.allclose(pushback(b, jnp.array([y]), [x]), k * (y - x))
 
 
-def test_outward_pair_is_minus_dC_and_closed_received_pair_is_not():
+def test_inward_pair_is_dC_and_closed_pushback_received_pair_is_not():
     k = 2.0
 
     def rest_pairs(v):
         x, y = v[:1], v[1:]
         xi_q, _, xi_n = bead(1.0, k).omega(y, Z, x)
         received = -xi_q  # condition (iv): xi_q + received = 0
-        return jnp.concatenate([xi_n, -received]), jnp.concatenate([xi_n, received])
+        return jnp.concatenate([-xi_n, received]), jnp.concatenate([xi_n, received])
 
     v = jnp.array([1.0, 4.0])
-    outward, received = rest_pairs(v)
-    minus_dC = -jax.grad(lambda u: 0.5 * k * (u[0] - u[1]) ** 2)(v)
-    assert np.allclose(outward, minus_dC)
-    J_out, J_rec = jax.jacobian(lambda u: rest_pairs(u)[0])(v), jax.jacobian(lambda u: rest_pairs(u)[1])(v)
-    assert np.allclose(J_out, J_out.T)
-    assert not np.allclose(J_rec, J_rec.T)
+    inward, _ = rest_pairs(v)
+    dC = jax.grad(lambda u: 0.5 * k * (u[0] - u[1]) ** 2)(v)
+    assert np.allclose(inward, dC)
+    J_in, J_raw = jax.jacobian(lambda u: rest_pairs(u)[0])(v), jax.jacobian(lambda u: rest_pairs(u)[1])(v)
+    assert np.allclose(J_in, J_in.T)
+    assert not np.allclose(J_raw, J_raw.T)
 
 
-def test_two_beads_carry_one_load_and_the_inner_outward_loads_cancel():
+def test_two_beads_carry_one_load_and_the_inner_inward_loads_cancel():
     k1, k2, x, z = 1.0, 3.0, 0.0, 1.0
     y = (k1 * x + k2 * z) / (k1 + k2)
     load = k1 * k2 / (k1 + k2) * (z - x)
@@ -106,7 +107,7 @@ def test_two_beads_carry_one_load_and_the_inner_outward_loads_cancel():
     inner_pushback = pushback(second, jnp.array([z]), [y])
     assert np.allclose(external_pushback, load)
     assert np.allclose(inner_pushback, load)
-    assert np.allclose(-load + inner_pushback, 0.0)     # first's outward at its output, second's at its input
+    assert np.allclose(load - inner_pushback, 0.0)      # first's inward at its output, second's at its input
 
 
 def test_port_data_agree_with_two_springs_both_ends_inputs():
@@ -120,10 +121,10 @@ def test_port_data_agree_with_two_springs_both_ends_inputs():
     )
     for d in DURATIONS:
         assert fixed(springs, [x1, x2], None, d)
-    data_springs = np.concatenate([[x1, x2], pushback(springs, jnp.array([q]), [x1, x2])])
+    data_springs = np.concatenate([[x1, x2], -pushback(springs, jnp.array([q]), [x1, x2])])
 
     load = k1 * k2 / (k1 + k2) * (x2 - x1)
     two = compose_seq(parallel_arrangements(bead(1.0, k1, q), bead(1.0, k2, x2)), beads_wire())
-    data_beads = np.concatenate([[x1, x2], pushback(two, jnp.array([q, x2]), [x1]), [-load]])
+    data_beads = np.concatenate([[x1, x2], -pushback(two, jnp.array([q, x2]), [x1]), [load]])
     assert np.allclose(data_springs, data_beads)
-    assert np.allclose(data_beads, [0.0, 1.0, 0.75, -0.75])
+    assert np.allclose(data_beads, [0.0, 1.0, -0.75, 0.75])

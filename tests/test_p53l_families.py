@@ -182,8 +182,8 @@ def test_linear_branching_composite_is_linear_and_steps_linearly():
 def rest_relation_basis(arr):
     """The rest relation of a linear system 1 -> N with critical matter: B(ker balance), as a matrix of columns.
 
-    Parameters e = (q, n_in, xi_nout); port data (n_in, n_out, xi_nin, xi_nout), forces recorded outward
-    (Ch 5 def.rest_relation): xi_nin = omega_n, xi_q = omega_q - (d_q out)^T xi_nout.
+    Parameters e = (q, n_in, xi_nout); port data (n_in, n_out, xi_nin, xi_nout), forces recorded outward,
+    the negatives of the book's inward loads (Ch 5 def.rest_relation), which changes no isotropy or Lagrangian test: xi_nin = omega_n, xi_q = omega_q - (d_q out)^T xi_nout.
     """
     dq, di, do = arr.P.Q_dim, arr.in_dim_N, arr.out_dim_N
 
@@ -490,8 +490,8 @@ def resistor_piece(interior, boundary, edges):
 
 
 def black_box(names_int, names_bd, P):
-    """{(psi, -dQ_psi)}: Baez--Fong's Graph(dP) restricted by Kirchhoff's current law inside, with the book's sign
-    (outward force, the negated boundary current); a basis of columns."""
+    """{(psi, -dQ_psi)}: Baez--Fong's Graph(dP) restricted by Kirchhoff's current law inside, with this file's sign
+    (outward force, the negated boundary current, the negative of the book's inward load); a basis of columns."""
     ni, nb = len(names_int), len(names_bd)
     H = jax.hessian(lambda x: P(x[:ni], x[ni:]))(jnp.zeros(ni + nb))
     Hii, Hib, Hbb = H[:ni, :ni], H[:ni, ni:], H[ni:, ni:]
