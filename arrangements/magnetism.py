@@ -15,6 +15,11 @@ Two typings of a circuit's parts, both with Ch 2 ``sec.kcl``'s capacitor charge 
 
 A charge in a given field is a mass presented the same way (position and velocity read out), and the field a
 stateless part returning ``e v x B`` on the position coordinates and nothing on the velocity ones.
+
+A third, *proposed* (book plan §5.9 item 90; the last section of this file): the *two-port capacitor*, one box with a charge
+and a flux coordinate, a load on either port adding to the charge. Ch 2's tank is a quotient of it, part by part. A resistor is
+then an exact cost on the voltage ports, a coil a stateless spring on the flux ports, and a motor's rotor the same box with
+moment of inertia in the capacitance slot.
 """
 
 from __future__ import annotations
@@ -22,9 +27,9 @@ from __future__ import annotations
 import jax.numpy as jnp
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import configuration, phase_on_cotangent
+from .coalgebra import CotCoalgK, configuration, phase_on_cotangent
 from .rvect import constant, diagonal
-from .wiring import trivial_parameter
+from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 _z = jnp.zeros(0)
 
@@ -248,3 +253,117 @@ def core(R: float) -> Arrangement:
         omega=exact(lambda q, m, n: -R * m[0] ** 2 / 2.0),
         label=f"core(R={R:g})",
     )
+
+
+# ---------------------------------------------------------------------------
+# The two-port capacitor and what wires to it (book plan §5.9 item 90, proposed; moved from the book's run scripts
+# notes/runs/light-12b2681e/two_port_cap.py and with_everything.py). Claude Opus 5.5, session 5c9967d2, 2026-11-05.
+# ---------------------------------------------------------------------------
+
+
+def two_port(C: float, s0: float, tau: float, phi0: float = 0.0, label: str = "cap2") -> Arrangement:
+    """The two-port capacitor (§5.9 item 90): state ``(phi, s)``. Told ``tau`` it reads out ``(phi + tau s/C, s/C)``, the flux
+    it is headed to and its voltage. A load on either port adds to the charge: ``s' = s + tau (l_phi + l_v)``,
+    ``phi' = phi + tau s/C``. Unital: at ``tau = 0`` nothing moves.
+
+    With ``f(phi, v) = v``, ``g(phi, s) = s`` it maps to Ch 2's ``tank`` by a morphism of integrators. A mass with position
+    ``phi`` and momentum ``s`` is the same box, so ``rotor`` and ``magnet`` below are built from it.
+    Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    P = CotCoalgK(Q_dim=2, init=jnp.array([float(phi0), float(s0)]),
+                  reads=(lambda p: jnp.array([p[0] + tau * p[1] / C, p[1] / C]),),
+                  advances=(lambda p, xi: jnp.array([p[0] + tau * p[1] / C, p[1] + tau * (xi[0] + xi[1])]),),
+                  label=label)
+    return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=2,
+                       out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label=label)
+
+
+cap_two_port = two_port
+
+
+def tank(C: float, s0: float, tau: float, label: str = "tank") -> Arrangement:
+    """Ch 2's tank at a duration, the comparison for the two-port capacitor (§5.9 item 90): it reads out ``s/C`` and steps
+    ``s' = s + tau l``. Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    P = CotCoalgK(Q_dim=1, init=jnp.array([float(s0)]), reads=(lambda p: p / C,),
+                  advances=(lambda p, xi: p + tau * xi,), label=label)
+    return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+                       out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label=label)
+
+
+def cost_part(n_ports: int, k, label: str) -> Arrangement:
+    """A stateless part hearing ``n_ports`` values with the exact cost ``k(m)``: what comes back is ``-dk``, and nothing else
+    is written (§5.9 item 90). Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=n_ports, in_dim_N=0, out_dim_N=0,
+                       out_f=lambda q, m: _z, in_f=lambda q, m, n: _z,
+                       omega=exact(lambda q, m, n: -k(m)), label=label)
+
+
+def resistor_cost(kappa: float, port_a: int, port_b: int, n_ports: int) -> Arrangement:
+    """Ch 2's resistor as an exact cost on two voltage ports, ``kappa (m_a - m_b)^2 / 2`` (§5.9 item 90). Unlike
+    ``resistor_damper``, what it returns lands on the voltage ports, which the two-port capacitor adds to the charge.
+    Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    return cost_part(n_ports, lambda m: 0.5 * kappa * (m[port_a] - m[port_b]) ** 2, f"R({kappa:g})")
+
+
+def rotor(J: float, ell0: float, tau: float, theta0: float = 0.0) -> Arrangement:
+    """A motor's rotor, retyped with a positive response (§5.9 item 90, W1): the two-port box with moment of inertia ``J`` in
+    the capacitance slot, state (angle, angular momentum), reading out (angle headed to, angular speed).
+    Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    return two_port(J, ell0, tau, phi0=theta0, label="rotor")
+
+
+def motor_winding(K: float, L: float, b: float = 0.0) -> Arrangement:
+    """The winding of a motor (§5.9 item 90, W1, W2): P76's ``winding`` with the rotor's angle in place of a core's flux, on the
+    ports (flux, voltage, angle, speed), one stateless cost ``(phi - K theta)^2 / 2L``. So its load on the flux is the current
+    ``i`` and on the angle the torque ``K i``, both one derivative, and no gyrator. ``b`` adds the drag ``b w^2 / 2`` on the
+    speed port. Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    if b == 0.0:
+        return cost_part(4, lambda m: (m[0] - K * m[2]) ** 2 / (2 * L), f"winding(K={K:g},L={L:g})")
+    return cost_part(4, lambda m: (m[0] - K * m[2]) ** 2 / (2 * L) + 0.5 * b * m[3] ** 2,
+                     f"winding(K={K:g},L={L:g})+drag({b:g})")
+
+
+def magnet(x: float, y: float, a: float, tau: float, m: float = 1.0, I: float = 1.0,
+           px: float = 0.0, py: float = 0.0, pa: float = 0.0) -> list:
+    """A magnet in the plane (§5.9 item 90, W5): three two-port boxes, for its position and its angle, ``[mx, my, ma]``; each
+    reads out (coordinate headed to, its rate). Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    return [two_port(m, px, tau, phi0=x, label="mx"), two_port(m, py, tau, phi0=y, label="my"),
+            two_port(I, pa, tau, phi0=a, label="ma")]
+
+
+def dipole_cost(mu: float) -> Arrangement:
+    """Two magnets' stateless exact cost (§5.9 item 90, W5), ``U = mu (cos(a1 - a2) - 3 cos(a1 - f) cos(a2 - f)) / r^3``, ``f`` the
+    bearing of the line between them, on the twelve ports of two ``magnet``s (each ``x, vx, y, vy, a, wa``). This takes the far
+    field as a given formula: the field is not a part here. Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+
+    def k(m):
+        dx, dy = m[6] - m[0], m[8] - m[2]
+        r = jnp.sqrt(dx * dx + dy * dy)
+        f = jnp.arctan2(dy, dx)
+        a1, a2 = m[4], m[10]
+        return mu * (jnp.cos(a1 - a2) - 3 * jnp.cos(a1 - f) * jnp.cos(a2 - f)) / r ** 3
+
+    return cost_part(12, k, f"dipoles(mu={mu:g})")
+
+
+def core_flux(g: float, tau: float, Phi0: float = 0.0) -> Arrangement:
+    """A transformer core's flux, stored (book Ch 6 ``ex.transformer``; plan P76 (b), David, 2026-10-28: "if we add sluggishness then it
+    becomes more realistic and it works right?"): state ``Phi``, it reads ``Phi`` out and steps by ``tau g`` times the load, ``g`` the
+    resistance of the eddy turn, so that a large ``g`` is little lag. Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    P = CotCoalgK(Q_dim=1, init=jnp.array([float(Phi0)]), reads=(lambda p: p,),
+                  advances=(lambda p, xi: p + tau * g * xi,), label="coreFlux")
+    return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+                       out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label=f"coreFlux(g={g:g})")
+
+
+def floating_coupler(kappa: float) -> Arrangement:
+    """What joins a capacitor to two junctions (book Ch 6 ``sec.circuits``): hears ``(v_a, v_b, q)`` with the cost
+    ``kappa (v_a - v_b - q)^2 / 2``, ``q`` the capacitor's voltage. With ``i = kappa (v_a - v_b - q)`` it returns ``-i`` to ``a``, ``i`` to ``b`` and
+    ``i`` to the capacitor. Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
+    return cost_part(3, lambda m: kappa * (m[0] - m[1] - m[2]) ** 2 / 2.0, f"lead(kappa={kappa:g})")
+
+
+def wire(boxes, top: Arrangement) -> Arrangement:
+    """``boxes`` side by side, then ``top`` over them: ``compose_seq(tensor(boxes), top)``. Claude Opus 5.5, session 5c9967d2,
+    2026-11-05."""
+    inner = boxes[0] if len(boxes) == 1 else tensor_arrangements(boxes)
+    return compose_seq(inner, top)
