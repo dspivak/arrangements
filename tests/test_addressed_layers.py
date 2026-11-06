@@ -106,22 +106,22 @@ def ref_loss(q, X, Y):
 # The token: what it sends, and its strategy (the fixed architecture, no weights of its own).
 # ---------------------------------------------------------------------------
 
-SEND = M + (M + 1)           # the token's send: address x, message (x, 1)
-HEAR = HEADS * (M + 1) + (RHO + 1)   # per round: each head message, the rule message
+SEND = M + M                 # the token's send: address x, value x (Ch 4 sec.softmax_attention)
+HEAR = HEADS * M + (RHO + HEADS * M * M)   # per round: each head value, the rule value (rho and every W_O W_V)
 
 
 def sends_of(x):
-    return jnp.concatenate([x, x, jnp.ones(1)])
-
-
-def val(m):
-    return m[:-1] / m[-1]
+    return jnp.concatenate([x, x])
 
 
 def step(x, e):
-    """The strategy's update from one round's hearing ``e``: residual, LN, FFN, residual, LN, with ``rho`` heard."""
-    heads = [val(e[a * (M + 1):(a + 1) * (M + 1)]) for a in range(HEADS)]
-    r = unpack(val(e[HEADS * (M + 1):]), RHO_SHAPES)
+    """The strategy's update from one round's hearing ``e``: apply the rule's W_O W_V to each head value, residual,
+    LN, FFN, residual, LN, with ``rho`` and the maps W_O W_V told in the rule value (Ch 4 lem.values_natural)."""
+    raw_heads = e[:HEADS * M].reshape(HEADS, M)
+    rule = e[HEADS * M:]
+    r = unpack(rule[:RHO], RHO_SHAPES)
+    maps = rule[RHO:].reshape(HEADS, M, M)
+    heads = [maps[a] @ raw_heads[a] for a in range(HEADS)]
     xt = ln(x + sum(heads), r["g1"], r["b1"])
     return ln(xt + ffn(r, xt), r["g2"], r["b2"])
 
@@ -144,20 +144,17 @@ def hear_round(q, l, S, rho_copies=None):
     ``rho_copies`` (rows = tokens), when given, replaces the one ``rho^l`` by a copy per token, untying them."""
     w, rho = layer_of(q, l)
     addrs = [S[j, :M] for j in range(N)]                      # each token's address
-    msgs = [S[j, M:SEND] for j in range(N)]                   # each token's message
+    vals = [S[j, M:SEND] for j in range(N)]                   # each token's value
     out = []
     for i in range(N):
         e = []
         for a in range(HEADS):
-            WOV = w[f"O{a}"] @ w[f"V{a}"]
-            heard = jnp.zeros(M + 1)
-            for j in range(N):
-                score = jnp.exp(jnp.dot(w[f"Q{a}"] @ addrs[i], w[f"K{a}"] @ addrs[j]) / jnp.sqrt(DK))
-                h, wt = msgs[j][:M], msgs[j][M:]
-                heard = heard + score * jnp.concatenate([WOV @ h, wt])      # msgfun(W_O W_V), a map of cones
-            e.append(heard)
+            scores = jnp.stack([jnp.dot(w[f"Q{a}"] @ addrs[i], w[f"K{a}"] @ addrs[j]) / jnp.sqrt(DK) for j in range(N)])
+            P = jax.nn.softmax(scores)                                          # the head row, a distribution (eqn.softmax_attention_hearing)
+            e.append(sum(P[j] * vals[j] for j in range(N)))                    # the mixture of the streams
         r_i = rho if rho_copies is None else rho_copies[i]
-        e.append(jnp.concatenate([r_i, jnp.ones(1)]))                          # from the voice: msg(rho^l)
+        maps = [jnp.ravel(w[f"O{a}"] @ w[f"V{a}"]) for a in range(HEADS)]
+        e.append(jnp.concatenate([r_i] + maps))                                # the rule value: rho^l and every W_O W_V, from the voice
         out.append(jnp.concatenate(e))
     return jnp.stack(out)
 
@@ -252,8 +249,10 @@ def test_forward_is_the_reference_transformer():
         xs = stream(X0[i], [h[i] for h in hist])
         np.testing.assert_allclose(xs[-1], XL[i], atol=1e-12)
         for l in range(L):
+            w, _ = layer_of(q, l)
             for a in range(HEADS):
-                np.testing.assert_allclose(val(hist[l][i][a * (M + 1):(a + 1) * (M + 1)]), outs[l][a][i], atol=1e-12)
+                mixture = hist[l][i][a * M:(a + 1) * M]                       # the head value: the streams mixed by the softmax row
+                np.testing.assert_allclose(w[f"O{a}"] @ w[f"V{a}"] @ mixture, outs[l][a][i], atol=1e-12)   # the token applies W_O W_V
     assert float(jnp.max(jnp.abs(q[:LAYER] - q[LAYER:]))) > 0.1
 
 
