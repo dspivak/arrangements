@@ -2407,6 +2407,10 @@ the listener's line decides whether a fleeing finder breaks up enough to change 
 
 `arrangements/available.py`, `tests/test_available.py`, 10 passed. The furniture room with a quick guest that reads the people's separation with zero load returned, a lamp for a reader with two sources, and a one-way room whose slow motion descends to its chairs. The room's coordinates are exactly those of the room alone at every step. A guest nudged to $-1$ falls back while the room is apart and holds once a routine of 81 steps, not 80, has brought it together. The lattices and their squares are read in the book repo's `notes/runs/p41j-836d12ce/`. *Weird*: the guest reads for free.
 
+### 3.80 Competing wholes: with no odd cycle competition is one monotone theory, with one it is frustrated (book P73, §5.9 item 95)
+
+`tests/test_competing_wholes.py`, 15 passed: gated pairs drawing one sun in proportion to activity, one nested closed arrangement through `Phi`. Evidence for a theorem proved by hand in the book repo's `notes/runs/p73-competition-3bf2ce2f/RESULTS.md`, not a result of its own, and not over the category of networks: the step is monotone in the mixed order, its extremes are the two winners, the staged trace equals the flat one, a share is a port and a shared sun is not, a line and an even ring of competitions have a polarity and an odd ring has none. Claude Opus 5.5, 3bf2ce2f, 2026-11-06.
+
 ### 3.78 A selection condition: two pendulums, a permuted tagged window (book P5 (l) stage C3)
 
 `arrangements/attention_beside_physics.py`, `tests/test_attention_beside_physics.py` (deepseek-v4-pro[1m], e2f6ff37,

@@ -10,6 +10,10 @@ are seated one-way, so the slow motion descends to the chairs, which is what the
 
 These are arrangements ``I -> <1|0>``, the routine on the one input port, run by ``two_clocks.routine_step``.
 Predictions and results: the book repo's ``notes/runs/p41j-836d12ce/``.
+
+A forward run cannot stay on a repelling sheet: rounding leaves it first, so a connection along one is missed and an
+order read off forward runs comes out wrong with no warning (the room and lamp's first count, 49 against the hand's 48;
+that file's RESULTS, "Where a forward run could not see the order", says what stood in).
 """
 
 from __future__ import annotations

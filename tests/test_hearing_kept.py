@@ -16,7 +16,7 @@ on ``w`` with mobility ``h * ETA``, whose returned covector on the ports ``e = (
     xi_w(e, w) = g (1 - w) - LAM w,                 g = q_A q_B / (K + q_A q_B).
 
 In the book's terms the coupler is an attention-like arrangement: its transfer maps are the scalar
-loudnesses ``T_AB = T_BA = w`` read off its configuration (Ch 4 `def.scalar_attention`), its effort
+loudnesses ``T_AB = T_BA = w`` read off its configuration (Ch 4 `def.attention_arrangement`), its effort
 field is non-exact (the gate, item 12 test 5), and ``w`` is a slow part of the whole (Ch 1
 `sec.held_form`: where the slow parts sit sets which forms the quick parts can settle into). The
 composite forcing on ``Q = R^4``, configuration ``(q_A, q_B, s, w)``:

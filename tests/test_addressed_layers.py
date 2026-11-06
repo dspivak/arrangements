@@ -5,7 +5,7 @@ in P92's block. The construction (book repository, ``notes/runs/p92-2fb1d833/CON
 
 * A token *just speaks*: at round ``l`` it sends its residual stream ``x^l`` as its address and
   ``msg(x^l) = (x^l, 1)`` as its one message, and it receives one message per head and a rule message; the arrangement
-  reads both the key and the query off the address. (Book Ch 4 ``sec.addressed_messages`` since 2026-11-03, 586b6a53:
+  reads both the key and the query off the address. (Book Ch 4 ``sec.addressed_values`` since 2026-11-03, 586b6a53:
   an object is an address space with a list of vector spaces sent in and a list received in, no slots.) Its parameter
   is its initial embedding ``x^0`` alone: it holds no weight.
 * The arrangement's configuration ``q`` holds every layer's weights. Round ``l``'s transfer maps read layer ``l``'s
