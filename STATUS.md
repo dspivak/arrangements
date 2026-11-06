@@ -2403,6 +2403,10 @@ prime-maker flips to a composite. Settings and their sensitivity (the parts' lag
 the listener's line decides whether a fleeing finder breaks up enough to change its number): the book's
 `notes/runs/p73-b-56518228/RESULTS.md`. 14 tests pass, 17 s.
 
+### 3.79 A guest reading the furniture room one-way: forms available over a slow motion (book P41 (j), §5.9 item 94)
+
+`arrangements/available.py`, `tests/test_available.py`, 10 passed. The furniture room with a quick guest that reads the people's separation with zero load returned, a lamp for a reader with two sources, and a one-way room whose slow motion descends to its chairs. The room's coordinates are exactly those of the room alone at every step. A guest nudged to $-1$ falls back while the room is apart and holds once a routine of 81 steps, not 80, has brought it together. The lattices and their squares are read in the book repo's `notes/runs/p41j-836d12ce/`. *Weird*: the guest reads for free.
+
 ### 3.78 A selection condition: two pendulums, a permuted tagged window (book P5 (l) stage C3)
 
 `arrangements/attention_beside_physics.py`, `tests/test_attention_beside_physics.py` (deepseek-v4-pro[1m], e2f6ff37,
