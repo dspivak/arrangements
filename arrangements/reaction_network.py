@@ -31,8 +31,9 @@ THE VERIFIED FRONTIER.
    (``crn_arrangement``) whose parameter is the configuration coalgebra on
    ``R^n`` with the state-dependent Mielke--Onsager sharp [Mielke 2011, "A
    gradient structure for reaction-diffusion systems and for
-   energy-drift-diffusion systems", Nonlinearity 24, thm 3.1 specialized to
-   pure reaction]
+   energy-drift-diffusion systems", Nonlinearity 24, sec. 3.1, eq. (3.1) and
+   Remark 3.1 (detailed balance); the paper has no thm 3.1, the locator a
+   docstring once gave; checked in the WIAS preprint 1485, 2026-11-09]
 
        sharpR_x = dt * K(x),
        K(x)     = sum_r Lambda(f_r(x), b_r(x)) * zeta_r zeta_r^T,

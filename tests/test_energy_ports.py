@@ -1,6 +1,6 @@
 """Energy through ports (book Ch 5 ``thm.energy_ports``, plan §5.9 item 92; run notes ``notes/runs/p76e-5c9967d2/`` in the book).
 
-On a linear exact-effort arrangement whose integrator is a tensor of masses, the kept energy
+On a linear exact-inclination arrangement whose integrator is a tensor of masses, the kept energy
 
     E(t) = sum p_i^2 / (2 m_i) - (1/2) (A y_{t-1}) (y_t)
 

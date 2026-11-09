@@ -314,8 +314,8 @@ def substitute(a: AddrOp, parts: Sequence[AddrOp], label: str = "", old_rule: bo
 # ---------------------------------------------------------------------------
 # The book's attention operad (Ch 4 def.attention_arrangement, eqn.attention_arrangement,
 # eqn.attention_substitution): no positions, self-hearing allowed, the matter's own messages.
-# Its exact-effort arrangements only: since 2026-11-02 (d1fbc71b, David: "please drop exactness") the book's
-# def.attention_arrangement takes any effort field; ``AttOp`` takes a cost, ``AddrOp`` takes any ``omega``.
+# Its exact-inclination arrangements only: since 2026-11-02 (d1fbc71b, David: "please drop exactness") the book's
+# def.attention_arrangement takes any inclination field; ``AttOp`` takes a cost, ``AddrOp`` takes any ``omega``.
 # ---------------------------------------------------------------------------
 
 
