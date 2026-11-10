@@ -1,8 +1,8 @@
-"""Arrangements: morphisms of ``arr = Para(cotcoalg, omegalens)`` (def.arr).
+"""Arrangements: morphisms of ``arr = Para(cotcoalg, omegalens)`` (def.imc).
 
 An arrangement ``a : M -> N`` with parameter ``P = (Q, S, u)`` (a ``cot(Q)``-coalgebra,
 coalgebra.py) is a morphism ``Q (x) M -> N`` of ``omegalens``, the lens category
-over the writer monad ``Omega(X) = X x Omega^1`` of one-forms (sec.effort_fields,
+over the writer monad ``Omega(X) = X x Omega^1`` of one-forms (sec.inclination_fields,
 sec.loads). Writing an interface as ``M = <M^- | M^+>`` (two smooth sets, the
 input and the output side), the lens morphism consists of smooth maps
 
@@ -41,7 +41,7 @@ OneForm = Callable[..., Tuple[Array, ...]]  # (x_1, ..., x_k) -> (xi_1, ..., xi_
 
 @dataclass(frozen=True)
 class Arrangement:
-    """An arrangement ``a : M -> N`` with parameter ``P`` (def.arr).
+    """An arrangement ``a : M -> N`` with parameter ``P`` (def.imc).
 
     The (possibly tensored) domain ``M = <M^- | M^+>`` has input dimension
     ``in_dim_M`` and output dimension ``out_dim_M``; the codomain ``N`` has

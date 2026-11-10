@@ -1,4 +1,4 @@
-"""The positioned examples of the book's Ch 4 ``sec.addressed_values``, in the addressed operad (book plan P79 (c)).
+"""The positioned examples of the book's Ch 4 ``sec.addressed_arrangements``, in the addressed operad (book plan P79 (c)).
 
 The predictions, written before this file, and the results are in the book repository,
 ``notes/runs/p79c-71075bb8/RESULTS.md``. Built with ``addressed_one.py``'s ``AddrOp`` at one address space ``R^2``, each

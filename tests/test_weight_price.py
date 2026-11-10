@@ -23,7 +23,7 @@ The reader fills the group's second box by operad substitution; the sender fills
 whole is a system ``1 -> B`` run by ``Phi`` (``open_step``) with the zero message at its external input.
 
 **Checked.** The forcing of the whole is ``-d`` of one function of ``(v, lam, mu)``, the three costs summed at the
-delivered points (``prop.exact_lenses``); the pair as the operad's substitution and as the lens composite agree
+delivered points (``prop.costs_nest``); the pair as the operad's substitution and as the lens composite agree
 (``prop.attention_operad``), and the unit law holds; the price paid by the sender and the same price charged by the
 group give the same forcing. Under ``Phi`` the sender always falls quiet, faster the more the reader disagrees, and
 the reader's belief returns to its prior as the message fades; a slow-to-quiet sender moves the reader further. The
@@ -155,7 +155,7 @@ def run(arr, steps):
 
 
 def test_forcing_is_minus_d_of_the_summed_costs():
-    """REPRODUCES ``prop.exact_lenses`` on this nest: the whole's forcing on ``(v, lam, mu)`` is ``-d`` of the
+    """REPRODUCES ``prop.costs_nest`` on this nest: the whole's forcing on ``(v, lam, mu)`` is ``-d`` of the
     price plus the reader's length at the delivered message plus the anchors, at several points."""
     v0, mu0 = 1.0, 0.0
     W = whole(sender(v0, 0.0), reader(mu0))

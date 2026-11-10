@@ -1,4 +1,4 @@
-"""A predictor beside a physical system, one-way and active (book Ch 4 ``sec.predictive_coding``).
+"""A predictor beside a physical system, one-way and active (book Ch 4 ``sec.prediction_learning``).
 
 The book's predictor (``eqn.predictor_look_ahead``, ``eqn.predictor_residual``, ``eqn.predictor_update``):
 an integrator with state ``(x, theta)`` (the estimate ``x``; ``mu`` in the code), configuration space ``X``,

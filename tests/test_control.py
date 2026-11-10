@@ -9,7 +9,7 @@ setpoint ``s`` a genuine run-time input on the outer boundary, gives
 * with the ``phase`` parameter: undamped oscillation about ``s`` at frequency
   ``~ sqrt(k/m)`` (the classical stiffness-only impedance controller).
 
-One wiring, two arrangements (def.arr): the parameter -- the coalgebra inside
+One wiring, two arrangements (def.imc): the parameter -- the coalgebra inside
 the arrangement -- is what differs, and there is one dynamics functor ``Phi``.
 
 Timestep convention: the framework has no separate ``dt``; it lives in the
@@ -160,7 +160,7 @@ def test_phase_oscillates_about_setpoint_at_sqrt_k_over_m():
 def test_setpoint_port_receives_equal_and_opposite_covector():
     """The composite EMITS, in its outer position, the one-form
     ``omega_N(s) = omega_c|_{N^-} = k(q_eval - s)`` on the setpoint port
-    (sec.effort_fields; CDLM eqn.omegaprime negated, STATUS.md §1) -- equal and
+    (sec.inclination_fields; CDLM eqn.omegaprime negated, STATUS.md §1) -- equal and
     opposite to the parameter covector ``xi_Q = -k(q_eval - s)`` the coalgebra
     consumes, because both are components of the one shared exact forcing
     (Newton's third law of the virtual spring). ``q_eval`` is the coalgebra's

@@ -1,4 +1,4 @@
-"""``cot(Q)``-coalgebras: the parameters of arrangements (sec.matter).
+"""``cot(Q)``-coalgebras: the parameters of arrangements (sec.integrators_arrangements).
 
 An object of ``cotcoalg`` is a triple ``(Q, S, u)`` of smooth sets ``Q`` (the
 base) and ``S`` (the state) with a ``cot(Q)``-coalgebra
@@ -7,7 +7,7 @@ base) and ``S`` (the state) with a ``cot(Q)``-coalgebra
 
 i.e. each state presents a base position ``q(s)`` and, on receiving a covector
 ``xi in T^*_{q(s)} Q``, moves to a new state. This is the book's *integrator*
-("u for update", NOTATION.md): in def.arr the coalgebra ``u``, and hence the
+("u for update", NOTATION.md): in def.imc the coalgebra ``u``, and hence the
 integrator, is part of an arrangement -- there is no separate integrator
 semantics to choose later, as there was in CDLM (``Phiconf``/``Phiphase``).
 The response ``sharp`` is not a separate field either; it lives inside ``step``.
@@ -54,7 +54,7 @@ from .rvect import ReactiveVectorSpace
 
 @dataclass(frozen=True)
 class CotCoalg:
-    """A ``cot(Q)``-coalgebra ``(Q, S, u)`` (sec.matter), with an initial state.
+    """A ``cot(Q)``-coalgebra ``(Q, S, u)`` (sec.integrators_arrangements), with an initial state.
 
     * ``Q_dim``    -- the base ``Q = R^{Q_dim}``.
     * ``init``     -- the initial state ``s_0 in S`` (the state ``Phi`` starts from).
@@ -109,7 +109,7 @@ class CotCoalg:
         return self.timed_step(s, xi_Q, duration)
 
     def tensor(self, other: "CotCoalg") -> "CotCoalg":
-        """The parallel product ``(Q, S, u) (x) (Q', S', u')`` (sec.matter).
+        """The parallel product ``(Q, S, u) (x) (Q', S', u')`` (sec.integrators_arrangements).
 
         Base ``Q x Q'``, state ``S x S'`` (a pair), and the product coalgebra
         induced by ``cot(Q x Q') ~= cot(Q) (x) cot(Q')``: the position is the

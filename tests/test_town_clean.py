@@ -1,4 +1,4 @@
-"""Filtering or cutting: which way the plant responds (book Chapter 1, ``sec.cost_later``; linked from the footnote
+"""Filtering or cutting: which way the plant responds (book Chapter 1, ``sec.timely_costs``; linked from the footnote
 "The runs are ... when one makes filtering cost more than cutting power, the plant output shrinks instead").
 
 For a reader of the book. The plant has two dials, its output ``x`` and its cleanliness ``c``, and the premium makes
@@ -41,7 +41,7 @@ SMALL, MODERATE, LARGE = .1, 1.0, 10.0
 
 
 def test_book_filtering_cheap_the_plant_cleans_filtering_dear_it_shrinks():
-    """``sec.cost_later``, in the town as drawn (``account_town``): "filtering the smoke is cheaper than
+    """``sec.timely_costs``, in the town as drawn (``account_town``): "filtering the smoke is cheaper than
     cutting power, so the plant cleans up rather than reducing its output", and the footnote's "when one
     makes filtering cost more than cutting power, the plant output shrinks instead"."""
     no_return = eve_town(1)

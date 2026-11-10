@@ -6,8 +6,8 @@ Audit of the claim (see ``hopfield.py``): the continuous Hopfield network
     u_i' = -u_i + sum_j W_ij g(u_j) + I_i,        g = tanh,  W symmetric,
 
 is the dynamics (sec.dynamics_functor) of the closed arrangement whose
-parameters are configuration coalgebras (sec.matter) and whose total
-forcing is ``-dU`` (sec.effort_fields) for the cost
+parameters are configuration coalgebras (sec.integrators_arrangements) and whose total
+forcing is ``-dU`` (sec.inclination_fields) for the cost
 
     U(u) = sum_i [u_i g(u_i) - log cosh(u_i) - I_i g(u_i)]
            - sum_{i<j} W_ij g(u_i) g(u_j),
@@ -166,8 +166,8 @@ def test_wire_routing_is_a_bijection():
 def test_state_dependent_sharp_is_positive():
     """The neuron sharp ``dt * cosh(u)^2`` is positive at every state (g' > 0).
 
-    The sharp is now inside the neurons' configuration coalgebras (def.arr,
-    sec.matter), so it is read off the step: ``step(u, xi) - u = sharp_u(xi)``.
+    The sharp is now inside the neurons' configuration coalgebras (def.imc,
+    sec.integrators_arrangements), so it is read off the step: ``step(u, xi) - u = sharp_u(xi)``.
     """
     N, dt = 3, 0.1
     rng = np.random.default_rng(4)

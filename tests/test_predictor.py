@@ -1,4 +1,4 @@
-"""A predictor beside a physical system, one-way and active (book Ch 4 ``sec.predictive_coding``; book plan
+"""A predictor beside a physical system, one-way and active (book Ch 4 ``sec.prediction_learning``; book plan
 P84 (g), Claude Opus 5.5, 4eacd80b).
 
 A free mass beside a predictor whose model says the hidden state decays to 0. Heard through the load-free,

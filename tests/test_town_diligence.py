@@ -1,4 +1,4 @@
-"""The insurer's own check (book Chapter 1, ``sec.cost_later``: "She knows they'll do their own due diligence from
+"""The insurer's own check (book Chapter 1, ``sec.timely_costs``: "She knows they'll do their own due diligence from
 there, because it's their money on the line"; linked from the footnote in ``sec.check_claims``).
 
 For a reader of the book. ``eve_town(4, diligence=True)`` gives the insurer its books, a record of the claims it has

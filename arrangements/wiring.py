@@ -1,10 +1,10 @@
-"""Composition and wiring constructors in ``arr`` (def.arr, sec.loads).
+"""Composition and wiring constructors in ``arr`` (def.imc, sec.loads).
 
 Provides:
 
 * ``compose_seq(f, g)``    -- sequential composition ``g . f`` in ``arr``: lens
   composition on the maps, **pullback-and-sum** on the forcings (Kleisli
-  composition for the writer monad ``Omega``, sec.effort_fields), tensor on the
+  composition for the writer monad ``Omega``, sec.inclination_fields), tensor on the
   parameters.
 * ``parallel_arrangements(p1, p2)`` / ``tensor_arrangements(parts)`` -- the
   monoidal product in ``arr``: direct sum of forcings, tensor of parameters.
@@ -43,12 +43,12 @@ def trivial_parameter() -> CotCoalg:
 
 
 # ---------------------------------------------------------------------------
-# Sequential composition in arr: pullback-and-sum (sec.effort_fields, notes/DESIGN.md §2).
+# Sequential composition in arr: pullback-and-sum (sec.inclination_fields, notes/DESIGN.md §2).
 # ---------------------------------------------------------------------------
 
 
 def compose_seq(f: Arrangement, g: Arrangement) -> Arrangement:
-    """Sequential composition ``g . f`` in ``arr`` (def.arr).
+    """Sequential composition ``g . f`` in ``arr`` (def.imc).
 
     For ``f : L -> M`` and ``g : M -> N`` (so ``f.out_dim_N == g.out_dim_M`` and
     ``f.in_dim_N == g.in_dim_M``), the composite ``g . f : L -> N`` has the lens

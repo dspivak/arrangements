@@ -6,7 +6,7 @@ The claim under test: the continuous Hopfield network (Hopfield 1984, units
     u_i' = -u_i + sum_j W_ij g(u_j) + I_i,        g = tanh,  W symmetric,
 
 is the dynamics ``Phi`` (sec.dynamics_functor) of a closed arrangement with
-*configuration* parameters (def.arr, sec.matter), built by *genuine
+*configuration* parameters (def.imc, sec.integrators_arrangements), built by *genuine
 composition* in ``arr`` (no hand-written total forcing):
 
 * one **neuron box** per unit ``i``: parameter the configuration coalgebra on
@@ -17,7 +17,7 @@ composition* in ``arr`` (no hand-written total forcing):
   (positive-definite everywhere since ``g' = sech^2 > 0``; the same species of
   position-dependent reaction as ``rvect.inverse_hessian``). Output map the
   diagonal broadcast of the *reported activation* ``V_i = g(u_i)`` to the
-  ``deg(i)`` incident synapse ports; input map vacuous; forcing (sec.effort_fields)
+  ``deg(i)`` incident synapse ports; input map vacuous; forcing (sec.inclination_fields)
   exact, ``omega_i = -dU_i`` for the leak-and-bias cost
 
       U_i(u) = u * g(u) - log cosh(u) - I_i * g(u),
@@ -42,7 +42,7 @@ forcing ``omega = -dU`` for the cost
            - sum_{i<j} W_ij g(u_i) g(u_j)
 
 *emerges* from ``compose_seq``'s pullback-and-sum (the Kleisli composition of
-the writer monad ``Omega``, sec.effort_fields). Then, since the composite is closed,
+the writer monad ``Omega``, sec.inclination_fields). Then, since the composite is closed,
 the parameter covector is ``xi_Q = -dU/du`` and one ``Phi`` step (the
 configuration coalgebra *adds* ``sharp(xi_Q)``, sec.differential_equations) is
 

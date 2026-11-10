@@ -1,4 +1,4 @@
-"""Her account: a cost that would arrive later counts now (book Chapter 1, ``sec.cost_later``; linked from the
+"""Her account: a cost that would arrive later counts now (book Chapter 1, ``sec.timely_costs``; linked from the
 footnotes there and in ``sec.check_claims``).
 
 For a reader of the book. ``account_town()`` (``arrangements/town.py``) is the town of ``eqn.town_account``, four boxes
@@ -65,7 +65,7 @@ from tests.town_checks import check_money
 def test_book_the_town_is_the_four_boxes_she_draws():
     """``eqn.town_account``: the composite is those four boxes and their wires and nothing else, each box has
     the ports the book draws, the estimator's and the insurer's states are one number each, and only the
-    power wire pushes back (``sec.better``, ``sec.cost_later``: the estimator "doesn't push anything back",
+    power wire pushes back (``sec.better``, ``sec.timely_costs``: the estimator "doesn't push anything back",
     the insurer "wouldn't push anything back")."""
     boxes = {b.label: b for b in account_boxes()}
     assert {name: (b.in_dim_N, b.out_dim_N, b.P.Q_dim) for name, b in boxes.items()} == {
@@ -90,7 +90,7 @@ def test_book_the_run_is_the_dynamics_functors():
 
 
 def test_book_estimate_climbs_premium_follows_plant_feels_it_at_once():
-    """``sec.cost_later``: "her estimate climbs to match the coughing, the premium climbs behind it, and the
+    """``sec.timely_costs``: "her estimate climbs to match the coughing, the premium climbs behind it, and the
     plant feels the premium on its smoke almost immediately"; then the plant cleans, "the townspeople keep
     nearly all their power and cough far less"."""
     no_return, town = eve_town(1), account_town()
@@ -111,7 +111,7 @@ def test_book_estimate_climbs_premium_follows_plant_feels_it_at_once():
 def test_book_the_court_and_the_ledger_change_nothing_on_the_four_boxes_and_the_premium_comes_first():
     """The fuller town, with memory, claims delay, court and money beside the four boxes, read one way: on
     the four boxes it is the drawn town, step for step, and its first paid claim comes well after the
-    premium has climbed and the plant has cleaned. The later cost counts now (``sec.cost_later``)."""
+    premium has climbed and the plant has cleaned. The later cost counts now (``sec.timely_costs``)."""
     town, full = account_town(), eve_town(4, fit_coughing=True)
     a, b = run(town), run(full)
     for name in town.slots:

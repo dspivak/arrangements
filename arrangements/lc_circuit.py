@@ -8,7 +8,7 @@ charge ``q``, with
 * forcing         ``omega = -dU``, ``U(q) = q^2 / (2 C)`` -- the capacitor's
   electrostatic energy (a cost; STATUS.md §1),
 
-made into two arrangements (def.arr) by two parameters (sec.matter), read
+made into two arrangements (def.imc) by two parameters (sec.integrators_arrangements), read
 by the one dynamics functor ``Phi`` (sec.dynamics_functor):
 
 * ``phase(Q)`` stores ``(q, xi)`` and steps ``q -> q + xi/L``, ``xi -> xi - q~/C``
@@ -103,7 +103,7 @@ def coupling_capacitor(C_c: float) -> Arrangement:
     the pair. Its forcing is exact, ``-d`` of the coupling capacitor's energy
     ``(m_1 - m_2)^2/(2 C_c)`` read off the two charges presented at its input
     ports; ``compose_seq`` pulls it back and adds it to the cells' own forcings
-    (pullback-and-sum, sec.effort_fields), and the interpretation's cotangent pullback
+    (pullback-and-sum, sec.inclination_fields), and the interpretation's cotangent pullback
     (CDLM eqn.bigtheta) routes it back to both cells' parameter covectors.
     """
     return Arrangement(

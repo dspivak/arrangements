@@ -1,5 +1,5 @@
 """The town of *Articulating Forms that Matter*, Chapter 1 (``sec.calculus_working``, ``sec.better``,
-``sec.cost_later``; linked from the footnotes in ``sec.calculus_working`` and ``sec.check_claims``).
+``sec.timely_costs``; linked from the footnotes in ``sec.calculus_working`` and ``sec.check_claims``).
 
 For a reader of the book. Eve draws her town as an arrangement of two systems (``eqn.town_system``), and
 ``eve_town()`` builds it, a composite of two boxes and their wires:

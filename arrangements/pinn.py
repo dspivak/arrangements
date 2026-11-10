@@ -3,7 +3,7 @@ configuration arrangement.
 
 EXTENSION (beyond the paper). This reuses the dynamics functor ``Phi`` of an
 arrangement with a *configuration* parameter (sec.dynamics_functor,
-sec.matter) and the learner of learning.py unchanged, but the deep-Ritz
+sec.integrators_arrangements) and the learner of learning.py unchanged, but the deep-Ritz
 Dirichlet energy, the coordinate MLP ansatz, and the Poisson discretization are
 standard numerics, not part of the paper's formal development. It is a toy
 demonstration that the primitives compose -- not an implementation of a paper

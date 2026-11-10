@@ -17,7 +17,7 @@ library's boxes (``decay_parameter_box`` below is ``network.parameter_box`` with
   the three parameters' lengths, so the differential of the length is the regularization force;
 * nested as a two-input substitution (the first layer and the second weight filling two holes of
   an outer arrangement holding the label and the loss), the composite's forcing is ``-d`` of the
-  sum of the pieces' cost functions at the points the wiring delivers (``prop.exact_lenses`` on a
+  sum of the pieces' cost functions at the points the wiring delivers (``prop.costs_nest`` on a
   branching composite), equals the flat network's, and steps the same; an identity inserted
   between layers changes nothing (the unit law).
 
@@ -32,7 +32,7 @@ port (``def.wiring_diagram``: ``out(X) + in(Y)`` sources):
 * the one way to make it additive, counting each interface once, leaves ``c_wire`` times
   (external inputs minus internal inputs), a boundary term, ``0`` on the whole training system.
 
-Reasonable: the parameter half is ``prop.exact_lenses`` and holds at any scale a stored quantity costs something
+Reasonable: the parameter half is ``prop.costs_nest`` and holds at any scale a stored quantity costs something
 to keep. Weird: a uniform count of boxes and wires says nothing about the wiring, and the length of the arrangement a
 nest denotes is not the sum of the nest's pieces. Results and the judgment: the book's
 ``notes/runs/p71a-c3bdb524/RESULTS.md``.
@@ -216,7 +216,7 @@ def test_forcing_is_minus_d_of_the_total_length():
 
 
 def test_nest_sums_the_pieces_costs_and_runs_like_the_flat_network():
-    """``prop.exact_lenses`` on a two-input substitution: the nest's forcing is ``-d`` of the pieces' cost
+    """``prop.costs_nest`` on a two-input substitution: the nest's forcing is ``-d`` of the pieces' cost
     functions summed at the delivered points, equals the flat network's, and the step agrees."""
     pieces, g, N = nest(GAMMA)
     A = flat_network(GAMMA).arr

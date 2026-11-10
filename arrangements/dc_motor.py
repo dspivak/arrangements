@@ -21,10 +21,10 @@ reactive vector space T^*R equipped with the opposite -sharpS of the symplectic
 sharp; the electrical system reports its momentum and the mechanical reports
 its position."
 
-In the book's terms (def.arr): "configuration dynamics" is the choice of the
-*configuration coalgebra* as the arrangement's parameter (sec.matter), and
+In the book's terms (def.imc): "configuration dynamics" is the choice of the
+*configuration coalgebra* as the arrangement's parameter (sec.integrators_arrangements), and
 there is one dynamics functor ``Phi`` (sec.dynamics_functor); a cost ``U``
-enters as the forcing ``omega = -dU`` (sec.effort_fields, STATUS.md §1). Every cost
+enters as the forcing ``omega = -dU`` (sec.inclination_fields, STATUS.md §1). Every cost
 below is CDLM's, unchanged in sign; only the arrangements' forcings carry the
 minus.
 
@@ -344,7 +344,7 @@ def dc_motor(
     locked_rotor: bool = False,
     parameter=configuration,
 ) -> Arrangement:
-    """The DC motor by genuine composition in ``arr`` (def.arr):
+    """The DC motor by genuine composition in ``arr`` (def.imc):
 
         dc_motor = compose_seq( electrical_cell (x) mechanical_cell, gyrator ),
 

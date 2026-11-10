@@ -2,7 +2,7 @@
 
 Book repo ``notes/runs/p53l-2e8eeac1/RESULTS.md`` (Claude Opus 5.5, 2e8eeac1, 2026-10-21) has the proofs; these
 tests check them on data. Every composite is built with ``compose_seq`` and ``parallel_arrangements`` (the book's
-``eqn.arr_compose``, ``eqn.coupling_composite_effort``, ``eqn.arr_tensor``) and every step is taken by ``closed_step``,
+``eqn.arr_compose``, ``eqn.stateless_composite_effort``, ``eqn.arr_tensor``) and every step is taken by ``closed_step``,
 the dynamics functor's step. The branching composite throughout is ``b . (a1 (x) a2)``: two systems filling the two
 internal boxes of ``b``, whose delivery copies the external input to both.
 

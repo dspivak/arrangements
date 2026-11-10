@@ -1,4 +1,4 @@
-"""The standard ``cot(Q)``-coalgebras and their tensor (sec.matter)."""
+"""The standard ``cot(Q)``-coalgebras and their tensor (sec.integrators_arrangements)."""
 
 import jax
 import jax.numpy as jnp

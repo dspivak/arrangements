@@ -9,10 +9,10 @@ gain would then be a statement about equilibria of the composite system."
 The construction
 ----------------
 
-**Stage** (``stage``): a ``<R^0|R^0> -> <R^1|R^1>`` arrangement (def.arr) with
-parameter the configuration coalgebra (sec.matter) on ``Q = R^2``, state
+**Stage** (``stage``): a ``<R^0|R^0> -> <R^1|R^1>`` arrangement (def.imc) with
+parameter the configuration coalgebra (sec.integrators_arrangements) on ``Q = R^2``, state
 ``q = (v, w)``, reported output ``out_f(q) = v``, one input port carrying the
-drive voltage ``e``, forcing ``omega = -dU`` (sec.effort_fields) for the cost
+drive voltage ``e``, forcing ``omega = -dU`` (sec.inclination_fields) for the cost
 
     U(q, e) = (kappa/2) (A g(e) - v - w)^2        (g = id for the linear stage)
 

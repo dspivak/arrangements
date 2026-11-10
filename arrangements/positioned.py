@@ -5,7 +5,7 @@ Everything here is the agents' and *proposed*; the predictions and results are i
 
 Fix a position space ``Pos = R^e``. A position is sent as a *message* of ``Pos``: ``(m z, m)`` in ``R^{e+1}``, mass
 times position and the mass, so that positions add as messages and the value of a sum is the centre of mass (Ch 4
-``prop.positive_messages`` (c)).
+``prop.message_weight_value`` (c)).
 
 **Colors** are value dimensions ``d``. The interface of a box of object ``d`` receives a message in ``R^{d+1}`` and sends
 its position message in ``R^{e+1}`` and a message in ``R^{d+1}``. This is the addressed operad of ``addressed_one.py``

@@ -55,7 +55,7 @@ the sender is alone in its group; with company, each sender takes the group's ac
 holding its own estimate ``g_G`` (matter of ``G``; cost a want on the weight it sends and a prediction error on the
 weight that returns) rests at ``g_G = gamma_b gamma_o``, the outer round trip, and ``g_j w_j = beta_j g_G W_s``, ``W_s = gamma_1 w_1 + gamma_2 w_2`` the weight the group sends: the
 members' estimates are not summed into the group's; each is the group's, scaled by how loudly the member hears the
-group's return and divided by the member's own weight. A price nests by ``prop.exact_lenses``: charged at a level on the
+group's return and divided by the member's own weight. A price nests by ``prop.costs_nest``: charged at a level on the
 weight an internal box sends it, it reaches a sender scaled by the transfers between, those of the levels the message
 passes through on its way out (``gamma_j`` for a price at the outer level, the sender's own group's), not by the
 charging level's own, since a cost function sees the messages its internal boxes send, before its own transfers act; so a
@@ -280,7 +280,7 @@ def nest_rest(gammas, betas, gamma_o, gamma_b, mu=None):
 
 
 def test_loop_forcing_is_minus_d_of_the_summed_costs_and_substitution_agrees():
-    """REPRODUCES ``prop.exact_lenses`` and ``prop.attention_operad`` on the loop: the whole's forcing is ``-d`` of
+    """REPRODUCES ``prop.costs_nest`` and ``prop.attention_operad`` on the loop: the whole's forcing is ``-d`` of
     the sender's cost at the return it hears plus the reader's cost at what arrives, as a function of all seven
     coordinates (shadows included); and the pair by substitution equals the lens composite in readout, forcing and a
     50-step trajectory."""
@@ -510,7 +510,7 @@ def test_a_price_charged_above_reaches_a_sender_scaled_by_the_gammas_between():
     """ILLUSTRATES who pays: a price ``c`` paid by each sender on its own loudness, a price ``c_G`` charged by the group
     on the weight it sends out, and a price ``c_O`` charged by the outer arrangement on what the group sends it, give the
     same forcing on the whole when ``c = c_G gamma_j = c_O gamma_j`` for each sender ``j``: the price pulls back along
-    the transfers the message passed through to the sender's matter, which is what moves (``prop.exact_lenses``). The
+    the transfers the message passed through to the sender's matter, which is what moves (``prop.costs_nest``). The
     outer level's own ``gamma_o`` does not enter: a cost function is of the messages the internal boxes send, before
     that level's transfers act (``def.attention_arrangement``), so ``c_O = c_G``, not ``c_G / gamma_o`` as this run
     first wrote. With unequal ``gamma_j`` one price above is unequal prices below."""

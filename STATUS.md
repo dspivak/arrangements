@@ -2191,7 +2191,7 @@ limitation, not a fact about people. Book evidence and predictions:
 - Everything ported from CDLM cites CDLM's own labels (`ex.`, `prop.`, `sec.`) in its
   docstring, so a reader with that draft can find the statement being implemented.
 
-### 3.65 The n-fold pendulum by nesting links (book Ch 3 `sec.arr`, §5.9 item 77)
+### 3.65 The n-fold pendulum by nesting links (book Ch 3 `sec.imc_arrangements`, §5.9 item 77)
 
 Claude Opus 5.5, fa95b8ae, 2026-10-14. `pendulum.py`, `tests/test_pendulum.py`: 3 passed in 3.85 s.
 `drop . link^n . pivot` (each link a rod from its support with a bob at its bottom; first drafted upside down as `pivot . link^(n-1) . end`, same costs), one bob of matter per level, rods smooth stiff springs. The composite equals the
@@ -2312,7 +2312,7 @@ the first layer and the second weight filling two holes of an outer arrangement 
 **What the tests are evidence of.** Closed forms: the step is the exercise's `(1.1, -0.7, 1.8)`; the composite's
 forcing on its configuration is `-d` of the loss's cost plus the three parameters' lengths (`jax.grad` of the sum
 written independently), so the differential of the parameters' length is the regularization force; the nest's forcing
-is `-d` of the pieces' costs summed at the delivered points and equals the flat network's (`prop.exact_lenses` on a
+is `-d` of the pieces' costs summed at the delivered points and equals the flat network's (`prop.costs_nest` on a
 branching composite); an identity between layers changes nothing (the unit).
 
 **What is a count, not a run.** A length `c_box` per internal box and `c_wire` per wire (a wire a source port, the

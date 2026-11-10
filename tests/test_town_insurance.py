@@ -1,4 +1,4 @@
-"""The same town without her account (book Chapter 1, ``sec.check_claims``; ``sec.cost_later`` tells the town with it).
+"""The same town without her account (book Chapter 1, ``sec.check_claims``; ``sec.timely_costs`` tells the town with it).
 
 For a reader of the book. ``eve_town(3)`` has the insurer and no estimator. The insurer reads only what a court has
 fitted from paid claims, and a claim is paid some time after the smoke that caused it (``delay_steps``), so a quote

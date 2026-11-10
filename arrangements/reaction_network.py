@@ -11,7 +11,7 @@ The network is *detailed balanced* if some ``x_eq > 0`` equalizes every
 reaction's forward and backward flux: ``kf_r x_eq^{alpha_r} = kb_r
 x_eq^{beta_r} =: w_r``. This module settles which of these ODEs are the
 configuration dynamics -- ``Phi`` of an arrangement whose parameter is the
-configuration coalgebra ``configuration(Q)`` (def.arr, sec.matter) -- and
+configuration coalgebra ``configuration(Q)`` (def.imc, sec.integrators_arrangements) -- and
 in which encoding.
 
 VACUITY GUARD. ``def.rvect`` puts no symmetry or definiteness condition on a
@@ -77,7 +77,7 @@ THE VERIFIED FRONTIER.
 
        U(x) = sum_r (w_r / 2) (x_i/x_eq_i - x_j/x_eq_j)^2,
 
-   emerges from pullback-and-sum (sec.effort_fields, notes/DESIGN.md §2), written nowhere
+   emerges from pullback-and-sum (sec.inclination_fields, notes/DESIGN.md §2), written nowhere
    by hand. One ``Phi`` step is again EXACTLY the forward-Euler mass-action
    step: the covector reaction ``r`` returns to species ``i`` is ``-+ w_r (a_i
    - a_j) / x_eq_i`` (the ``1/x_eq_i`` from the readout's pullback), and the
@@ -133,7 +133,7 @@ THE VERIFIED FRONTIER.
 
    The no-go is about EXACT forcings (a shared potential ``U``): closedness of
    ``dU`` is what forces the separability. The book's forcing need not be
-   exact (def.arr), and item 6 is the realization the obstruction does not
+   exact (def.imc), and item 6 is the realization the obstruction does not
    reach -- at the price of certifying nothing.
 
 4. COMPOSITIONAL, ARBITRARY Petri net (the paper's "Petri nets" item): put the
@@ -215,7 +215,7 @@ THE VERIFIED FRONTIER.
    orthant at ``dt > 1/rate`` while the log tick ``x e^{-rate dt}`` is
    positive, monotone, and stable at every ``dt``.
 
-6. DIRECT, any network (the book's non-exact forcing, def.arr, sec.effort_fields;
+6. DIRECT, any network (the book's non-exact forcing, def.imc, sec.inclination_fields;
    STATUS.md §2, trick vs direct). An arrangement's forcing need not be exact, so the
    mass-action field itself is admissible as a one-form.
    ``mass_action_arrangement`` is the closed one-box arrangement whose
@@ -414,7 +414,7 @@ def step_matrix(P: CotCoalg, flat: Array) -> Array:
     with flat coordinates ``flat``: for a configuration coalgebra with constant
     sharp this IS the composite sharp (``rvect.direct_sum`` of the boxes'),
     which the book stores inside ``step`` rather than as a field
-    (sec.matter)."""
+    (sec.integrators_arrangements)."""
     s = state_from_flat(P.init, flat)
     base = flat_state(s)
     return jax.jacobian(lambda xi: flat_state(P.step(s, xi)) - base)(jnp.zeros(P.Q_dim))
@@ -1122,7 +1122,7 @@ def mass_action_arrangement(
 
     with NO potential: it is exact iff ``DV`` is symmetric, which already
     ``A + B <-> C`` violates (module docstring, 3 and 6), and in general it is
-    a genuinely non-exact forcing (def.arr, sec.effort_fields). One ``Phi`` step is
+    a genuinely non-exact forcing (def.imc, sec.inclination_fields). One ``Phi`` step is
     ``x + dt * V(x)`` for ANY network -- no detailed balance, reversibility or
     molecularity hypothesis, so it runs what ``crn_arrangement`` (the TRICK,
     module docstring 1) rejects; on a detailed-balanced network the two agree
