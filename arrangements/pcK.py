@@ -193,9 +193,15 @@ def PhiK(arr) -> PCMorphismK:
     P = arr.P
     if not isinstance(P, CotCoalgK):
         raise TypeError(f"PhiK: the parameter must be a CotCoalgK, got {type(P).__name__}")
-    interp = interpretation(arr)
-    src_p = phi_box_poly(arr.out_dim_M, arr.in_dim_M)
-    tgt_p = phi_box_poly(arr.out_dim_N, arr.in_dim_N)
+    return rounds(P, interpretation(arr), phi_box_poly(arr.out_dim_M, arr.in_dim_M), phi_box_poly(arr.out_dim_N, arr.in_dim_N))
+
+
+def rounds(P, interp, src_p, tgt_p) -> PCMorphismK:
+    """The K rounds of a K-stage parameter ``P`` around an interpretation ``interp : q |-> (position_action,
+    direction_action)``: the half of ``PhiK`` that steps the integrator. It never looks inside a position or a direction; it
+    hands the parameter covector ``xi_Q``, an array on ``P``'s configuration, to ``P``'s advances. So it is shared by the array
+    core (``PhiK`` above) and by the core whose wires may carry fields (``smooth.PhiK``): what differs between them is the
+    interpretation, never the stepping (book plan P76 (i))."""
     K = P.K
 
     def make(level: int, mid: Any, PP=P) -> PCMorphismK:

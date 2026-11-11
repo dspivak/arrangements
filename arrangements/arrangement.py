@@ -15,9 +15,12 @@ exact; when it comes from a potential, ``omega = dU`` (``exact(U)``), and for a
 cost ``k`` one has ``U = -k``, so ``omega = -dk`` (STATUS.md §1; the sign
 translation from CDLM is in STATUS.md §1).
 
-In v1 the smooth sets are Cartesian spaces ``R^d``, recorded by their
-dimensions -- the admissible subcategory of STATUS.md §3.1, not the whole
-of ``SmSet``. A one-form on ``R^a x R^b x R^c`` is represented as a callable
+In this module, the array core, the smooth sets are Cartesian spaces ``R^d``,
+recorded by their dimensions -- the admissible subcategory of STATUS.md §3.1,
+not the whole of ``SmSet``. An interface side that is a mapping space (a wire
+that carries a function) is in ``smooth.py``, the core beside this one;
+``smooth.include`` sends an ``Arrangement`` of this module into it, and both are
+stepped by ``pcK.rounds``. A one-form on ``R^a x R^b x R^c`` is represented as a callable
 ``omega(x_a, x_b, x_c) -> (xi_a, xi_b, xi_c)`` returning the covector's components
 on each factor at that point. This is the object the dynamics functor ``Phi``
 (functors.py, sec.dynamics_functor) acts on; it was ``SmoothArrangement`` (with a

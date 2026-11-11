@@ -123,11 +123,36 @@ from the mark of Claude Fable 5.1, 4f679514; *proposed*).
 ### 3.1 The domain of `cot`
 
 The ambient category is smooth sets, sheaves on Cartesian spaces for the differentiably
-good open-cover topology. That topos does not canonically supply a fiberwise-linear
-cotangent bundle on every object, so `cot` is additional structure whose domain is not
-settled. **This library stays on Cartesian spaces `R^d`**, an admissible subcategory
-containing every example, and records a smooth set by its dimension. Nothing here
-depends on the general case, and nothing here settles it.
+good open-cover topology. Since 2026-10-14 the book defines `cot` on every smooth set, by
+its plots (the book's `X-technical-holding.tex`, `def.cot` and `prop.cot`; its plan §5.3
+(c)), so the domain is settled there; this paragraph said until 2026-11-10 that it was
+not. **The array core stays on Cartesian spaces `R^d`** (`arrangement.py`, `wiring.py`,
+`interpretation.py`, and every example but one), a subcategory containing those examples,
+and records a smooth set by its dimension.
+
+**Since 2026-11-10 a second core stands beside it, `smooth.py`, whose wires may carry a
+function** (the book's plan P76 (i); its arrangements with smooth interfaces, Ch 4). There
+an interface side is a finite list of factors `R(n)` and `Maps(a, b)`, the smooth set of
+smooth maps `R^a -> R^b`; a point of a mapping space is a Python function; a 1-form on a
+side is a function of a plot and a point of the plot's domain, as the book defines a
+1-form on a smooth set; and a load on a function wire is the covector, on the domain of
+the plot the value was sent by, that `def.cot`'s family gives for that plot. Composition
+there takes no derivative: it precomposes plots. Integrators are the array core's, with
+configuration `R^d`, and both cores are stepped by one piece of code, `pcK.rounds`.
+`smooth.include` is the inclusion of the array core, preserving composites and identities
+exactly and tensors up to `smooth.join`; `tests/test_smooth.py` checks each law on a
+composite with two inputs and against array runs. `magnets.py` is built on it: every body
+has the interface `<(F, F) | (F, F)>`, `F = Maps(2)`, and one arrangement serves any bodies;
+`magnets_rn.py` is the same construction on `R^d`, kept to compare, and
+`tests/test_magnets.py` checks them equal step for step.
+
+What `smooth.py` does not cover: a smooth set that is not concrete, `Omega` itself for one,
+whose plots are not functions into its points (maps would have to be given on plots);
+mapping spaces of mapping spaces (a factor type to add); configurations and states that
+are not `R^d`; the symmetry of the tensor (no swap is coded, in either core); a parameter
+run at a duration. The closed structure (the book's `thm.smooth_arr_closed`) is coded in
+one case only, `evaluate` and `reads_out_its_function`, the learner that reads out its
+function.
 
 ### 3.2 The attention paper's propositions are continuous-time
 
