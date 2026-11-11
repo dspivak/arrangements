@@ -2454,3 +2454,29 @@ settings (rate 1.5e-4) neither learner selects (block 0.621, MLP 0.630, above "n
 wide enough to carry four identities plus the value. 2 tests pass (`test_selection_learner_does_not_move_the_pendulums`,
 `test_selection_forces_at_the_weights_are_backpropagation`); the third (`test_selection_learner_predicts_the_target`)
 is the learning run. Results, plot and judgment: the book's `notes/runs/p5lC3-e2f6ff37/RESULTS.md`.
+
+
+## Copying input pushback
+
+Book Ch 3 `ex.copying_pushback`; GPT-6, fde05da3, 2026-11-11.
+`arrangements/pushback_copying.py` constructs the complete copy system
+`I -> <V | W x V>` from an integrator, output map, and inclination assignments,
+and the stateless comparison morphism `C`. The copy's additional output has
+zero readout but a nonzero configuration differential; its prescribed update
+uses that output's load and the current input, supplied by an auxiliary
+configuration covector. No new state is added. Composition returns the current
+input-pushback discrepancy through ordinary cotangent pullback.
+
+`tests/test_pushback_copying.py`: five focused tests pass. They cover 18
+nonlinear look-ahead/input/load combinations against an independent analytic
+update, a moving-spring composite with ordinary external loads and a changing
+teaching switch, unchanged ordinary response under zero teaching, the no-input
+reduction, and equality between the diagram's factored wiring/teacher and the
+comparison morphism for vector and empty interfaces, including nonzero z.
+All functional dynamics run through the existing library interpretation;
+closed-form arithmetic is a diagnostic alongside it. The construction is on
+Cartesian spaces with Euclidean metrics. It specifies a learning inclination,
+not convergence for arbitrary models or interactions. A responsive shared
+input provider can indirectly affect the original, since it receives both
+pushbacks. Physical realization of the prescribed integrator is a separate
+question. These qualifications apply at every modeling scale.
