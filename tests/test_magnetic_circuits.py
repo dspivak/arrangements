@@ -9,6 +9,9 @@ import time
 import jax
 import numpy as np
 import pytest
+from magnetic_checks import checked_jit, outside_smoothing_discs
+
+pytestmark = pytest.mark.usefixtures("outside_smoothing_discs")
 from arrangements import magnetic_circuits as C, smooth as sm
 
 
@@ -33,7 +36,7 @@ def run(places, L, widths, turns, Q0, tau=0.05, K=16, steps=10):
     arr = C.fixed_circuits([C.circuit(l, h=h, charge0=q, tau=tau, K=K, turns=n)
                            for l,h,n,q in zip(L,widths,turns,Q0)], places)
     O = sm.PhiK(arr)
-    step = jax.jit(lambda s: O.with_state(s).run_one(sm.CLOSED_IN, sm.closed_tell)[1])
+    step = checked_jit(lambda s: O.with_state(s).run_one(sm.CLOSED_IN, sm.closed_tell)[1])
     flat = lambda s: np.concatenate([np.asarray(x).ravel() for x in jax.tree_util.tree_leaves(s)])
     state = O.state
     output = [flat(state)]

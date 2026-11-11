@@ -85,5 +85,19 @@ for(const row of J.open) {
   }
   near("one held, one free: every cart state",gap,0,1e-11);
 }
+// Whole-plane smoothing: compare the core and boundary with library field
+// values and force pushbacks, so the force tests check the chain-rule factor.
+const core=JSON.parse(fs.readFileSync(path.join(__dirname,'magnetic_smoothing_reference.json'),'utf8'));
+near('smoothing radius',M.r0,core.r0,0);
+for(const row of core.rows){
+  near('smoothed field at distance '+row.distance,M.g(row.distance,0),row.g,1e-12);
+  for(const kind of ['wire','bumper']){
+    const b=[body('wire',kind==='wire'?1:0,0,0,0,0,{bump:kind==='bumper'?1:0}),
+             body('wire',kind==='wire'?1:0,0,row.distance,0,0,{bump:kind==='bumper'?.7:0})];
+    const load=M.loads(b)[0],got=[load.fx,load.fy,load.tq],want=row[kind];
+    const gap=Math.max(...got.map((v,i)=>Math.abs(v-want[i])));
+    near(kind+' force in smoothed core at '+row.distance,gap,0,1e-10*Math.max(1,...want.map(Math.abs)));
+  }
+}
 console.log(bad ? bad + " check(s) failed" : "all checks passed");
 process.exit(bad ? 1 : 0);

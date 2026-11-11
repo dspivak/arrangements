@@ -15,6 +15,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from magnetic_checks import checked_jit, outside_smoothing_discs
+
+pytestmark = pytest.mark.usefixtures("outside_smoothing_discs")
 
 from arrangements import magnets as M
 from arrangements import magnets_rn as RN
@@ -33,7 +36,7 @@ UNIT, PINNED, FREE = [1.0, 1.0, HEAVY], [HEAVY, HEAVY, HEAVY], [1.0, 1.0, 1.0]
 
 def trace(arr, steps):
     O = sm.PhiK(arr)
-    step = jax.jit(lambda s: O.with_state(s).run_one(sm.CLOSED_IN, sm.closed_tell)[1])
+    step = checked_jit(lambda s: O.with_state(s).run_one(sm.CLOSED_IN, sm.closed_tell)[1])
     flat = lambda s: np.concatenate([np.asarray(x, float).ravel() for x in jax.tree_util.tree_leaves(s)])
     s = O.state
     out = [flat(s)]
@@ -179,7 +182,7 @@ BODY = (M.FIELDS, M.FIELDS)
 def trace_rn(arr, steps):
     """A run of the version on ``R^n``, through the array core's ``PhiK``."""
     O, IN = PhiK_rn(arr), (jnp.zeros(0), trivial_omega(0))
-    step = jax.jit(lambda s: O.with_state(s).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)))[1])
+    step = checked_jit(lambda s: O.with_state(s).run_one(IN, lambda _o: (jnp.zeros(0), jnp.zeros(0)))[1])
     s, out = O.state, [leaves(O.state)]
     for _ in range(steps):
         s = step(s)

@@ -9,8 +9,16 @@
 (function (root) {
   "use strict";
   const TWO_PI = 2 * Math.PI;
+  const r0 = 0.001; // same whole-plane smoothing as arrangements/magnets.py
 
-  function g(dx, dy) { return -Math.log(dx * dx + dy * dy) / (4 * Math.PI); }
+  function radiusSquared(dx, dy) {
+    const q = dx * dx + dy * dy, t = q / (r0 * r0);
+    if (t >= 1) return [q, 1];
+    const u = 1 - t, bump = Math.exp(-1 / u);
+    return [q + r0 * r0 * bump, 1 - bump / (u * u)]; // value, derivative with respect to q
+  }
+
+  function g(dx, dy) { return -Math.log(radiusSquared(dx, dy)[0]) / (4 * Math.PI); }
 
   function ends(b) {            // the two points +h and -h on the body's own axis
     const c = Math.cos(b.th), s = Math.sin(b.th);
@@ -42,7 +50,7 @@
       out[i].tq += (p.x - bodies[i].x) * fy - (p.y - bodies[i].y) * fx;
     }
     function on(a, b) {         // the force on the wire a from the wire b: I_a I_b grad g
-      const dx = a.x - b.x, dy = a.y - b.y, k = -a.I * b.I / (TWO_PI * (dx * dx + dy * dy));
+      const dx = a.x - b.x, dy = a.y - b.y, [r2, slope] = radiusSquared(dx, dy), k = -a.I * b.I * slope / (TWO_PI * r2);
       return [k * dx, k * dy];
     }
     for (let i = 0; i < bodies.length; i++) {
@@ -54,12 +62,12 @@
     for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++)
       for (const a of em[i]) for (const c of em[j]) { const F = on(a, c); push(i, a, F[0], F[1]); push(j, c, -F[0], -F[1]); }
     // the contact field: a bumper of strength b.bump at each point where the body makes or reads the magnetic field; two bumpers
-    // on different bodies push apart with the force 6 b_a b_c sigma^6 d / |d|^8 (the library's bumper, sigma = 0.25)
+    // on different bodies push apart; differentiate the same smoothed denominator as the library's bumper (sigma = 0.25).
     const S6 = Math.pow(0.25, 6);
     const bp = bodies.map(b => !b.bump ? [] : b.kind === "wire" ? [{ x: b.x, y: b.y }] : ends(b));
     for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++)
       for (const a of bp[i]) for (const c of bp[j]) {
-        const dx = a.x - c.x, dy = a.y - c.y, r2 = dx * dx + dy * dy, k = 6 * bodies[i].bump * bodies[j].bump * S6 / (r2 * r2 * r2 * r2);
+        const dx = a.x - c.x, dy = a.y - c.y, [r2, slope] = radiusSquared(dx, dy), k = 6 * bodies[i].bump * bodies[j].bump * S6 * slope / (r2 * r2 * r2 * r2);
         push(i, a, k * dx, k * dy); push(j, c, -k * dx, -k * dy);
       }
     for (let i = 0; i < bodies.length; i++) {
@@ -112,7 +120,7 @@
     return best;
   }
 
-  const model = { g, ends, wiresOf, fieldAt, loads, sources, step, closest };
+  const model = { g, r0, radiusSquared, ends, wiresOf, fieldAt, loads, sources, step, closest };
   root.magnetsModel = model;
   if (typeof module !== "undefined") module.exports = model;
 })(typeof window !== "undefined" ? window : globalThis);

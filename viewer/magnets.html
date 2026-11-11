@@ -47,6 +47,21 @@ tr:last-child td { border-bottom: 0; }
 details { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 14px; }
 details p { margin: 8px 0; max-width: 75ch; }
 summary { cursor: pointer; font-weight: 500; }
+
+#circuits { display: grid; gap: 12px; }
+#circuits h2, #circuits h3, #circuits p { margin: 0; }
+#circuits canvas { cursor: default; }
+.cp-explain { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; display: grid; gap: 12px; }
+.cp-cycle { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+.cp-cycle div { padding: 10px; background: var(--ground); border-radius: 6px; }
+.cp-cycle strong { display: block; }
+.cp-diagram { overflow-x: auto; }
+.cp-diagram svg { display: block; min-width: 720px; width: 100%; height: auto; }
+.cp-diagram text { fill: var(--ink); font: 18px system-ui; }
+.cp-diagram .small { font-size: 15px; fill: var(--muted); }
+.cp-diagram .box { fill: var(--panel); stroke: var(--ink); stroke-width: 2; }
+.cp-diagram .wire { fill: none; stroke: var(--value); stroke-width: 2.5; }
+@media (max-width: 650px) { .cp-cycle { grid-template-columns: repeat(2,1fr); } }
 </style>
 <div class="wrap">
   <h1>Magnets</h1>
@@ -71,36 +86,7 @@ summary { cursor: pointer; font-weight: 500; }
       <th>force on it, across</th><th>force on it, up</th><th>turning force on it</th></tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
-  <!-- P76(j) deliberately adds a second experiment on this page, as requested.
-       It has its own clock and controls. Positions are fixed during induction. -->
-  <section aria-labelledby="circuits-title">
-    <h2 id="circuits-title">A coil can start another circuit ringing</h2>
-    <p class="lede">Charge the first capacitor, then let go. Each coil makes a changing field; the other circuit starts ringing
-      without a wire between them. The coils stay fixed here. Change their spacing or flip a winding to start a new experiment.</p>
-    <div class="bar">
-      <button class="primary" id="cp-play">Play circuits</button>
-      <button id="cp-reset">Recharge first capacitor</button>
-      <button id="cp-flip">Flip second winding</button>
-      <label>coils <select id="cp-count"><option value="2">2</option><option value="3">3</option></select></label>
-      <label>spacing <input class="in" id="cp-gap" type="number" min="1.5" max="4" step="0.1" value="2"></label>
-      <label>one step lasts <input class="in" id="cp-tau" type="number" min="0.01" max="0.1" step="0.01" value="0.05"> s</label>
-      <span class="note" id="cp-time"></span>
-    </div>
-    <div class="stage"><canvas id="cp-canvas" width="1200" height="480" aria-label="Separate coil and capacitor circuits, with charge and current"></canvas></div>
-    <p class="note" id="cp-energy" aria-live="off"></p>
-    <div class="stage"><canvas id="cp-history" width="1200" height="250" aria-label="Capacitor charge over model time"></canvas></div>
-    <details><summary>See the circuit numbers and checks</summary>
-      <p>The blue bars show charge on each capacitor. The current tells how fast charge leaves it. A changing current changes
-        the field received by every other coil. Magnetic energy includes the shared field, so only the total is shown.</p>
-      <p>This is the same long-wire geometry as the magnets above, per unit of length, with no resistance or radiation.
-        The computation exchanges trial fields sixteen times each step. These controls keep it in the tested range.</p>
-      <p>Checked against separate capacitor and winding parts composed in the library: two and three circuits, a reversed
-        winding, total energy, and shorter steps. The held-magnet force arrows above now also have an open arrangement
-        in the library: your position goes in and force comes back.</p>
-      <button id="cp-download">Download circuit steps</button>
-    </details>
-  </section>
-  <details><summary>What is this a picture of?</summary>
+  <details><summary>What the magnets picture shows</summary>
     <p>Every wire here runs straight out of the screen, so a magnet is a long coil seen end-on: two wires, one carrying its current
       toward you (the dot) and one away (the cross). The thin lines are the field's lines; where they crowd, the field is strong.</p>
     <p>The only thing entered is the field of one wire. A magnet emits the field of its two wires, and what it costs a magnet to sit
@@ -112,7 +98,7 @@ summary { cursor: pointer; font-weight: 500; }
       that is all that keeps two things out of one place. With friction, two magnets that pull come to rest where the pull equals the
       bumpers' push. Without the bumpers they would fall into each other.</p>
   </details>
-  <details><summary>What was checked</summary>
+  <details><summary>Checks for the magnets picture</summary>
     <p>The page steps the same equations, by the same Runge–Kutta rule, as the companion library's arrangement
       (<code>arrangements/magnets.py</code>). At the library's test settings the two agree to the last digit shown there: the force
       between two wires, the four forces between two magnets, 300 steps of two magnets closing and parting, 400 steps of a magnet
@@ -121,6 +107,93 @@ summary { cursor: pointer; font-weight: 500; }
     <p>What the model leaves out: the field arrives at once, so there is no light; everything is per unit of length of the wires;
       the bumper's field is a chosen shape, not a law.</p>
   </details>
+  <!-- P76(j) deliberately adds a second experiment on this page, as requested.
+       It has its own clock and controls. Positions are fixed during induction. -->
+  <section id="circuits" aria-labelledby="circuits-title">
+    <h2 id="circuits-title">Can one circuit charge another without a connecting wire?</h2>
+    <p class="lede">Only capacitor 1 starts charged. Release it: current flows through coil 1, making a changing magnetic field.
+      That starts current in coil 2 and charges capacitor 2. Watch the charge leave one capacitor and build up on the other.</p>
+    <p class="note">The same numbered coils appear in both views: their shared magnetic field above, each coil wired to its own capacitor below.</p>
+    <div class="bar">
+      <button class="primary" id="cp-play">Release capacitor 1</button>
+      <button id="cp-reset">Recharge first capacitor</button>
+      <button id="cp-flip">Flip second winding</button>
+      <label>coils <select id="cp-count"><option value="1">1 · alone</option><option value="2" selected>2</option><option value="3">3</option></select></label>
+      <label>spacing <input class="in" id="cp-gap" type="number" min="1.5" max="4" step="0.1" value="2"></label>
+      <label>one step lasts <input class="in" id="cp-tau" type="number" min="0.01" max="0.1" step="0.01" value="0.05"> model units</label>
+      <span class="note" id="cp-time"></span>
+    </div>
+    <p class="note">Playback: one model time unit per wall-clock second. An isolated circuit takes about 6.28 model units per cycle.</p>
+    <div class="stage"><canvas id="cp-canvas" width="1200" height="880" aria-label="Coils in their magnetic field, and each coil connected to its capacitor with moving current and visible charge"></canvas></div>
+    <p class="note" id="cp-story" aria-live="polite"></p>
+    <p class="note" id="cp-energy" aria-live="off"></p>
+    <div class="cp-explain">
+      <h3>Why does the charge come back?</h3>
+      <p><strong>At zero charge, the current has not stopped.</strong> Energy is then in the coil’s magnetic field.
+        The current continues and puts opposite charges on the plates. The reversed capacitor voltage slows the current,
+        then drives it the other way.</p>
+      <div><button id="cp-quarter">Next quarter-cycle · one circuit</button>
+        <span class="note">Switches to one isolated circuit and pauses at successive stages. Recharge returns to the start.</span></div>
+      <div class="cp-cycle">
+        <div><strong>Start · charged</strong>Current is zero. The capacitor’s voltage starts it flowing.</div>
+        <div><strong>¼ cycle · empty</strong>Current is fastest. The coil’s magnetic energy keeps it flowing.</div>
+        <div><strong>½ cycle · reversed</strong>The plates have opposite charges. Current stops, then reverses.</div>
+        <div><strong>¾ cycle · empty again</strong>Current flows the other way, restoring the starting charges.</div>
+      </div>
+      <p class="note">These stages describe one isolated circuit. With two, the changing field also drives the other circuit,
+        so energy passes between them. This ideal model has no resistance or radiation to drain it away.</p>
+    </div>
+    <div class="cp-explain" id="circuit-wiring">
+      <h3>The wiring, in the book’s sense</h3>
+      <p id="cp-wiring-summary"></p>
+      <div class="cp-diagram" id="cp-wiring"></div>
+      <p class="note">Blue arrows carry values forward. The red arrows show the current loads returned to the capacitors:
+        positive current removes charge from the plate whose charge is plotted. A field wire is a dependency, not a copper connection.
+        The gray circles perform the field routing (or supply zero and discard an unused field); they store nothing.</p>
+      <details><summary>How this diagram relates to the model</summary><p>This is composition in the category of smooth-interface arrangements.
+        Every wire also carries loads backward; only the electrical current loads are marked here.
+        The unused contact-field component is zero and omitted from the labels.
+        The diagram follows the coil selector. One circuit has zero incoming external field;
+        with three, each receives the sum of the other two fields. The routing circle gathers all emitted fields,
+        changes their coordinates, and excludes each receiving coil’s own field.</p></details>
+    </div>
+    <div class="cp-explain">
+      <h3>How fast is this?</h3>
+      <p>The model sets inductance and capacitance to 1. One isolated cycle lasts 2π ≈ 6.28 model time units.
+        In physical units its period is <strong>2π√(LC)</strong>, where L is inductance and C is capacitance.
+        For example, an ideal 1 mH coil with a 1 µF capacitor cycles in about 0.20 milliseconds (5 kHz).</p>
+      <p>That example supplies a time scale, not a physical calibration of these long coils.
+        Nearby coils shift the periods and exchange energy over a longer time.
+        Playback is deliberately slow: the seconds you wait at the screen are not physical seconds in a specified circuit.</p>
+      <p class="note"><a href="https://openstax.org/books/university-physics-volume-2/pages/14-5-oscillations-in-an-lc-circuit">LC oscillation and its period · OpenStax University Physics</a></p>
+    </div>
+    <details><summary>What the water analogy does—and what it needs for two coils</summary>
+      <p>For one circuit, a difference in water levels corresponds to voltage, flow to current,
+        and water’s inertia in a pipe to inductance. When the levels become equal, the moving water keeps going and overshoots,
+        just as current keeps flowing when the capacitor reaches zero charge.</p>
+      <p>That accounts for the oscillation within one circuit. Two independent tank-and-pipe systems do not by themselves
+        provide the shared magnetic field that couples these two circuits. A fluid model of that interaction would need
+        an additional coupling and a check of its equations; none has been constructed here.</p>
+    </details>
+    <div class="stage"><canvas id="cp-history" width="1200" height="250" aria-label="Capacitor charge over model time"></canvas></div>
+    <details><summary>How the coils charge the capacitors</summary>
+      <p>Each capacitor stores separated charge on its two plates. Its voltage drives current through the wire wound into its coil.
+        The coil’s changing magnetic field induces voltage in the other coil. That drives current around the other circuit,
+        charging its capacitor. There is no wire between the circuits.</p>
+      <p>The moving dots show conventional current, with direction and motion computed from the charge that has passed.
+        The plus and minus marks show capacitor polarity. Each capacitor’s filled bar shows its stored energy;
+        the rest is in the shared magnetic field. The field lines are computed from the coils’ currents.</p>
+      <p>The upper view looks end-on along the long coils: a dot means current toward you, a cross means current away.
+        The lower view unfolds each circuit to show its wiring; it is not another spatial view. The coils stay fixed.</p>
+      <p>This is the same long-wire approximation as the magnets experiment, per unit of length, with no resistance or radiation.
+        The field responds instantly in this model. Changing spacing or reversing a winding resets the experiment.</p>
+      <details><summary>Numerical checks</summary><p>Compared with separately composed winding and capacitor parts in the library:
+        two and three circuits, winding reversal, total energy, and shorter steps. Sixteen field exchanges per step are used
+        within the tested control range.</p></details>
+      <button id="cp-download">Download circuit steps</button>
+    </details>
+  </section>
+
 </div>
 <script src="models/magnets.js"></script>
 <script>

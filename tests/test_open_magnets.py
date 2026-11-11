@@ -3,6 +3,10 @@
 All dynamics run through smooth.PhiK. Same physical limits as magnets.py;
 externally imposed positions supply/remove mechanical work.
 """
+import pytest
+from magnetic_checks import checked_jit, outside_smoothing_discs
+
+pytestmark = pytest.mark.usefixtures("outside_smoothing_discs")
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -55,8 +59,8 @@ def test_no_held_carts_is_existing_field():
                      M.cart([1,1,1],[1,0,-.4],[0,0,0])])
     X,Y=sm.PhiK(sm.compose_seq(parts,a)),sm.PhiK(sm.compose_seq(parts,b))
     x,y=X.state,Y.state
-    sx=jax.jit(lambda s:X.with_state(s).run_one(sm.CLOSED_IN,sm.closed_tell)[1])
-    sy=jax.jit(lambda s:Y.with_state(s).run_one(sm.CLOSED_IN,sm.closed_tell)[1])
+    sx=checked_jit(lambda s:X.with_state(s).run_one(sm.CLOSED_IN,sm.closed_tell)[1])
+    sy=checked_jit(lambda s:Y.with_state(s).run_one(sm.CLOSED_IN,sm.closed_tell)[1])
     for _ in range(10): x,y=sx(x),sy(y)
     for p,q in zip(jax.tree_util.tree_leaves(x),jax.tree_util.tree_leaves(y)):
         assert np.allclose(p,q,atol=1e-12)
@@ -69,7 +73,7 @@ def held_run(steps=100,tau=.01):
     arr=OM.open_system(bodies,held=[0],carts=[free])
     O=sm.PhiK(arr)
     def tell(op):return jax.tree_util.tree_map(jnp.zeros_like,op[0][1]),held
-    step=jax.jit(lambda s:O.with_state(s).run_one(sm.CLOSED_IN,tell)[1])
+    step=checked_jit(lambda s:O.with_state(s).run_one(sm.CLOSED_IN,tell)[1])
     state=O.state
     flat=lambda s:np.concatenate([np.asarray(x).ravel() for x in jax.tree_util.tree_leaves(s)])
     out=[flat(state)]

@@ -21,9 +21,10 @@ body's shape, is kept as ``magnets_rn.py``; ``tests/test_magnets.py`` checks the
 Entered: the field of one long straight wire, ``g``; the contact field of one bumper, ``contact``; each part's own cost. Nothing about
 a pair of bodies is written anywhere; what two bodies do to each other comes out of ``smooth.compose_seq``.
 
-ASSUMED. ``g`` and ``contact`` are singular at the body's own point, so they are smooth maps on the plane only away from it: a point
-of ``F`` should be the field made smooth inside a small disc around the body, or the bodies kept apart. The code evaluates a body's
-field only where another body reads, and no body reads its own field.
+SMOOTH FIELDS. In the category of smooth sets, ``g`` and ``contact`` are morphisms from the whole plane to the line, hence points
+of ``F``. Their squared-radius denominator is made positive inside the disc of radius ``r0`` by a correction flat at its boundary.
+Outside that disc the original fields and all derivatives are unchanged. This inner profile is a chosen regularization, not a
+measured wire or contact law. Regression tests check that their actual field readings stay outside these discs.
 
 Three ways the positions are carried, all the same step (``tests/test_magnets.py``): ``plane``, whose integrator is one frictionless
 mass per cart; ``field`` with ``cart`` boxes, each cart a part of its own and the arrangement without state; and a body made of bodies,
@@ -47,17 +48,32 @@ F = Maps(2)                 # a field: a smooth map from the plane to R
 FIELDS = (F, F)             # what a body puts out, and what it receives: (magnetic, contact)
 MAGNETIC, CONTACT = 0, 1
 _origin = jnp.zeros(2)
+r0 = 0.001                  # smoothing radius, in model length units; mirrored in viewer/models/magnets.js
+
+
+def _smooth_radius_squared(d):
+    """Positive smooth radial denominator, exactly squared distance outside r0.
+
+    The exponential correction and every derivative vanish at the boundary.
+    Guard its unused branch before division, so autodiff never encounters 1/0.
+    """
+    squared = jnp.sum(d * d, axis=-1)
+    t = squared / (r0 * r0)
+    inside = t < 1.0
+    gap = jnp.where(inside, 1.0 - t, 1.0)
+    bump = jnp.where(inside, jnp.exp(-1.0 / gap), 0.0)
+    return squared + r0 * r0 * bump
 
 
 def g(d):
-    """The magnetic field of one long straight wire carrying unit current, at the displacement ``d`` from it: ``-(1/2 pi) ln |d|``."""
-    return -jnp.log(jnp.sum(d * d, axis=-1)) / (4.0 * jnp.pi)
+    """Smooth wire potential; ``-(1/2 pi) ln |d|`` for ``|d| >= r0``."""
+    return -jnp.log(_smooth_radius_squared(d)) / (4.0 * jnp.pi)
 
 
 def contact(d, sigma):
     """The contact field of one bumper of unit strength and size ``sigma``, at the displacement ``d`` from it: ``(sigma / |d|)^6``. A
-    chosen shape, steep and short: it stands for two things not fitting in one place, and is not taken from a source."""
-    return (sigma * sigma / jnp.sum(d * d, axis=-1)) ** 3
+    chosen shape, steep and short, made smooth inside ``r0``; not taken from a source."""
+    return (sigma * sigma / _smooth_radius_squared(d)) ** 3
 
 
 def nothing(r):
