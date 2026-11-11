@@ -71,6 +71,35 @@ summary { cursor: pointer; font-weight: 500; }
       <th>force on it, across</th><th>force on it, up</th><th>turning force on it</th></tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
+  <!-- P76(j) deliberately adds a second experiment on this page, as requested.
+       It has its own clock and controls. Positions are fixed during induction. -->
+  <section aria-labelledby="circuits-title">
+    <h2 id="circuits-title">A coil can start another circuit ringing</h2>
+    <p class="lede">Charge the first capacitor, then let go. Each coil makes a changing field; the other circuit starts ringing
+      without a wire between them. The coils stay fixed here. Change their spacing or flip a winding to start a new experiment.</p>
+    <div class="bar">
+      <button class="primary" id="cp-play">Play circuits</button>
+      <button id="cp-reset">Recharge first capacitor</button>
+      <button id="cp-flip">Flip second winding</button>
+      <label>coils <select id="cp-count"><option value="2">2</option><option value="3">3</option></select></label>
+      <label>spacing <input class="in" id="cp-gap" type="number" min="1.5" max="4" step="0.1" value="2"></label>
+      <label>one step lasts <input class="in" id="cp-tau" type="number" min="0.01" max="0.1" step="0.01" value="0.05"> s</label>
+      <span class="note" id="cp-time"></span>
+    </div>
+    <div class="stage"><canvas id="cp-canvas" width="1200" height="480" aria-label="Separate coil and capacitor circuits, with charge and current"></canvas></div>
+    <p class="note" id="cp-energy" aria-live="off"></p>
+    <div class="stage"><canvas id="cp-history" width="1200" height="250" aria-label="Capacitor charge over model time"></canvas></div>
+    <details><summary>See the circuit numbers and checks</summary>
+      <p>The blue bars show charge on each capacitor. The current tells how fast charge leaves it. A changing current changes
+        the field received by every other coil. Magnetic energy includes the shared field, so only the total is shown.</p>
+      <p>This is the same long-wire geometry as the magnets above, per unit of length, with no resistance or radiation.
+        The computation exchanges trial fields sixteen times each step. These controls keep it in the tested range.</p>
+      <p>Checked against separate capacitor and winding parts composed in the library: two and three circuits, a reversed
+        winding, total energy, and shorter steps. The held-magnet force arrows above now also have an open arrangement
+        in the library: your position goes in and force comes back.</p>
+      <button id="cp-download">Download circuit steps</button>
+    </details>
+  </section>
   <details><summary>What is this a picture of?</summary>
     <p>Every wire here runs straight out of the screen, so a magnet is a long coil seen end-on: two wires, one carrying its current
       toward you (the dot) and one away (the cross). The thin lines are the field's lines; where they crowd, the field is strong.</p>
@@ -254,3 +283,6 @@ document.getElementById("remove").onclick = () => { if (bodies.length > 1) { bod
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => draw());
 draw(); table(true);
 </script>
+
+<script src="models/magnetic_circuits.js"></script>
+<script src="models/magnetic_circuits_view.js"></script>

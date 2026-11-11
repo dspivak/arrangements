@@ -245,9 +245,11 @@ def test_a_learner_reads_out_its_function_and_evaluation_undoes_it():
         assert gap(back, phi, seed) < 1e-12
 
 
-def test_a_load_comes_back_along_a_function_wire():
+def test_a_load_passes_through_a_function_wire_inside_a_composite():
     """The curried learner, then evaluation at a datum: an output load ``lam`` reaches the configuration as ``(T_q F(-, x))^T lam``
-    plus the learner's own inclination, and the datum's wire as ``(T_x F(q, -))^T lam``."""
+    plus the learner's own inclination, and the datum's wire as ``(T_x F(q, -))^T lam``. The function wire here is inside the
+    composite and the outer wires are Cartesian, so no covector is formed on a function wire; the two tests at the end of this
+    file do that."""
     F, arr = _learner()
     hat = sm.reads_out_its_function(sm.include(arr))
     back = sm.compose_seq(sm.parallel(hat, sm.identity((), (R(2),))), sm.evaluate(2, 2))
@@ -261,3 +263,72 @@ def test_a_load_comes_back_along_a_function_wire():
     assert np.abs(np.asarray(xi_Q) - np.asarray(want_q - 0.1 * q)).max() < 1e-12
     assert np.abs(np.asarray(xi_M[0]) - np.asarray(want_x)).max() < 1e-12
     assert in_m == ()
+
+
+# ---- a load on a function wire, and the tensor of composites with states (added after the audit by session fac1f5aa, which
+# ---- found that neither was run by a test; its two scratch cases are in the book repo's notes/runs/p76h-audit-fac1f5aa) ----
+
+def _a_closing_arrangement():
+    """An arrangement with state ``r`` in ``R^2`` from the interface of ``_a_field_part`` to the closed one: it hands the part a
+    function made from the part's own output and ``r``, and has a cost on that output."""
+    P = configuration(euclidean(2, 0.1), init=jnp.array([0.8, 0.25]))
+    return sm.SmoothArrangement(
+        P=P, M_in=(Maps(1),), M_out=(Maps(1),), N_in=(), N_out=(),
+        out_f=lambda r, m: (), in_f=lambda r, m, n: (lambda x: r[0] * m[0](x + r[1]) + x[0] ** 2,),
+        omega=sm.exact(lambda r, m, n: -0.3 * m[0](jnp.array([r[1]])) ** 2), label="closing")
+
+
+def test_running_respects_composition_across_a_function_wire():
+    """The two interpretations run one after the other, the load handed back on the function wire being a covector on the
+    sender's plot, against the inclination field of the composite: the same covector on both configurations. This is the
+    law that the dynamics functor preserves a composite, at one position, with a function on the wire between the factors."""
+    f, g = _a_field_part(), _a_closing_arrangement()
+    q, r = jnp.array([0.4, -0.7]), jnp.array([0.8, 0.25])
+    pos_f, dir_f = sm.interpretation(f)(q)
+    pos_g, dir_g = sm.interpretation(g)(r)
+    shown_f, pushback_f = pos_f(sm.point(()), sm.zero_form)          # f shows a plotted function and a 1-form on functions
+    shown_g, _ = pos_g(shown_f, pushback_f)
+    xi_r, load_on_wire, handed_in = dir_g(shown_f, pushback_f, sm.closed_tell((shown_g, None))[0], ())
+    xi_q, _, _ = dir_f(sm.point(()), sm.zero_form, load_on_wire, handed_in)
+    whole = sm.compose_seq(f, g).omega(lambda v: (v, (), ()), jnp.concatenate([q, r]))
+    assert np.abs(leaves(load_on_wire)).max() > 0.01              # a covector on (q, ()), the sender's plot's domain
+    assert leaves(load_on_wire).shape == (2,)
+    assert np.abs(np.concatenate([np.asarray(xi_q), np.asarray(xi_r)]) - np.asarray(whole)).max() < 1e-12
+    assert np.abs(np.asarray(whole)).max() > 0.01
+
+
+def _a_stage(r0):
+    """An arrangement with state ``r`` in ``R`` from the interface with a function on each side to itself."""
+    P = configuration(euclidean(1, 0.1), init=jnp.array([r0]))
+    return sm.SmoothArrangement(
+        P=P, M_in=(Maps(1),), M_out=(Maps(1),), N_in=(Maps(1),), N_out=(Maps(1),),
+        out_f=lambda r, m: (lambda x: m[0](x) + r[0] * x[0],), in_f=lambda r, m, n: (lambda x: r[0] * n[0](x),),
+        omega=sm.exact(lambda r, m, n: -0.5 * (m[0](jnp.array([0.2])) - r[0]) ** 2), label="stage")
+
+
+def test_the_tensor_of_two_composites_with_states_is_the_composite_of_two_tensors():
+    """``(g1 . f1) (x) (g2 . f2)`` against ``(g1 (x) g2) . (f1 (x) f2)``, every part with a state and a function on every wire.
+    The two order the configuration differently, ``(f1, g1, f2, g2)`` against ``(f1, f2, g1, g2)``; up to that reordering,
+    the isomorphism of integrators the book's "on isomorphism classes" is for, they are equal."""
+    f1, f2, g1, g2 = _a_field_part(), _a_field_part(), _a_stage(0.3), _a_stage(-0.6)
+    left = sm.parallel(sm.compose_seq(f1, g1), sm.compose_seq(f2, g2))
+    right = sm.compose_seq(sm.parallel(f1, f2), sm.parallel(g1, g2))
+    assert left.source == right.source and left.target == right.target and left.P.Q_dim == right.P.Q_dim == 6
+    to_left = jnp.array([0, 1, 4, 2, 3, 5])                       # right's (f1, f2, g1, g2) read in left's order
+
+    def plot_right(v):
+        fn = lambda a, b: (lambda x: a * x[0] ** 2 + jnp.cos(b * x[0]) + a * b)
+        return jnp.tanh(v) + jnp.array([0.4, -0.7, 0.2, 0.9, 0.3, -0.6]), (), (fn(v[0], v[1]), fn(v[2], v[5]))
+
+    def plot_left(v):
+        q, m, n = plot_right(v)
+        return q[to_left], m, n
+
+    v, x = jnp.array([0.3, -1.1, 0.8, 0.2, -0.5, 0.6]), jnp.array([0.9])
+    q = plot_right(v)[0]
+    for k in (0, 1):
+        assert abs(float(left.out_f(q[to_left], ())[k](x)) - float(right.out_f(q, ())[k](x))) < 1e-14
+    a, b = leaves(left.omega(plot_left, v)), leaves(right.omega(plot_right, v))
+    assert np.abs(a - b).max() < 1e-12 and np.abs(b).max() > 0.1
+    # control: without the reordering they differ
+    assert np.abs(leaves(left.omega(plot_right, v)) - b).max() > 1e-3

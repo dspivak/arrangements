@@ -52,5 +52,38 @@ for (const key of ["h2_head to tail", "h2_side by side"]) {
   near("magnets with bumpers and drag: distance after 6000 steps", r[6000], S["h9_as built"].r[1200], 1e-9);
   near("magnets with bumpers and drag: where they rest", r[6000], 0.395410, 1e-3);
 }
+// P76(j): recorded from the field-valued library, including external inputs.
+const path = require("path");
+const C = require("./magnetic_circuits.js");
+const J = JSON.parse(fs.readFileSync(process.argv[3] || path.join(__dirname,"magnetic_circuits_reference.json"),"utf8"));
+for (const row of J.circuits) {
+  let b=row.places.map((p,i)=>({x:p[0],y:p[1],th:p[2],L:1,C:1,h:.5,turns:row.turns[i],Q:i===0?1:0,phi:0,I:0}));
+  let gap=0,drift=0,residual=0;
+  for(let k=0;k<=row.steps;k++) {
+    if(k%row.stride===0) b.forEach((v,i)=>[v.Q,v.phi,v.I].forEach((a,j)=>{
+      gap=Math.max(gap,Math.abs(a-row.states[k/row.stride][i][j]));
+    }));
+    drift=Math.max(drift,Math.abs(C.energy(b)-.5));residual=Math.max(residual,C.residual(b));
+    if(k<row.steps)b=C.step(b,row.tau,row.K);
+  }
+  near(row.name+": all recorded circuit states",gap,0,1e-10);
+  near(row.name+": total energy change",drift,0,1e-8);
+  near(row.name+": current/flux residual",residual,0,1e-9);
+}
+for(const row of J.open) {
+  const b=row.positions.map((p,i)=>body(i===0?"magnet":row.kind,i===0?1:.7,i===0?.25:.4,...p));
+  const loads=M.loads(b);let gap=0;
+  loads.forEach((v,i)=>[v.fx,v.fy,v.tq].forEach((a,k)=>gap=Math.max(gap,Math.abs(a-row.loads[i][k]))));
+  near("open positions, "+row.kind+": force and torque",gap,0,1e-12);
+}
+{
+  let b=[body("magnet",1,.25,-1,.1,.4),body("magnet",.7,.4,1,.2,-.3,{J:.2})];
+  let gap=0;
+  for(let k=0;k<J.held.states.length;k++) {
+    const a=b[1];[a.x,a.y,a.th,a.px,a.py,a.pth].forEach((v,j)=>gap=Math.max(gap,Math.abs(v-J.held.states[k][j])));
+    if(k+1<J.held.states.length)b=M.step(b,J.held.tau,[true,false],{drag:0,turn:true});
+  }
+  near("one held, one free: every cart state",gap,0,1e-11);
+}
 console.log(bad ? bad + " check(s) failed" : "all checks passed");
 process.exit(bad ? 1 : 0);
