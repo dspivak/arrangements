@@ -40,6 +40,14 @@ waterfall's not; the total water is conserved whenever the two flows are equal a
 through a leak; and wiring the tanks to the coupler before running, or running the tanks and then the
 coupler, gives the same steps.
 
+Ch 3's ``ex.pipe_any_duration`` (Claude Opus 5.5, 00f2d232, 2026-11-12): the tank as Ch 3's integrator
+``eqn.tank_integrator``, configuration its pressure ``q``, state its volume ``s``, look-ahead ``s/A`` at every duration,
+update ``s + tau xi`` (``tank_integrator``; the ``tank`` above reads the pressure out in its transfer instead, the same
+step). Predictions before the code: wired to the pipe, a step of duration ``tau`` is ``eqn.pipe_run``,
+``(s_1 - tau I, s_2 + tau I)`` with ``I = kappa (s_1/A_1 - s_2/A_2)``, at ``tau = 1/2`` and ``2``, so it moves ``tau``
+times the water of the unit step; wired to the waterfall and to the pump (``exc.run_tanks``) only the coupler changes,
+and at duration ``1`` they are the book's ``(4, 0) -> (2, 2)`` and ``(2, 6) -> (3, 5)``.
+
 For agents: the antisymmetric part of the returned covector's Jacobian is ``d omega``, the reciprocity
 lemma of ``background/note-retroactivity.tex`` §3; forcings carry the book's sign (STATUS.md §1). The
 file's earlier head and what changed on 2026-10-30 are in ``notes/P31-B-CH2-HISTORY-2026-10-30.md``.
@@ -50,8 +58,8 @@ import jax.numpy as jnp
 import numpy as np
 
 from arrangements.arrangement import Arrangement, exact, zero_form
-from arrangements.coalgebra import configuration
-from arrangements.functors import Phi
+from arrangements.coalgebra import CotCoalg, configuration
+from arrangements.functors import Phi, closed_step
 from arrangements.rvect import ReactiveVectorSpace
 from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
 
@@ -191,6 +199,41 @@ def test_book_steps_by_hand():
                                [(4, 8), (2, 10), (1, 11), (0.5, 11.5)], atol=1e-12)
     np.testing.assert_allclose(_by_hand((2.0, 6.0), pump(1.0), 3),
                                [(2, 6), (3, 5), (4, 4), (5, 3)], atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Ch 3 ex.pipe_any_duration: the tank as an integrator, a step of any duration.
+# ---------------------------------------------------------------------------
+
+
+def tank_integrator(A, s0):
+    """``eqn.tank_integrator``: state the volume ``s``, look-ahead the pressure ``s/A`` at every duration, update
+    ``s + tau xi``; in a box that transfers out its configuration."""
+    P = CotCoalg(Q_dim=1, init=jnp.array([s0]), position=lambda s: s / A, step=lambda s, xi: s + xi,
+                 look_ahead=lambda s, tau: s / A, timed_step=lambda s, xi, tau: s + tau * xi, label=f"tank({A:g})")
+    return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1, out_f=lambda q, m: q,
+                       in_f=lambda q, m, n: jnp.zeros(0), omega=zero_form, label=f"tank({A:g})")
+
+
+def _one_step(A, s0, cpl, tau):
+    arr = closed([tank_integrator(A[0], s0[0]), tank_integrator(A[1], s0[1])], cpl)
+    return volumes(closed_step(arr, duration=tau)(arr.P.init))
+
+
+def test_pipe_step_at_any_duration():
+    A, s0, kappa = (1.0, 2.0), (5.0, 1.0), 0.3
+    I = kappa * (s0[0] / A[0] - s0[1] / A[1])
+    unit = _one_step(A, s0, pipe(kappa), 1.0)
+    np.testing.assert_allclose(unit, (s0[0] - I, s0[1] + I), atol=1e-12)
+    for tau in (0.5, 2.0):
+        s1 = _one_step(A, s0, pipe(kappa), tau)
+        np.testing.assert_allclose(s1, (s0[0] - tau * I, s0[1] + tau * I), atol=1e-12)          # eqn.pipe_run
+        np.testing.assert_allclose(np.subtract(s1, s0), tau * np.subtract(unit, s0), atol=1e-12)
+        W = kappa * s0[0] / A[0]
+        np.testing.assert_allclose(_one_step(A, s0, waterfall(kappa), tau), (s0[0] - tau * W, s0[1] + tau * W), atol=1e-12)
+        np.testing.assert_allclose(_one_step(A, s0, pump(1.0), tau), (s0[0] + tau, s0[1] - tau), atol=1e-12)
+    np.testing.assert_allclose(_one_step((1.0, 1.0), (4.0, 0.0), waterfall(0.5), 1.0), (2, 2), atol=1e-12)
+    np.testing.assert_allclose(_one_step((1.0, 1.0), (2.0, 6.0), pump(1.0), 1.0), (3, 5), atol=1e-12)
 
 
 # ---------------------------------------------------------------------------

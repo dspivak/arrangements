@@ -26,6 +26,11 @@ Added with the look-ahead (David's "yes," 2026-10-10), predictions before the co
    duration 1, still at 0, and its momentum with no other push keeps ``1 - c tau`` of itself;
 8. a part whose look-ahead is half the coming duration is the leapfrog step in one round: second order
    (the error falls by about 4 when the duration halves) where the full look-ahead falls by about 2.
+   This part is Ch 3 ``ex.look_ahead``; added for it (Claude Opus 5.5, 00f2d232, 2026-11-12), before the code:
+10. a mass ``m = 2`` with that look-ahead, ``q + (tau/2) p/m``, on a spring and under a constant load, run by ``Phi`` at
+    durations ``1/2`` and ``3/2``, takes the step ``eqn.leapfrog_update``; under the constant load its state is
+    Newton's at both durations (``exc.leapfrog_accuracy`` (b)), and the phase part's position falls short by
+    ``tau^2 load / (2m)`` (``exc.leapfrog_accuracy`` (a)).
 
 The rod is Ch 3's grouped rod: three segments of heat capacity 4, joined by conductance 1, insulated at
 both ends (held ends with no spring), from ``(8, 4, 0)``.
@@ -206,6 +211,45 @@ def test_half_look_ahead_is_second_order():
         assert 3.6 < a / b < 4.4, half
     for a, b in zip(full, full[1:]):
         assert 1.6 < a / b < 2.4, full
+
+
+def leapfrog_mass(m, q0, p0):
+    """Ch 3 ``ex.look_ahead``: a mass ``m`` reading out ``q + (tau/2) p/m`` (``eqn.leapfrog_lookahead``); told the load
+    ``xi`` there, ``p' = p + tau xi`` and it coasts the rest of the step on ``p'`` (``eqn.leapfrog_update``)."""
+    def timed(s, xi, t):
+        p_new = s[1] + t * xi
+        return (s[0] + 0.5 * t * s[1] / m + 0.5 * t * p_new / m, p_new)
+
+    return CotCoalg(Q_dim=1, init=(jnp.array([q0]), jnp.array([p0])),
+                    position=lambda s: s[0] + 0.5 * s[1] / m, step=lambda s, xi: timed(s, xi, 1.0),
+                    look_ahead=lambda s, t: s[0] + 0.5 * t * s[1] / m, timed_step=timed, label="leapfrog_mass")
+
+
+def test_look_ahead_is_the_books_leapfrog_step():
+    """Prediction 10."""
+    from arrangements.arrangement import Arrangement, exact
+    m, q0, p0, kappa, F = 2.0, 0.6, -1.3, 1.7, 0.9
+
+    def closed(P, cost):
+        return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=0,
+                           out_f=lambda q, m_: jnp.zeros(0), in_f=lambda q, m_, n: jnp.zeros(0),
+                           omega=exact(lambda q, m_, n: -cost(q[0])), label="closed")
+
+    for tau in (0.5, 1.5):
+        r = q0 + 0.5 * tau * p0 / m                                    # eqn.leapfrog_lookahead
+        p1 = p0 + tau * (-kappa * r)                                   # the spring's load at the look-ahead
+        sp = closed(leapfrog_mass(m, q0, p0), lambda q: 0.5 * kappa * q ** 2)
+        s = closed_step(sp, duration=tau)(sp.P.init)
+        np.testing.assert_allclose([float(s[0][0]), float(s[1][0])],
+                                   [q0 + 0.5 * tau * p0 / m + 0.5 * tau * p1 / m, p1], atol=1e-12)
+        newton = (q0 + tau * p0 / m + tau ** 2 * F / (2 * m), p0 + tau * F)
+        lf = closed(leapfrog_mass(m, q0, p0), lambda q: -F * q)
+        s = closed_step(lf, duration=tau)(lf.P.init)
+        np.testing.assert_allclose([float(s[0][0]), float(s[1][0])], newton, atol=1e-12)
+        ph = closed(phase(diagonal(jnp.array([1.0 / m])), init=(jnp.array([q0]), jnp.array([p0]))), lambda q: -F * q)
+        s = closed_step(ph, duration=tau)(ph.P.init)
+        np.testing.assert_allclose(newton[0] - float(s[0][0]), tau ** 2 * F / (2 * m), atol=1e-12)
+        np.testing.assert_allclose(float(s[1][0]), newton[1], atol=1e-12)
 
 
 def test_damped_friction_is_a_push_held_for_the_duration():

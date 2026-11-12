@@ -1,4 +1,5 @@
-"""Forms available over a slow motion, along one-way nesting (book plan P41 (j); ``arrangements/available.py``).
+"""Forms available over a slow motion, along one-way nesting (book plan P41 (j); ``arrangements/available.py``). The room,
+the guest at ``mu = 9/20`` and the routine are Ch 5 ``ex.guest``.
 
 Predictions fixed before the code: the book repo's ``notes/runs/p41j-836d12ce/PREDICTIONS.md``; the lattices and their
 squares are read in that folder's ``piece*.py``. Claude Opus 5.5, 836d12ce, 2026-11-05.

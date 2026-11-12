@@ -1,4 +1,5 @@
-"""Book Ch 5 ``sec.modes``: one chain with two matters, and the swing (Claude Opus 5.5, d4e65d6e, 2026-11-05).
+"""Book Ch 5 ``sec.modes``: one chain with two matters (``ex.modes_chain``), and the swing (``ex.swing``) (Claude Opus 5.5,
+d4e65d6e, 2026-11-05).
 
 The library has no tangent arrangements, so a solution is approached by running an arrangement at shrinking durations.
 Every arrangement here is built in ``arr`` and run by the dynamics functor (``Phi`` and ``PhiK``); the expected curves

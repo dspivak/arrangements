@@ -87,7 +87,8 @@ def _bead(q0, p0, m, kappa, tau):
 
 
 def test_bead_chain_numbers_and_balance():
-    """CLOSED FORM. Ch 3 ex.bead_chain from (8, 0, 0) at rest: the kept energy is 8 at each round, the Hamiltonian 8, 12, 10.25; and each
+    """CLOSED FORM. Ch 3 ex.bead_chain from (8, 0, 0) at rest, the numbers of Ch 5 ex.bead_energy: the kept energy is 8 at each
+    round, the Hamiltonian 8, 12, 10.25; and each
     bead's balance holds, its work the inward loads at its two ports against the central differences."""
     tau, k1, k2 = 1.0, 0.25, 0.25
     first = Arrangement(P=masses([8.0], [0.0], [1.0], tau, "mass"), in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,

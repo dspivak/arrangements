@@ -281,6 +281,20 @@ box per chemical holding its amount and a box per reaction (7).
    ``F`` falls along the run because the mass-action flow dissipates it (a
    measured fact, at small ``dt``), not because the arrangement's forcing is
    ``-dF``.
+
+8. THE BOOK'S, Ch 3 ``ex.reaction_network`` (``book_reaction_network``; Claude
+   Opus 5.5, 00f2d232, 2026-11-12). 7 as the book draws it: a SPECIES box per
+   species, the cautious configuration system on ``R_{>0}`` of
+   ``cautious.species`` (update ``q + tau load``, allowed where it lands in
+   ``R_{>0}``), its output split once per arrow at it; a stateless TRANSITION
+   box per transition with one input port per arrow, in or out
+   (``book_transition``), whose inclination field is ``eqn.transition_effort``,
+   ``kappa_t prod_{i in I_t} x_i (sum_o dx_o - sum_i dx_i)``. It differs from
+   7 in two ways the book's picture has: a transition has a port per arrow, not
+   per species (so ``2A -> B`` has two ports for ``A``), and a species is
+   cautious. Its step at duration ``tau`` is the Euler step of the mass-action
+   rate equation, ``eqn.reaction_network_step`` for the net of the book's
+   picture, allowed when every new concentration is positive.
 """
 
 from __future__ import annotations
@@ -1265,3 +1279,56 @@ def composed_mass_action_arrangement(
                  for r, t in enumerate(touched)]
     wired = compose_seq(tensor_arrangements(chemicals + reactions), reaction_wire(alpha, beta))
     return replace(wired, label=f"composed_mass_action(n={len(degrees)}, R={len(touched)})")
+
+
+# ---------------------------------------------------------------------------
+# 8. The book's Ch 3 ex.reaction_network: cautious species, a transition port per arrow (module docstring, 8).
+# ---------------------------------------------------------------------------
+
+
+def book_transition(n_in: int, n_out: int, kappa: float) -> Arrangement:
+    """A transition ``t`` of ``ex.reaction_network``: stateless, one input port per arrow, the ``n_in`` arrows of
+    ``I_t`` first and then the ``n_out`` of ``O_t``; at the received concentrations ``x`` its inclination field is
+    ``eqn.transition_effort``: the load ``-kappa prod_{i in I_t} x_i`` on each input arrow, its negation on each output
+    arrow."""
+    sign = jnp.concatenate([-jnp.ones(n_in), jnp.ones(n_out)])
+
+    def omega(q: Array, m_out: Array, n_in_vals: Array):
+        rate = kappa * jnp.prod(n_in_vals[:n_in])
+        return jnp.zeros_like(q), jnp.zeros_like(m_out), rate * sign
+
+    return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=n_in + n_out, out_dim_N=0,
+                       out_f=lambda q, m_out: jnp.zeros(0), in_f=lambda q, m_out, n: jnp.zeros(0),
+                       omega=omega, label="transition")
+
+
+def book_reaction_network(q0: Sequence[float], transitions: Sequence[Tuple[Sequence[int], Sequence[int], float]],
+                          names: Sequence[str] = ()) -> Arrangement:
+    """The closed system of ``ex.reaction_network`` for the Petri net with species ``0..S-1`` at the concentrations
+    ``q0`` and ``transitions`` a list of ``(I_t, O_t, kappa_t)``, each ``I_t`` and ``O_t`` a list of species, one entry
+    per arrow. Each species' output wire is split once per arrow at it, and each copy goes to that arrow's port on its
+    transition:
+
+        compose_seq(tensor(species boxes, transition boxes), wire).
+
+    Its state is the concentrations in species order; a step not allowed leaves ``nan`` (``cautious.allowed``)."""
+    from .cautious import species
+
+    arrows = [(t, s) for t, (I, O, _) in enumerate(transitions) for s in list(I) + list(O)]   # transition-major
+    S = len(q0)
+    port, degrees, k = {}, [], 0
+    for s in range(S):                                         # out-ports species-major, the arrows in order
+        at_s = [a for a, (_, sa) in enumerate(arrows) if sa == s]
+        for a in at_s:
+            port[a] = k
+            k += 1
+        degrees.append(len(at_s))
+    perm = jnp.asarray([port[a] for a in range(len(arrows))], dtype=int)
+    names = list(names) or [f"species{s}" for s in range(S)]
+    boxes = [species(float(q0[s]), degrees[s], names[s]) for s in range(S)]
+    boxes += [book_transition(len(I), len(O), float(kappa)) for I, O, kappa in transitions]
+    wire = Arrangement(P=trivial_parameter(), in_dim_M=len(arrows), out_dim_M=len(arrows), in_dim_N=0, out_dim_N=0,
+                       out_f=lambda q, m_out: jnp.zeros(0), in_f=lambda q, m_out, n: m_out[perm],
+                       omega=zero_form, label="arrows")
+    wired = compose_seq(tensor_arrangements(boxes), wire)
+    return replace(wired, label=f"book_reaction_network(S={S}, T={len(transitions)}): {wired.label}")

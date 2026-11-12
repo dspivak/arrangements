@@ -4,7 +4,9 @@ written before this file).
 
 The reading under test (P5 (m) claim 1): a positive-weight message ``(h, w)`` on ``V = R^r`` is the
 likelihood ``exp(<h, x> - w |x|^2 / 2)``, the bell curve ``N(h/w, I/w)`` up to a constant, so weight is
-precision and value is the mean. Part 1 checks the reading on numbers. Parts 2-5 run attention
+precision and value is the mean. Part 1 checks the reading on numbers, and it is Ch 5 ``ex.message_encoding``, the
+encoding ``enc(h, w) = exp(h z - w |z|^2 / 2)`` taking sums of messages to products, ``0`` to ``1`` and scaling to
+powers, on ``R^1``. Parts 2-5 run attention
 arrangements of ``attention.py`` composed in arr with frozen scouts (the idiom of
 tests/test_fire.py): the scouts' reports are their frozen configurations, and the truth, where a
 cost needs it, arrives from outside as the external message.

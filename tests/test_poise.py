@@ -1,5 +1,5 @@
 """Book Ch 5 ``sec.poise``: leverage, balance points, and what one-way nesting does to them (Claude Opus 5.5, ccc7e1fe,
-2026-11-04).
+2026-11-04). Predictions (c)-(e), the switches in a chain, a branching nest and a loop, are ``ex.switch_loop``.
 
 Every system here is an arrangement run by the dynamics functor: each is built with ``compose_seq`` and
 ``parallel_arrangements``, its output dropped by a wire, and stepped by ``closed_step``, which is ``Phi``'s step checked

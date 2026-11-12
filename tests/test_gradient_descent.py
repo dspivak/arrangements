@@ -10,7 +10,10 @@ boxes ``x``, ``+`` and ``tanh`` for the maps, each passing the force at its outp
 the transpose of its differential (``exc.nn_boxes``); the wiring's dots; and the loss, a part with the
 cost function ``(1/2)(y - l)^2`` on the answer ``y`` and the label. ``Phi`` runs the whole: values go
 forward along the wires and forces come back, so the force on each parameter is minus the partial
-derivative of the loss's cost at that parameter (``exc.nn_chain_rule``), which is backpropagation. The
+derivative of the loss's cost at that parameter (``exc.nn_chain_rule``), which is backpropagation: the load on the
+parameters is ``-d(c o y)``, minus the differential of one cost function, the loss's cost ``c`` composed with the
+network's answer ``y`` (Ch 3 ``ex.backprop_exact``, by ``prop.costs_nest``; the two-layer test checks it against
+``jax.grad``). The
 book's step (parameters ``(1, -1, 2)``, datum ``1``, label ``1``, learning rate ``1/10``, forces
 ``(2, 2, 0)``, new parameters ``(1.2, -0.8, 2)``),
 run from the library's folder with it on the path, as the README's *Run it* says

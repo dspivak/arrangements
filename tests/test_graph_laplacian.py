@@ -18,15 +18,24 @@ per-vertex harmonic particles ``Part_v``. We check:
 
 The test graph mixes in- and out-degrees and has a non-identity prism permutation,
 so it exercises the broadcast (``outp f_v``) and routing (``inpt f``) non-trivially.
+
+The book's Ch 3 ``ex.graph_laplacian`` (Claude Opus 5.5, 00f2d232, 2026-11-12): the triangle it draws, edges
+``a : 1 -> 2``, ``b : 2 -> 3``, ``c : 1 -> 3`` with their own spring constants, built as the book builds it (three part
+boxes, the wiring's dots, a spring box per edge, ``wiring.boxes_and_couplers``). Predictions before the code: the closed
+inclination at the positions ``x`` is ``-L x`` for the book's matrix ``eqn.graph_laplacian_triangle``, whatever fills
+the mass boxes (rod segments or masses), and the rod segments' step at durations ``1/4`` and ``1`` is
+``x - tau eta L x``.
 """
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
+from arrangements.arrangement import Arrangement, exact, zero_form
 from arrangements.coalgebra import configuration, phase
-from arrangements.functors import Phi
-from arrangements.wiring import compose_graph, graph_wire
+from arrangements.functors import Phi, closed_step
+from arrangements.rvect import diagonal
+from arrangements.wiring import boxes_and_couplers, compose_graph, graph_wire, trivial_parameter
 
 from tests.chain import IN_POS, conf_flat, conf_state, load_regress, phase_flat, phase_state
 
@@ -144,3 +153,43 @@ def test_regression_matches_cdlm():
         q = _conf_step(O2, q)
         traj.append(np.asarray(q))
     np.testing.assert_allclose(np.stack(traj), R["gl_heat_q"], rtol=1e-10, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# The book's Ch 3 ex.graph_laplacian: its triangle, a spring constant per edge.
+# ---------------------------------------------------------------------------
+
+
+def _box(P):
+    """A box of the book's picture filled with a part reading out its position."""
+    return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1, out_f=lambda q, m: q,
+                       in_f=lambda q, m, n: _Z0, omega=zero_form, label="part")
+
+
+def _spring(k):
+    """``spring_e``: stateless, receiving ``(x_v, x_v')``, cost ``k/2 (x_v - x_v')^2``."""
+    return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=0, out_f=lambda q, m: _Z0,
+                       in_f=lambda q, m, n: _Z0, omega=exact(lambda q, m, n: -0.5 * k * (m[0] - m[1]) ** 2),
+                       label=f"spring({k:g})")
+
+
+def test_book_triangle_loads_are_minus_its_laplacian():
+    ka, kb, kc = 0.7, 1.9, 0.4
+    edges = [(0, 1), (1, 2), (0, 2)]               # a : 1 -> 2, b : 2 -> 3, c : 1 -> 3
+    L = np.array([[ka + kc, -ka, -kc], [-ka, ka + kb, -kb], [-kc, -kb, kb + kc]])   # eqn.graph_laplacian_triangle
+    x = jnp.array([1.0, -0.5, 2.0])
+    eta = 0.3
+    fills = {
+        "rod segments": [_box(configuration(diagonal(jnp.array([eta])), init=x[i:i + 1])) for i in range(3)],
+        "masses": [_box(phase(diagonal(jnp.array([1.0])), init=(x[i:i + 1], jnp.zeros(1)))) for i in range(3)],
+    }
+    for name, boxes in fills.items():
+        arr = boxes_and_couplers(boxes, edges, [_spring(ka), _spring(kb), _spring(kc)])
+        assert arr.label.count("spring") == 3, name
+        xi_q, _, _ = arr.omega(x, _Z0, _Z0)
+        np.testing.assert_allclose(np.asarray(xi_q), -L @ np.asarray(x), atol=1e-12, err_msg=name)
+    arr = boxes_and_couplers(fills["rod segments"], edges, [_spring(ka), _spring(kb), _spring(kc)])
+    for tau in (0.25, 1.0):
+        s1 = closed_step(arr, duration=tau)(arr.P.init)
+        flat = np.concatenate([np.ravel(np.asarray(a)) for a in jax.tree_util.tree_leaves(s1)])
+        np.testing.assert_allclose(flat, np.asarray(x) - tau * eta * L @ np.asarray(x), atol=1e-12)

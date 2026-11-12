@@ -13,17 +13,24 @@ inward pair (minus pushback, received) is dC for C = k/2 (x-y)^2 and is closed, 
 not; (c) two beads of stiffness 1 and 3, ends 0 and 1, wired output to input, rest with y = 3/4 and one load 3/4 on all
 three wires, the inward loads on the inner wire cancelling; (d) their port data (0, 1, -3/4, 3/4) equal those of two
 springs joined at a mass with both ends inputs, though the far end is an output in one and an input in the other.
+(a)-(c) are Ch 5 ``ex.bead_rest``.
+
+Added for Ch 5 ``ex.springs_rest`` (Claude Opus 5.5, 00f2d232, 2026-11-12), predictions before the code: (e) the two
+springs as the book draws them, a junction box and two stateless spring boxes wired to the two free ends, rest at both
+durations exactly when the junction sits at ``(k1 x1 + k2 x2)/(k1 + k2)`` with zero momentum, and the inward end loads
+are ``dC_eff`` for ``C_eff = k_eff/2 (x2 - x1)^2``, ``k_eff = k1 k2/(k1 + k2)``; at ``k = (1, 3)``, ends ``(0, 1)``:
+junction ``3/4``, loads ``(-3/4, 3/4)``; (f) the same with the junction a configuration part of response ``eta``.
 """
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arrangements.arrangement import Arrangement, exact
-from arrangements.coalgebra import phase
+from arrangements.arrangement import Arrangement, exact, zero_form
+from arrangements.coalgebra import configuration, phase
 from arrangements.functors import open_step
 from arrangements.rvect import diagonal
-from arrangements.wiring import compose_seq, parallel_arrangements, trivial_parameter
+from arrangements.wiring import compose_seq, parallel_arrangements, tensor_arrangements, trivial_parameter
 
 Z = jnp.zeros(0)
 DURATIONS = (0.25, 1.0)
@@ -128,3 +135,54 @@ def test_port_data_agree_with_two_springs_both_ends_inputs():
     data_beads = np.concatenate([[x1, x2], -pushback(two, jnp.array([q, x2]), [x1]), [load]])
     assert np.allclose(data_springs, data_beads)
     assert np.allclose(data_beads, [0.0, 1.0, -0.75, 0.75])
+
+
+# ---------------------------------------------------------------------------
+# Ch 5 ex.springs_rest: two springs in series, drawn as the book draws them.
+# ---------------------------------------------------------------------------
+
+
+def junction(P):
+    """The junction: a part reading out its displacement ``q``, with no inclination of its own."""
+    return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
+                       out_f=lambda q, m_: q, in_f=lambda q, m_, n: Z, omega=zero_form, label="junction")
+
+
+def spring(k):
+    """A stateless spring receiving its two end displacements ``(a, b)``, cost ``k/2 (b - a)^2``."""
+    return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=0, in_dim_N=2, out_dim_N=0,
+                       out_f=lambda q, m_: Z, in_f=lambda q, m_, n: Z,
+                       omega=exact(lambda q, m_, n: -0.5 * k * (n[1] - n[0]) ** 2), label=f"spring({k:g})")
+
+
+def two_springs(P, k1, k2):
+    """``two_springs : 1 -> <R^2|R^0>``: the junction and the two springs in boxes; the first spring hears the free end
+    ``x1`` and the junction, the second the junction and the free end ``x2``."""
+    wire = Arrangement(P=trivial_parameter(), in_dim_M=4, out_dim_M=1, in_dim_N=2, out_dim_N=0,
+                       out_f=lambda q, m_: Z,
+                       in_f=lambda q, m_, n: jnp.concatenate([n[:1], m_, m_, n[1:]]),
+                       omega=lambda q, m_, n: (Z, jnp.zeros(1), jnp.zeros(2)), label="wire")
+    return compose_seq(tensor_arrangements([junction(P), spring(k1), spring(k2)]), wire)
+
+
+def test_springs_in_series_rest_as_one_spring():
+    """Predictions (e) and (f): ``ex.springs_rest``'s ``eqn.springs_series_rest``, with a mass and with a configuration
+    part at the junction, at both durations."""
+    k1, k2 = 1.0, 3.0
+    k_eff = k1 * k2 / (k1 + k2)
+    for x1, x2 in [(0.0, 1.0), (-2.0, 0.5), (1.5, 1.5)]:
+        q = (k1 * x1 + k2 * x2) / (k1 + k2)
+        for P in (mass(2.0, q), configuration(diagonal(jnp.array([0.3])), init=jnp.array([q]))):
+            arr = two_springs(P, k1, k2)
+            assert arr.label.count("spring") == 2 and "junction" in arr.label
+            for d in DURATIONS:
+                assert fixed(arr, [x1, x2], None, d)
+            inward = -pushback(arr, jnp.array([q]), [x1, x2])
+            assert np.allclose(inward, [k_eff * (x1 - x2), k_eff * (x2 - x1)])
+            assert np.allclose(inward, jax.grad(lambda x: 0.5 * k_eff * (x[1] - x[0]) ** 2)(jnp.array([x1, x2])))
+        off = two_springs(mass(2.0, q + 0.1), k1, k2)
+        for d in DURATIONS:
+            assert not fixed(off, [x1, x2], None, d)
+    q = (k1 * 0.0 + k2 * 1.0) / (k1 + k2)
+    assert q == 0.75
+    assert np.allclose(-pushback(two_springs(mass(2.0, q), k1, k2), jnp.array([q]), [0.0, 1.0]), [-0.75, 0.75])

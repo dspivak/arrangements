@@ -143,6 +143,7 @@ things from it worth knowing before you trust a number:
 | module | role |
 |---|---|
 | `coalgebra.py` | `cot(Q)`-coalgebras (parameters, integrators): `CotCoalg`, `configuration`, `phase`, `tensor` |
+| `cautious.py` | cautious integrators (a step off its allowed set returns `nan`), Euler integrators of integrands, the rod in kelvin, a reaction network's species |
 | `cascade.py` | a fund that pays its parts by a gate, nested to any depth; workers, sources, a market |
 | `account.py` | the cascade's one level with a report channel: workers who say what they want, a fund that reads it, three wires |
 | `pain.py` | the cascade's one level with learning and pain: a fund that reads its own balance and sends it down, parts that turn learning to product when it is high |
