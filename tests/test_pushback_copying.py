@@ -1,7 +1,31 @@
-"""Ch 3 ex.copying_pushback, run by composition in Cartesian IMC.
+"""The copier and the comparison arrangement, composed and run (book Chapter 3, ``ex.copying_pushback``; linked from
+its last paragraph, "The composite runs in IMC").
 
-Closed-form reference updates are diagnostics, not replacement dynamics.
-These checks establish routing and the stated response, not convergence.
+For a reader of the book. The arrangements are in ``arrangements/pushback_copying.py``, whose head matches the book's
+names to the code's: ``pushback_copy`` is the book's ``copier``, ``pushback_comparator`` its ``compare``. Here every
+step is a step of the dynamics functor ``Phi``; the updates written out by hand beside it are the book's formulas,
+checked against it, not dynamics of their own. ``spring(initial, rate)`` is the book's small example: ``V = W = R``,
+configuration ``q = (x, kappa_c)``, a position and a stiffness, output ``o(q) = x`` and pushback
+``pi_c(q, v) = kappa_c (x - v)`` at the anchor position ``v``, with internal inclination ``(-pi_c, 0)``, the spring's
+own pull; it returns the plain spring ``<V | W>`` and its copier ``<V | W x V>``. The example a reader can run is in
+the module's head.
+
+What the tests check, each of which could fail. ``test_current_input_and_nonlinear_sensitivity_at_look_ahead``: the
+copier's update ``eqn.copy_general_update`` on a nonlinear pushback, differentiated at the look-ahead and at the input
+the copier currently receives. ``test_composite_step_matches_both_teaching_terms_and_external_loads``: one step of
+``compare . (original (x) copier)`` gives the loads of ``eqn.copy_general_step_loads``: ``kappa (y_o - y_c)`` at the
+copier's ordinary output, ``kappa (lambda_o - lambda_c)`` at its extra one, pulled back to ``kappa_c`` times it at
+position and ``(x - v)`` times it at stiffness, and ``lambda_o + lambda_c`` and ``0`` pushed back at the shared input
+and the signal. ``test_teaching_is_descent_on_the_pushback_mismatch``: the added inclination is minus the differential
+in ``q`` of ``(1/2) kappa |lambda_o - pi_c(q, v)|^2``, holding ``lambda_o`` and ``v`` fixed.
+``test_zero_teaching_retains_the_prescribed_ordinary_response``: with no teaching load the copier steps as the plain
+spring. ``test_no_input_recovers_the_same_integrator_under_ordinary_loads``: with ``V = 0`` the copier is its
+integrator with output teaching only, as for ``ex.copying_learner``.
+``test_drawn_factorization_equals_the_comparator_even_away_from_zero_readout``: the drawn wiring, the circle ``T`` and
+``couple`` (``eqn.copy_general_transfer``, ``eqn.copy_general_couple``), composes to ``pushback_comparator``. These
+checks establish the stated step, not convergence for every choice of copier.
+
+For agents: the head before 2026-11-13 is in ``notes/P31-B-CH3-HISTORY-2026-11-13.md``.
 """
 import jax.numpy as jnp
 import numpy as np
@@ -79,6 +103,28 @@ def test_composite_step_matches_both_teaching_terms_and_external_loads():
         np.testing.assert_allclose(pos[1](jnp.array([x, kappa])), jnp.array([a+b, 0.]), atol=1e-12)
         np.testing.assert_allclose(state[0][0], expected_o, atol=1e-12)
         np.testing.assert_allclose(state[0][1], expected_c, atol=1e-12)
+
+
+def test_teaching_is_descent_on_the_pushback_mismatch():
+    """Could fail: the teaching load could be pulled back along the wrong map, or at the wrong point, so that the added
+    inclination were not minus the differential of the squared mismatch of pushbacks (book ``ex.copying_pushback``)."""
+    import jax
+
+    source, _ = spring((.2, 2.), 0.)
+    _, copy = spring((-.3, 4.), 1.)
+    pi_c = lambda q, v: q[1]*(q[0]-v)
+    for x, kappa, duration in ((.8, 1., .02), (-.4, .5, .1), (.2, .7, .3)):
+        pair = compose_seq(parallel_arrangements(source, copy), pushback_comparator(1, 1))
+        on = step(pair, jnp.array([x, kappa]), jnp.zeros(2), duration)[2]
+        off = step(pair, jnp.array([x, 0.]), jnp.zeros(2), duration)[2]
+        (so, sc), _ = pair.P.init
+        lam_o = pi_c(so, x)
+        mismatch = lambda q: .5*kappa*(lam_o-pi_c(q, x))**2
+        added = (on[0][1]-off[0][1])/duration
+        # the W-teaching kappa (y_o - y_c) lands at position only, through o(q) = x
+        added_by_output = jnp.array([kappa*(so[0]-sc[0]), 0.])
+        print("added inclination", added-added_by_output, "minus the differential", -jax.grad(mismatch)(sc))
+        np.testing.assert_allclose(added-added_by_output, -jax.grad(mismatch)(sc), atol=1e-12)
 
 
 def test_zero_teaching_retains_the_prescribed_ordinary_response():

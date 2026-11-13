@@ -1,15 +1,49 @@
-"""A copy and its original (book Ch 3 ``ex.copying_learner``): ``copying.copy_pair``.
+"""One oscillator copies another (book Chapter 3, ``ex.copying_learner``, with ``ex.oscillator`` and
+``exc.osc_sine``; linked from the paragraph "Run it at duration 1").
 
-Two ``osc`` of one kind (book Ch 3 ``ex.oscillator``), the original at angular frequency 0.30 and the copy at 0.22, the
-copy coupled one way to the original while the external input ``K`` is 1. Each state is ``(alpha, nu)``, the angle on
-the circle and the angular frequency. Each test says whether it could have come out otherwise.
+For a reader of the book. ``copying.osc(lam, eta, (alpha, nu), amp=1)`` is the book's ``osc : I -> <0 | 1>``
+(``ex.oscillator``): it stores an angle ``alpha`` and an angular frequency ``nu``; told a duration ``tau`` it reads out
+the angle ``q = alpha + tau nu`` and sends ``amp sin q``; receiving a load ``xi`` at its output it updates to
+``(q + tau lam xi amp cos q, nu + tau eta xi amp cos q)`` (``eqn.osc_step``), ``lam`` the book's ``lambda`` and ``eta``
+its ``eta``. ``copying.couple()`` is the book's ``couple : I -> <3 | 0>``: it receives the original's value ``x``, the
+signal ``kappa`` and the copier's value ``y``, in that order, and pushes back ``kappa (x - y)`` at ``y`` and ``0`` at
+``x`` and at ``kappa``. ``copying.copy_pair_out(lam, eta, original, copier)`` is the book's whole arrangement
+``copier : I -> <1 | 2>`` of ``eqn.copier_wd``: the two ``osc`` and ``couple`` in the boxes of ``copier_wire``, the
+signal ``kappa`` arriving at its input and both values ``(x, y)`` sent out. ``copier_step`` is one step of the dynamics
+functor at duration 1, told ``kappa`` and the load ``0`` at the outputs; ``copier_q`` reads the two oscillators'
+states ``(alpha, nu)``, the original's first.
+
+The paragraph's run, from the library's folder with it on the path, as the README's *Run it* says
+(``PYTHONPATH=. .venv/bin/python example.py``):
+
+    import jax, jax.numpy as jnp
+    jax.config.update("jax_enable_x64", True)
+    from arrangements.copying import copy_pair_out, copier_step, copier_q
+    C = copy_pair_out(0.2, 0.04, [0.0, 0.3], [0.0, 0.22])
+    step, s = copier_step(C), C.P.init
+    for kappa in [1.0] * 4000 + [0.0] * 3000:
+        s = step(s, jnp.array([kappa]))
+    print(copier_q(C, s))
+    # (array([2.1e+03, 3.0e-01]), array([2.1e+03, 3.0e-01])): the original turned 7000 * 0.3 = 2100 radians at
+    # angular frequency 0.3, and the copier has come to the same angle and the same angular frequency
+
+What the tests check, each of which could fail. With ``kappa = 1`` for 4000 steps the copier comes to send what the
+original sends, at the original's angular frequency, and with ``kappa = 0`` for 3000 more it keeps that angular
+frequency, read both from its state and from the zero crossings of what it sends; the original sends the same free
+sine wave throughout; with ``kappa = 0`` from the start the copier stays at 0.22; without the angle's rate ``lam``
+nothing locks. The book's ``copier`` steps as ``copying.copy_pair``, the same two ``osc`` closed by the one-way contact
+with ``kappa`` as an input and nothing sent out. ``osc``'s step is ``eqn.osc_step`` at durations other than 1 too, its
+inclination field is 0, shorter steps land on the same wave (``exc.osc_sine`` (a)), and angular frequencies ``2 pi``
+apart send the same values at duration 1 and not at duration 1/2 (``exc.osc_sine`` (b)).
+
+For agents: the heads before 2026-11-13 are in ``notes/P31-B-CH3-HISTORY-2026-11-13.md``.
 """
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arrangements.copying import copy_pair, copy_pair_q, driven_step
+from arrangements.copying import copier_q, copier_step, copy_pair, copy_pair_out, copy_pair_q, driven_step
 
 jax.config.update("jax_enable_x64", True)
 
@@ -20,22 +54,22 @@ def _init(nu):
     return np.array([0.0, nu])
 
 
-def _sent(s):
-    """What an ``osc`` in state ``(alpha, nu)`` sends at a step of duration 1: ``sin(alpha + nu)``."""
-    return np.sin(s[0] + s[1])
+def _sent(C, s):
+    """The values ``(x, y)`` the book's ``copier`` sends at its two outputs at a step of duration 1 from state ``s``."""
+    return np.asarray(C.out_f(C.P.position(s), jnp.zeros(0)))
 
 
-def _run(Ks):
-    W = copy_pair(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
-    step = driven_step(W, check_inputs=[[1.0]] * 3)
-    s, xs, ys = W.P.init, [], []
-    for K in Ks:
-        o, c = copy_pair_q(W, s)
-        xs.append(_sent(o))
-        ys.append(_sent(c))
-        s = step(s, jnp.array([float(K)]))
-    o, c = copy_pair_q(W, s)
-    return o, c, np.array(xs), np.array(ys)
+def _run(kappas, lam=LAM):
+    """The book's ``copier`` told the signal ``kappas[k]`` at step ``k``; returns both states and what was sent."""
+    C = copy_pair_out(lam, ETA, _init(NU_ORIG), _init(NU_COPY))
+    step = copier_step(C, check_inputs=[[1.0], [0.0]])
+    s, sent = C.P.init, []
+    for kappa in kappas:
+        sent.append(_sent(C, s))
+        s = step(s, jnp.array([float(kappa)]))
+    o, c = copier_q(C, s)
+    sent = np.array(sent)
+    return o, c, sent[:, 0], sent[:, 1]
 
 
 def _crossing_rate(y):
@@ -44,11 +78,11 @@ def _crossing_rate(y):
     return np.pi / np.mean(np.diff(z))
 
 
-def test_the_copy_takes_the_original_angular_frequency_and_keeps_it():
-    """Could fail: the angular frequency could stop short, or drift once the coupling is off."""
+def test_the_copier_takes_the_original_angular_frequency_and_keeps_it():
+    """Could fail: the angular frequency could stop short, or drift once the signal is 0."""
     o, c, xs, ys = _run([1.0] * 4000 + [0.0] * 3000)
     mismatch = np.abs(xs[3800:4000] - ys[3800:4000]).max()
-    print("copy nu", c[1], "by crossings after", _crossing_rate(ys[4100:]), "mismatch", mismatch)
+    print("copier nu", c[1], "by crossings after", _crossing_rate(ys[4100:]), "mismatch", mismatch)
     assert abs(c[1] - NU_ORIG) < 1e-6 and mismatch < 1e-9
     assert abs(_crossing_rate(ys[4100:]) - NU_ORIG) < 1e-3
 
@@ -63,69 +97,60 @@ def test_the_original_is_untouched():
 
 
 def test_uncoupled_nothing_is_copied():
-    """Could fail: the copy could drift toward the original without the coupling."""
+    """Could fail: the copier could drift toward the original with the signal at 0."""
     _, c, _, ys = _run([0.0] * 3000)
-    print("copy nu uncoupled", c[1], "by crossings", _crossing_rate(ys[100:]))
+    print("copier nu uncoupled", c[1], "by crossings", _crossing_rate(ys[100:]))
     assert c[1] == NU_COPY and abs(_crossing_rate(ys[100:]) - NU_COPY) < 1e-3
 
 
 def test_without_the_angle_rate_nothing_locks():
-    """Could fail: the angular frequency's own response could be enough to lock on. Without the angle rate ``lam`` the
-    copy's angle swings around the original's like an undamped spring (book Ch 3 ``ex.copying_learner``)."""
-    W = copy_pair(0.0, ETA, _init(NU_ORIG), _init(NU_COPY))
-    step = driven_step(W)
-    s = W.P.init
-    for _ in range(4000):
-        s = step(s, jnp.array([1.0]))
-    _, c = copy_pair_q(W, s)
-    print("lam = 0: copy nu after 4000 coupled steps", c[1])
+    """Could fail: the angular frequency's own response could be enough to lock on. Without the angle's rate ``lam``
+    the copier's angle swings around the original's like an undamped spring."""
+    _, c, _, _ = _run([1.0] * 4000, lam=0.0)
+    print("lam = 0: copier nu after 4000 steps with the signal at 1", c[1])
     assert abs(c[1] - NU_ORIG) > 1e-2
 
 
-def test_the_exported_copier_sends_both_values_and_steps_as_the_closed_one():
-    """Could fail: exporting the values could change the step, or send something other than ``x`` and ``y``."""
-    from arrangements.copying import copy_pair_out
+def test_the_books_copier_steps_as_copy_pair_through_the_whole_run():
+    """Could fail: ``couple``'s pushback reaches the copier through the split of ``y`` and ``copier_wire``'s backward
+    map, not through a contact on the wire, so a wrong order of ``couple``'s inputs, or a split that dropped or doubled
+    the load, would move the copier elsewhere or touch the original."""
+    Ks = [1.0] * 4000 + [0.0] * 3000
+    W = copy_pair(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
+    C = copy_pair_out(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
+    step = driven_step(W, check_inputs=[[1.0]] * 3)
+    step_c = copier_step(C, check_inputs=[[1.0], [0.5], [0.0]])
+    s, sc, gap = W.P.init, C.P.init, 0.0
+    for K in Ks:
+        s, sc = step(s, jnp.array([K])), step_c(sc, jnp.array([K]))
+        gap = max(gap, max(np.abs(a - b).max() for a, b in zip(copy_pair_q(W, s), copier_q(C, sc))))
+    print("largest state difference over 7000 steps", gap)
+    assert gap < 1e-12
+
+
+def test_the_copier_sends_both_values_as_the_dynamics_functor_does():
+    """Could fail: the compiled step or the outputs read here could differ from the dynamics functor's own step."""
     from arrangements.functors import Phi
     from arrangements.interpretation import trivial_omega
 
-    W = copy_pair(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
-    Wo = copy_pair_out(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
-    assert (Wo.in_dim_M, Wo.out_dim_M, Wo.in_dim_N, Wo.out_dim_N) == (0, 0, 1, 2)
-    step = driven_step(W)
-    s, so = W.P.init, Wo.P.init
+    C = copy_pair_out(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
+    assert (C.in_dim_M, C.out_dim_M, C.in_dim_N, C.out_dim_N) == (0, 0, 1, 2)
+    step = copier_step(C)
+    s, s_phi = C.P.init, C.P.init
     for K in [1.0, 1.0, 0.5, 0.0, 1.0]:
-        o, c = copy_pair_q(W, s)
-        out, _, so = Phi(Wo).with_state(so).run_one(
+        o, c = copier_q(C, s)
+        out, _, s_phi = Phi(C).with_state(s_phi).run_one(
             (jnp.zeros(0), trivial_omega(0)), lambda _o, K=K: (jnp.zeros(2), jnp.array([K])))
+        sent = _sent(C, s)
         s = step(s, jnp.array([K]))
-        print("outputs", np.asarray(out[0]), "values", (_sent(o), _sent(c)))
-        assert np.allclose(np.asarray(out[0]), [_sent(o), _sent(c)], atol=1e-12)
-        assert np.allclose(np.asarray(Wo.P.position(so)), np.asarray(W.P.position(s)), atol=1e-12)
+        print("functor's outputs", np.asarray(out[0]), "read here", sent, "sines", (np.sin(o.sum()), np.sin(c.sum())))
+        assert np.allclose(np.asarray(out[0]), sent, atol=1e-12)
+        assert np.allclose(sent, [np.sin(o.sum()), np.sin(c.sum())], atol=1e-12)
+        assert np.allclose(np.asarray(C.P.position(s_phi)), np.asarray(C.P.position(s)), atol=1e-12)
 
 
-def test_the_books_copier_steps_as_copy_pair_through_the_whole_run():
-    """Could fail: ``couple``'s pushback reaches the copy through the split of ``y`` and ``copier_wire``'s backward map, not
-    through a contact on the wire, so a wrong order of ``couple``'s inputs, or a split that dropped or doubled the force,
-    would move the copy elsewhere or touch the original (book Ch 3 ``ex.copying_learner``)."""
-    from arrangements.copying import copier_q, copier_step, copy_pair_out
-
-    Ks = [1.0] * 4000 + [0.0] * 3000
-    W = copy_pair(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
-    Wo = copy_pair_out(LAM, ETA, _init(NU_ORIG), _init(NU_COPY))
-    step = driven_step(W)
-    step_o = copier_step(Wo, check_inputs=[[1.0], [0.5], [0.0]])
-    s, so, gap = W.P.init, Wo.P.init, 0.0
-    for K in Ks:
-        s, so = step(s, jnp.array([K])), step_o(so, jnp.array([K]))
-        gap = max(gap, max(np.abs(a - b).max() for a, b in zip(copy_pair_q(W, s), copier_q(Wo, so))))
-    o, c = copier_q(Wo, so)
-    print("largest state difference over 7000 steps", gap, "copier's copy nu", c[1], "original nu", o[1])
-    assert gap < 1e-12
-    assert abs(c[1] - NU_ORIG) < 1e-6 and o[1] == NU_ORIG
-
-
-def test_osc_has_effort_field_zero_and_steps_as_the_book_says():
-    """Could fail: the turning could sit in the effort field, or the force could reach the matter other than as
+def test_osc_has_inclination_field_zero_and_steps_as_the_book_says():
+    """Could fail: the turning could sit in the inclination field, or the load could reach the integrator other than as
     ``xi cos q`` at the look-ahead ``q = alpha + tau nu`` (book Ch 3 ``eqn.osc_step``), at durations other than 1 too."""
     from arrangements.copying import osc
 
@@ -145,8 +170,7 @@ def test_osc_has_effort_field_zero_and_steps_as_the_book_says():
 
 def test_shorter_steps_land_on_the_same_wave():
     """Could fail: steps of duration 1/2 or 1/100 could land somewhere other than one step of duration 1 does, at a
-    high angular frequency too (book ``exc.osc_sine`` (a); David, 2026-10-20: "a smaller duration means we're asking
-    for more precision")."""
+    high angular frequency too (book ``exc.osc_sine`` (a))."""
     from arrangements.copying import oscillator
 
     for nu in [0.3, 10.0]:

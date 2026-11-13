@@ -1,30 +1,65 @@
-"""The n-fold pendulum by nesting links (book Ch 3 ``sec.imc_arrangements``; ``arrangements/pendulum.py``).
+"""The n-fold pendulum, built by nesting links (book Chapter 3, ``sec.imc_arrangements``: ``eqn.link``,
+``eqn.link_link``, the double pendulum and ``eqn.pendulum_cost``; linked from the footnote to the paragraph
+"No real bar is perfectly stiff").
 
-The pendulum is ``drop . link^2 . pivot``, each link a bar from its support with a bob at its bottom
-(turned right side up from the first draft's ``pivot . link . end``, same costs, at David's "yes," 2026-10-14).
-Predictions, fixed before the first run (book ``notes/runs/pendulum-fa95b8ae/PREDICTIONS.md``, Claude Opus
-5.5, fa95b8ae, 2026-10-14), from rest at angles 1 and 1.5 rad, bobs 1 kg, bars 1 m:
-1. the nested composite is the same pendulum written flat, to 1e-10;
-2. as the bars stiffen through 1e4, 1e6 and steel's 2e7 N/m, the lower bob comes closer to the rigid double
-   pendulum over 1 s, within 1 mm at steel; steel stretches under 10 micrometres;
-4. the bar sets the step: at steel a step of 1e-3 s blows up, one of 1e-4 s keeps the energy within 0.1%.
-All held (the book's RESULTS.md beside the predictions); prediction 5, chaos, is not tested here.
+For a reader of the book. A *link* (``eqn.link``) is a bar of length ``ell`` and stiffness ``kappa`` hanging from
+a support, with a bob of mass ``m`` at its bottom and gravity ``g`` pulling it down. In the library it is
+``pendulum.link(m, kappa, ell, q0, g)``: its integrator is the bob (``pendulum.bob``: state ``(q, p)``, position and
+momentum; told a duration ``tau`` it reads out its look-ahead ``q + tau p/m`` and, receiving a load there, adds
+``tau`` times it to ``p``), its open box is the support, which reads out the point ``x`` the bar hangs from, and its
+cost is the bar's ``pendulum.bar_cost(kappa, ell, x, q)``, the book's ``eqn.bar_cost``
+``kappa/(8 ell^2) (|q - x|^2 - ell^2)^2``, plus gravity's ``m g q[1]``, the height being the second coordinate.
+``pivot()`` is the support that never moves, reading out the point ``0``; ``drop()`` drops the last bob's position.
+``pendulum(angles, m, kappa, ell, g, dt=1.0)`` is ``drop . link^n . pivot``, one link per angle, nested by
+``compose_seq`` as in ``eqn.link_link``, started at rest with its bars at the given angles from straight down;
+``bob_states`` reads the bobs' ``(q, p)`` off its state, top first. ``functors.closed_step(A, duration=tau)`` is one
+step of the dynamics functor told the duration ``tau``.
+
+The paragraph's numbers: two bobs of 1 kg on steel bars 1 m long, ``kappa = 2e7`` newtons per meter. Run from the
+library's folder with it on the path, as the README's *Run it* says (``PYTHONPATH=. .venv/bin/python example.py``):
+
+    import jax
+    jax.config.update("jax_enable_x64", True)
+    from arrangements.functors import closed_step
+    from arrangements.pendulum import pendulum, bob_states
+    A = pendulum([1.0, 1.5], m=1.0, kappa=2e7, ell=1.0, g=9.81, dt=1.0)
+    print(A.label)                                  # (drop . (link . (link . pivot)))
+    for tau in (1e-3, 1e-4):                        # one vibration of the bars lasts about 1e-3 s
+        step, s = closed_step(A, duration=tau), A.P.init
+        for _ in range(round(0.1 / tau)):           # a tenth of a second
+            s = step(s)
+        print(tau, bob_states(s)[1][0])             # 1e-3: [nan nan], blown up; 1e-4: the lower bob at [1.82 -0.66]
+
+What the tests check, each of which could fail. ``test_nesting_is_the_flat_pendulum``: the nested composite steps as
+the cost ``eqn.pendulum_cost`` written flat, by hand, to 1e-10. ``test_stiff_bars_approach_rigid_ones``: as the bars
+stiffen through 1e4, 1e6 and steel's 2e7 N/m, the lower bob comes closer to the rigid double pendulum (Lagrange's
+equations, ordinary code beside the arrangement), within 1 mm at steel over 1 s, and steel stretches by a couple of
+micrometers, between 1 and 5. ``test_the_rates_of_bar_and_swing``: linearized at the hanging rest, the composite's
+own inclination field gives the bars' vibrations, about a thousand a second (440 and 1150), and the slow swing,
+about once every two seconds (2.6 s). ``test_the_bar_sets_the_step``: one steel pendulum told a step of 1e-3 s, about
+one vibration, blows up, and told 1e-4 s keeps its energy within 0.1% over 2 s; the step it can take is
+``2/omega`` for its fastest vibration ``omega``; and the same step of 1e-3 s runs well on bars of ``kappa = 1e4``.
+
+For agents: the heads before 2026-11-13 are in ``notes/P31-B-CH3-HISTORY-2026-11-13.md``.
 """
 
 import jax
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
+import numpy as np
 
 from arrangements.functors import closed_step
 from arrangements.pendulum import bob_states, pendulum, positions, bar_cost
 
 M, L, G = 1.0, 1.0, 9.81
+STEEL = 2e7
 ANGLES = [1.0, 1.5]
 
 
-def _runner(A):
-    step = closed_step(A)
+def _runner(A, tau):
+    """``k`` steps of ``A``, each told the duration ``tau``, compiled."""
+    step = closed_step(A, duration=tau)
     return jax.jit(lambda s, k: jax.lax.fori_loop(0, k, lambda _i, t: step(t), s), static_argnums=1)
 
 
@@ -39,7 +74,7 @@ def _energy(s, kappa):
     return E + bar_cost(kappa, L, jnp.zeros(2), qs[0]) + bar_cost(kappa, L, qs[0], qs[1])
 
 
-def _rigid(T, h):
+def _rigid(h):
     """Rigid double pendulum, Lagrange's equations in the two angles, RK4 (ordinary code, the reference)."""
     def lag(th, w):
         x1 = L * jnp.array([jnp.sin(th[0]), -jnp.cos(th[0])])
@@ -62,47 +97,79 @@ def _rigid(T, h):
     return jax.jit(lambda y, k: jax.lax.fori_loop(0, k, lambda _i, t: rk4(t), y), static_argnums=1)
 
 
+def _rates(kappa):
+    """The angular frequencies, in radians per second, of the double pendulum's small motions about its hanging rest,
+    read off the composite's own inclination field: its rest is where the field vanishes, and minus its Jacobian there,
+    divided by the mass, has the squared angular frequencies as eigenvalues."""
+    A = pendulum([0.0, 0.0], M, kappa, L, G, dt=1.0)
+    field = lambda q: A.omega(q, jnp.zeros(0), jnp.zeros(0))[0]
+    q = jnp.concatenate(positions([0.0, 0.0], L))
+    for _ in range(20):    # Newton to the rest: the bars stretch under the bobs' weight (pinv: no sideways stiffness yet)
+        q = q - jnp.linalg.pinv(jax.jacfwd(field)(q)) @ field(q)
+    assert float(jnp.max(jnp.abs(field(q)))) < 1e-6
+    return np.sqrt(np.sort(np.linalg.eigvalsh(-np.asarray(jax.jacfwd(field)(q)) / M)))
+
+
 def test_nesting_is_the_flat_pendulum():
-    kappa, dt, N = 1e4, 1e-3, 500
-    A = pendulum(ANGLES, M, kappa, L, G, dt)
+    """Could fail: nesting could wire a bar to the wrong support or drop a bob's gravity."""
+    kappa, tau, N = 1e4, 1e-3, 500
+    A = pendulum(ANGLES, M, kappa, L, G, dt=1.0)
     assert A.label == "(drop . (link . (link . pivot)))"
-    s = _runner(A)(A.P.init, N)
+    s = _runner(A, tau)(A.P.init, N)
     q = jnp.stack(positions(ANGLES, L)); p = jnp.zeros_like(q)
     cost = lambda Q: bar_cost(kappa, L, jnp.zeros(2), Q[0]) + bar_cost(kappa, L, Q[0], Q[1]) + M * G * jnp.sum(Q[:, 1])
     g = jax.jit(jax.grad(cost))
     for _ in range(N):
-        q = q + dt * p / M
-        p = p - dt * g(q)
+        q = q + tau * p / M
+        p = p - tau * g(q)
     assert float(jnp.max(jnp.abs(jnp.stack(_bobs(s)[0]) - q))) < 1e-10
 
 
-def test_stiff_rods_approach_rigid_ones():
+def test_stiff_bars_approach_rigid_ones():
+    """Could fail: stiffer bars could stray further from the rigid pendulum, or steel could stretch visibly."""
     gaps = []
-    for kappa, dt in [(1e4, 1e-4), (1e6, 1e-4), (2e7, 2e-5)]:
-        A = pendulum(ANGLES, M, kappa, L, G, dt)
-        run, every = _runner(A), int(round(1e-3 / dt))
-        rigid, h = _rigid(1.0, 1e-5), 1e-5
+    for kappa, tau in [(1e4, 1e-4), (1e6, 1e-4), (STEEL, 2e-5)]:
+        A = pendulum(ANGLES, M, kappa, L, G, dt=1.0)
+        run, every = _runner(A, tau), int(round(1e-3 / tau))
+        h = 1e-5
+        rigid = _rigid(h)
         s, y = A.P.init, jnp.array(ANGLES + [0.0, 0.0])
         worst = stretch = 0.0
         for _ in range(1000):
-            s, y = run(s, every), rigid(y, int(round(every * dt / h)))
+            s, y = run(s, every), rigid(y, int(round(every * tau / h)))
             (q1, q2), _ = _bobs(s)
             worst = max(worst, float(jnp.linalg.norm(q2 - positions([y[0], y[1]], L)[1])))
             stretch = max(stretch, abs(float(jnp.linalg.norm(q1)) - L), abs(float(jnp.linalg.norm(q2 - q1)) - L))
+        print("kappa", kappa, "largest gap to rigid", worst, "largest stretch", stretch)
         gaps.append((worst, stretch))
     assert gaps[0][0] > gaps[1][0] > gaps[2][0]
-    assert gaps[2][0] < 1e-3 and gaps[2][1] < 1e-5
+    assert gaps[2][0] < 1e-3 and 1e-6 < gaps[2][1] < 5e-6
 
 
-def test_the_rod_sets_the_step():
-    kappa = 2e7
-    A = pendulum(ANGLES, M, kappa, L, G, 1e-3)
-    s = _runner(A)(A.P.init, 1000)
-    E = float(_energy(s, kappa))
-    assert not (abs(E) < 1e6)                       # blown up (or overflowed)
-    A = pendulum(ANGLES, M, kappa, L, G, 1e-4)
-    run, E0 = _runner(A), float(_energy(A.P.init, kappa))
-    s = A.P.init
+def test_the_rates_of_bar_and_swing():
+    """Could fail: the bars could ring far from a thousand times a second, or the swing far from once in two seconds."""
+    w = _rates(STEEL)
+    print("angular frequencies (rad/s)", w, "cycles per second", w / (2 * np.pi), "periods (s)", 2 * np.pi / w)
+    swing_slow, swing_fast, bar_slow, bar_fast = w
+    assert 1.5 < 2 * np.pi / swing_slow < 3.0
+    assert 300 < bar_slow / (2 * np.pi) < bar_fast / (2 * np.pi) < 2000
+
+
+def test_the_bar_sets_the_step():
+    """Could fail: steel could run at a step as long as one vibration, or the limit could be set by something other
+    than the bars' fastest vibration, so that softer bars did no better."""
+    A = pendulum(ANGLES, M, STEEL, L, G, dt=1.0)
+    limit = 2 / _rates(STEEL)[-1]                     # symplectic Euler holds while tau omega < 2: about 2.8e-4 s
+    for tau, holds in [(1e-3, False), (1.5 * limit, False), (0.75 * limit, True), (1e-4, True)]:
+        s = _runner(A, tau)(A.P.init, int(round(1.0 / tau)))
+        E = float(_energy(s, STEEL))
+        print("steel, tau", tau, "energy after 1 s", E)
+        assert (abs(E - float(_energy(A.P.init, STEEL))) < 1.0) == holds
+    run, E0, s = _runner(A, 1e-4), float(_energy(A.P.init, STEEL)), A.P.init
     for _ in range(20):
-        s = run(s, 500)
-        assert abs(float(_energy(s, kappa)) - E0) < 1e-3 * abs(E0)
+        s = run(s, 1000)
+        assert abs(float(_energy(s, STEEL)) - E0) < 1e-3 * abs(E0)
+    soft = pendulum(ANGLES, M, 1e4, L, G, dt=1.0)
+    s = _runner(soft, 1e-3)(soft.P.init, 2000)
+    print("kappa 1e4, tau 1e-3, energy after 2 s", float(_energy(s, 1e4)), "from", float(_energy(soft.P.init, 1e4)))
+    assert abs(float(_energy(s, 1e4)) - float(_energy(soft.P.init, 1e4))) < 1e-2 * abs(float(_energy(soft.P.init, 1e4)))
