@@ -41,21 +41,23 @@ def theta_of(kind, s):
 
 
 def test_predictor_sends_its_prediction():
-    """The modeling predictor sends out msg(o(xhat)) at its forecast xhat (book def.model_predictor)."""
+    """The modeling predictor sends out its prediction o(xhat) at its forecast xhat (book def.model_predictor)."""
     pred = predictor(decay, jnp.sin, jnp.eye(1), 0.0, 0.4, 1.0, dy=1)
     xhat = pred.P.look_ahead(pred.P.init, 0.1)
     assert jnp.allclose(xhat, jnp.exp(-0.1) * 0.4)
-    assert jnp.allclose(pred.out_f(xhat, jnp.zeros(0)), jnp.array([jnp.sin(xhat[0]), 1.0]))
+    out = pred.out_f(xhat, jnp.zeros(0))
+    assert out.shape == (1,) and jnp.allclose(out, jnp.array([jnp.sin(xhat[0])]))
 
 
 @pytest.mark.parametrize("kind", ["one_way", "active"])
 def test_grouping_transfers_out_the_prediction(kind):
-    """Both arrangements transfer out the predictor's prediction msg(o(xhat))."""
+    """Both arrangements transfer out the predictor's prediction o(xhat), a value in Y."""
     arr, tau = pair(kind, o=jnp.sin, mu0=0.4), 0.1
+    assert arr.out_dim_N == 1
     tell = lambda _o: (jnp.zeros(arr.out_dim_N), jnp.zeros(arr.in_dim_N))
     out_pos = Phi(arr).with_state(arr.P.init).run_one(_IN, tell, tau)[0]
     xhat = jnp.exp(-tau) * 0.4
-    assert jnp.allclose(jnp.ravel(jax.tree_util.tree_leaves(out_pos)[0]), jnp.array([jnp.sin(xhat), 1.0]), atol=1e-6)
+    assert jnp.allclose(jnp.ravel(jax.tree_util.tree_leaves(out_pos)[0]), jnp.array([jnp.sin(xhat)]), atol=1e-6)
 
 
 def test_force_on_system_is_the_prediction_error_pulled_back():
