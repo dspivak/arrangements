@@ -18,9 +18,8 @@ The system reads out ``q`` and is observed by its own map ``g``, which need not 
 (Friston et al. 2009, Methods, "Active inference," eqs. (7)-(8)); the tests pass the same map for both.
 
 * ``one_way``: the predictor hears the system through the book's sensor (``sensor`` below; the book says only
-  that it takes a snapshot of ``g(q)`` and reads it out while ignoring every force on its readout), a part storing
-  a reading and a report, load-free and unilateral (Ch 3 ``def.arr_vocabulary``), so the system never feels
-  the predictor.
+  is the follower of Ch 4 ``ex.follower``, its report pulled toward ``g(q)``), load-free and unilateral at its output
+  (Ch 3 ``def.arr_vocabulary``), so the system never feels the predictor.
 * ``active``: the sensor is removed; the wiring sends ``q`` to the value ``g(q)``. The predictor's load on
   that value comes back along the wire, pulled back through ``g``, so the system receives
   ``(T_q g)^T (o(xhat) - g(q))``: active inference (Friston et al. 2009, Methods, "Active inference," eq. (9)).
@@ -37,10 +36,10 @@ import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import CotCoalg, phase
+from .coalgebra import CotCoalg, configuration, phase
 from .functors import Phi
 from .interpretation import trivial_omega
-from .rvect import diagonal
+from .rvect import constant, diagonal
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 Model = Callable[[Array, float, Array], Array]   # f(theta, tau, mu) -> X, with f(theta, 0, mu) = mu
@@ -92,24 +91,23 @@ def predictor(f: Model, o: Callable[[Array], Array], G: Array, eta: float, mu0, 
 
 
 def sensor(g: Callable[[Array], Array], k: float, dx: int, dy: int, y0=None) -> Arrangement:
-    """The book's sensor ``<0|0> -> <dy|dx>``: stores a reading ``z`` and a report ``y``, reads out ``y``.
+    """The book's sensor ``<0|0> -> <dy|dx>``: the follower of Ch 4 ``ex.follower``, a report ``y`` that follows a
+    leader ``z``, reading out ``y``.
 
-    Its inclination field is ``g(q) - z`` on the reading and ``0`` on the report and on ``q`` (load-free); its update uses
-    only the reading's component (unilateral): ``z' = z + k tau xi_z``, ``y' = y + k tau (z' - y)``."""
+    Its integrator is the response-integrator on ``Y x Y`` with constant response ``(xi_y, xi_z) |-> k (xi_z, xi_z)``
+    (Ch 3 ``def.response_integrator``): a load on the leader moves both, a load on the report moves neither. Its
+    inclination field is ``g(x) - y`` on the leader and ``0`` on the report and on the input ``x`` (load-free), so
+    ``y' = y + k tau (g(x) - y)``: at ``k tau = 1`` the report is a snapshot of ``g(x)``. A load on the readout ``y``
+    is pulled back to ``(xi, 0)``, which the response sends to ``0``: unilateral at its output (Ch 3
+    ``def.arr_vocabulary`` (x)). (Until 2026-11-14 the update was two-stage, ``y' = y + k tau (z' - y)``, not a
+    response-integrator, so not unilateral in the book's sense; book plan P103 (a), Claude Opus 5.5, e1aedebb.)"""
     s0 = jnp.zeros(2 * dy) if y0 is None else jnp.concatenate([jnp.asarray(y0, float)] * 2)
-
-    def timed_step(s, xi, tau):
-        y, z = s[:dy], s[dy:]
-        z2 = z + k * tau * xi[dy:]
-        return jnp.concatenate([y + k * tau * (z2 - y), z2])
-
-    P = CotCoalg(
-        Q_dim=2 * dy, init=s0, position=lambda s: s, step=lambda s, xi: timed_step(s, xi, 1.0),
-        timed_step=timed_step, label="sensor",
-    )
+    I = jnp.eye(dy)
+    O = jnp.zeros((dy, dy))
+    P = configuration(constant(k * jnp.block([[O, I], [O, I]])), init=s0)
 
     def omega(q, m_out, n_in):
-        return (jnp.concatenate([jnp.zeros(dy), g(n_in) - q[dy:]]), jnp.zeros_like(m_out), jnp.zeros_like(n_in))
+        return (jnp.concatenate([jnp.zeros(dy), g(n_in) - q[:dy]]), jnp.zeros_like(m_out), jnp.zeros_like(n_in))
 
     return Arrangement(
         P=P, in_dim_M=0, out_dim_M=0, in_dim_N=dx, out_dim_N=dy,
