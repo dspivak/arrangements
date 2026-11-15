@@ -1,5 +1,6 @@
-"""Portwise unilateral arrangements (book Ch 3 ``def.arr_vocabulary`` (x), Ch 4 ``def.unilateral_ports``,
-``prop.unilateral_ports`` and ``ex.follower``; book plan P103 (a), Claude Opus 5.5, e1aedebb, 2026-11-14).
+"""Walled arrangements on the output side (book Ch 3 ``def.arr_vocabulary`` (x), Ch 4 ``def.walled``,
+``prop.walled`` and ``ex.follower``; book plan P103 (a), Claude Opus 5.5, e1aedebb, 2026-11-14; walled names since
+P103 (c), e06f45e7, 2026-11-15).
 
 The follower ``follow : 1 -> <1 | R x R>`` has the response-integrator on ``Q = R^2`` with constant response
 ``sharp(xi_1, xi_2) = (xi_1, xi_1)``: a load on the leader ``q_1`` moves both coordinates, a load on the follower
@@ -79,14 +80,14 @@ def test_follower_unilateral_at_b_not_at_a(eta):
 
 
 @pytest.mark.parametrize("eta", [1.0, -2.5])
-def test_routing_from_marked_port_keeps_unilateral(eta):
+def test_routing_from_walled_port_keeps_unilateral(eta):
     """psi reads b: a two-input composite (follow beside rod), unilateral at its one port."""
     comp = compose_seq(parallel_arrangements(follow(), rod()), static(3, 1, "psi_b"))
     assert jnp.allclose(flat(stepped(comp, [eta])), flat(stepped(comp, [0.0])))
 
 
 @pytest.mark.parametrize("eta", [1.0, -2.5])
-def test_routing_from_unmarked_port_fails(eta):
+def test_routing_from_unwalled_port_fails(eta):
     """psi reads the rod segment's temperature: static, so (i) holds, but (ii) fails and so does the composite."""
     comp = compose_seq(parallel_arrangements(follow(), rod()), static(3, 2, "psi_theta"))
     diff = flat(stepped(comp, [eta])) - flat(stepped(comp, [0.0]))
@@ -95,7 +96,7 @@ def test_routing_from_unmarked_port_fails(eta):
 
 @pytest.mark.parametrize("eta", [1.0, -2.5])
 def test_identity_filled_with_rod_is_the_rod(eta):
-    """The identity on <1|R> is unilateral at its port (configuration R^0) but not marked-to-marked from an unmarked
+    """The identity on <1|R> is unilateral at its port (configuration R^0) but not walled-to-walled from an unwalled
     port; filled with the rod segment it steps as the rod segment, which a load at its output moves."""
     r = rod()
     comp = compose_seq(r, static(1, 0, "id"))
@@ -118,8 +119,8 @@ def test_sensor_is_load_free_and_unilateral(eta):
     assert jnp.allclose(flat(base)[0], 0.4 + TAU * (2.0 * 0.9 - 0.4))                 # the report moves toward g(x)
 
 
-def test_identity_on_marked_interface_is_a_unit():
-    """The identity on <1 | R x R>, marked at b, composed after the follower steps as the follower, at every load."""
+def test_identity_on_walled_interface_is_a_unit():
+    """The identity on <1 | R x R>, walled at b, composed after the follower steps as the follower, at every load."""
     f = follow()
     ident = Arrangement(
         P=trivial_parameter(), in_dim_M=0, out_dim_M=2, in_dim_N=0, out_dim_N=2,
