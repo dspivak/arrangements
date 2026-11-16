@@ -7,7 +7,7 @@ holds the predictions).
 returns to the charge ``e (E(x) + v x B(x))``, with ``E(x)``, ``B(x)`` by Whitney's shapes from the edge voltages and the flux around the cell,
 and to each edge the current ``-e v . W_e(x)``. The field's springs are gathered into that one box, for speed: they are
 ``light_lattice.py``'s face boxes, summed by hand. The push and the current are the two sides of one exchange of power, so the box is not
-exact, and sits outside Ch 5's rest-is-Lagrangian and potential functors.
+exact, and sits outside Ch 5's rest-is-Lagrangian and exact-field functors.
 
 *The source.* ``source_lattice_3d`` is the mass-and-spring lattice one dimension up, with ``clock_part`` (time its state) returning a current to
 one edge: an input varying with time arrives through a part with a clock. ``loop_step`` is the plain loop that stands beside it, checked equal to
