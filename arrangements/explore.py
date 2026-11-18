@@ -152,19 +152,19 @@ def scene(record, *, title=None, time=0):
         return np.asarray(value).tolist()
     def node(id, parent, label, kind='box', **kw):
         nodes.append(dict(id=id, parent=parent, label=label, kind=kind, **kw))
-    def wire(id, source, target, value, load, label):
+    def wire(id, source, target, value, load, label, **ports):
         if not isinstance(value, (tuple, list)) or len(value):
             if isinstance(value, (np.ndarray, jax.Array)) and value.size == 0:
                 return
             wires.append(dict(id=id, source=source, target=target, label=label,
                               value=data(value), load=data(load), valueScale=1, loadScale=1,
-                              description=('Load components on the supplied plot; not a scalar field-wire load.'
+                              **ports, description=('Load components on the supplied plot; not a scalar field-wire load.'
                                            if record['operation'].startswith('smooth') else '')))
     def visit(r, id, parent):
         node(id, parent, r['label'], description=r['operation'])
         for side, label in [('mi', 'Internal inputs'), ('mo', 'Internal outputs'),
                             ('ni', 'External inputs'), ('no', 'External outputs')]:
-            node(id+'/'+side, id, label, 'boundary')
+            node(id+'/'+side, id, label, 'boundary', side='in' if side in ('mo','ni') else 'out')
         if r['children']:
             a, b = r['children']
             visit(a, id+'/a', id); visit(b, id+'/b', id)
@@ -177,11 +177,18 @@ def scene(record, *, title=None, time=0):
                     ends = (id+'/'+side, id+'/'+child+'/'+side)
                     wire(id+'/'+side, *(ends[::-1] if rev else ends), r[key], r[lk], side)
             else:
-                for child, rr in [('a',a),('b',b)]:
-                    for side, key, lk, rev in [('mo','m_out','m_load',False),('mi','m_in','m_in_load',True),
-                                              ('ni','n_in','n_in_load',False),('no','n_out','n_load',True)]:
-                        ends = (id+'/'+side, id+'/'+child+'/'+side)
-                        wire(id+'/'+child+'-'+side, *(ends[::-1] if rev else ends), rr[key], rr[lk], side)
+                for side, key, lk, rev in [('mo','m_out','m_load',False),('mi','m_in','m_in_load',True),
+                                          ('ni','n_in','n_in_load',False),('no','n_out','n_load',True)]:
+                    # A product's two coordinates are different readouts, not
+                    # two copies of one wire. Show the split/join as a static map.
+                    operation=id+'/'+side+'-product'
+                    node(operation,id,'Assemble product' if rev else 'Read product coordinates','operation')
+                    ends=(id+'/'+side,operation)
+                    wire(id+'/'+side,*(ends[::-1] if rev else ends),r[key],r[lk],side)
+                    for child,rr in [('a',a),('b',b)]:
+                        ends=(operation,id+'/'+child+'/'+side)
+                        wire(id+'/'+child+'-'+side,*(ends[::-1] if rev else ends),rr[key],rr[lk],
+                             side+' · '+child,sourcePort=child if not rev else side)
         else:
             node(id+'/coupling', id, 'Transfers and inclination field', 'field')
             if np.asarray(r['configuration']).size:
@@ -194,7 +201,7 @@ def scene(record, *, title=None, time=0):
                 wire(id+'/'+side, *(ends[::-1] if rev else ends), r[key], r[lk], side)
     visit(record, 'root', None)
     connected = {end for w in wires for end in (w['source'], w['target'])}
-    nodes = [n for n in nodes if n['kind'] != 'boundary' or n['id'] in connected]
+    nodes = [n for n in nodes if n['kind'] not in ('boundary','operation') or n['id'] in connected]
     return dict(version=1, title=title or record['label'], root='root', time=time, nodes=nodes, wires=wires)
 
 
@@ -205,7 +212,7 @@ def write_html(frames, path):
         raise ValueError('At least one frame is required')
     viewer = Path(__file__).resolve().parents[1] / 'viewer'
     css = (viewer/'explorer.css').read_text()
-    core = (viewer/'explorer-core.js').read_text()
+    core = (viewer/'explorer-core.js').read_text() + '\n' + (viewer/'explorer-layout.js').read_text()
     ui = (viewer/'explorer.js').read_text()
     payload = json.dumps(frames, allow_nan=False).replace('<', '\\u003c')
     html = ('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'

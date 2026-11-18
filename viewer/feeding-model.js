@@ -43,7 +43,7 @@
   };
   const near = (u, R) => { const t = (R * R - u * u) / (0.75 * R * R); return [theta(t), dtheta(t) * (-2 * u) / (0.75 * R * R)]; };
 
-  function field(s, places, P) {
+  function field(s, places, P, learner) {
     const [b, l, h, y, my, zc, r, sc, eta, zeta] = s;
     const n = places.length;
     const live = theta(b / P.b0), hold = theta(l), dhold = dtheta(l);
@@ -63,9 +63,10 @@
     const lookR = live * (free * (P.omega * sc + P.gam * ring * r) + P.lam * dseen);
     const lookS = live * free * (-P.omega * r + P.gam * ring * sc);
     const ringp = P.B * P.B - eta * eta - zeta * zeta;
-    const patE = live * free * (P.nup * zeta + P.gamp * ringp * eta);
-    const patZ = live * free * (-P.nup * eta + P.gamp * ringp * zeta);
-    const torque = live * (P.ktau * seen * r + P.kexp * free * (eta - y));
+    const patE = learner ? 0 : live * free * (P.nup * zeta + P.gamp * ringp * eta);
+    const patZ = learner ? 0 : live * free * (-P.nup * eta + P.gamp * ringp * zeta);
+    const search = learner ? learner.pull : P.kexp * (eta - y);
+    const torque = live * (P.ktau * seen * r + free * search);
     // the lever: grip toward a full casing at its tip, lift toward the mouth while holding
     let K = 0;
     for (let k = 0; k < n; k++) {
@@ -125,16 +126,16 @@
     return { rate, live, hold, seen, free, torque, grip, lift, wheel, pay, eatAll, pryAll, casings, energy, loss, patE };
   }
 
-  function rk4(s, h, places, P) {
+  function rk4(s, h, places, P, evaluate = field) {
     const add = (u, v, c) => u.map((ui, i) => ui + c * v[i]);
-    const k1 = field(s, places, P).rate;
-    const k2 = field(add(s, k1, h / 2), places, P).rate;
-    const k3 = field(add(s, k2, h / 2), places, P).rate;
-    const k4 = field(add(s, k3, h), places, P).rate;
+    const k1 = evaluate(s, places, P).rate;
+    const k2 = evaluate(add(s, k1, h / 2), places, P).rate;
+    const k3 = evaluate(add(s, k2, h / 2), places, P).rate;
+    const k4 = evaluate(add(s, k3, h), places, P).rate;
     return s.map((si, i) => si + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
   }
 
-  const api = { DEFAULTS, NR, NC, PLACES, FOODS, START, start, casing, theta, field, rk4 };
+  const api = { DEFAULTS, NR, NC, PLACES, FOODS, START, start, casing, theta, dtheta, field, rk4 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Feeding = api;
 })(this);

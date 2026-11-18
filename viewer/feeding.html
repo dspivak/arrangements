@@ -7,7 +7,7 @@
    a receiver on a cart on a line, with an eye that scans how far away it looks, and casings on the ground.
    Layout follows PRINCIPLES.md: one question in the bar with Play; the picture with what is yours to set drawn on it;
    the calculation of the present moment under it, in the order the mathematics has it; the record over time.
-   The model is feeding-model.js, checked by feeding-model.test.js.
+   The model uses food-learning.js and feeding-model.js. The library and browser checks include complete search trips.
    Claude Opus 5.5, 2ff5d861 (first page), d531d927 (the cart and the eye) and 003367d0 (the patrol, damped contacts),
    2026-11-18. */
 :root {
@@ -71,25 +71,32 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
 
 <div class="wrap">
   <h1>Feeding</h1>
-  <p><a href="feeding-explorer.html">Explore the arrangement: open boxes, follow values and loads, and regroup parts.</a></p>
-  <p class="lede">A receiver rides a cart along a line. Its eye sweeps how far away it looks; when the place it looks at is red, the eye holds there and the wheels drive the cart toward it. While it sees nothing red, the cart patrols: it follows a point that sweeps slowly up and down the line. A casing is red while it is full of food. At the casing the lever grips it, lifts it to the mouth, pries it open, and the receiver digests the food into its battery. Everything is paid for from the battery.</p>
+  <p class="lede">The eye watches for red casings while the cart searches. When it sees one, the cart heads there to eat. A meal teaches the cart how much food a place yields. A later look teaches it how soon to come back. If the place is still empty, its chance of getting the next flag recovers more slowly.</p>
 
   <div class="ask">
-    <span class="q">Will the eye find the food? Place full and empty casings on the line, then press Play.</span>
+    <span class="q">Will the cart find its way back to food it remembers?</span>
     <button class="primary" id="play">Play</button>
-    <button id="reset">Start over</button>
+    <button id="outing">New outing · keep memory</button>
+    <button id="reset">Start over · forget</button>
     <span class="hint" style="margin:0">time runs at <span class="knob" id="k-speed" tabindex="0"></span> units a second</span>
   </div>
 
   <div class="card">
     <h2>The line</h2>
-    <svg id="scene" viewBox="0 0 940 300" role="img" aria-label="The cart on the line, its eye's gaze, and the casings on the ground"></svg>
+    <svg id="scene" viewBox="0 0 940 392" role="img" aria-label="The cart on the line, its eye's gaze, the casings on the ground, and the search probability density beneath the destination flag"></svg>
+    <p class="hint"><strong>Next flag · probability per unit distance.</strong> The shaded area under each stretch of ground is its chance of getting the next flag. The curve updates as the cart explores. The flag marks the destination already chosen.</p>
     <div class="tools">
       <button id="add-full">Add a full casing</button>
       <button id="add-empty">Add an empty casing</button>
-      <span class="hint" style="margin:0">Add a casing at any time, even while it runs. Before Play, drag a casing or the cart along the line, click a casing to make it full or empty, or drag it off either end to remove it.</span>
+      <span class="hint" style="margin:0">During an outing, click a depleted casing to refill it. You can also add a casing at any time. Before Play, drag the cart or a casing, click a casing to toggle its food, or drag it off either end to remove it.</span>
     </div>
-    <p style="margin:var(--s3) 0 0">The battery starts at <span class="knob" id="k-batt" tabindex="0"></span>. The eye sweeps out to <span class="knob" id="k-A" tabindex="0"></span> either way, and holding its gaze costs <span class="knob" id="k-see" tabindex="0"></span>; the wheels push with <span class="knob" id="k-tau" tabindex="0"></span> per unit of distance to what the eye holds. The patrol sweeps out to <span class="knob" id="k-B" tabindex="0"></span> either way, and the wheels push toward it with <span class="knob" id="k-exp" tabindex="0"></span> per unit of distance.</p>
+    <p style="margin:var(--s3) 0 0">The battery starts at <span class="knob" id="k-batt" tabindex="0"></span>. The eye sweeps out to <span class="knob" id="k-A" tabindex="0"></span> either way, and holding its gaze costs <span class="knob" id="k-see" tabindex="0"></span>; the wheels push with <span class="knob" id="k-tau" tabindex="0"></span> per unit of distance to what the eye holds. Between sightings, the cart heads toward one search destination. The flag marks that destination.</p>
+  </div>
+
+  <div class="card">
+    <h2>Usual meal yield</h2>
+    <svg id="maps" viewBox="0 0 940 140" role="img" aria-label="Usual meal yield along the line"></svg>
+    <p class="hint">A new outing restores the starting food and keeps what the cart learned about meal size and return time.</p>
   </div>
 
   <div class="card">
@@ -102,21 +109,23 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
     <svg id="chart" viewBox="0 0 940 300" aria-label="Battery and food over time; the cart's place and where the eye looks"></svg>
     <div class="key">
       <span><i style="background:var(--batt)"></i>battery</span><span><i style="background:var(--food)"></i>food left in all casings</span>
-      <span><i style="background:var(--wall)"></i>the cart's place</span><span><i style="background:var(--eye)"></i>where the eye looks</span><span><i style="background:var(--open)"></i>the patrol</span>
+      <span><i style="background:var(--wall)"></i>the cart's place</span><span><i style="background:var(--eye)"></i>where the eye looks</span>
     </div>
   </div>
 
+  <p><a href="feeding-explorer.html">Explore the earlier patrol receiver and its mechanical parts.</a></p>
   <div class="more">
     <button id="b-what" aria-expanded="false">What is this?</button>
     <button id="b-check" aria-expanded="false">What was checked</button>
   </div>
-  <p class="explain" id="t-what" hidden>The page runs one arrangement: a receiver wired to every casing. Each casing is a source: its food, its opening, its height as a mass, gravity, the ground, and a dragger. It sends out how full it is, and so how red. The receiver holds a battery, a grip, the lever's height, the cart (a mass on a dragger whose memory is the wheel), and the eye's look distance and scan. Its stateless parts push back on what they read: the eye's motors, the wheel's drive, the gripper, the lever and the springs of the attachment. Every push on one value adds, and each store moves by the push it receives. Each motor pays the battery for what it pushes times how fast its store moves. Written out in the book's terms in <code>background/feeding-imc/feeding-imc.tex</code>.</p>
-  <p class="explain" id="t-check" hidden>The model (<code>feeding-model.js</code>) is tested by <code>feeding-model.test.js</code> against the book's <code>background/feeding-imc/check_episode.py</code>. With the note's three casings, full ones at −8 and 8 and an empty one at 4, and the cart at 0, the eye holds on red at 11.13 and again at 46.59. After 60 units of time the battery is 7.342, both full casings' food 0.074, the cart at −7.074, and the energy lost, the dampers' included, adds back to the energy at the start. The script also checks symbolically that the equations follow from the parts and that the energy identity holds. The page’s equations are also checked against the composed library model in arrangements/feeding.py, including its returning source loads. The arrangement explorer exposes those parts and observations.</p>
+  <p class="explain" id="t-what" hidden>Each casing sends its redness to the scanning eye. Meal size trains its usual yield. The search curve gives less weight to neighborhoods the eye or body has just covered. Its area is one. It pays for changing these memories, running the eye and driving the wheels from the same battery that its meals recharge.</p>
+  <p class="explain" id="t-check" hidden>The learning receiver is run in tangent IMC. A test compares its library steps with the browser calculation. When the eye returns after ten time units, an empty casing lowers the predicted chance of finding food after that wait, and a refilled casing raises it. With meals remembered at −8 and +8, two runs go to opposite ends first. Each cart feeds at both ends.</p>
 </div>
 
 <script src="feeding-model.js"></script>
+<script src="food-learning.js"></script>
 <script>
-const F = window.Feeding;
+const F = window.FoodLearning;
 const P = { ...F.DEFAULTS };
 const NS = 'http://www.w3.org/2000/svg';
 const FIG = ' ';
@@ -126,11 +135,12 @@ const fw = (v, dec, width, sign) => {          // fixed-width number (PRINCIPLES
   return s.padStart(width, FIG);
 };
 const FULL = 10, EMPTY = 0.05;
-let places = F.PLACES.slice(), foods = F.FOODS.map(f => (f > 1 ? FULL : EMPTY)), cart0 = 0, batt0 = 3;
+let places = F.PLACES.slice(), foods = F.FOODS.map(f => (f > 1 ? FULL : EMPTY)), cart0 = 0, batt0 = 6;
 let s, t, playing = false, speed = 2, hist;
-function restart() { s = F.start(places, foods, cart0, P); s[0] = batt0; t = 0; hist = []; record(); }
+let carriedMemory;
+function restart() { s = F.start(places, foods, cart0, P, carriedMemory); s[0] = batt0; t = 0; hist = []; record(); }
 const totalFood = () => places.reduce((acc, _, k) => acc + s[F.NR + F.NC * k], 0);
-function record() { hist.push([t, s[0], totalFood(), s[3], s[3] + s[6], s[8]]); }
+function record() { hist.push([t, s[0], totalFood(), s[3], s[3] + s[6]]); }
 restart();
 
 // ---------- knobs: a number shown is a number you can slide, where it is shown ----------
@@ -153,9 +163,6 @@ knob('k-batt', () => batt0, v => { batt0 = v; if (t === 0) { s[0] = v; hist = []
 knob('k-A', () => P.A, v => { P.A = v; if (t === 0) { s[7] = v; s[6] = 0; } }, 1, 10, 0.02, v => fw(v, 1, 4));
 knob('k-see', () => P.csee, v => { P.csee = v; }, 0, 0.05, 0.0001, v => fw(v, 3, 5));
 knob('k-tau', () => P.ktau, v => { P.ktau = v; }, 0.02, 1, 0.002, v => fw(v, 2, 4));
-knob('k-B', () => P.B, v => { P.B = v; if (t === 0) { s[9] = v; s[8] = 0; } }, 0, 9, 0.02, v => fw(v, 1, 3));
-knob('k-exp', () => P.kexp, v => { P.kexp = v; }, 0, 0.5, 0.001, v => fw(v, 2, 4));
-
 // ---------- the scene: the line seen from the side; heights drawn larger than places ----------
 const scene = document.getElementById('scene');
 const X0 = 30, X1 = 910, LO = -9, HI = 9, GY = 230, HS = 150;     // world place -> screen x; height -> screen y
@@ -163,7 +170,7 @@ const sx = p => X0 + (X1 - X0) * (p - LO) / (HI - LO);
 const px = X => LO + (X - X0) / (X1 - X0) * (HI - LO);
 const sy = x => GY - (x - P.xg) * HS;
 function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || scene).appendChild(e); return e; }
-function drawScene() {
+function drawScene(samples) {
   scene.textContent = '';
   const fd = F.field(s, places, P);
   const y = s[3], r = s[6], h = s[2];
@@ -176,10 +183,7 @@ function drawScene() {
   // the eye's sweep: how far it can look either way
   el('line', { x1: sx(y - P.A), x2: sx(y + P.A), y1: 26, y2: 26, stroke: 'var(--eye)', opacity: .25, 'stroke-width': 6, 'stroke-linecap': 'round' });
   el('text', { x: sx(y + P.A) + 8, y: 30, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'how far the eye sweeps';
-  // the patrol: the place the cart heads for while the eye sees nothing red
-  const ex0 = sx(Math.max(LO, Math.min(HI, s[8])));
-  el('path', { d: `M ${ex0 - 7} ${GY + 66} L ${ex0 + 7} ${GY + 66} L ${ex0} ${GY + 54} Z`, fill: 'var(--open)', opacity: .35 + .6 * fd.free });
-  el('text', { x: ex0 + 10, y: GY + 66, 'font-size': 12, fill: 'var(--open)' }).textContent = 'patrol';
+  drawSearchDensity(samples, fd.target);
   // the casings
   places.forEach((p, k) => {
     const [f, a, x] = s.slice(F.NR + F.NC * k, F.NR + F.NC * k + 3);
@@ -227,7 +231,13 @@ function drawScene() {
 }
 let drag = null, moved = false;
 function dragStart(e, what) {
-  if (playing || t > 0) return;
+  if (playing || t > 0) {
+    if (what !== 'cart') {
+      const food = F.NR + F.NC * what;
+      if (s[food] <= P.fr) { s[food] = FULL; draw(); }
+    }
+    return;
+  }
   drag = what; moved = false; scene.setPointerCapture(e.pointerId);
 }
 function svgX(e) { const b = scene.getBoundingClientRect(); return (e.clientX - b.left) * 940 / b.width; }
@@ -267,11 +277,11 @@ function drawCalc() {
   const k = fd.casings.reduce((best, c, i) => (c.atMouth > (best < 0 ? -1 : fd.casings[best].atMouth) ? i : best), -1);
   const c = k >= 0 ? fd.casings[k] : null;
   document.getElementById('calc').innerHTML =
-    `<p>The <span class="e">eye</span> looks <span class="out">${fw(s[6], 2, 6, true)}</span> from the cart, at the place <span class="out">${fw(s[3] + s[6], 2, 6, true)}</span>; how red it sees there, from 0 to 1: <span class="out">${fw(fd.seen, 2, 4)}</span>. So its scan runs at <span class="out">${fw(fd.free, 2, 4)}</span> of full speed, and its look distance changes at <span class="out">${fw(r[6], 2, 6, true)}</span>.</p>` +
-    `<p>The <span class="a">patrol</span> is at <span class="out">${fw(s[8], 2, 6, true)}</span>, moving at <span class="out">${fw(fd.patE, 2, 5, true)}</span> (it stops while the eye holds red). The <span class="e">wheels</span> push with awake <span class="out">${fw(fd.live, 2, 4)}</span> × (${fw(P.ktau, 2, 4)} × how red × look distance + ${fw(P.kexp, 2, 4)} × free × distance to the patrol) = <span class="out">${fw(fd.torque, 3, 6, true)}</span>; the wheel turns at <span class="out">${fw(fd.wheel, 2, 6, true)}</span>, and the cart is at <span class="out">${fw(s[3], 2, 6, true)}</span>.</p>` +
+    `<p>The <span class="e">eye</span> looks <span class="out">${fw(s[6], 2, 6, true)}</span> from the cart, at the place <span class="out">${fw(s[3] + s[6], 2, 6, true)}</span>; redness there: <span class="out">${fw(fd.seen, 2, 4)}</span>. So its scan runs at <span class="out">${fw(fd.free, 2, 4)}</span> of full speed, and its look distance changes at <span class="out">${fw(r[6], 2, 6, true)}</span>.</p>` +
+    `<p>At the cart, the usual meal score is <span class="out">${fw(F.maps(s, s[3])[0], 2, 5)}</span>. The search density here is <span class="out">${fw(F.maps(s, s[3])[1], 2, 5)}</span>. The search destination is <span class="out">${fw(fd.target, 2, 5, true)}</span>. The wheels apply torque <span class="out">${fw(fd.torque, 3, 6, true)}</span>.</p>` +
     `<p>The <span class="l">lever</span> grips at <span class="out">${fw(fd.grip, 2, 6, true)}</span> (grip <span class="out">${fw(s[1], 2, 5, true)}</span>, holding <span class="out">${fw(fd.hold, 2, 4)}</span>) and lifts its tip at <span class="out">${fw(fd.lift, 2, 6, true)}</span> (tip <span class="out">${fw(s[2] - P.xg, 2, 5)}</span> above the ground).` +
     (c ? ` At the mouth it pries at <span class="out">${fw(c.pry, 2, 5)}</span> and the receiver eats at <span class="out">${fw(c.eat, 2, 5)}</span>.</p>` : `</p>`) +
-    `<p>The <span class="b">battery</span> moves by ${P.alpha.toFixed(2)}×eat − ${P.ctear.toFixed(2)}×pry − what the motors cost: gripper <span class="out">${fw(fd.pay.grip, 3, 6, true)}</span>, lever <span class="out">${fw(fd.pay.lift, 3, 6, true)}</span>, wheels <span class="out">${fw(fd.pay.drive, 3, 6, true)}</span>, eye <span class="out">${fw(fd.pay.eye, 3, 6, true)}</span>, patrol <span class="out">${fw(fd.pay.patrol, 3, 6, true)}</span>; in all <span class="out">${fw(r[0], 3, 6, true)}</span>.</p>`;
+    `<p>The <span class="b">battery</span> moves by ${P.alpha.toFixed(2)}×eat − ${P.ctear.toFixed(2)}×pry − what the motors cost: gripper <span class="out">${fw(fd.pay.grip, 3, 6, true)}</span>, lever <span class="out">${fw(fd.pay.lift, 3, 6, true)}</span>, wheels <span class="out">${fw(fd.pay.drive, 3, 6, true)}</span>, eye <span class="out">${fw(fd.pay.eye, 3, 6, true)}</span>, memory <span class="out">${fw(fd.pay.memory, 3, 6, true)}</span>; in all <span class="out">${fw(r[0], 3, 6, true)}</span>.</p>`;
 }
 
 // ---------- the record over time (the axis compresses; the page never grows) ----------
@@ -294,23 +304,70 @@ function drawChart() {
   };
   const fmax = Math.max(12, Math.ceil(hist[0][2] / 5) * 5);
   panel(20, 100, 0, fmax, [[1, 'var(--batt)'], [2, 'var(--food)']], 'energy');
-  panel(150, 120, LO, HI, [[5, 'var(--open)', 1.2], [4, 'var(--eye)', 1.2], [3, 'var(--wall)', 2.5]], 'place on the line');
+  panel(150, 120, LO, HI, [[4, 'var(--eye)', 1.2], [3, 'var(--wall)', 2.5]], 'place on the line');
   el('line', { x1: xs(t), x2: xs(t), y1: 14, y2: 274, stroke: 'var(--accent)', 'stroke-width': 1 }, chart);
   const step = T > 60 ? 20 : T > 30 ? 10 : 5;
   for (let k = 0; k <= T; k += step)
     el('text', { x: xs(k), y: 292, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = k;
 }
 
+function mapSamples() {
+  const map = F.searchMap(s);
+  return Array.from({length: 181}, (_, i) => {
+    const place = LO + i * (HI - LO) / 180;
+    const [yieldScore, density] = F.maps(s, place, map);
+    return {x: sx(place), yieldScore, density};
+  });
+}
+
+function curvePath(samples, ordinate) {
+  return samples.map((sample, i) =>
+    (i ? 'L' : 'M') + sample.x.toFixed(2) + ' ' + ordinate(sample).toFixed(2)).join(' ');
+}
+
+function drawSearchDensity(samples, target) {
+  const plot = el('g', {id: 'search-density'});
+  const top = GY + 82, bottom = GY + 150;
+  const peak = Math.max(...samples.map(sample => sample.density));
+  const limit = Math.max(0.1, Math.ceil(peak * 10) / 10);
+  const ys = density => bottom - (bottom - top) * density / limit;
+  for (const value of [0, limit]) {
+    const y = ys(value);
+    el('line', {x1: X0, x2: X1, y1: y, y2: y, stroke: 'var(--rule)'}, plot);
+    el('text', {x: X0 - 5, y: y + 4, 'text-anchor': 'end', 'font-size': 11}, plot).textContent = value;
+  }
+  const curve = curvePath(samples, sample => ys(sample.density));
+  el('path', {d: curve + ` L ${X1} ${bottom} L ${X0} ${bottom} Z`, fill: 'var(--open)', opacity: 0.19}, plot);
+  el('path', {d: curve, fill: 'none', stroke: 'var(--open)', 'stroke-width': 2}, plot);
+  const x = sx(target);
+  el('line', {x1: x, x2: x, y1: GY + 72, y2: bottom, stroke: 'var(--open)', 'stroke-dasharray': '3 3'}, plot);
+  el('path', {d: `M ${x} ${GY+72} v -20 l 12 4 l -12 5`, fill: 'var(--open)', stroke: 'var(--open)'}, plot);
+}
+
+function drawYield(samples) {
+  const plot = document.getElementById('maps');
+  plot.textContent = '';
+  const top = Math.max(1, Math.ceil(Math.max(...samples.map(sample => sample.yieldScore))));
+  const ys = value => 95 - 65 * value / top;
+  el('line', {x1:X0, x2:X1, y1:ys(0), y2:ys(0), stroke:'var(--rule)'}, plot);
+  for (const value of [0,top]) el('text', {x:X0-8, y:ys(value)+4, 'text-anchor':'end', fill:'var(--muted)'}, plot).textContent = value;
+  for (const place of [-8,-4,0,4,8]) {
+    el('text', {x:sx(place), y:135, 'text-anchor':'middle', fill:'var(--muted)'}, plot).textContent = place;
+  }
+  el('path', {d: curvePath(samples, sample => ys(sample.yieldScore)), fill:'none', stroke:'var(--open)', 'stroke-width':3}, plot);
+}
+
 let lastText = 0;
 function draw(force) {
-  drawScene(); drawChart();
+  const samples = mapSamples();
+  drawScene(samples); drawYield(samples); drawChart();
   const now = performance.now();
   if (force !== false || now - lastText > 100) { drawCalc(); lastText = now; }
 }
 
 // ---------- running: time on the page is the model's time ----------
 const H = 0.004;
-let last = null;
+let last = null, animation;
 function step(dt) {
   let todo = dt;
   while (todo > 1e-12) { const h = Math.min(H, todo); s = F.rk4(s, h, places, P); t += h; todo -= h; }
@@ -321,14 +378,24 @@ function frame(now) {
   if (last !== null) step(Math.min(0.1, (now - last) / 1000) * speed);
   last = now;
   draw(false);
-  requestAnimationFrame(frame);
+  animation = requestAnimationFrame(frame);
 }
 const playBtn = document.getElementById('play');
 playBtn.addEventListener('click', () => {
+  cancelAnimationFrame(animation); last = null;
   playing = !playing; playBtn.textContent = playing ? 'Pause' : 'Play';
-  if (playing) requestAnimationFrame(frame); else draw();
+  if (playing) animation = requestAnimationFrame(frame); else draw();
+});
+document.getElementById('outing').addEventListener('click', () => {
+  cancelAnimationFrame(animation);
+  P.searchSeed = crypto.getRandomValues(new Uint32Array(1))[0];
+  carriedMemory = F.learnedMemory(s);
+  playing = false; last = null; playBtn.textContent = 'Play'; restart(); draw();
 });
 document.getElementById('reset').addEventListener('click', () => {
+  cancelAnimationFrame(animation);
+  P.searchSeed = F.DEFAULTS.searchSeed;
+  carriedMemory = undefined; last = null;
   playing = false; playBtn.textContent = 'Play'; restart(); draw();
 });
 for (const k of ['what', 'check']) {

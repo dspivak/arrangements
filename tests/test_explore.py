@@ -52,8 +52,22 @@ def test_identity_and_opaque_primitive_export(tmp_path):
     assert not any(n['kind']=='box' and n['label']=='Internal state' for n in sc['nodes'])
     path=write_html(sc,tmp_path/'explorer.html')
     assert 'ArrangementExplorer.View' in path.read_text()
+    assert 'E.layout=layout' in path.read_text()
     viewer=Path(__file__).resolve().parents[1]/'viewer'
     result=subprocess.run(['node','-e',"const E=require('./explorer-core.js');E.validate(JSON.parse(process.argv[1]));",json.dumps(sc)],cwd=viewer,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+
+def test_tensor_scene_keeps_product_coordinates_and_boundary_directions():
+    arr=parallel_arrangements(primitive(2.),primitive(3.))
+    sc=scene(inspect(arr,inputs=[1.,2.],loads=[3.,4.]))
+    assert all(n['side'] in ('in','out') for n in sc['nodes'] if n['kind']=='boundary')
+    assert any(n['kind']=='operation' and n['label']=='Read product coordinates' for n in sc['nodes'])
+    viewer=Path(__file__).resolve().parents[1]/'viewer'
+    script="""const E=require('./explorer-core.js');require('./explorer-layout.js');
+    const sc=JSON.parse(process.argv[1]),m=new E.Model(sc);
+    for(const n of sc.nodes)if(m.children(n.id).length){m.enter(n.id);const p=m.project();E.layout(p);
+      if(p.nodes.some(n=>n.id.startsWith('boundary:')))throw Error('Explicit interface duplicated as a synthetic boundary');} """
+    result=subprocess.run(['node','-e',script,json.dumps(sc)],cwd=viewer,capture_output=True,text=True)
     assert result.returncode==0,result.stderr
 
 def test_feeding_browser_field_and_port_loads_match_library_phi():

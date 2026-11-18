@@ -26,7 +26,7 @@
     node('wheels','receiver','Wheels','box',{renderer:'wheels',column:1,row:2});
     node('lever','receiver','Lever','box',{renderer:'lever',column:2,row:0});
     node('eye','receiver','Eye','box',{renderer:'eye',column:1,row:0});
-    node('mouth','receiver','Mouth','box',{renderer:'mouth',column:2,row:2});
+    node('mouth','receiver','Mouth','box',{renderer:'mouth',column:2,row:2,description:'Opening and digestion are factored once per casing. Each opener acts on its named casing and charges the shared battery. It acts only while that casing is held at the mouth and the battery has energy.'});
     node('patrol','receiver','Patrol','box',{column:1,row:1});
     node('patrol-point','patrol','Patrol point','state',{value:s[8]});node('patrol-scan','patrol','Patrol scan','state',{value:s[9]});
     node('patrol-motor','patrol','Patrol motor','effort');node('patrol-scan-motor','patrol','Patrol scan motor','effort');
@@ -86,7 +86,8 @@
       wire(id+'/red','vision','Red '+(k+1),red,0);wire(id+'/place','vision','Place '+(k+1),place,0,{valueScale:6});
       const atMouth=live*near(x-P.x0,P.R)[0]*nh*hold,pry=P.lpry*atMouth*(1-a),eat=P.leat*atMouth*access*f;
       const opener='opener-'+k,eater='eater-'+k;
-      node(opener,'mouth','Opener '+(k+1),'effort');node(eater,'mouth','Digestion '+(k+1),'effort');
+      node(opener,'mouth','Casing '+(k+1)+' opener','effort',{description:'Opening interaction with casing '+(k+1)+'. Its returning loads increase that casing’s opening and spend battery energy.'});
+      node(eater,'mouth','Casing '+(k+1)+' digestion','effort');
       term(opener,start+1,pry);term(opener,0,-P.ctear*pry);term(opener,1);term(opener,3);term(opener,start+2);
       wire(id+'/place',opener,'Place '+(k+1),place,0,{valueScale:6});
       term(eater,start,-eat);term(eater,0,P.alpha*eat);term(eater,1);term(eater,3);term(eater,start+2);

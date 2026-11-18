@@ -4,6 +4,9 @@
   const copy = value => JSON.parse(JSON.stringify(value));
   const numbers = x => Array.isArray(x) ? x.flatMap(numbers) : typeof x === 'number' ? [x] : [];
   const magnitude = x => x == null || !numbers(x).length ? null : Math.hypot(...numbers(x));
+  // Signal identity survives projection and changes of value. Two equal numbers
+  // from different readouts must never accidentally become the same port.
+  const signalKey = w => w.signal ?? JSON.stringify([w.source,w.sourcePort ?? w.label]);
   function validate(scene) {
     if (scene.version !== 1 || !Array.isArray(scene.nodes) || !Array.isArray(scene.wires)) throw Error('Expected an explorer version-1 scene');
     const nodes = new Map();
@@ -21,7 +24,7 @@
       }
       if (p.id!==scene.root) throw Error('Disconnected hierarchy');
     }
-    const ids=new Set();
+    const ids=new Set(),signals=new Map(),inputs=new Map();
     for (const w of scene.wires) {
       if (!w.id || ids.has(w.id) || !nodes.has(w.source) || !nodes.has(w.target)) throw Error('Invalid wire: '+w.id);
       ids.add(w.id);
@@ -29,6 +32,12 @@
         if (w[key]!==null && w[key]!==undefined && numbers(w[key]).some(v=>!Number.isFinite(v))) throw Error('Nonfinite '+key+' at '+w.id);
       }
       for (const key of ['valueScale','loadScale']) if (w[key]!=null && !(w[key]>0 && Number.isFinite(w[key]))) throw Error('Invalid scale');
+      const signal=signalKey(w),value=JSON.stringify(w.value??null);
+      if(signals.has(signal)&&signals.get(signal)!==value)throw Error('Conflicting values for one output port: '+w.label);
+      signals.set(signal,value);
+      if(w.targetPort!=null){const key=JSON.stringify([w.target,w.targetPort]);
+        if(inputs.has(key)&&inputs.get(key)!==signal)throw Error('Distinct readouts require distinct input ports: '+w.targetPort);
+        inputs.set(key,signal);}
     }
     return scene;
   }
@@ -99,15 +108,19 @@
         return n?.id||null;
       };
       const port=(w,side)=>{
-        const id='boundary:'+side+':'+w.source+':'+w.label;
+        const id='boundary:'+side+':'+signalKey(w);
         if(!boundary.has(id))boundary.set(id,{id,parent:this.scope,kind:'boundary',label:w.label,side,wire:w.id});
         return id;
       };
       for(const w of this.scene.wires) {
         let source=representative(w.source),target=representative(w.target);
         if((!source&&!target)||(source&&source===target))continue;
+        // An explicitly supplied boundary already ends this view. The segment
+        // on its other side belongs to the enclosing view, not a second port.
+        if(source&&!target&&source===w.source&&this.nodes.get(source).kind==='boundary')continue;
+        if(!source&&target&&target===w.target&&this.nodes.get(target).kind==='boundary')continue;
         if(!source)source=port(w,'in');if(!target)target=port(w,'out');
-        wires.push({...w,source,target});
+        wires.push({...w,signal:signalKey(w),source,target});
       }
       // Display bundles retain every individual wire and its own scale and load.
       const bundles=new Map();
@@ -122,12 +135,13 @@
   function aggregate(wires) {
     const groups=new Map();
     for(const w of wires){
-      const key=JSON.stringify([w.source,w.target,w.label,w.value,w.valueScale,w.loadScale]);
+      const key=JSON.stringify([w.source,w.target,signalKey(w),w.targetPort,w.valueScale,w.loadScale]);
       if(!groups.has(key))groups.set(key,{...w,branches:[]});
       groups.get(key).branches.push(w);
     }
+    const shape=x=>Array.isArray(x)?'['+x.map(shape).join(',')+']':typeof x;
     const add=(a,b)=>Array.isArray(a)&&Array.isArray(b)?a.map((v,i)=>add(v,b[i])):a+b;
-    return [...groups.values()].map(w=>({...w,load:w.branches.length===1?w.load:w.branches.some(b=>b.load==null||!numbers(b.load).length)?null:w.branches.map(b=>b.load).reduce(add)}));
+    return [...groups.values()].map(w=>({...w,load:w.branches.length===1?w.load:w.branches.some(b=>b.load==null||!numbers(b.load).length||shape(b.load)!==shape(w.load))?null:w.branches.map(b=>b.load).reduce(add)}));
   }
   function intensity(value,scale=1) {const v=magnitude(value);return v==null?null:Math.min(1,v/scale);}
   function color(value,scale=1,kind='value') {
@@ -142,6 +156,6 @@
     if(typeof value==='number')return Math.abs(value)<1e-9?'0.000':Math.abs(value)>=1e4||Math.abs(value)<.001?value.toExponential(2):value.toFixed(3);
     return String(value);
   }
-  const api={Model,validate,magnitude,intensity,color,format,aggregate};
+  const api={Model,validate,magnitude,intensity,color,format,aggregate,signalKey};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementExplorer=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

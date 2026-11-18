@@ -5,10 +5,22 @@ new dependency is needed. Press Play, click Receiver, then Wheels and Dragger.
 The path above the picture returns to any enclosing arrangement. Shift-click
 parts (or use Select parts), give the group a name, then Put a box around. Open
 the new box, Remove this box, or Undo grouping. Grouping is saved locally.
+Drag a part to move it; its wires reroute as it moves. A click without a drag
+still enters the part. Leave clearance between parts; an overlapping move keeps
+the last clear position. Positions are saved separately at each level and
+survive reload. Auto arrange clears positions at the current level. Alt + arrow
+keys move a focused part. Moving a part changes the diagram only.
 
-Illustrated bundles shared values between visible parts; selecting a bundle
-shows every value and its summed returning load. Wiring draws the individual
-values, with their names, in separate lanes. Both styles use the same observations.
+Both styles draw individual named ports, inputs on the left and outputs on the
+right. Illustrated adds library animations; Wiring shows the same arrangement
+with plain glyphs. Click a port to isolate its readout and branches; click a wire
+for that branch's value and returning load. Use Zoom, + / −, or Ctrl/⌘ + scroll
+to enlarge a dense view (25–400%, or Fit). Pinch/scroll changes size continuously
+with gesture distance, with small deltas combined into one render per frame;
+it does not jump a preset on every trackpad event. Scroll zoom keeps the point under the
+pointer fixed as far as the page's scroll bounds permit. Fork dots mark shared
+readouts, with returning loads summed on the trunk.
+Forward and backward strokes follow the same complete path to the same port.
 Blue marks travel forward; amber/red marks travel backward. A zero load has no
 moving marks. Color indicates magnitude relative to the fixed scale supplied
 for that wire. Signs and exact numbers appear on selection. An array uses its
@@ -35,6 +47,10 @@ view.refresh();                        // after an external model update
 view.enter('receiver');                // also usable by an existing animation
 view.destroy();
 ```
+
+Load `explorer-core.js`, `explorer-layout.js`, and `explorer.js` in that order,
+with `explorer.css`. The layout module is dependency-free and also runs under
+Node for geometry tests.
 
 `step` must consume the supplied model duration. Replay adapters should respect
 frame timestamps. Multi-round adapters should emit a complete round's
@@ -67,6 +83,13 @@ IDs must be stable, unique within their list, and resolve to a connected rooted
 hierarchy. Wires refer to the actual deepest endpoints. `Model.project()`
 computes the visible boundary ports when entering or grouping. Shared values
 are displayed once at a boundary and their returning contributions add.
+Port identity defaults to the original source node and wire label, preserved
+through projection. Equal numbers from different readouts remain different
+ports. Use optional wire `sourcePort` for a stable output-port name independent
+of its display label, and `targetPort` for an explicit input-port name. Otherwise
+each distinct incoming readout gets its own port. An array-valued readout is one
+port; split its coordinates into separately identified wires when appropriate
+to the actual interface. Port identity must not depend on the current value.
 `kind` is `box`, `state`, `operation` (static map), `field` (inclination field),
 or `boundary`. An internal integrator is drawn as state, without a box or a
 fictitious input port. A state-to-coupling observation carries its configuration
@@ -76,11 +99,18 @@ other structured values need a meaningful sample/summary supplied by the model;
 the viewer cannot assign them a canonical scalar magnitude.
 
 Optional node fields include `description`, `renderer`, and layout hints
-`column` (0–2) and `row`. Hints are ignored when regrouping would cause overlap.
+`column` and `row`. Hints are ignored when regrouping would cause overlap.
+The shared layout sizes parts for their port counts, aligns boundary ports,
+uses horizontal endpoint tangents, and routes around other parts and their
+titles. Unboxed states have visible readout marks; wires meet those marks.
 An adapter can append application data to a node or snapshot; feeding supplies
 its state and individual spring stretches this way. Grouping is a view operation:
 it leaves model state, values, loads and dynamics untouched. It neither deletes
 parts nor constructs a new physical coupling.
+`ArrangementExplorer.layout(project, {placements})` also accepts named `{x,y}`
+centers in SVG units. It rejects overlapping parts, expands the drawing as
+needed, and preserves port ordering when parts move. The view persists these
+placements by scope alongside its grouping, without writing them into the scene.
 
 ## Animation hooks
 
@@ -94,6 +124,9 @@ springs show their own stretch, and a casing uses its own food and height.
 Custom canvas or WebGL drawing can be mounted in an SVG `foreignObject`; the
 renderer is recreated on each observation. It may return a cleanup function,
 called before the next rendering and when the view is destroyed.
+Keep a default icon within about 130 by 100 local units; the host scales and
+places this group within the part, reserving its port labels and readout marks.
+An animation does not need to implement port positioning or wire geometry.
 For persistent canvas animation, keep the canvas in the host and call
 `view.enter(id)` on its hit targets, drawing from the same adapter snapshot.
 
@@ -140,11 +173,24 @@ the corresponding displayed contributions and integrates their sum. It is
 checked against both the independently maintained `feeding-model.js` and the
 library's actual `Phi` / `PhiK` steps. The six source-output loads agree at five
 points in the 60-unit episode. The generic explorer has no feeding constants.
+The mouth contains an opening interaction and a digestion interaction per
+casing, as in the feeding note. The names identify the affected casing. This
+factorization does not assert a separate anatomical tool for each casing.
+The demonstration is the patrol receiver. The main `feeding.html` has since
+gained a food-learning receiver in another run and links back to this example.
+Its live animation has not yet been connected to this observer; that adapter
+must expose its meal and learned spatial memories as well as the mechanics.
 
-Run `node --test viewer/explorer.test.js`, `node viewer/feeding-model.test.js`,
+Run `node --test viewer/explorer.test.js viewer/explorer-layout.test.js`, `node viewer/feeding-model.test.js`,
 and `.venv/bin/python -m pytest tests/test_explore.py -q`. The browser regression
 also checks click-through, grouping/undo, both styles, playback and mobile
-overflow; the book run records its script and results.
+overflow; the book run records its script and results. Geometry checks visit
+every expandable feeding level and nested groups, testing actual port counts,
+endpoint continuity, horizontal tangents, obstacle clearance, and identity of
+readouts whose values happen to coincide. Browser checks compare rendered SVG
+path endpoints with rendered port and fork coordinates in both styles.
+They also exercise real pointer dragging, persisted positions after reload,
+ordinary click-to-enter after a drag, scroll zoom, and restoration of layout.
 
 The browser reference permits an eye cost of zero. Its chosen eye rate then
 persists with zero payment, a limiting convention; the Python rod-segment
