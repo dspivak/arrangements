@@ -117,6 +117,7 @@ def compose_seq(f: Arrangement, g: Arrangement) -> Arrangement:
         in_f=in_f,
         omega=omega,
         label=f"({g.label} . {f.label})",
+        construction=("compose", f, g),
     )
 
 
@@ -169,6 +170,7 @@ def parallel_arrangements(p1: Arrangement, p2: Arrangement) -> Arrangement:
         in_f=in_f,
         omega=omega,
         label=f"({p1.label} || {p2.label})",
+        construction=("tensor", p1, p2),
     )
 
 

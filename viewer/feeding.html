@@ -8,7 +8,8 @@
    Layout follows PRINCIPLES.md: one question in the bar with Play; the picture with what is yours to set drawn on it;
    the calculation of the present moment under it, in the order the mathematics has it; the record over time.
    The model is feeding-model.js, checked by feeding-model.test.js.
-   Claude Opus 5.5, 2ff5d861 (first page) and d531d927 (the cart and the eye), 2026-11-18. */
+   Claude Opus 5.5, 2ff5d861 (first page), d531d927 (the cart and the eye) and 003367d0 (the patrol, damped contacts),
+   2026-11-18. */
 :root {
   --ground: #eef1f3; --panel: #ffffff; --ink: #1b232c; --muted: #5a6672; --rule: #d3dae0;
   --accent: #2b4c8c; --accent-ink: #ffffff; --faint: rgba(43, 76, 140, 0.10);
@@ -70,7 +71,8 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
 
 <div class="wrap">
   <h1>Feeding</h1>
-  <p class="lede">A receiver rides a cart along a line. Its eye sweeps how far away it looks; when the place it looks at is red, the eye holds there and the wheels drive the cart toward it. A casing is red while it is full of food. At the casing the lever grips it, lifts it to the mouth, pries it open, and the receiver digests the food into its battery. Everything is paid for from the battery.</p>
+  <p><a href="feeding-explorer.html">Explore the arrangement: open boxes, follow values and loads, and regroup parts.</a></p>
+  <p class="lede">A receiver rides a cart along a line. Its eye sweeps how far away it looks; when the place it looks at is red, the eye holds there and the wheels drive the cart toward it. While it sees nothing red, the cart patrols: it follows a point that sweeps slowly up and down the line. A casing is red while it is full of food. At the casing the lever grips it, lifts it to the mouth, pries it open, and the receiver digests the food into its battery. Everything is paid for from the battery.</p>
 
   <div class="ask">
     <span class="q">Will the eye find the food? Place full and empty casings on the line, then press Play.</span>
@@ -87,7 +89,7 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
       <button id="add-empty">Add an empty casing</button>
       <span class="hint" style="margin:0">Add a casing at any time, even while it runs. Before Play, drag a casing or the cart along the line, click a casing to make it full or empty, or drag it off either end to remove it.</span>
     </div>
-    <p style="margin:var(--s3) 0 0">The battery starts at <span class="knob" id="k-batt" tabindex="0"></span>. The eye sweeps out to <span class="knob" id="k-A" tabindex="0"></span> either way, and holding its gaze costs <span class="knob" id="k-see" tabindex="0"></span>; the wheels push with <span class="knob" id="k-tau" tabindex="0"></span> per unit of distance to what the eye holds.</p>
+    <p style="margin:var(--s3) 0 0">The battery starts at <span class="knob" id="k-batt" tabindex="0"></span>. The eye sweeps out to <span class="knob" id="k-A" tabindex="0"></span> either way, and holding its gaze costs <span class="knob" id="k-see" tabindex="0"></span>; the wheels push with <span class="knob" id="k-tau" tabindex="0"></span> per unit of distance to what the eye holds. The patrol sweeps out to <span class="knob" id="k-B" tabindex="0"></span> either way, and the wheels push toward it with <span class="knob" id="k-exp" tabindex="0"></span> per unit of distance.</p>
   </div>
 
   <div class="card">
@@ -100,7 +102,7 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
     <svg id="chart" viewBox="0 0 940 300" aria-label="Battery and food over time; the cart's place and where the eye looks"></svg>
     <div class="key">
       <span><i style="background:var(--batt)"></i>battery</span><span><i style="background:var(--food)"></i>food left in all casings</span>
-      <span><i style="background:var(--wall)"></i>the cart's place</span><span><i style="background:var(--eye)"></i>where the eye looks</span>
+      <span><i style="background:var(--wall)"></i>the cart's place</span><span><i style="background:var(--eye)"></i>where the eye looks</span><span><i style="background:var(--open)"></i>the patrol</span>
     </div>
   </div>
 
@@ -109,7 +111,7 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
     <button id="b-check" aria-expanded="false">What was checked</button>
   </div>
   <p class="explain" id="t-what" hidden>The page runs one arrangement: a receiver wired to every casing. Each casing is a source: its food, its opening, its height as a mass, gravity, the ground, and a dragger. It sends out how full it is, and so how red. The receiver holds a battery, a grip, the lever's height, the cart (a mass on a dragger whose memory is the wheel), and the eye's look distance and scan. Its stateless parts push back on what they read: the eye's motors, the wheel's drive, the gripper, the lever and the springs of the attachment. Every push on one value adds, and each store moves by the push it receives. Each motor pays the battery for what it pushes times how fast its store moves. Written out in the book's terms in <code>background/feeding-imc/feeding-imc.tex</code>.</p>
-  <p class="explain" id="t-check" hidden>The model (<code>feeding-model.js</code>) is tested by <code>feeding-model.test.js</code> against the book's <code>background/feeding-imc/check_episode.py</code>. With the note's two casings, an empty one at 4 and a full one at −3, and the cart at 0, the eye first holds on red at 5.92. After 30 units of time the battery is 8.377, the full casing's food 0.074, the cart at −2.966, and the energy lost adds back to the energy at the start. The script also checks symbolically that the equations follow from the parts and that the energy identity holds. It is ordinary code; this arrangement is not yet built in the library itself.</p>
+  <p class="explain" id="t-check" hidden>The model (<code>feeding-model.js</code>) is tested by <code>feeding-model.test.js</code> against the book's <code>background/feeding-imc/check_episode.py</code>. With the note's three casings, full ones at −8 and 8 and an empty one at 4, and the cart at 0, the eye holds on red at 11.13 and again at 46.59. After 60 units of time the battery is 7.342, both full casings' food 0.074, the cart at −7.074, and the energy lost, the dampers' included, adds back to the energy at the start. The script also checks symbolically that the equations follow from the parts and that the energy identity holds. The page’s equations are also checked against the composed library model in arrangements/feeding.py, including its returning source loads. The arrangement explorer exposes those parts and observations.</p>
 </div>
 
 <script src="feeding-model.js"></script>
@@ -124,11 +126,11 @@ const fw = (v, dec, width, sign) => {          // fixed-width number (PRINCIPLES
   return s.padStart(width, FIG);
 };
 const FULL = 10, EMPTY = 0.05;
-let places = F.PLACES.slice(), foods = [EMPTY, FULL], cart0 = 0, batt0 = 3;
+let places = F.PLACES.slice(), foods = F.FOODS.map(f => (f > 1 ? FULL : EMPTY)), cart0 = 0, batt0 = 3;
 let s, t, playing = false, speed = 2, hist;
 function restart() { s = F.start(places, foods, cart0, P); s[0] = batt0; t = 0; hist = []; record(); }
-const totalFood = () => places.reduce((acc, _, k) => acc + s[F.NR + 5 * k], 0);
-function record() { hist.push([t, s[0], totalFood(), s[3], s[3] + s[6]]); }
+const totalFood = () => places.reduce((acc, _, k) => acc + s[F.NR + F.NC * k], 0);
+function record() { hist.push([t, s[0], totalFood(), s[3], s[3] + s[6], s[8]]); }
 restart();
 
 // ---------- knobs: a number shown is a number you can slide, where it is shown ----------
@@ -151,6 +153,8 @@ knob('k-batt', () => batt0, v => { batt0 = v; if (t === 0) { s[0] = v; hist = []
 knob('k-A', () => P.A, v => { P.A = v; if (t === 0) { s[7] = v; s[6] = 0; } }, 1, 10, 0.02, v => fw(v, 1, 4));
 knob('k-see', () => P.csee, v => { P.csee = v; }, 0, 0.05, 0.0001, v => fw(v, 3, 5));
 knob('k-tau', () => P.ktau, v => { P.ktau = v; }, 0.02, 1, 0.002, v => fw(v, 2, 4));
+knob('k-B', () => P.B, v => { P.B = v; if (t === 0) { s[9] = v; s[8] = 0; } }, 0, 9, 0.02, v => fw(v, 1, 3));
+knob('k-exp', () => P.kexp, v => { P.kexp = v; }, 0, 0.5, 0.001, v => fw(v, 2, 4));
 
 // ---------- the scene: the line seen from the side; heights drawn larger than places ----------
 const scene = document.getElementById('scene');
@@ -172,9 +176,13 @@ function drawScene() {
   // the eye's sweep: how far it can look either way
   el('line', { x1: sx(y - P.A), x2: sx(y + P.A), y1: 26, y2: 26, stroke: 'var(--eye)', opacity: .25, 'stroke-width': 6, 'stroke-linecap': 'round' });
   el('text', { x: sx(y + P.A) + 8, y: 30, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'how far the eye sweeps';
+  // the patrol: the place the cart heads for while the eye sees nothing red
+  const ex0 = sx(Math.max(LO, Math.min(HI, s[8])));
+  el('path', { d: `M ${ex0 - 7} ${GY + 66} L ${ex0 + 7} ${GY + 66} L ${ex0} ${GY + 54} Z`, fill: 'var(--open)', opacity: .35 + .6 * fd.free });
+  el('text', { x: ex0 + 10, y: GY + 66, 'font-size': 12, fill: 'var(--open)' }).textContent = 'patrol';
   // the casings
   places.forEach((p, k) => {
-    const [f, a, x] = s.slice(F.NR + 5 * k, F.NR + 5 * k + 3);
+    const [f, a, x] = s.slice(F.NR + F.NC * k, F.NR + F.NC * k + 3);
     const red = fd.casings[k].red, cx = sx(p), cy = sy(x) + 12, w = 44, hh = 30;
     const g = el('g', { class: 'grab' });
     const gapw = 32 * a;
@@ -248,7 +256,7 @@ function addCasing(food) {
     if (d > bestd) { bestd = d; best = p; }
   }
   places.push(best); foods.push(food);
-  if (t > 0) { s.push(food, 0, P.xg, 0, P.xg); draw(); } else { restart(); draw(); }
+  if (t > 0) { s.push(...F.casing(food, P)); draw(); } else { restart(); draw(); }
 }
 document.getElementById('add-full').addEventListener('click', () => addCasing(FULL));
 document.getElementById('add-empty').addEventListener('click', () => addCasing(EMPTY));
@@ -260,10 +268,10 @@ function drawCalc() {
   const c = k >= 0 ? fd.casings[k] : null;
   document.getElementById('calc').innerHTML =
     `<p>The <span class="e">eye</span> looks <span class="out">${fw(s[6], 2, 6, true)}</span> from the cart, at the place <span class="out">${fw(s[3] + s[6], 2, 6, true)}</span>; how red it sees there, from 0 to 1: <span class="out">${fw(fd.seen, 2, 4)}</span>. So its scan runs at <span class="out">${fw(fd.free, 2, 4)}</span> of full speed, and its look distance changes at <span class="out">${fw(r[6], 2, 6, true)}</span>.</p>` +
-    `<p>The <span class="e">wheels</span> push with <span class="out">${fw(P.ktau, 2, 4)}</span> × awake <span class="out">${fw(fd.live, 2, 4)}</span> × how red × look distance = <span class="out">${fw(fd.torque, 3, 6, true)}</span>; the wheel turns at <span class="out">${fw(fd.wheel, 2, 6, true)}</span>, and the cart is at <span class="out">${fw(s[3], 2, 6, true)}</span>.</p>` +
+    `<p>The <span class="a">patrol</span> is at <span class="out">${fw(s[8], 2, 6, true)}</span>, moving at <span class="out">${fw(fd.patE, 2, 5, true)}</span> (it stops while the eye holds red). The <span class="e">wheels</span> push with awake <span class="out">${fw(fd.live, 2, 4)}</span> × (${fw(P.ktau, 2, 4)} × how red × look distance + ${fw(P.kexp, 2, 4)} × free × distance to the patrol) = <span class="out">${fw(fd.torque, 3, 6, true)}</span>; the wheel turns at <span class="out">${fw(fd.wheel, 2, 6, true)}</span>, and the cart is at <span class="out">${fw(s[3], 2, 6, true)}</span>.</p>` +
     `<p>The <span class="l">lever</span> grips at <span class="out">${fw(fd.grip, 2, 6, true)}</span> (grip <span class="out">${fw(s[1], 2, 5, true)}</span>, holding <span class="out">${fw(fd.hold, 2, 4)}</span>) and lifts its tip at <span class="out">${fw(fd.lift, 2, 6, true)}</span> (tip <span class="out">${fw(s[2] - P.xg, 2, 5)}</span> above the ground).` +
     (c ? ` At the mouth it pries at <span class="out">${fw(c.pry, 2, 5)}</span> and the receiver eats at <span class="out">${fw(c.eat, 2, 5)}</span>.</p>` : `</p>`) +
-    `<p>The <span class="b">battery</span> moves by ${P.alpha.toFixed(2)}×eat − ${P.ctear.toFixed(2)}×pry − what the motors cost: gripper <span class="out">${fw(fd.pay.grip, 3, 6, true)}</span>, lever <span class="out">${fw(fd.pay.lift, 3, 6, true)}</span>, wheels <span class="out">${fw(fd.pay.drive, 3, 6, true)}</span>, eye <span class="out">${fw(fd.pay.eye, 3, 6, true)}</span>; in all <span class="out">${fw(r[0], 3, 6, true)}</span>.</p>`;
+    `<p>The <span class="b">battery</span> moves by ${P.alpha.toFixed(2)}×eat − ${P.ctear.toFixed(2)}×pry − what the motors cost: gripper <span class="out">${fw(fd.pay.grip, 3, 6, true)}</span>, lever <span class="out">${fw(fd.pay.lift, 3, 6, true)}</span>, wheels <span class="out">${fw(fd.pay.drive, 3, 6, true)}</span>, eye <span class="out">${fw(fd.pay.eye, 3, 6, true)}</span>, patrol <span class="out">${fw(fd.pay.patrol, 3, 6, true)}</span>; in all <span class="out">${fw(r[0], 3, 6, true)}</span>.</p>`;
 }
 
 // ---------- the record over time (the axis compresses; the page never grows) ----------
@@ -286,7 +294,7 @@ function drawChart() {
   };
   const fmax = Math.max(12, Math.ceil(hist[0][2] / 5) * 5);
   panel(20, 100, 0, fmax, [[1, 'var(--batt)'], [2, 'var(--food)']], 'energy');
-  panel(150, 120, LO, HI, [[4, 'var(--eye)', 1.2], [3, 'var(--wall)', 2.5]], 'place on the line');
+  panel(150, 120, LO, HI, [[5, 'var(--open)', 1.2], [4, 'var(--eye)', 1.2], [3, 'var(--wall)', 2.5]], 'place on the line');
   el('line', { x1: xs(t), x2: xs(t), y1: 14, y2: 274, stroke: 'var(--accent)', 'stroke-width': 1 }, chart);
   const step = T > 60 ? 20 : T > 30 ? 10 : 5;
   for (let k = 0; k <= T; k += step)

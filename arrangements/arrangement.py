@@ -29,7 +29,7 @@ reactive vector space ``Q`` and a potential ``U``) in CDLM's companion.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Tuple
 
 import jax
@@ -62,6 +62,8 @@ class Arrangement:
     in_f: SmoothMap   # (q, m_out, n_in)  -> m_in
     omega: OneForm    # (q, m_out, n_in)  -> (xi_q, xi_mout, xi_nin)
     label: str = ""
+    # Retain construction data for inspection; never used by the dynamics.
+    construction: tuple = field(default=(), repr=False, compare=False)
 
 
 def exact(U: Callable[[Array, Array, Array], Array]) -> OneForm:

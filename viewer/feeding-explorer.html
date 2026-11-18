@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Feeding · Arrangement explorer</title><link rel="stylesheet" href="explorer.css"></head>
+<body>
+<main id="explorer"></main>
+<script src="feeding-model.js"></script>
+<script src="explorer-core.js"></script>
+<script src="explorer.js"></script>
+<script src="feeding-arrangement.js"></script>
+<script src="feeding-animations.js"></script>
+<script>
+const adapter=FeedingArrangement.adapter();
+const explorer=new ArrangementExplorer.View(document.getElementById('explorer'),adapter,{
+  renderers:FeedingAnimations,storageKey:'feeding-explorer-v1',sceneURL:'feeding.html',
+  description:'The same feeding episode, assembled from the source and receiver’s inclination fields. The illustrated view is supplied by the feeding model; Wiring uses the shared renderer.'
+});
+</script>
+</body></html>
