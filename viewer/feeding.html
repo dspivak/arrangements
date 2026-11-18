@@ -1,0 +1,290 @@
+<title>Feeding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* The feeding arrangement of the book's background/feeding-imc/feeding-imc.tex, run in the browser.
+   Layout follows PRINCIPLES.md: one question in the bar with Play; the picture with what is yours to set drawn on it;
+   the calculation of the present moment under it, in the order the mathematics has it; the record over time.
+   The model is feeding-model.js, checked by feeding-model.test.js. Claude Opus 5.5, 2ff5d861, 2026-11-18. */
+:root {
+  --ground: #eef1f3; --panel: #ffffff; --ink: #1b232c; --muted: #5a6672; --rule: #d3dae0;
+  --accent: #2b4c8c; --accent-ink: #ffffff; --faint: rgba(43, 76, 140, 0.10);
+  --batt: #2b6cb0; --food: #b5472f; --grip: #7b3fa0; --open: #1f8f7e; --pos: #c07a12; --wall: #3a4651; --zone: rgba(31,143,126,0.10);
+  --display: "Spectral", Georgia, serif; --body: "Public Sans", system-ui, sans-serif; --data: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+    --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142,174,245,0.12);
+    --batt: #6fa3e6; --food: #e07a5f; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --wall: #b5c0ca; --zone: rgba(69,194,173,0.12);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
+  --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142,174,245,0.12);
+  --batt: #6fa3e6; --food: #e07a5f; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --wall: #b5c0ca; --zone: rgba(69,194,173,0.12);
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: var(--s4); padding-block: var(--s5) var(--s6); display: grid; gap: var(--s4); }
+.wrap > * { min-width: 0; }
+h1 { margin: 0; font: 600 30px/1.15 var(--display); }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.ask { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 8px; padding: var(--s3) var(--s4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.ask .q { font-size: 16px; margin-right: auto; }
+button { font: 500 15px/1.2 var(--body); color: var(--ink); background: var(--ground); border: 1px solid var(--rule);
+  border-radius: 6px; padding: var(--s2) var(--s3); min-height: 38px; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 84px; }
+button:focus-visible, .knob:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: var(--s4); }
+.card h2 { margin: 0 0 var(--s2); font: 600 12px/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.hint { font-size: 13px; color: var(--muted); }
+svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: var(--ink); }
+.grab { cursor: ns-resize; }
+.knob { color: var(--accent); font: 500 15px var(--data); border-bottom: 1.5px dashed var(--accent); cursor: ew-resize; padding: 0 2px;
+  user-select: none; -webkit-user-select: none; touch-action: none; white-space: pre; }
+.out { font: 500 15px var(--data); color: var(--muted); white-space: pre; font-variant-numeric: tabular-nums; }
+.calc { margin: 0; padding: var(--s3) var(--s4); background: var(--faint); border-radius: 6px; font-size: 15px; line-height: 1.75; }
+.calc p { margin: 0 0 var(--s2); }
+.b { color: var(--batt); font-weight: 600; } .f { color: var(--food); font-weight: 600; } .l { color: var(--grip); font-weight: 600; }
+.a { color: var(--open); font-weight: 600; } .x { color: var(--pos); font-weight: 600; }
+.more { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.explain { margin: 0; max-width: 75ch; }
+.key { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); color: var(--muted); font-size: 13px; }
+.key i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+</style>
+
+<div class="wrap">
+  <h1>Feeding</h1>
+  <p class="lede">A receiver grips a casing that holds food, pries it open, digests what it can reach into its battery, and lets go when the food runs low. Every action is paid for from the battery.</p>
+
+  <div class="ask">
+    <span class="q">Does the meal pay for itself? Set the starting battery, the food, where the casing hangs, and how much digestion lets through, then press Play.</span>
+    <button class="primary" id="play">Play</button>
+    <button id="reset">Start over</button>
+    <span class="hint">time runs at <span class="knob" id="k-speed" tabindex="0"></span> units a second</span>
+  </div>
+
+  <div class="card">
+    <h2>The receiver and the casing</h2>
+    <svg id="scene" viewBox="0 0 940 330" role="img" aria-label="The receiver above, the casing hanging below its mouth, the battery at the right"></svg>
+    <p class="hint">Drag the casing up or down, or the battery's level, to set where they start. The shaded band is where the mouth can reach.</p>
+    <p style="margin:var(--s2) 0 0">The casing holds <span class="knob" id="k-food" tabindex="0"></span> of food. Digestion lets <span class="knob" id="k-alpha" tabindex="0"></span> of it into the battery; prying costs <span class="knob" id="k-tear" tabindex="0"></span> per unit opened, and gripping wears at <span class="knob" id="k-wear" tabindex="0"></span>.</p>
+  </div>
+
+  <div class="card">
+    <h2>What moves it, now</h2>
+    <div class="calc" id="calc"></div>
+  </div>
+
+  <div class="card">
+    <h2>Over time</h2>
+    <svg id="chart" viewBox="0 0 940 300" aria-label="Battery, food, grip, opening and position over time"></svg>
+    <div class="key">
+      <span><i style="background:var(--batt)"></i>battery</span><span><i style="background:var(--food)"></i>food</span>
+      <span><i style="background:var(--grip)"></i>grip</span><span><i style="background:var(--open)"></i>opening</span>
+      <span><i style="background:var(--pos)"></i>position of the casing</span>
+    </div>
+  </div>
+
+  <div class="more">
+    <button id="b-what" aria-expanded="false">What is this?</button>
+    <button id="b-check" aria-expanded="false">What was checked</button>
+  </div>
+  <p class="explain" id="t-what" hidden>The page runs one arrangement: a source (the food, the opening, the casing as a mass, gravity, and a dragger that is a spring tied to a memory of where the casing was) wired to a receiver (a battery, a grip, and three stateless parts, the gripper, the opener and the digestor). Each stateless part pushes back on the values it reads; the pushes on one value add, and each part that stores a state moves it by the push it receives. The rates below are those pushes. Written out in the book's terms in <code>background/feeding-imc/feeding-imc.tex</code>.</p>
+  <p class="explain" id="t-check" hidden>The model (<code>feeding-model.js</code>) is tested by <code>feeding-model.test.js</code> against the book's <code>background/feeding-imc/check_episode.py</code>: at the starting values shown when the page opens, after 12 units of time the battery is 10.399 and the food 0.074, the grip lets go at 3.058, and the energy lost adds back to the energy at the start. That script is ordinary code; this arrangement is not yet built in the library itself.</p>
+</div>
+
+<script src="feeding-model.js"></script>
+<script>
+const F = window.Feeding;
+const P = { ...F.DEFAULTS };
+const NS = 'http://www.w3.org/2000/svg';
+const FIG = ' ';
+const fw = (v, dec, width, sign) => {          // fixed-width number (PRINCIPLES 12)
+  let s = (sign && v >= 0 ? '+' : '') + v.toFixed(dec);
+  if (sign && v < 0) s = '−' + (-v).toFixed(dec);
+  return s.padStart(width, FIG);
+};
+let start = F.START.slice();
+let s = start.slice(), t = 0, playing = false, speed = 1, hist = [];
+const record = () => hist.push([t, s[0], s[1], s[5], s[4], s[2]]);
+record();
+
+// ---------- knobs: a number shown is a number you can slide, where it is shown ----------
+function knob(id, get, set, lo, hi, per, fmt) {
+  const el = document.getElementById(id);
+  const show = () => { el.textContent = fmt(get()); };
+  let x0 = null, v0 = 0;
+  el.addEventListener('pointerdown', e => { x0 = e.clientX; v0 = get(); el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', e => { if (x0 === null) return; set(Math.min(hi, Math.max(lo, v0 + (e.clientX - x0) * per))); show(); draw(); });
+  el.addEventListener('pointerup', () => { x0 = null; });
+  el.addEventListener('keydown', e => {
+    const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
+    if (d) { set(Math.min(hi, Math.max(lo, get() + d * per * 10))); show(); draw(); e.preventDefault(); }
+  });
+  show();
+  return show;
+}
+const atStart = () => t === 0;
+const setStart = (i, v) => { start[i] = v; if (atStart()) { s[i] = v; hist = []; record(); } };
+knob('k-speed', () => speed, v => { speed = v; }, 0.1, 5, 0.01, v => fw(v, 1, 3));
+const showFood = knob('k-food', () => start[1], v => setStart(1, v), 0.5, 12, 0.02, v => fw(v, 1, 4));
+knob('k-alpha', () => P.alpha, v => { P.alpha = v; }, 0.05, 1, 0.002, v => fw(v, 2, 4));
+knob('k-tear', () => P.ctear, v => { P.ctear = v; }, 0, 3, 0.005, v => fw(v, 2, 4));
+knob('k-wear', () => P.cwear, v => { P.cwear = v; }, 0, 0.5, 0.0005, v => fw(v, 3, 5));
+
+// ---------- the scene ----------
+const scene = document.getElementById('scene');
+const yOf = x => 100 + (P.x0 - x) * 190;          // mouth at y 100; down is lower position
+const xOfY = y => P.x0 - (y - 100) / 190;
+const BX = 760, BTOP = 30, BH = 260, BMAX = 12;
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || scene).appendChild(e); return e; }
+function drawScene() {
+  scene.textContent = '';
+  const fd = F.field(s, P);
+  // reach band: full within R/2, none past R
+  el('rect', { x: 330, y: 100, width: 280, height: yOf(P.x0 - P.R / 2) - 100, fill: 'var(--zone)' });
+  el('line', { x1: 330, x2: 610, y1: yOf(P.x0 - P.R), y2: yOf(P.x0 - P.R), stroke: 'var(--open)', 'stroke-dasharray': '3 4', opacity: .6 });
+  el('text', { x: 336, y: yOf(P.x0 - P.R) - 6, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'edge of reach';
+  // receiver and its mouth
+  el('rect', { x: 400, y: 14, width: 140, height: 56, rx: 10, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 2 });
+  el('text', { x: 470, y: 47, 'text-anchor': 'middle', 'font-size': 15 }).textContent = 'receiver';
+  // jaws: they close as the grip holds
+  const hold = fd.gates.hold, jy = yOf(s[2]);
+  const reach = Math.min(jy, 100 + 26);
+  for (const side of [-1, 1]) {
+    const tipx = 470 + side * (58 - 30 * hold);
+    el('path', { d: `M ${470 + side * 50} 70 Q ${470 + side * 70} ${(70 + reach) / 2} ${tipx} ${reach}`, fill: 'none', stroke: 'var(--grip)', 'stroke-width': 5, 'stroke-linecap': 'round' });
+  }
+  // the casing: a pod whose top opens as a grows; the food fills it
+  const cy = jy, w = 90, h = 70, gapw = 70 * s[4];
+  const g = el('g', { class: 'grab' });
+  el('path', { d: `M ${470 - gapw / 2} ${cy} L ${470 - w / 2} ${cy} Q ${470 - w / 2} ${cy + h} ${470} ${cy + h} Q ${470 + w / 2} ${cy + h} ${470 + w / 2} ${cy} L ${470 + gapw / 2} ${cy}`,
+    fill: 'var(--panel)', stroke: 'var(--wall)', 'stroke-width': 2.5 }, g);
+  const ff = Math.min(1, s[1] / 12), fh = (h - 8) * ff;
+  el('rect', { x: 470 - w / 2 + 8, y: cy + h - 4 - fh, width: w - 16, height: fh, rx: 6, fill: 'var(--food)', opacity: .75 }, g);
+  el('text', { x: 470 + w / 2 + 12, y: cy + 22, 'font-size': 13, fill: 'var(--pos)' }).textContent = 'casing';
+  el('text', { x: 470 + w / 2 + 12, y: cy + 40, 'font-size': 13, fill: 'var(--food)', 'font-family': 'var(--data)' }).textContent = 'food ' + fw(s[1], 2, 5);
+  el('text', { x: 470 + w / 2 + 12, y: cy + 58, 'font-size': 13, fill: 'var(--open)', 'font-family': 'var(--data)' }).textContent = 'open ' + fw(100 * s[4], 0, 3) + '%';
+  el('rect', { x: 470 - w / 2 - 10, y: cy - 10, width: w + 20, height: h + 20, fill: 'transparent' }, g);
+  g.addEventListener('pointerdown', e => dragStart(e, 'casing'));
+  // gravity and drag on the casing
+  el('text', { x: 470 - w / 2 - 14, y: cy + 40, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--muted)' }).textContent = 'force on the casing ' + fw(fd.force, 2, 6, true);
+  // the battery
+  const bh = BH * Math.min(1, s[0] / BMAX);
+  el('rect', { x: BX, y: BTOP, width: 60, height: BH, rx: 6, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 2 });
+  const bg = el('g', { class: 'grab' });
+  el('rect', { x: BX + 4, y: BTOP + BH - bh, width: 52, height: Math.max(0, bh - 4), rx: 3, fill: 'var(--batt)', opacity: .8 }, bg);
+  el('rect', { x: BX - 10, y: BTOP - 10, width: 80, height: BH + 20, fill: 'transparent' }, bg);
+  bg.addEventListener('pointerdown', e => dragStart(e, 'battery'));
+  el('line', { x1: BX - 8, x2: BX + 68, y1: BTOP + BH - BH * P.b0 / BMAX, y2: BTOP + BH - BH * P.b0 / BMAX, stroke: 'var(--muted)', 'stroke-dasharray': '3 3' });
+  el('text', { x: BX + 74, y: BTOP + BH - BH * P.b0 / BMAX + 4, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'awake';
+  el('text', { x: BX + 30, y: BTOP + BH + 26, 'text-anchor': 'middle', 'font-size': 13, fill: 'var(--batt)' }).textContent = 'battery ' + fw(s[0], 2, 5);
+  // grip readout under the receiver
+  el('text', { x: 560, y: 47, 'font-size': 13, fill: 'var(--grip)', 'font-family': 'var(--data)' }).textContent = 'grip ' + fw(s[5], 2, 5, true);
+  el('text', { x: 40, y: 300, 'font-size': 13, fill: 'var(--muted)', 'font-family': 'var(--data)' }).textContent = 'time ' + fw(t, 2, 6);
+}
+let drag = null;
+function dragStart(e, what) {
+  if (playing) return;
+  drag = what; scene.setPointerCapture(e.pointerId); dragMove(e);
+}
+function svgY(e) { const r = scene.getBoundingClientRect(); return (e.clientY - r.top) * 330 / r.height; }
+function dragMove(e) {
+  if (!drag) return;
+  const y = svgY(e);
+  if (drag === 'casing') {
+    const x = Math.min(0.3, Math.max(-1.1, xOfY(y)));
+    s[2] = x; s[6] = x; s[3] = 0; start[2] = x; start[6] = x; start[3] = 0;
+  } else {
+    const b = Math.min(BMAX, Math.max(0.05, (BTOP + BH - y) / BH * BMAX));
+    s[0] = b; start[0] = b;
+  }
+  if (atStart()) { hist = []; record(); }
+  draw();
+}
+scene.addEventListener('pointermove', dragMove);
+scene.addEventListener('pointerup', () => { drag = null; });
+
+// ---------- the calculation of the present moment ----------
+function drawCalc() {
+  const fd = F.field(s, P), G = fd.gates, R = fd.rates, r = fd.rate;
+  document.getElementById('calc').innerHTML =
+    `<p>The receiver reads <span class="b">battery</span> <span class="out">${fw(s[0], 2, 5)}</span>, <span class="f">food</span> <span class="out">${fw(s[1], 2, 5)}</span>, <span class="a">opening</span> <span class="out">${fw(s[4], 2, 4)}</span>, <span class="x">position</span> <span class="out">${fw(s[2], 2, 5, true)}</span>, <span class="l">grip</span> <span class="out">${fw(s[5], 2, 5, true)}</span>.</p>` +
+    `<p>Its conditions, each from 0 to 1: awake <span class="out">${fw(G.live, 2, 4)}</span>, near the mouth <span class="out">${fw(G.near, 2, 4)}</span>, holding <span class="out">${fw(G.hold, 2, 4)}</span>, food worth keeping <span class="out">${fw(G.keep, 2, 4)}</span>, food reachable <span class="out">${fw(G.access, 2, 4)}</span>.</p>` +
+    `<p>So it grips at <span class="out">${fw(R.grip, 3, 6, true)}</span>, pries at <span class="out">${fw(R.pry, 3, 5)}</span>, and eats at <span class="out">${fw(R.eat, 3, 6)}</span>; gripping draws <span class="out">${fw(R.draw, 3, 6, true)}</span> from the battery.</p>` +
+    `<p>Each store moves by the push it receives: the <span class="b">battery</span> by ${P.alpha.toFixed(2)}×eat − draw − ${P.ctear.toFixed(2)}×pry = <span class="out">${fw(r[0], 3, 6, true)}</span>, the <span class="f">food</span> by −eat = <span class="out">${fw(r[1], 3, 6, true)}</span>, the <span class="a">opening</span> by pry = <span class="out">${fw(r[4], 3, 6, true)}</span>, the <span class="l">grip</span> by grip = <span class="out">${fw(r[5], 3, 6, true)}</span>, and the casing's momentum by the force of attachment, gravity and drag, <span class="out">${fw(r[3], 3, 6, true)}</span>.</p>`;
+}
+
+// ---------- the record over time (the axis compresses; the page never grows) ----------
+const chart = document.getElementById('chart');
+function drawChart() {
+  chart.textContent = '';
+  const T = Math.max(12, t), X0 = 60, X1 = 920;
+  const xs = tt => X0 + (X1 - X0) * tt / T;
+  const panel = (top, hgt, lo, hi, cols, label) => {
+    const ys = v => top + hgt - hgt * (v - lo) / (hi - lo);
+    el('line', { x1: X0, x2: X1, y1: top + hgt, y2: top + hgt, stroke: 'var(--rule)' }, chart);
+    if (lo < 0) el('line', { x1: X0, x2: X1, y1: ys(0), y2: ys(0), stroke: 'var(--rule)', 'stroke-dasharray': '2 3' }, chart);
+    el('text', { x: X0 - 8, y: ys(hi) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = hi;
+    el('text', { x: X0 - 8, y: ys(lo) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = lo;
+    el('text', { x: X0, y: top - 6, 'font-size': 12, fill: 'var(--muted)' }, chart).textContent = label;
+    for (const [i, c] of cols) {
+      const d = hist.map((h, k) => `${k ? 'L' : 'M'} ${xs(h[0]).toFixed(1)} ${ys(Math.min(hi, Math.max(lo, h[i]))).toFixed(1)}`).join(' ');
+      el('path', { d, fill: 'none', stroke: c, 'stroke-width': 2 }, chart);
+    }
+  };
+  panel(20, 110, 0, 12, [[1, 'var(--batt)'], [2, 'var(--food)']], 'energy');
+  panel(160, 110, -1.2, 2.1, [[3, 'var(--grip)'], [4, 'var(--open)'], [5, 'var(--pos)']], 'grip, opening, position');
+  el('line', { x1: xs(t), x2: xs(t), y1: 14, y2: 274, stroke: 'var(--accent)', 'stroke-width': 1 }, chart);
+  for (let k = 0; k <= T; k += T > 30 ? 10 : 3)
+    el('text', { x: xs(k), y: 292, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = k;
+}
+
+let lastText = 0;
+function draw(force) {
+  drawScene(); drawChart();
+  const now = performance.now();
+  if (force !== false || now - lastText > 100) { drawCalc(); lastText = now; }
+}
+
+// ---------- running: time on the page is the model's time ----------
+const H = 0.002;
+let last = null;
+function frame(now) {
+  if (!playing) { last = null; return; }
+  if (last !== null) {
+    let todo = Math.min(0.1, (now - last) / 1000) * speed;
+    while (todo > 1e-12) { const h = Math.min(H, todo); s = F.rk4(s, h, P); t += h; todo -= h; }
+    if (hist.length === 0 || t - hist[hist.length - 1][0] > 0.02) record();
+  }
+  last = now;
+  draw(false);
+  requestAnimationFrame(frame);
+}
+const playBtn = document.getElementById('play');
+playBtn.addEventListener('click', () => {
+  playing = !playing; playBtn.textContent = playing ? 'Pause' : 'Play';
+  if (playing) requestAnimationFrame(frame); else draw();
+});
+document.getElementById('reset').addEventListener('click', () => {
+  playing = false; playBtn.textContent = 'Play';
+  s = start.slice(); t = 0; hist = []; record(); showFood(); draw();
+});
+for (const k of ['what', 'check']) {
+  const b = document.getElementById('b-' + k), p = document.getElementById('t-' + k);
+  b.addEventListener('click', () => { p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden)); });
+}
+// #t=N opens the page already run to time N (for checking a page mid-run in headless Chrome; PRINCIPLES.md)
+const jump = /t=([\d.]+)/.exec(location.hash);
+if (jump) { const T = +jump[1]; while (t < T - 1e-12) { const h = Math.min(H, T - t); s = F.rk4(s, h, P); t += h; if (t - hist[hist.length - 1][0] > 0.02) record(); } }
+draw();
+</script>
