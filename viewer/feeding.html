@@ -3,14 +3,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* The feeding arrangement of the book's background/feeding-imc/feeding-imc.tex, run in the browser.
+/* The feeding arrangement of the book's background/feeding-imc/feeding-imc.tex, run in the browser:
+   a receiver on a cart on a line, with an eye that scans how far away it looks, and casings on the ground.
    Layout follows PRINCIPLES.md: one question in the bar with Play; the picture with what is yours to set drawn on it;
    the calculation of the present moment under it, in the order the mathematics has it; the record over time.
-   The model is feeding-model.js, checked by feeding-model.test.js. Claude Opus 5.5, 2ff5d861, 2026-11-18. */
+   The model is feeding-model.js, checked by feeding-model.test.js.
+   Claude Opus 5.5, 2ff5d861 (first page) and d531d927 (the cart and the eye), 2026-11-18. */
 :root {
   --ground: #eef1f3; --panel: #ffffff; --ink: #1b232c; --muted: #5a6672; --rule: #d3dae0;
   --accent: #2b4c8c; --accent-ink: #ffffff; --faint: rgba(43, 76, 140, 0.10);
-  --batt: #2b6cb0; --food: #b5472f; --grip: #7b3fa0; --open: #1f8f7e; --pos: #c07a12; --wall: #3a4651; --zone: rgba(31,143,126,0.10);
+  --batt: #2b6cb0; --food: #c0392b; --empty: #9aa5af; --grip: #7b3fa0; --open: #1f8f7e; --pos: #c07a12; --eye: #c07a12;
+  --wall: #3a4651; --earth: #c9b79c;
   --display: "Spectral", Georgia, serif; --body: "Public Sans", system-ui, sans-serif; --data: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
 }
@@ -18,14 +21,16 @@
   :root:not([data-theme="light"]) {
     --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
     --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142,174,245,0.12);
-    --batt: #6fa3e6; --food: #e07a5f; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --wall: #b5c0ca; --zone: rgba(69,194,173,0.12);
+    --batt: #6fa3e6; --food: #e5604f; --empty: #6b7782; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --eye: #e0a84a;
+    --wall: #b5c0ca; --earth: #5a4d3b;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
   --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142,174,245,0.12);
-  --batt: #6fa3e6; --food: #e07a5f; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --wall: #b5c0ca; --zone: rgba(69,194,173,0.12);
+  --batt: #6fa3e6; --food: #e5604f; --empty: #6b7782; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --eye: #e0a84a;
+  --wall: #b5c0ca; --earth: #5a4d3b;
   color-scheme: dark;
 }
 [hidden] { display: none !important; }
@@ -33,7 +38,7 @@ body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--body);
 .wrap { max-width: 980px; margin: 0 auto; padding-inline: var(--s4); padding-block: var(--s5) var(--s6); display: grid; gap: var(--s4); }
 .wrap > * { min-width: 0; }
 h1 { margin: 0; font: 600 30px/1.15 var(--display); }
-.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+.lede { margin: 0; color: var(--muted); max-width: 72ch; }
 .ask { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; background: var(--panel); border: 1px solid var(--rule);
   border-radius: 8px; padding: var(--s3) var(--s4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3);
   box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
@@ -41,20 +46,22 @@ h1 { margin: 0; font: 600 30px/1.15 var(--display); }
 button { font: 500 15px/1.2 var(--body); color: var(--ink); background: var(--ground); border: 1px solid var(--rule);
   border-radius: 6px; padding: var(--s2) var(--s3); min-height: 38px; cursor: pointer; }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 84px; }
+button:disabled { opacity: .45; cursor: default; }
 button:focus-visible, .knob:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: var(--s4); }
 .card h2 { margin: 0 0 var(--s2); font: 600 12px/1.2 var(--body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.hint { font-size: 13px; color: var(--muted); }
+.hint { font-size: 13px; color: var(--muted); margin: var(--s2) 0 0; }
+.tools { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin-top: var(--s2); }
 svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
 svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: var(--ink); }
-.grab { cursor: ns-resize; }
+.grab { cursor: ew-resize; }
 .knob { color: var(--accent); font: 500 15px var(--data); border-bottom: 1.5px dashed var(--accent); cursor: ew-resize; padding: 0 2px;
   user-select: none; -webkit-user-select: none; touch-action: none; white-space: pre; }
 .out { font: 500 15px var(--data); color: var(--muted); white-space: pre; font-variant-numeric: tabular-nums; }
 .calc { margin: 0; padding: var(--s3) var(--s4); background: var(--faint); border-radius: 6px; font-size: 15px; line-height: 1.75; }
 .calc p { margin: 0 0 var(--s2); }
 .b { color: var(--batt); font-weight: 600; } .f { color: var(--food); font-weight: 600; } .l { color: var(--grip); font-weight: 600; }
-.a { color: var(--open); font-weight: 600; } .x { color: var(--pos); font-weight: 600; }
+.a { color: var(--open); font-weight: 600; } .e { color: var(--eye); font-weight: 600; }
 .more { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .explain { margin: 0; max-width: 75ch; }
 .key { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); color: var(--muted); font-size: 13px; }
@@ -63,20 +70,24 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
 
 <div class="wrap">
   <h1>Feeding</h1>
-  <p class="lede">A receiver grips a casing that holds food, pries it open, digests what it can reach into its battery, and lets go when the food runs low. Every action is paid for from the battery.</p>
+  <p class="lede">A receiver rides a cart along a line. Its eye sweeps how far away it looks; when the place it looks at is red, the eye holds there and the wheels drive the cart toward it. A casing is red while it is full of food. At the casing the lever grips it, lifts it to the mouth, pries it open, and the receiver digests the food into its battery. Everything is paid for from the battery.</p>
 
   <div class="ask">
-    <span class="q">Does the meal pay for itself? Set the starting battery, the food, where the casing hangs, and how much digestion lets through, then press Play.</span>
+    <span class="q">Will the eye find the food? Place full and empty casings on the line, then press Play.</span>
     <button class="primary" id="play">Play</button>
     <button id="reset">Start over</button>
-    <span class="hint">time runs at <span class="knob" id="k-speed" tabindex="0"></span> units a second</span>
+    <span class="hint" style="margin:0">time runs at <span class="knob" id="k-speed" tabindex="0"></span> units a second</span>
   </div>
 
   <div class="card">
-    <h2>The receiver and the casing</h2>
-    <svg id="scene" viewBox="0 0 940 330" role="img" aria-label="The receiver above, the casing hanging below its mouth, the battery at the right"></svg>
-    <p class="hint">Drag the casing up or down, or the battery's level, to set where they start. The shaded band is where the mouth can reach.</p>
-    <p style="margin:var(--s2) 0 0">The casing holds <span class="knob" id="k-food" tabindex="0"></span> of food. Digestion lets <span class="knob" id="k-alpha" tabindex="0"></span> of it into the battery; prying costs <span class="knob" id="k-tear" tabindex="0"></span> per unit opened, and gripping wears at <span class="knob" id="k-wear" tabindex="0"></span>.</p>
+    <h2>The line</h2>
+    <svg id="scene" viewBox="0 0 940 300" role="img" aria-label="The cart on the line, its eye's gaze, and the casings on the ground"></svg>
+    <div class="tools">
+      <button id="add-full">Add a full casing</button>
+      <button id="add-empty">Add an empty casing</button>
+      <span class="hint" style="margin:0">Add a casing at any time, even while it runs. Before Play, drag a casing or the cart along the line, click a casing to make it full or empty, or drag it off either end to remove it.</span>
+    </div>
+    <p style="margin:var(--s3) 0 0">The battery starts at <span class="knob" id="k-batt" tabindex="0"></span>. The eye sweeps out to <span class="knob" id="k-A" tabindex="0"></span> either way, and holding its gaze costs <span class="knob" id="k-see" tabindex="0"></span>; the wheels push with <span class="knob" id="k-tau" tabindex="0"></span> per unit of distance to what the eye holds.</p>
   </div>
 
   <div class="card">
@@ -86,11 +97,10 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
 
   <div class="card">
     <h2>Over time</h2>
-    <svg id="chart" viewBox="0 0 940 300" aria-label="Battery, food, grip, opening and position over time"></svg>
+    <svg id="chart" viewBox="0 0 940 300" aria-label="Battery and food over time; the cart's place and where the eye looks"></svg>
     <div class="key">
-      <span><i style="background:var(--batt)"></i>battery</span><span><i style="background:var(--food)"></i>food</span>
-      <span><i style="background:var(--grip)"></i>grip</span><span><i style="background:var(--open)"></i>opening</span>
-      <span><i style="background:var(--pos)"></i>position of the casing</span>
+      <span><i style="background:var(--batt)"></i>battery</span><span><i style="background:var(--food)"></i>food left in all casings</span>
+      <span><i style="background:var(--wall)"></i>the cart's place</span><span><i style="background:var(--eye)"></i>where the eye looks</span>
     </div>
   </div>
 
@@ -98,8 +108,8 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
     <button id="b-what" aria-expanded="false">What is this?</button>
     <button id="b-check" aria-expanded="false">What was checked</button>
   </div>
-  <p class="explain" id="t-what" hidden>The page runs one arrangement: a source (the food, the opening, the casing as a mass, gravity, and a dragger that is a spring tied to a memory of where the casing was) wired to a receiver (a battery, a grip, and three stateless parts, the gripper, the opener and the digestor). Each stateless part pushes back on the values it reads; the pushes on one value add, and each part that stores a state moves it by the push it receives. The rates below are those pushes. Written out in the book's terms in <code>background/feeding-imc/feeding-imc.tex</code>.</p>
-  <p class="explain" id="t-check" hidden>The model (<code>feeding-model.js</code>) is tested by <code>feeding-model.test.js</code> against the book's <code>background/feeding-imc/check_episode.py</code>: at the starting values shown when the page opens, after 12 units of time the battery is 10.399 and the food 0.074, the grip lets go at 3.058, and the energy lost adds back to the energy at the start. That script is ordinary code; this arrangement is not yet built in the library itself.</p>
+  <p class="explain" id="t-what" hidden>The page runs one arrangement: a receiver wired to every casing. Each casing is a source: its food, its opening, its height as a mass, gravity, the ground, and a dragger. It sends out how full it is, and so how red. The receiver holds a battery, a grip, the lever's height, the cart (a mass on a dragger whose memory is the wheel), and the eye's look distance and scan. Its stateless parts push back on what they read: the eye's motors, the wheel's drive, the gripper, the lever and the springs of the attachment. Every push on one value adds, and each store moves by the push it receives. Each motor pays the battery for what it pushes times how fast its store moves. Written out in the book's terms in <code>background/feeding-imc/feeding-imc.tex</code>.</p>
+  <p class="explain" id="t-check" hidden>The model (<code>feeding-model.js</code>) is tested by <code>feeding-model.test.js</code> against the book's <code>background/feeding-imc/check_episode.py</code>. With the note's two casings, an empty one at 4 and a full one at −3, and the cart at 0, the eye first holds on red at 5.92. After 30 units of time the battery is 8.377, the full casing's food 0.074, the cart at −2.966, and the energy lost adds back to the energy at the start. The script also checks symbolically that the equations follow from the parts and that the energy identity holds. It is ordinary code; this arrangement is not yet built in the library itself.</p>
 </div>
 
 <script src="feeding-model.js"></script>
@@ -107,16 +117,19 @@ svg text { font-family: var(--body); font-variant-numeric: tabular-nums; fill: v
 const F = window.Feeding;
 const P = { ...F.DEFAULTS };
 const NS = 'http://www.w3.org/2000/svg';
-const FIG = ' ';
+const FIG = ' ';
 const fw = (v, dec, width, sign) => {          // fixed-width number (PRINCIPLES 12)
   let s = (sign && v >= 0 ? '+' : '') + v.toFixed(dec);
   if (sign && v < 0) s = '−' + (-v).toFixed(dec);
   return s.padStart(width, FIG);
 };
-let start = F.START.slice();
-let s = start.slice(), t = 0, playing = false, speed = 1, hist = [];
-const record = () => hist.push([t, s[0], s[1], s[5], s[4], s[2]]);
-record();
+const FULL = 10, EMPTY = 0.05;
+let places = F.PLACES.slice(), foods = [EMPTY, FULL], cart0 = 0, batt0 = 3;
+let s, t, playing = false, speed = 2, hist;
+function restart() { s = F.start(places, foods, cart0, P); s[0] = batt0; t = 0; hist = []; record(); }
+const totalFood = () => places.reduce((acc, _, k) => acc + s[F.NR + 5 * k], 0);
+function record() { hist.push([t, s[0], totalFood(), s[3], s[3] + s[6]]); }
+restart();
 
 // ---------- knobs: a number shown is a number you can slide, where it is shown ----------
 function knob(id, get, set, lo, hi, per, fmt) {
@@ -133,119 +146,150 @@ function knob(id, get, set, lo, hi, per, fmt) {
   show();
   return show;
 }
-const atStart = () => t === 0;
-const setStart = (i, v) => { start[i] = v; if (atStart()) { s[i] = v; hist = []; record(); } };
-knob('k-speed', () => speed, v => { speed = v; }, 0.1, 5, 0.01, v => fw(v, 1, 3));
-const showFood = knob('k-food', () => start[1], v => setStart(1, v), 0.5, 12, 0.02, v => fw(v, 1, 4));
-knob('k-alpha', () => P.alpha, v => { P.alpha = v; }, 0.05, 1, 0.002, v => fw(v, 2, 4));
-knob('k-tear', () => P.ctear, v => { P.ctear = v; }, 0, 3, 0.005, v => fw(v, 2, 4));
-knob('k-wear', () => P.cwear, v => { P.cwear = v; }, 0, 0.5, 0.0005, v => fw(v, 3, 5));
+knob('k-speed', () => speed, v => { speed = v; }, 0.2, 8, 0.02, v => fw(v, 1, 3));
+knob('k-batt', () => batt0, v => { batt0 = v; if (t === 0) { s[0] = v; hist = []; record(); } }, 0.2, 10, 0.02, v => fw(v, 1, 4));
+knob('k-A', () => P.A, v => { P.A = v; if (t === 0) { s[7] = v; s[6] = 0; } }, 1, 10, 0.02, v => fw(v, 1, 4));
+knob('k-see', () => P.csee, v => { P.csee = v; }, 0, 0.05, 0.0001, v => fw(v, 3, 5));
+knob('k-tau', () => P.ktau, v => { P.ktau = v; }, 0.02, 1, 0.002, v => fw(v, 2, 4));
 
-// ---------- the scene ----------
+// ---------- the scene: the line seen from the side; heights drawn larger than places ----------
 const scene = document.getElementById('scene');
-const yOf = x => 100 + (P.x0 - x) * 190;          // mouth at y 100; down is lower position
-const xOfY = y => P.x0 - (y - 100) / 190;
-const BX = 760, BTOP = 30, BH = 260, BMAX = 12;
+const X0 = 30, X1 = 910, LO = -9, HI = 9, GY = 230, HS = 150;     // world place -> screen x; height -> screen y
+const sx = p => X0 + (X1 - X0) * (p - LO) / (HI - LO);
+const px = X => LO + (X - X0) / (X1 - X0) * (HI - LO);
+const sy = x => GY - (x - P.xg) * HS;
 function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || scene).appendChild(e); return e; }
 function drawScene() {
   scene.textContent = '';
-  const fd = F.field(s, P);
-  // reach band: full within R/2, none past R
-  el('rect', { x: 330, y: 100, width: 280, height: yOf(P.x0 - P.R / 2) - 100, fill: 'var(--zone)' });
-  el('line', { x1: 330, x2: 610, y1: yOf(P.x0 - P.R), y2: yOf(P.x0 - P.R), stroke: 'var(--open)', 'stroke-dasharray': '3 4', opacity: .6 });
-  el('text', { x: 336, y: yOf(P.x0 - P.R) - 6, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'edge of reach';
-  // receiver and its mouth
-  el('rect', { x: 400, y: 14, width: 140, height: 56, rx: 10, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 2 });
-  el('text', { x: 470, y: 47, 'text-anchor': 'middle', 'font-size': 15 }).textContent = 'receiver';
-  // jaws: they close as the grip holds
-  const hold = fd.gates.hold, jy = yOf(s[2]);
-  const reach = Math.min(jy, 100 + 26);
-  for (const side of [-1, 1]) {
-    const tipx = 470 + side * (58 - 30 * hold);
-    el('path', { d: `M ${470 + side * 50} 70 Q ${470 + side * 70} ${(70 + reach) / 2} ${tipx} ${reach}`, fill: 'none', stroke: 'var(--grip)', 'stroke-width': 5, 'stroke-linecap': 'round' });
+  const fd = F.field(s, places, P);
+  const y = s[3], r = s[6], h = s[2];
+  // ground and its scale
+  el('rect', { x: X0, y: GY + 12, width: X1 - X0, height: 8, fill: 'var(--earth)', rx: 2 });
+  for (let p = Math.ceil(LO); p <= HI; p += 1) {
+    el('line', { x1: sx(p), x2: sx(p), y1: GY + 20, y2: GY + (p % 5 === 0 ? 30 : 25), stroke: 'var(--muted)' });
+    if (p % 5 === 0) el('text', { x: sx(p), y: GY + 46, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)' }).textContent = p;
   }
-  // the casing: a pod whose top opens as a grows; the food fills it
-  const cy = jy, w = 90, h = 70, gapw = 70 * s[4];
-  const g = el('g', { class: 'grab' });
-  el('path', { d: `M ${470 - gapw / 2} ${cy} L ${470 - w / 2} ${cy} Q ${470 - w / 2} ${cy + h} ${470} ${cy + h} Q ${470 + w / 2} ${cy + h} ${470 + w / 2} ${cy} L ${470 + gapw / 2} ${cy}`,
-    fill: 'var(--panel)', stroke: 'var(--wall)', 'stroke-width': 2.5 }, g);
-  const ff = Math.min(1, s[1] / 12), fh = (h - 8) * ff;
-  el('rect', { x: 470 - w / 2 + 8, y: cy + h - 4 - fh, width: w - 16, height: fh, rx: 6, fill: 'var(--food)', opacity: .75 }, g);
-  el('text', { x: 470 + w / 2 + 12, y: cy + 22, 'font-size': 13, fill: 'var(--pos)' }).textContent = 'casing';
-  el('text', { x: 470 + w / 2 + 12, y: cy + 40, 'font-size': 13, fill: 'var(--food)', 'font-family': 'var(--data)' }).textContent = 'food ' + fw(s[1], 2, 5);
-  el('text', { x: 470 + w / 2 + 12, y: cy + 58, 'font-size': 13, fill: 'var(--open)', 'font-family': 'var(--data)' }).textContent = 'open ' + fw(100 * s[4], 0, 3) + '%';
-  el('rect', { x: 470 - w / 2 - 10, y: cy - 10, width: w + 20, height: h + 20, fill: 'transparent' }, g);
-  g.addEventListener('pointerdown', e => dragStart(e, 'casing'));
-  // gravity and drag on the casing
-  el('text', { x: 470 - w / 2 - 14, y: cy + 40, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--muted)' }).textContent = 'force on the casing ' + fw(fd.force, 2, 6, true);
-  // the battery
-  const bh = BH * Math.min(1, s[0] / BMAX);
-  el('rect', { x: BX, y: BTOP, width: 60, height: BH, rx: 6, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 2 });
-  const bg = el('g', { class: 'grab' });
-  el('rect', { x: BX + 4, y: BTOP + BH - bh, width: 52, height: Math.max(0, bh - 4), rx: 3, fill: 'var(--batt)', opacity: .8 }, bg);
-  el('rect', { x: BX - 10, y: BTOP - 10, width: 80, height: BH + 20, fill: 'transparent' }, bg);
-  bg.addEventListener('pointerdown', e => dragStart(e, 'battery'));
-  el('line', { x1: BX - 8, x2: BX + 68, y1: BTOP + BH - BH * P.b0 / BMAX, y2: BTOP + BH - BH * P.b0 / BMAX, stroke: 'var(--muted)', 'stroke-dasharray': '3 3' });
-  el('text', { x: BX + 74, y: BTOP + BH - BH * P.b0 / BMAX + 4, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'awake';
-  el('text', { x: BX + 30, y: BTOP + BH + 26, 'text-anchor': 'middle', 'font-size': 13, fill: 'var(--batt)' }).textContent = 'battery ' + fw(s[0], 2, 5);
-  // grip readout under the receiver
-  el('text', { x: 560, y: 47, 'font-size': 13, fill: 'var(--grip)', 'font-family': 'var(--data)' }).textContent = 'grip ' + fw(s[5], 2, 5, true);
-  el('text', { x: 40, y: 300, 'font-size': 13, fill: 'var(--muted)', 'font-family': 'var(--data)' }).textContent = 'time ' + fw(t, 2, 6);
+  // the eye's sweep: how far it can look either way
+  el('line', { x1: sx(y - P.A), x2: sx(y + P.A), y1: 26, y2: 26, stroke: 'var(--eye)', opacity: .25, 'stroke-width': 6, 'stroke-linecap': 'round' });
+  el('text', { x: sx(y + P.A) + 8, y: 30, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'how far the eye sweeps';
+  // the casings
+  places.forEach((p, k) => {
+    const [f, a, x] = s.slice(F.NR + 5 * k, F.NR + 5 * k + 3);
+    const red = fd.casings[k].red, cx = sx(p), cy = sy(x) + 12, w = 44, hh = 30;
+    const g = el('g', { class: 'grab' });
+    const gapw = 32 * a;
+    el('path', { d: `M ${cx - gapw / 2} ${cy - hh} L ${cx - w / 2} ${cy - hh} Q ${cx - w / 2} ${cy} ${cx} ${cy} Q ${cx + w / 2} ${cy} ${cx + w / 2} ${cy - hh} L ${cx + gapw / 2} ${cy - hh}`,
+      fill: 'var(--panel)', stroke: red > 0.5 ? 'var(--food)' : 'var(--empty)', 'stroke-width': 3 }, g);
+    const fh = (hh - 6) * Math.min(1, f / FULL);
+    el('rect', { x: cx - w / 2 + 6, y: cy - 3 - fh, width: w - 12, height: fh, rx: 3, fill: 'var(--food)', opacity: .35 + .5 * red }, g);
+    el('text', { x: cx, y: cy - hh - 8, 'text-anchor': 'middle', 'font-size': 12, fill: red > 0.5 ? 'var(--food)' : 'var(--muted)', 'font-family': 'var(--data)' }, g).textContent = fw(f, 1, 4);
+    el('rect', { x: cx - w / 2 - 6, y: cy - hh - 8, width: w + 12, height: hh + 32, fill: 'transparent' }, g);
+    g.addEventListener('pointerdown', e => dragStart(e, k));
+  });
+  // the cart: body, wheels, mouth at height x0, the lever down to its tip at height h
+  const cx = sx(y), body = sy(P.x0) - 6;
+  const cg = el('g', { class: 'grab' });
+  el('rect', { x: cx - 46, y: body - 34, width: 92, height: 34, rx: 6, fill: 'var(--panel)', stroke: 'var(--wall)', 'stroke-width': 2 }, cg);
+  el('text', { x: cx, y: body - 13, 'text-anchor': 'middle', 'font-size': 13 }, cg).textContent = 'receiver';
+  const turn = (s[5] / 0.12) % (2 * Math.PI);
+  for (const dx of [-30, 30]) {
+    const wx = cx + dx, wy = body + 4;
+    el('line', { x1: wx, x2: wx, y1: body, y2: GY + 12 - 14, stroke: 'var(--wall)', 'stroke-width': 2 }, cg);
+    el('circle', { cx: wx, cy: GY + 12 - 14, r: 14, fill: 'var(--panel)', stroke: 'var(--wall)', 'stroke-width': 2.5 }, cg);
+    el('line', { x1: wx, y1: GY - 2, x2: wx + 12 * Math.cos(turn), y2: GY - 2 + 12 * Math.sin(turn), stroke: 'var(--wall)', 'stroke-width': 2 }, cg);
+  }
+  el('rect', { x: cx - 50, y: body - 40, width: 100, height: GY - body + 40, fill: 'transparent' }, cg);
+  cg.addEventListener('pointerdown', e => dragStart(e, 'cart'));
+  // lever: from the mouth down to its tip; jaws close as the grip holds
+  const tipy = sy(h) - 4, hold = fd.hold;
+  el('line', { x1: cx, x2: cx, y1: body, y2: tipy, stroke: 'var(--grip)', 'stroke-width': 4, 'stroke-linecap': 'round' });
+  for (const side of [-1, 1])
+    el('line', { x1: cx, y1: tipy, x2: cx + side * (26 - 12 * hold), y2: tipy + 6, stroke: 'var(--grip)', 'stroke-width': 4, 'stroke-linecap': 'round' });
+  // the eye and its gaze: a line from the eye to the place it looks at
+  const ex = cx + 34 * Math.sign(r || 1), eyY = body - 46, lx = sx(y + r);
+  el('line', { x1: ex, y1: eyY, x2: lx, y2: GY - 6, stroke: 'var(--eye)', 'stroke-width': 1.5 + 2.5 * fd.seen, 'stroke-dasharray': fd.seen > 0.5 ? '' : '5 4', opacity: .9 });
+  el('circle', { cx: ex, cy: eyY, r: 7, fill: 'var(--panel)', stroke: 'var(--eye)', 'stroke-width': 2.5 });
+  el('circle', { cx: lx, cy: GY - 6, r: 5 + 6 * fd.seen, fill: fd.seen > 0.05 ? 'var(--food)' : 'var(--eye)', opacity: .35 + .5 * fd.seen });
+  // battery gauge, top left
+  const BW = 160, frac = Math.min(1, s[0] / 12);
+  el('rect', { x: X0, y: 52, width: BW, height: 14, rx: 3, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 1.5 });
+  el('rect', { x: X0 + 2, y: 54, width: Math.max(0, (BW - 4) * frac), height: 10, rx: 2, fill: 'var(--batt)', opacity: .85 });
+  el('text', { x: X0 + BW + 10, y: 64, 'font-size': 13, fill: 'var(--batt)', 'font-family': 'var(--data)' }).textContent = 'battery ' + fw(s[0], 2, 5);
+  el('text', { x: X1, y: 64, 'text-anchor': 'end', 'font-size': 13, fill: 'var(--muted)', 'font-family': 'var(--data)' }).textContent = 'time ' + fw(t, 1, 5);
 }
-let drag = null;
+let drag = null, moved = false;
 function dragStart(e, what) {
-  if (playing) return;
-  drag = what; scene.setPointerCapture(e.pointerId); dragMove(e);
+  if (playing || t > 0) return;
+  drag = what; moved = false; scene.setPointerCapture(e.pointerId);
 }
-function svgY(e) { const r = scene.getBoundingClientRect(); return (e.clientY - r.top) * 330 / r.height; }
-function dragMove(e) {
-  if (!drag) return;
-  const y = svgY(e);
-  if (drag === 'casing') {
-    const x = Math.min(0.3, Math.max(-1.1, xOfY(y)));
-    s[2] = x; s[6] = x; s[3] = 0; start[2] = x; start[6] = x; start[3] = 0;
-  } else {
-    const b = Math.min(BMAX, Math.max(0.05, (BTOP + BH - y) / BH * BMAX));
-    s[0] = b; start[0] = b;
+function svgX(e) { const b = scene.getBoundingClientRect(); return (e.clientX - b.left) * 940 / b.width; }
+scene.addEventListener('pointermove', e => {
+  if (drag === null) return;
+  moved = true;
+  const p = Math.round(px(svgX(e)) * 10) / 10;
+  if (drag === 'cart') cart0 = Math.min(HI - 0.5, Math.max(LO + 0.5, p));
+  else places[drag] = p;
+  restart(); draw();
+});
+scene.addEventListener('pointerup', () => {
+  if (drag === null) return;
+  if (drag !== 'cart') {
+    if (!moved) foods[drag] = foods[drag] > 1 ? EMPTY : FULL;
+    else if (places[drag] < LO + 0.3 || places[drag] > HI - 0.3) { places.splice(drag, 1); foods.splice(drag, 1); }
   }
-  if (atStart()) { hist = []; record(); }
-  draw();
+  drag = null; restart(); draw();
+});
+function addCasing(food) {
+  // the free place farthest from everything already on the line; while running, the casing joins the run as it is
+  const here = t > 0 ? s[3] : cart0;
+  let best = 0, bestd = -1;
+  for (let p = LO + 1; p <= HI - 1; p += 0.5) {
+    const d = Math.min(Math.abs(p - here), ...places.map(q => Math.abs(p - q)));
+    if (d > bestd) { bestd = d; best = p; }
+  }
+  places.push(best); foods.push(food);
+  if (t > 0) { s.push(food, 0, P.xg, 0, P.xg); draw(); } else { restart(); draw(); }
 }
-scene.addEventListener('pointermove', dragMove);
-scene.addEventListener('pointerup', () => { drag = null; });
+document.getElementById('add-full').addEventListener('click', () => addCasing(FULL));
+document.getElementById('add-empty').addEventListener('click', () => addCasing(EMPTY));
 
-// ---------- the calculation of the present moment ----------
+// ---------- the calculation of the present moment, in the order the mathematics has it ----------
 function drawCalc() {
-  const fd = F.field(s, P), G = fd.gates, R = fd.rates, r = fd.rate;
+  const fd = F.field(s, places, P), r = fd.rate;
+  const k = fd.casings.reduce((best, c, i) => (c.atMouth > (best < 0 ? -1 : fd.casings[best].atMouth) ? i : best), -1);
+  const c = k >= 0 ? fd.casings[k] : null;
   document.getElementById('calc').innerHTML =
-    `<p>The receiver reads <span class="b">battery</span> <span class="out">${fw(s[0], 2, 5)}</span>, <span class="f">food</span> <span class="out">${fw(s[1], 2, 5)}</span>, <span class="a">opening</span> <span class="out">${fw(s[4], 2, 4)}</span>, <span class="x">position</span> <span class="out">${fw(s[2], 2, 5, true)}</span>, <span class="l">grip</span> <span class="out">${fw(s[5], 2, 5, true)}</span>.</p>` +
-    `<p>Its conditions, each from 0 to 1: awake <span class="out">${fw(G.live, 2, 4)}</span>, near the mouth <span class="out">${fw(G.near, 2, 4)}</span>, holding <span class="out">${fw(G.hold, 2, 4)}</span>, food worth keeping <span class="out">${fw(G.keep, 2, 4)}</span>, food reachable <span class="out">${fw(G.access, 2, 4)}</span>.</p>` +
-    `<p>So it grips at <span class="out">${fw(R.grip, 3, 6, true)}</span>, pries at <span class="out">${fw(R.pry, 3, 5)}</span>, and eats at <span class="out">${fw(R.eat, 3, 6)}</span>; gripping draws <span class="out">${fw(R.draw, 3, 6, true)}</span> from the battery.</p>` +
-    `<p>Each store moves by the push it receives: the <span class="b">battery</span> by ${P.alpha.toFixed(2)}×eat − draw − ${P.ctear.toFixed(2)}×pry = <span class="out">${fw(r[0], 3, 6, true)}</span>, the <span class="f">food</span> by −eat = <span class="out">${fw(r[1], 3, 6, true)}</span>, the <span class="a">opening</span> by pry = <span class="out">${fw(r[4], 3, 6, true)}</span>, the <span class="l">grip</span> by grip = <span class="out">${fw(r[5], 3, 6, true)}</span>, and the casing's momentum by the force of attachment, gravity and drag, <span class="out">${fw(r[3], 3, 6, true)}</span>.</p>`;
+    `<p>The <span class="e">eye</span> looks <span class="out">${fw(s[6], 2, 6, true)}</span> from the cart, at the place <span class="out">${fw(s[3] + s[6], 2, 6, true)}</span>; how red it sees there, from 0 to 1: <span class="out">${fw(fd.seen, 2, 4)}</span>. So its scan runs at <span class="out">${fw(fd.free, 2, 4)}</span> of full speed, and its look distance changes at <span class="out">${fw(r[6], 2, 6, true)}</span>.</p>` +
+    `<p>The <span class="e">wheels</span> push with <span class="out">${fw(P.ktau, 2, 4)}</span> × awake <span class="out">${fw(fd.live, 2, 4)}</span> × how red × look distance = <span class="out">${fw(fd.torque, 3, 6, true)}</span>; the wheel turns at <span class="out">${fw(fd.wheel, 2, 6, true)}</span>, and the cart is at <span class="out">${fw(s[3], 2, 6, true)}</span>.</p>` +
+    `<p>The <span class="l">lever</span> grips at <span class="out">${fw(fd.grip, 2, 6, true)}</span> (grip <span class="out">${fw(s[1], 2, 5, true)}</span>, holding <span class="out">${fw(fd.hold, 2, 4)}</span>) and lifts its tip at <span class="out">${fw(fd.lift, 2, 6, true)}</span> (tip <span class="out">${fw(s[2] - P.xg, 2, 5)}</span> above the ground).` +
+    (c ? ` At the mouth it pries at <span class="out">${fw(c.pry, 2, 5)}</span> and the receiver eats at <span class="out">${fw(c.eat, 2, 5)}</span>.</p>` : `</p>`) +
+    `<p>The <span class="b">battery</span> moves by ${P.alpha.toFixed(2)}×eat − ${P.ctear.toFixed(2)}×pry − what the motors cost: gripper <span class="out">${fw(fd.pay.grip, 3, 6, true)}</span>, lever <span class="out">${fw(fd.pay.lift, 3, 6, true)}</span>, wheels <span class="out">${fw(fd.pay.drive, 3, 6, true)}</span>, eye <span class="out">${fw(fd.pay.eye, 3, 6, true)}</span>; in all <span class="out">${fw(r[0], 3, 6, true)}</span>.</p>`;
 }
 
 // ---------- the record over time (the axis compresses; the page never grows) ----------
 const chart = document.getElementById('chart');
 function drawChart() {
   chart.textContent = '';
-  const T = Math.max(12, t), X0 = 60, X1 = 920;
-  const xs = tt => X0 + (X1 - X0) * tt / T;
+  const T = Math.max(20, t), C0 = 60, C1 = 920;
+  const xs = tt => C0 + (C1 - C0) * tt / T;
   const panel = (top, hgt, lo, hi, cols, label) => {
     const ys = v => top + hgt - hgt * (v - lo) / (hi - lo);
-    el('line', { x1: X0, x2: X1, y1: top + hgt, y2: top + hgt, stroke: 'var(--rule)' }, chart);
-    if (lo < 0) el('line', { x1: X0, x2: X1, y1: ys(0), y2: ys(0), stroke: 'var(--rule)', 'stroke-dasharray': '2 3' }, chart);
-    el('text', { x: X0 - 8, y: ys(hi) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = hi;
-    el('text', { x: X0 - 8, y: ys(lo) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = lo;
-    el('text', { x: X0, y: top - 6, 'font-size': 12, fill: 'var(--muted)' }, chart).textContent = label;
-    for (const [i, c] of cols) {
-      const d = hist.map((h, k) => `${k ? 'L' : 'M'} ${xs(h[0]).toFixed(1)} ${ys(Math.min(hi, Math.max(lo, h[i]))).toFixed(1)}`).join(' ');
-      el('path', { d, fill: 'none', stroke: c, 'stroke-width': 2 }, chart);
+    el('line', { x1: C0, x2: C1, y1: top + hgt, y2: top + hgt, stroke: 'var(--rule)' }, chart);
+    if (lo < 0) el('line', { x1: C0, x2: C1, y1: ys(0), y2: ys(0), stroke: 'var(--rule)', 'stroke-dasharray': '2 3' }, chart);
+    el('text', { x: C0 - 8, y: ys(hi) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = hi;
+    el('text', { x: C0 - 8, y: ys(lo) + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = lo;
+    el('text', { x: C0, y: top - 6, 'font-size': 12, fill: 'var(--muted)' }, chart).textContent = label;
+    for (const [i, col, wdt] of cols) {
+      const d = hist.map((hh, k) => `${k ? 'L' : 'M'} ${xs(hh[0]).toFixed(1)} ${ys(Math.min(hi, Math.max(lo, hh[i]))).toFixed(1)}`).join(' ');
+      el('path', { d, fill: 'none', stroke: col, 'stroke-width': wdt || 2 }, chart);
     }
   };
-  panel(20, 110, 0, 12, [[1, 'var(--batt)'], [2, 'var(--food)']], 'energy');
-  panel(160, 110, -1.2, 2.1, [[3, 'var(--grip)'], [4, 'var(--open)'], [5, 'var(--pos)']], 'grip, opening, position');
+  const fmax = Math.max(12, Math.ceil(hist[0][2] / 5) * 5);
+  panel(20, 100, 0, fmax, [[1, 'var(--batt)'], [2, 'var(--food)']], 'energy');
+  panel(150, 120, LO, HI, [[4, 'var(--eye)', 1.2], [3, 'var(--wall)', 2.5]], 'place on the line');
   el('line', { x1: xs(t), x2: xs(t), y1: 14, y2: 274, stroke: 'var(--accent)', 'stroke-width': 1 }, chart);
-  for (let k = 0; k <= T; k += T > 30 ? 10 : 3)
+  const step = T > 60 ? 20 : T > 30 ? 10 : 5;
+  for (let k = 0; k <= T; k += step)
     el('text', { x: xs(k), y: 292, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = k;
 }
 
@@ -257,15 +301,16 @@ function draw(force) {
 }
 
 // ---------- running: time on the page is the model's time ----------
-const H = 0.002;
+const H = 0.004;
 let last = null;
+function step(dt) {
+  let todo = dt;
+  while (todo > 1e-12) { const h = Math.min(H, todo); s = F.rk4(s, h, places, P); t += h; todo -= h; }
+  if (t - hist[hist.length - 1][0] > 0.05) record();
+}
 function frame(now) {
   if (!playing) { last = null; return; }
-  if (last !== null) {
-    let todo = Math.min(0.1, (now - last) / 1000) * speed;
-    while (todo > 1e-12) { const h = Math.min(H, todo); s = F.rk4(s, h, P); t += h; todo -= h; }
-    if (hist.length === 0 || t - hist[hist.length - 1][0] > 0.02) record();
-  }
+  if (last !== null) step(Math.min(0.1, (now - last) / 1000) * speed);
   last = now;
   draw(false);
   requestAnimationFrame(frame);
@@ -276,8 +321,7 @@ playBtn.addEventListener('click', () => {
   if (playing) requestAnimationFrame(frame); else draw();
 });
 document.getElementById('reset').addEventListener('click', () => {
-  playing = false; playBtn.textContent = 'Play';
-  s = start.slice(); t = 0; hist = []; record(); showFood(); draw();
+  playing = false; playBtn.textContent = 'Play'; restart(); draw();
 });
 for (const k of ['what', 'check']) {
   const b = document.getElementById('b-' + k), p = document.getElementById('t-' + k);
@@ -285,6 +329,6 @@ for (const k of ['what', 'check']) {
 }
 // #t=N opens the page already run to time N (for checking a page mid-run in headless Chrome; PRINCIPLES.md)
 const jump = /t=([\d.]+)/.exec(location.hash);
-if (jump) { const T = +jump[1]; while (t < T - 1e-12) { const h = Math.min(H, T - t); s = F.rk4(s, h, P); t += h; if (t - hist[hist.length - 1][0] > 0.02) record(); } }
+if (jump) { const T = +jump[1]; while (t < T - 1e-9) step(Math.min(0.05, T - t)); }
 draw();
 </script>

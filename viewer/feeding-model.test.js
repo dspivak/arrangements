@@ -1,25 +1,29 @@
 // node viewer/feeding-model.test.js — the page's model against the book's check_episode.py figures
-// (b 10.39890, f 0.07397 at t = 12; grip through 0 at t 3.05838), and the energy identity E + H = E(0).
+// (t = 30: battery 8.37718, the full casing's food 0.07392, cart at -2.96609; the eye first holds on red,
+// seen > 1/2, at t 5.922), and the energy identity E + H = E(0).
 const F = require('./feeding-model.js');
 const P = { ...F.DEFAULTS };
+const places = F.PLACES;
 let s = F.START.slice();
-const h = 0.0005;
-let t = 0, H = 0, cross = null;
-const E0 = F.field(s, P).energy;
-for (let n = 0; n < 12 / h; n++) {
-  const L0 = F.field(s, P).loss;
-  const s1 = F.rk4(s, h, P);
-  H += h / 2 * (L0 + F.field(s1, P).loss);
-  if (cross === null && s[5] > 0 && s1[5] <= 0) cross = t + h * s[5] / (s[5] - s1[5]);
+const h = 0.001;
+let t = 0, H = 0, lock = null;
+const E0 = F.field(s, places, P).energy;
+for (let n = 0; n < 30 / h; n++) {
+  const f0 = F.field(s, places, P);
+  const s1 = F.rk4(s, h, places, P);
+  const f1 = F.field(s1, places, P);
+  H += h / 2 * (f0.loss + f1.loss);
+  if (lock === null && f0.seen <= 0.5 && f1.seen > 0.5) lock = t + h * (0.5 - f0.seen) / (f1.seen - f0.seen);
   s = s1; t += h;
 }
-const E = F.field(s, P).energy;
+const E = F.field(s, places, P).energy;
 const ok = (name, got, want, tol) => {
   const pass = Math.abs(got - want) <= tol;
   console.log(`${pass ? 'ok  ' : 'FAIL'} ${name}: ${got.toFixed(6)} (want ${want} ± ${tol})`);
   if (!pass) process.exitCode = 1;
 };
-ok('battery at t=12', s[0], 10.39890, 1e-4);
-ok('food at t=12', s[1], 0.07397, 1e-4);
-ok('grip crosses 0 at', cross, 3.05838, 1e-3);
-ok('E(12) + H(12) - E(0)', E + H - E0, 0, 1e-4);
+ok('battery at t=30', s[0], 8.37718, 1e-3);
+ok('full casing food at t=30', s[F.NR + 5], 0.07392, 1e-3);
+ok('cart at t=30', s[3], -2.96609, 1e-3);
+ok('eye holds on red at', lock, 5.922, 2e-3);
+ok('E(30) + H(30) - E(0)', E + H - E0, 0, 1e-4);
