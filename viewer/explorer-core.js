@@ -144,7 +144,7 @@
     return branches.slice(1).reduce((total,branch)=>add(total,branch.load),first);
   }
   function forkWire(branches){
-    return {...branches[0],branches,load:sumLoads(branches),
+    return {...branches[0],branches,argument:branches.some(w=>w.argument!==false),load:sumLoads(branches),
       loadScale:Math.max(...branches.map(w=>w.loadScale??1))};
   }
   function aggregate(wires) {
@@ -154,7 +154,7 @@
       if(!groups.has(key))groups.set(key,{...w,branches:[]});
       groups.get(key).branches.push(w);
     }
-    return [...groups.values()].map(w=>({...w,load:sumLoads(w.branches)}));
+    return [...groups.values()].map(w=>({...w,argument:w.branches.some(b=>b.argument!==false),load:sumLoads(w.branches)}));
   }
   function intensity(value,scale=1) {const v=magnitude(value);return v==null?null:Math.min(1,v/scale);}
   function color(value,scale=1,kind='value') {

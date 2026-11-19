@@ -17,13 +17,13 @@ CDLM sec.spring_second_pass; the book's Ch 4).
 
 from __future__ import annotations
 
-from typing import Sequence, Tuple
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
-from .arrangement import Arrangement
+from .arrangement import Arrangement, Numbers
 from .interpretation import interpretation
 from .pc import PCMorphism
 from .polynomial import Cot, DirichletProduct, Poly, PolyMap, nest_left, unnest_left
@@ -222,7 +222,7 @@ def Phi(arr: Arrangement) -> PCMorphism:
     )
 
 
-def closed_step(arr: Arrangement, check: int = 2, duration=None):
+def closed_step(arr: Arrangement, check: int = 2, duration: Optional[float] = None) -> Callable[[Any], Any]:
     """One step of ``Phi(arr)`` for a closed arrangement, compiled by JAX, checked against ``Phi``.
 
     For a closed arrangement (all four port dimensions zero) the covector triple collapses
@@ -237,7 +237,8 @@ def closed_step(arr: Arrangement, check: int = 2, duration=None):
     without the check.
 
     ``duration`` fixes how long every step is held (``None``: the unit step), and the
-    check runs ``Phi`` at the same duration.
+    check runs ``Phi`` at the same duration. The returned step maps a state of ``arr.P``
+    (a pytree of arrays, hence ``Any``) to the next one.
     """
     from .interpretation import trivial_omega
 
@@ -264,7 +265,8 @@ def closed_step(arr: Arrangement, check: int = 2, duration=None):
     return step
 
 
-def open_step(arr: Arrangement, n_in, xi_out=None, check: int = 2, duration=None):
+def open_step(arr: Arrangement, n_in: Numbers, xi_out: Optional[Numbers] = None, check: int = 2,
+              duration: Optional[float] = None) -> Callable[[Any], Any]:
     """One step of ``Phi(arr)`` for a system ``1 -> <N-|N+>``, told fixed input values and a fixed force at its
     outputs, compiled by JAX and checked against ``Phi``, as ``closed_step`` is for a closed one.
 

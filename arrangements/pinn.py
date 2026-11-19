@@ -30,7 +30,7 @@ indefinite and cannot be descended (see the conclusion).
 
 from __future__ import annotations
 
-from typing import Callable, Tuple
+from typing import Callable, List, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -113,7 +113,7 @@ def solve_deep_ritz(
     eta: float = 0.3,
     steps: int = 4000,
     seed: int = 0,
-):
+) -> Tuple[Array, Array, List[float], Array]:
     """Train the field network to minimize ``E`` (the deep-Ritz solve).
 
     The learner's parameter is the configuration coalgebra on ``(R^n, eta * I)``;

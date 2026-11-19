@@ -31,12 +31,14 @@ against.
 from __future__ import annotations
 
 import math
+from typing import Any, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax.typing import ArrayLike
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .belief import belief_coalgebra, belief_of
 from .coalgebra import configuration
 from .functors import Phi
@@ -52,15 +54,17 @@ D0S = (5.0, 2.0, 6.0, 4.0, 3.0, 7.0) * 2
 PROBLEMS = {"P1": ((0.3, 0.2), (0.3, 0.4)), "P2": ((0.1, 0.2), (0.3, 0.4)), "P3": ((0.3, 0.2), (0.3, 0.5))}
 
 
-def scene(a, b, d0, T=T_INNER):
-    """The scene's final gap ``D``."""
+def scene(a: ArrayLike, b: ArrayLike, d0: ArrayLike, T: int = T_INNER) -> ArrayLike:
+    """The scene's final gap ``D``. The arguments are numbers or JAX scalars (the function is traced), and so
+    is the result."""
     s, c = 0.0, d0
     for _ in range(T):
         s, c = s + a * (c - s), c + b * (s + D_PREF - c)
     return c - s
 
 
-def family(a0, b0, A=A_VALUES, B=B_VALUES):
+def family(a0: float, b0: float, A: Sequence[float] = A_VALUES,
+           B: Sequence[float] = B_VALUES) -> List[Tuple[float, float]]:
     """The six one-part-altered scenes of the start: the snake's three, then the cat's three."""
     return [(a, b0) for a in A] + [(a0, b) for b in B]
 
@@ -101,7 +105,9 @@ def _closed_run(closed, rounds, read):
 # ---------------------------------------------------------------------------
 
 
-def s0_arrangement(a0, b0, truth, sigma, d0s=D0S, noise=None, trigger=True, trusted=0.1, A=A_VALUES, B=B_VALUES):
+def s0_arrangement(a0: float, b0: float, truth: Tuple[float, float], sigma: float, d0s: Sequence[float] = D0S,
+                   noise: Optional[Numbers] = None, trigger: bool = True, trusted: float = 0.1,
+                   A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES) -> Arrangement:
     """S0 as one closed arrangement; with ``trigger`` its external output is the trigger's ``fire``."""
     lik = _bell(sigma)
     fam = family(a0, b0, A, B)
@@ -157,7 +163,8 @@ def s0_arrangement(a0, b0, truth, sigma, d0s=D0S, noise=None, trigger=True, trus
     return compose_seq(scenes, compose_seq(beliefs, compose_seq(split, tensor_arrangements([pay, trig]))))
 
 
-def s0_run(problem, sigma, rounds=12, noise=None, trigger=True, trusted=0.1):
+def s0_run(problem: str, sigma: float, rounds: int = 12, noise: Optional[Numbers] = None, trigger: bool = True,
+           trusted: float = 0.1) -> List[dict]:
     """Run S0 on a problem: the flat trust after each round, and, with the trigger, each scene's summed miss, the
     count and the ``fire`` shown at each step (from the state before it)."""
     (a0, b0), truth = PROBLEMS[problem]
@@ -176,7 +183,7 @@ def s0_run(problem, sigma, rounds=12, noise=None, trigger=True, trusted=0.1):
     return _closed_run(arr, rounds + (1 if trigger else 0), read)
 
 
-def s0_by_hand(problem, sigma, rounds=12, noise=None):
+def s0_by_hand(problem: str, sigma: float, rounds: int = 12, noise: Optional[Numbers] = None) -> List[dict]:
     """The flat trust after each round by Bayes' rule, and each scene's summed miss."""
     (a0, b0), truth = PROBLEMS[problem]
     fam = family(a0, b0)
@@ -200,7 +207,8 @@ def s0_by_hand(problem, sigma, rounds=12, noise=None):
 # ---------------------------------------------------------------------------
 
 
-def s6_arrangement(truth, sigma, d0s=D0S, A=A_VALUES, B=B_VALUES, b2=B2):
+def s6_arrangement(truth: Tuple[float, float], sigma: float, d0s: Sequence[float] = D0S,
+                   A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES, b2: float = B2) -> Arrangement:
     lik = _bell(sigma)
     nA, nB = len(A), len(B)
 
@@ -233,7 +241,7 @@ def s6_arrangement(truth, sigma, d0s=D0S, A=A_VALUES, B=B_VALUES, b2=B2):
     return compose_seq(gammas, compose_seq(beliefs, pay))
 
 
-def s6_run(problem, sigma, rounds=12):
+def s6_run(problem: str, sigma: float, rounds: int = 12) -> List[dict]:
     """The two beliefs after each round. S6 reads the problem's truth only; its start is never read."""
     _, truth = PROBLEMS[problem]
     arr = s6_arrangement(truth, sigma)
@@ -245,7 +253,8 @@ def s6_run(problem, sigma, rounds=12):
     return _closed_run(arr, rounds, read)
 
 
-def s6_by_hand(problem, sigma, rounds=12, A=A_VALUES, B=B_VALUES, b2=B2):
+def s6_by_hand(problem: str, sigma: float, rounds: int = 12, A: Sequence[float] = A_VALUES,
+               B: Sequence[float] = B_VALUES, b2: float = B2) -> List[dict]:
     _, truth = PROBLEMS[problem]
     ns, nc = np.full(len(A), 1 / len(A)), np.full(len(B), 1 / len(B))
     bell = lambda x, y: math.exp(-0.5 * ((x - y) / sigma) ** 2)
@@ -265,7 +274,8 @@ def s6_by_hand(problem, sigma, rounds=12, A=A_VALUES, B=B_VALUES, b2=B2):
 # ---------------------------------------------------------------------------
 
 
-def s6g_arrangement(truth, sigma, d0s=D0S, A=A_VALUES, B=B_VALUES, b2=B2):
+def s6g_arrangement(truth: Tuple[float, float], sigma: float, d0s: Sequence[float] = D0S,
+                    A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES, b2: float = B2) -> Arrangement:
     """S6 with the cat's scenes run with the average snake ``sum_a nu_s(a) a``, read one-way: the scene box holds
     the snake's belief fixed in its backward map, so no force reaches it from the cat's payment."""
     lik = _bell(sigma)
@@ -305,7 +315,7 @@ def s6g_arrangement(truth, sigma, d0s=D0S, A=A_VALUES, B=B_VALUES, b2=B2):
     return compose_seq(heard, compose_seq(beliefs, compose_seq(route, compose_seq(cats, pay))))
 
 
-def s6g_run(problem, sigma, rounds=12):
+def s6g_run(problem: str, sigma: float, rounds: int = 12) -> List[dict]:
     _, truth = PROBLEMS[problem]
     arr = s6g_arrangement(truth, sigma)
 
@@ -316,7 +326,8 @@ def s6g_run(problem, sigma, rounds=12):
     return _closed_run(arr, rounds, read)
 
 
-def s6g_by_hand(problem, sigma, rounds=12, A=A_VALUES, B=B_VALUES, b2=B2):
+def s6g_by_hand(problem: str, sigma: float, rounds: int = 12, A: Sequence[float] = A_VALUES,
+                B: Sequence[float] = B_VALUES, b2: float = B2) -> List[dict]:
     _, truth = PROBLEMS[problem]
     ns, nc = np.full(len(A), 1 / len(A)), np.full(len(B), 1 / len(B))
     bell = lambda x, y: math.exp(-0.5 * ((x - y) / sigma) ** 2)
@@ -332,8 +343,9 @@ def s6g_by_hand(problem, sigma, rounds=12, A=A_VALUES, B=B_VALUES, b2=B2):
     return out
 
 
-def settled(tops, truth):
-    """The first round (from 1) from which the top cast is the truth at every later round, else ``None``."""
+def settled(tops: Sequence[Any], truth: Any) -> Optional[int]:
+    """The first round (from 1) from which the top cast is the truth at every later round, else ``None``.
+    A cast is whatever the caller compares with ``==`` (``Any``): ``truth`` and each entry of ``tops`` are of one type."""
     for t in range(len(tops)):
         if all(x == truth for x in tops[t:]):
             return t + 1

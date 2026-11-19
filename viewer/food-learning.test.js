@@ -38,14 +38,14 @@ for(const seed of [37,127]) {
   let inspected=false, committed=false;
   const end=outing(start,places,60,settings,(t,s)=>{
     if(t===2) committed=Math.abs(F.field(s,places,settings).target-target)<1e-8;
-    if(!inspected && s[F.NR+7*first]<.1 && s[F.NR+7*other]>9){
+    if(!inspected && s[F.NR+F.NC*first]<.1 && s[F.NR+F.NC*other]>9){
       inspected=true;
       const here=places[first], elsewhere=places[other];
       assert.ok(mass(s,here-1,here+1)<.005);
       assert.ok(mass(s,elsewhere-1,elsewhere+1)>.5);
     }
   });
-  assert.ok(committed && inspected && end[F.NR]<.1 && end[F.NR+7]<.1);
+  assert.ok(committed && inspected && end[F.NR]<.1 && end[F.NR+F.NC]<.1);
   records.push({places,foods,cart:0,seed,memory,end,time:60});
 }
 // One remembered site across the full test span; the old local slope stalled.
@@ -65,7 +65,7 @@ for(const x of [-8,8]) {
 }
 // Blank memory explores. With two nearby meals, a sighting overrides the search.
 const blank=outing(F.start(places,foods),places,60,p);
-assert.ok(blank[F.NR]<.1 && blank[F.NR+7]<.1);
+assert.ok(blank[F.NR]<.1 && blank[F.NR+F.NC]<.1);
 const local=outing(F.start(),F.PLACES,25,p,(time,state)=>{
   const field = F.field(state, F.PLACES, p);
   if (time === 2) {
@@ -74,7 +74,7 @@ const local=outing(F.start(),F.PLACES,25,p,(time,state)=>{
   }
   samples.push({time,state,rate:field.rate});
 });
-assert.ok(local[F.NR]<.1 && local[F.NR+7]<.1);
+assert.ok(local[F.NR]<.1 && local[F.NR+F.NC]<.1);
 // Hold the cart at zero; direct its eye to +4, away for ten units, and back.
 // Both branches begin with the same real empty observation. Only the casing changes.
 const fixed={...p,A:0,omega:0,gam:0,lam:0,ktau:0,memoryDrive:0};

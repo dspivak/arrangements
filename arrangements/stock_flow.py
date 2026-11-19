@@ -25,9 +25,12 @@ formalism").
 """
 from __future__ import annotations
 
+from typing import Callable, List, Optional, Tuple
+
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
 from .arrangement import Arrangement, zero_form
 from .coalgebra import configuration
@@ -35,6 +38,12 @@ from .rvect import euclidean, trivial
 from .wiring import compose_seq, tensor_arrangements
 from .functors import closed_step
 
+# A diagram ``(stocks, auxes, flows)``, as ``arrangement_of`` documents it.
+Diagram = Tuple[
+    List[Tuple[str, float]],
+    List[Tuple[str, List[str], Callable[[Array], Array]]],
+    List[Tuple[str, Optional[str], Optional[str], List[str], Callable[[Array], Array]]],
+]
 
 def _wire(idx, d_in):  # a wiring: route/copy/drop values; pushes come back summed
     idx = jnp.array(idx, dtype=int)
@@ -42,17 +51,18 @@ def _wire(idx, d_in):  # a wiring: route/copy/drop values; pushes come back summ
         out_dim_N=len(idx), out_f=lambda q, m: m[idx] if len(idx) else jnp.zeros(0),
         in_f=lambda q, m, n: jnp.zeros(0), omega=zero_form, label="wire")
 
-def stock_box(level0, dt):
+def stock_box(level0: float, dt: float) -> Arrangement:
     return Arrangement(P=configuration(euclidean(1, dt), init=jnp.array([float(level0)])),
         in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
         out_f=lambda q, m: q, in_f=lambda q, m, n: jnp.zeros(0), omega=zero_form, label="stock")
 
-def aux_box(fn, d_in):
+def aux_box(fn: Callable[[Array], Array], d_in: int) -> Arrangement:
     return Arrangement(P=configuration(trivial()), in_dim_M=0, out_dim_M=d_in, in_dim_N=0, out_dim_N=1,
         out_f=lambda q, m: jnp.atleast_1d(fn(m)), in_f=lambda q, m, n: jnp.zeros(0),
         omega=zero_form, label="aux")
 
-def flow_box(rate, d_in, src_slot, tgt_slot):
+def flow_box(rate: Callable[[Array], Array], d_in: int, src_slot: Optional[int],
+             tgt_slot: Optional[int]) -> Arrangement:
     def omega(q, m, n):
         r, xi = rate(m), jnp.zeros(d_in)
         if src_slot is not None: xi = xi.at[src_slot].add(-r)
@@ -62,7 +72,7 @@ def flow_box(rate, d_in, src_slot, tgt_slot):
         out_f=lambda q, m: jnp.zeros(0), in_f=lambda q, m, n: jnp.zeros(0), omega=omega, label="flow")
 
 
-def arrangement_of(diagram, dt):
+def arrangement_of(diagram: Diagram, dt: float) -> Arrangement:
     """diagram = (stocks, auxes, flows):
          stocks: [(name, level0)]
          auxes:  [(name, [names read], fn)]        in topological order
@@ -87,7 +97,7 @@ def arrangement_of(diagram, dt):
     return compose_seq(a, tensor_arrangements(boxes))
 
 
-def euler(diagram, dt, steps):  # the diagram's own update, as stock-and-flow software does it
+def euler(diagram: Diagram, dt: float, steps: int) -> np.ndarray:  # the diagram's own update, as stock-and-flow software does it
     stocks, auxes, flows = diagram
     x = np.array([v for _, v in stocks], float); out = []
     for _ in range(steps):
@@ -102,7 +112,7 @@ def euler(diagram, dt, steps):  # the diagram's own update, as stock-and-flow so
     return np.array(out)
 
 
-def run(diagram, dt, steps):
+def run(diagram: Diagram, dt: float, steps: int) -> np.ndarray:
     """The stock levels after each of ``steps`` steps of the closed arrangement."""
     a = arrangement_of(diagram, dt); step = closed_step(a, check=1); s = a.P.init; out = []
     for _ in range(steps):
@@ -111,7 +121,7 @@ def run(diagram, dt, steps):
     return np.array(out)
 
 
-def random_diagram(rng):
+def random_diagram(rng: np.random.Generator) -> Diagram:
     n, na, nf = rng.integers(1, 6), rng.integers(0, 5), rng.integers(1, 7)
     stocks = [(f"s{i}", float(rng.uniform(1, 10))) for i in range(n)]
     pool, auxes = [s for s, _ in stocks], []

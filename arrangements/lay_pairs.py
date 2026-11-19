@@ -24,7 +24,7 @@ costs, which a coupler shared with a configuration part cannot do).
 
 from __future__ import annotations
 
-from typing import Callable, Dict
+from typing import Callable, Dict, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -175,7 +175,7 @@ def pair(first: str, second: str, coupler: str) -> Arrangement:
     return compose_seq(tensor_arrangements([PARTS[first](), PARTS[second]()]), COUPLERS[coupler]())
 
 
-def trajectory(names, arr: Arrangement, steps: int = STEPS) -> Array:
+def trajectory(names: Sequence[str], arr: Arrangement, steps: int = STEPS) -> Array:
     """Run the closed composite and return each named part's report at every step."""
     parts = [PARTS[n]() for n in names]
     dims = [p.P.Q_dim for p in parts]

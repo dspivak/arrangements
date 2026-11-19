@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .arrangement import Arrangement
 from .pc import PCMorphism
 from .polynomial import DirichletProduct, PolyMap
 
@@ -155,7 +156,7 @@ class PCMorphism2:
         )
 
 
-def Phi2(arr) -> PCMorphism2:
+def Phi2(arr: Arrangement) -> PCMorphism2:
     """The two-stage dynamics of an arrangement whose parameter is a ``CotCoalg2``
     (the K=2 analog of ``functors.Phi`` / CDLM prop.integrator_to_pc).
 

@@ -37,14 +37,14 @@ THE COMPOSITE is ``compose_seq(tensor(listener, source), spatial(2).arr())``, th
 
 from __future__ import annotations
 
-from typing import NamedTuple, Sequence
+from typing import Any, Callable, NamedTuple, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from .arrangement import Arrangement
+from .arrangement import Arrangement, Numbers
 from .attention import input_dim, make_input, message, msg_dim, spatial_arrangement, spatial_config
 from .belief import belief_coalgebra, belief_of
 from .coalgebra import configuration
@@ -77,7 +77,8 @@ class Model(NamedTuple):
 DEFAULT = Model()
 
 
-def page_model(keep=(0.98, 0.6, 0.6), lined=(0.95, 0.95, 0.2), fail: float = 20.0) -> Model:
+def page_model(keep: Sequence[float] = (0.98, 0.6, 0.6), lined: Sequence[float] = (0.95, 0.95, 0.2),
+               fail: float = 20.0) -> Model:
     """The listener page's defaults as an arrangement (P43 (b) job 8, at David's "b seems good", 2026-10-10): the
     table from how often each kind keeps a promise and how often its account lines up; the expected losses from one
     cost of a broken promise, ``(1 - keep) * fail``; full hearing; the peaked kernel; and a personal-space box of
@@ -98,8 +99,9 @@ def nll_table(model: Model) -> Array:
 
 
 def belief_box(model: Model, n: int = 3, *, wire: str = "oneway", likelihood: str = "unilateral",
-               init=None) -> Arrangement:
-    """``I -> <E | R^n>``: receives the parent's input ``e = ((h, w), p_0)``, sends its belief forward."""
+               init: Optional[Numbers] = None) -> Arrangement:
+    """``I -> <E | R^n>``: receives the parent's input ``e = ((h, w), p_0)``, sends its belief forward. ``init``: the
+    starting ``n`` log-heights (zeros if ``None``)."""
     assert wire in ("oneway", "exact", "subtract") and likelihood in ("unilateral", "exact")
     N = nll_table(model)
     ell = jnp.asarray(model.ell, float)
@@ -191,10 +193,11 @@ def personal_space_box(model: Model, n: int = 3) -> Arrangement:
     )
 
 
-def listener(model: Model = DEFAULT, **kw) -> Arrangement:
+def listener(model: Model = DEFAULT, **kw: Any) -> Arrangement:
     """The listener ``I -> B``: the valuation box after the belief box. With ``wire="checker"`` the belief
     is sent forward plainly and the checker box sits between it and the valuation; ``wire="subtract"`` is
-    the same checker folded into the belief box's forcing, the run before P43 (b) job 8."""
+    the same checker folded into the belief box's forcing, the run before P43 (b) job 8. ``kw``: ``belief_box``'s
+    ``n``, ``wire``, ``likelihood`` and ``init``."""
     rest = valuation_box(model)
     if model.sigma:
         rest = compose_seq(personal_space_box(model), rest)
@@ -222,9 +225,10 @@ def source() -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def listener_system(model: Model = DEFAULT, **kw) -> Arrangement:
+def listener_system(model: Model = DEFAULT, **kw: Any) -> Arrangement:
     """``spatial(2)(listener, source) : I -> B``; the listener at ``p0``, the source at ``0``; only the
-    listener's placement responds (mobility ``mu_p``), the value maps and the source's placement frozen."""
+    listener's placement responds (mobility ``mu_p``), the value maps and the source's placement frozen. ``kw`` as
+    in ``listener``."""
     n_Q = 2 * DP + 2 * DH * DH
     diag = jnp.zeros(n_Q).at[0].set(model.mu_p)
     parent = spatial_arrangement(
@@ -238,25 +242,25 @@ def listener_system(model: Model = DEFAULT, **kw) -> Arrangement:
 # The composite's state is ``(((l, ()), x), q_parent)``: the listener's pair (belief log-heights, the
 # valuation's empty state), the source's signal, the parent's configuration.
 
-def log_heights(state) -> Array:
+def log_heights(state: Any) -> Array:
     return state[0][0][0]
 
 
-def placement(state) -> Array:
+def placement(state: Any) -> Array:
     return state[1][0]
 
 
-def set_signal(state, x):
+def set_signal(state: Any, x: Numbers) -> Any:
     """The state with the source's signal set to ``x`` (``jnp.zeros(DH)`` for no news)."""
     ((l, z), _), q = state
     return ((l, z), jnp.asarray(x, float)), q
 
 
-def one_hot(o) -> Array:
+def one_hot(o: int) -> Array:
     return jnp.zeros(DH).at[o].set(1.0)
 
 
-def step_fn(arr: Arrangement):
+def step_fn(arr: Arrangement) -> Callable[[Any], Tuple[Any, Array]]:
     """One step of ``Phi(arr)`` on the exterior input ``(0_M, 0)`` with zero exterior covector,
     specialized to the configuration component of the forcing (the form ``collective.step_fn`` uses)."""
     P, omega = arr.P, arr.omega
@@ -269,7 +273,8 @@ def step_fn(arr: Arrangement):
     return step
 
 
-def run_script(arr: Arrangement, script: str, steps_per_round: int = 10, repeats: Sequence = ()):
+def run_script(arr: Arrangement, script: str, steps_per_round: int = 10, repeats: Sequence[Tuple[int, str]] = ()
+               ) -> Tuple[np.ndarray, np.ndarray, Any]:
     """Run ``script`` (one letter per round, ``K``, ``L`` or ``X``), the outcome on each round's first
     step and no news on the rest; ``repeats`` are ``(step, letter)`` pairs sent again on those steps.
     Returns the trajectory of (placement, kernel weight, belief) at steps ``0..T`` as arrays."""

@@ -143,8 +143,9 @@ def exact(U: Callable) -> Callable:
     return omega
 
 
-def zero_form(plot, u):
-    """The zero 1-form."""
+def zero_form(plot: Callable[[Any], Tuple[Any, Any, Any]], u: Any) -> Any:
+    """The zero 1-form. ``plot`` sends a point ``u`` (a pytree of arrays) to ``(q, m_out, n_in)`` and is not used;
+    the result is the zero covector at ``u``, a pytree shaped like ``u``, hence ``Any``."""
     return _zero(u)
 
 
@@ -308,14 +309,15 @@ class BoxPoly:
     inn: Side
 
 
-def point(value) -> Tuple[Callable, Any]:
-    """A point as a plotted point: the constant plot, of shape ``R^0``."""
+def point(value: Any) -> Tuple[Callable, Any]:
+    """A point as a plotted point: the constant plot, of shape ``R^0``. ``value`` is a point of a side, a pytree
+    of arrays or functions, hence ``Any``."""
     return (lambda u: value, ())
 
 
-def at(value) -> Tuple[Callable, Any]:
+def at(value: Any) -> Tuple[Callable, Any]:
     """A point of a Cartesian side (a tuple of arrays) as a plotted point: the identity plot. The covector that comes back on it
-    is the array core's."""
+    is the array core's. ``value`` is that tuple of arrays, a pytree, hence ``Any``."""
     return (lambda u: u, value)
 
 
@@ -368,7 +370,8 @@ def PhiK(arr: SmoothArrangement) -> PCMorphismK:
 CLOSED_IN = (point(()), zero_form)
 
 
-def closed_tell(out_pos):
-    """The direction a closed arrangement is told: the zero covector on its position's plot, and the empty point."""
+def closed_tell(out_pos: Any) -> Tuple[Any, Tuple[()]]:
+    """The direction a closed arrangement is told: the zero covector on its position's plot, and the empty point.
+    ``out_pos`` is the position ``((plot, w), omega)`` of the arrangement, whose parts are pytrees, hence ``Any``."""
     (_plot, w), _omega = out_pos
     return _zero(w), ()

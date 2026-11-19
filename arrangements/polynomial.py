@@ -14,7 +14,7 @@ We do not provide a generic ``Polynomial`` class.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Sequence, Tuple, Union
+from typing import Any, Callable, Sequence, Tuple, Union
 
 import jax.numpy as jnp
 from jax import Array
@@ -102,7 +102,7 @@ class PolyMap:
         return self.direction_action(i, d_tgt)
 
 
-def nest_left(items: Sequence):
+def nest_left(items: Sequence[Any]) -> Any:
     """Left-nest a sequence: ``[a, b, c] |-> ((a, b), c)``.
 
     ``DirichletProduct`` is built pairwise (``PCMorphism.parallel`` folds from the
@@ -118,7 +118,7 @@ def nest_left(items: Sequence):
     return acc
 
 
-def unnest_left(value, k: int) -> list:
+def unnest_left(value: Any, k: int) -> list:
     """Inverse of ``nest_left`` for ``k`` factors."""
     out = []
     for _ in range(k - 1):

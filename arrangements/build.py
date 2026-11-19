@@ -20,12 +20,14 @@ and the worked examples).
 import jax
 jax.config.update("jax_enable_x64", True)
 
+from typing import Any, Callable, Collection, List, Literal, Optional, Tuple
+
 import jax.numpy as jnp
 import numpy as np
 
 from arrangements.interpretation import trivial_omega
 from arrangements.arrangement import Arrangement, exact
-from arrangements.coalgebra import configuration, phase
+from arrangements.coalgebra import ParameterRule, configuration, phase
 from arrangements.functors import Phi
 from arrangements.leapfrog import leapfrog
 from arrangements.pc2 import Phi2
@@ -43,8 +45,11 @@ _IN_DIR_CLOSED = (jnp.zeros(0), jnp.zeros(0))
 # ---------------------------------------------------------------------------
 
 
-def ask(prompt, default=None, parse=str, choices=None):
-    """Prompt until a valid value is given; blank input takes the default."""
+def ask(prompt: str, default: Any = None, parse: Callable[[str], Any] = str,
+        choices: Optional[Collection[Any]] = None) -> Any:
+    """Prompt until a valid value is given; blank input takes the default.
+
+    The value is whatever ``parse`` returns on the typed string, so its type is ``Any`` here."""
     suffix = f" [{default}]" if default is not None else ""
     while True:
         raw = input(f"{prompt}{suffix}: ").strip()
@@ -77,7 +82,7 @@ def _initial(K, spec):
     return jnp.asarray(np.random.default_rng(seed).standard_normal(K))
 
 
-def parse_init(spec):
+def parse_init(spec: str) -> str:
     """'random' (fresh) / 'zeros' / 'sine [n]' (smooth mode) / 'bump' / integer seed."""
     spec = spec.strip().lower()
     parts = spec.split()
@@ -180,7 +185,7 @@ def _name(dynamics):
     return "Phi2 (pc^(2), leapfrog)" if dynamics == "leapfrog" else f"Phi ({dynamics})"
 
 
-def harmonic_particle(m, kappa, parameter=configuration):
+def harmonic_particle(m: float, kappa: float, parameter: ParameterRule = configuration) -> Arrangement:
     """A harmonic particle box: parameter ``parameter(Q)`` on Q = R with sharp p|->p/m,
     out_f = id, forcing ``omega = -dk`` for the cost ``k = (kappa/2)(q-y)^2``."""
     return Arrangement(
@@ -219,7 +224,7 @@ def _graph_laplacian(num_vertices, edges):
     return L
 
 
-def parse_graph(spec):
+def parse_graph(spec: str) -> Tuple[int, List[Tuple[int, ...]]]:
     """Parse 'path N' / 'ring N' / 'complete N' / explicit 'i-j i-j ...'."""
     parts = spec.split()
     if parts and parts[0] in ("path", "ring", "complete"):
@@ -255,7 +260,8 @@ def _chain_trajectory(dynamics, K, m, kappa, q0, steps):
     return np.stack(traj)
 
 
-def run_chain(dynamics, K, m, kappa, init_kind, steps, animate=False):
+def run_chain(dynamics: Literal["phase", "conf", "leapfrog"], K: int, m: float, kappa: float,
+              init_kind: str, steps: int, animate: bool = False) -> None:
     q0 = _initial(K, init_kind)
     a = _chain_trajectory(dynamics, K, m, kappa, q0, steps)
 
@@ -297,7 +303,8 @@ def run_chain(dynamics, K, m, kappa, init_kind, steps, animate=False):
         print(f"  peak |q|: {peaks[0]:.2f} -> {peaks[-1]:.1e}  ({'dissipating' if peaks[-1] < peaks[0] else 'growing (step too large)'})")
 
 
-def run_graph(dynamics, V, edges, m, kappa, init_kind, steps):
+def run_graph(dynamics: Literal["phase", "conf", "leapfrog"], V: int, edges: List[Tuple[int, ...]],
+              m: float, kappa: float, init_kind: str, steps: int) -> None:
     # wire_G = R^{varphi_G}((Part_v)_v), CDLM eqn.graph_wire, with the chosen parameter
     arr = compose_graph(V, edges, m, kappa, parameter=_PARAMETER[dynamics])
     q0 = _initial(V, init_kind)
@@ -348,7 +355,7 @@ def run_graph(dynamics, V, edges, m, kappa, init_kind, steps):
         print(f"  peak |q|: {peaks[0]:.2f} -> {peaks[-1]:.1e}  ({'dissipating' if peaks[-1] < peaks[0] else 'growing (step too large)'})")
 
 
-def run_gd(in_dim, out_dim, eta, ndata, steps):
+def run_gd(in_dim: int, out_dim: int, eta: float, ndata: int, steps: int) -> None:
     dim = out_dim * in_dim + out_dim
 
     def F(q, x):
@@ -373,7 +380,7 @@ def run_gd(in_dim, out_dim, eta, ndata, steps):
 # ---------------------------------------------------------------------------
 
 
-def main():
+def main() -> None:
     print("dynamic-algebra-potentials: build your own arrangement\n")
     try:
         dynamics = ask("parameter (phase=symplectic Hamilton, conf=descent, leapfrog=two-stage)", "phase",

@@ -36,10 +36,12 @@ Claude Fable 5.2, sessions 2524b69e and 7328b8c7, 2026-11-10.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence, Tuple
 
 import jax.numpy as jnp
+from jax import Array
 
+from .arrangement import Numbers
 from .light_tank import lift
 from .smooth import Maps, R, SmoothArrangement, compose_seq, exact, tensor, zero_form
 from .wiring import trivial_parameter
@@ -49,6 +51,7 @@ FIELDS = (F, F)             # what a body puts out, and what it receives: (magne
 MAGNETIC, CONTACT = 0, 1
 _origin = jnp.zeros(2)
 r0 = 0.001                  # smoothing radius, in model length units; mirrored in viewer/models/magnets.js
+FieldMap = Callable[[Array], Array]   # a point of F as the code holds it: a point of the plane to a number
 
 
 def _smooth_radius_squared(d):
@@ -65,23 +68,24 @@ def _smooth_radius_squared(d):
     return squared + r0 * r0 * bump
 
 
-def g(d):
+def g(d: Array) -> Array:
     """Smooth wire potential; ``-(1/2 pi) ln |d|`` for ``|d| >= r0``."""
     return -jnp.log(_smooth_radius_squared(d)) / (4.0 * jnp.pi)
 
 
-def contact(d, sigma):
+def contact(d: Array, sigma: float) -> Array:
     """The contact field of one bumper of unit strength and size ``sigma``, at the displacement ``d`` from it: ``(sigma / |d|)^6``. A
     chosen shape, steep and short, made smooth inside ``r0``; not taken from a source."""
     return (sigma * sigma / _smooth_radius_squared(d)) ** 3
 
 
-def nothing(r):
+def nothing(r: Array) -> Array:
     """The zero field."""
     return jnp.zeros(())
 
 
-def body(magnetic, touch, minus_cost, label: str) -> SmoothArrangement:
+def body(magnetic: FieldMap, touch: FieldMap, minus_cost: Callable[[Tuple[FieldMap, FieldMap]], Array],
+         label: str) -> SmoothArrangement:
     """A stateless body ``1 -> <FIELDS|FIELDS>``: it puts out the fields ``magnetic`` and ``touch``, functions of a point of its own
     frame, and has the cost ``-minus_cost(received)`` on the pair of fields it receives."""
     return SmoothArrangement(P=trivial_parameter(), M_in=(), M_out=(), N_in=FIELDS, N_out=FIELDS,
@@ -208,12 +212,14 @@ def _mass_rule(mass, drag, k):
     return lambda s, xi: jnp.concatenate([s[k:] / mass, xi - drag * s[k:]])
 
 
-def plane(n: int, q0, p0, mass, rule: str = "rk4", tau: float = 0.01, K: int = 1,
+def plane(n: int, q0: Numbers, p0: Numbers, mass: Numbers, rule: str = "rk4", tau: float = 0.01, K: int = 1,
           cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> SmoothArrangement:
     """The arrangement that carries the positions of ``n`` bodies, whatever they are, in its own integrator: one frictionless mass
     per cart, with configuration ``(x, y, angle)``; ``mass`` lists each cart's ``(m, m, inertia)``, and ``drag`` is the rate at which
     a cart loses momentum to what it rolls on. Body ``i`` rides cart ``cart_of[i]`` (its own, by default). Its in-transfer gives each
-    body the sum of the other bodies' fields, moved between their carts' frames. It has no inclination field of its own."""
+    body the sum of the other bodies' fields, moved between their carts' frames. It has no inclination field of its own.
+    ``q0``, ``p0`` and ``mass``: each of the ``c`` carts' starting configuration, momentum and ``(m, m, inertia)``, shape
+    ``(c, 3)`` or ``3c`` numbers."""
     cart_of, c = _carts(cart_of, n)
     mass = jnp.asarray(mass, float).reshape(3 * c)
     s0 = jnp.concatenate([jnp.asarray(q0, float).reshape(3 * c), jnp.asarray(p0, float).reshape(3 * c)])
@@ -227,15 +233,18 @@ def plane(n: int, q0, p0, mass, rule: str = "rk4", tau: float = 0.01, K: int = 1
                              out_f=lambda q, m: (), in_f=in_f, omega=zero_form, label=f"plane({c})")
 
 
-def system(bodies: Sequence[SmoothArrangement], q0, p0, mass, rule: str = "rk4", tau: float = 0.01, K: int = 1,
-           cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> SmoothArrangement:
-    """The closed composite ``plane . (body_1 || ... || body_n)``."""
+def system(bodies: Sequence[SmoothArrangement], q0: Numbers, p0: Numbers, mass: Numbers, rule: str = "rk4",
+           tau: float = 0.01, K: int = 1, cart_of: Optional[Sequence[int]] = None, drag: float = 0.0
+           ) -> SmoothArrangement:
+    """The closed composite ``plane . (body_1 || ... || body_n)``; ``q0``, ``p0`` and ``mass`` as in ``plane``."""
     return compose_seq(tensor(list(bodies)), plane(len(bodies), q0, p0, mass, rule, tau, K, cart_of, drag))
 
 
-def cart(mass, q0, p0, rule: str = "rk4", tau: float = 0.01, K: int = 1, drag: float = 0.0) -> SmoothArrangement:
+def cart(mass: Numbers, q0: Numbers, p0: Numbers, rule: str = "rk4", tau: float = 0.01, K: int = 1, drag: float = 0.0
+         ) -> SmoothArrangement:
     """One cart as a part of its own: a frictionless mass with configuration ``(x, y, angle)`` and ``mass = (m, m, inertia)``. It
-    reads out its configuration on one output; what comes back there is the force and the torque on it."""
+    reads out its configuration on one output; what comes back there is the force and the torque on it. ``q0``, ``p0``: its
+    starting configuration and momentum, three numbers each."""
     mass = jnp.asarray(mass, float)
     s0 = jnp.concatenate([jnp.asarray(q0, float), jnp.asarray(p0, float)])
     P = lift(rule, lambda s: s[:3], _mass_rule(mass, drag, 3), s0, 3, tau, K)
@@ -255,9 +264,11 @@ def field(n: int, cart_of: Optional[Sequence[int]] = None) -> SmoothArrangement:
                              out_f=lambda q, m: (), in_f=in_f, omega=zero_form, label=f"field({c})")
 
 
-def system_of_carts(bodies: Sequence[SmoothArrangement], q0, p0, mass, rule: str = "rk4", tau: float = 0.01, K: int = 1,
-                    cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> SmoothArrangement:
-    """The closed composite ``field . (body_1 || ... || body_n || cart_1 || ... || cart_c)``: every cart independent."""
+def system_of_carts(bodies: Sequence[SmoothArrangement], q0: Numbers, p0: Numbers, mass: Numbers, rule: str = "rk4",
+                    tau: float = 0.01, K: int = 1, cart_of: Optional[Sequence[int]] = None, drag: float = 0.0
+                    ) -> SmoothArrangement:
+    """The closed composite ``field . (body_1 || ... || body_n || cart_1 || ... || cart_c)``: every cart independent.
+    ``q0``, ``p0`` and ``mass``: shape ``(c, 3)``, one row per cart, as in ``cart``."""
     q0, p0, mass = jnp.asarray(q0, float), jnp.asarray(p0, float), jnp.asarray(mass, float)
     carts = [cart(mass[i], q0[i], p0[i], rule, tau, K, drag) for i in range(q0.shape[0])]
     return compose_seq(tensor(list(bodies) + carts), field(len(bodies), cart_of))

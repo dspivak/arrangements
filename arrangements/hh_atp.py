@@ -6,10 +6,12 @@ and ATPase fill the membrane wiring. live_membrane exposes the composed
 library step and local observations to the browser exporter.
 """
 import math
+from typing import Any, Callable, Literal, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
 from arrangements.arrangement import Arrangement, zero_form
 from arrangements.coalgebra import CotCoalg
@@ -30,7 +32,7 @@ NA_BATH, K_BATH = 440e-9, 10e-9  # bath concentrations times 1 microlitre
 EMPTY = jnp.zeros(0)
 
 
-def hh_rates(v):
+def hh_rates(v: float | Array) -> Tuple[Array, Array]:
     w = 1000 * v + 65  # millivolts above -65 mV, depolarization positive
 
     def trap(z):
@@ -45,7 +47,7 @@ def hh_rates(v):
     return alpha * 1000, beta * 1000  # inverse seconds
 
 
-def soft_limit(z):
+def soft_limit(z: float | Array) -> Array:
     # A smooth convex blend equal to z up to 1/2 and to tanh(z) past 0.9.
     def bump(x):
         return jnp.where(x > 0, jnp.exp(-1 / jnp.where(x > 0, x, 1)), 0.)
@@ -54,7 +56,10 @@ def soft_limit(z):
     return (1 - w) * z + w * jnp.tanh(z)
 
 
-def store(name, initial, read, radius=None, clamped=False):
+def store(
+    name: str, initial: float, read: Callable[[Array], Array],
+    radius: Optional[Callable[[Array], Array]] = None, clamped: bool = False,
+) -> Arrangement:
     def update(s, xi, dt):
         if clamped:
             return s
@@ -70,37 +75,40 @@ def store(name, initial, read, radius=None, clamped=False):
                        lambda q, m, n: EMPTY, zero_form, name)
 
 
-def process(name, dimension, field):
+def process(name: str, dimension: int, field: Callable[[Array], Array]) -> Arrangement:
     return Arrangement(trivial_parameter(), 0, 0, dimension, 0,
                        lambda q, m: EMPTY, lambda q, m, n: EMPTY,
                        lambda q, m, n: (EMPTY, EMPTY, field(n)), name)
 
 
-def wiring(label, inner_inputs, inner_outputs, outer_inputs, outer_outputs, route, publish):
+def wiring(
+    label: str, inner_inputs: int, inner_outputs: int, outer_inputs: int, outer_outputs: int,
+    route: Callable[[Array, Array], Array], publish: Callable[[Array], Array],
+) -> Arrangement:
     """A stateless affine lens. Its transpose carries loads back to its parts."""
     return Arrangement(trivial_parameter(), inner_inputs, inner_outputs, outer_inputs, outer_outputs,
                        lambda q, m: publish(m), lambda q, m, n: route(m, n), zero_form, label)
 
 
-def fill(parts, router):
+def fill(parts: Sequence[Arrangement], router: Arrangement) -> Arrangement:
     return compose_seq(tensor_arrangements(parts), router)
 
 
-def capacitor():
+def capacitor() -> Arrangement:
     return store("capacitor", C * -0.065, lambda charge: charge / C)
 
 
-def ion_pool(name, bath, reversal, clamp=False):
+def ion_pool(name: str, bath: float, reversal: float, clamp: bool = False) -> Arrangement:
     return store(name, bath * math.exp(-F * reversal / RT), lambda s: RT * jnp.log(s / bath),
                  lambda s: s, clamp)
 
 
-def atp_pool(clamp=False):
+def atp_pool(clamp: bool = False) -> Arrangement:
     return store("ATP", ATP0, lambda a: H_REF + RT * jnp.log(a / (TOTAL - a)),
                  lambda a: a * (1 - a / TOTAL), clamp)
 
 
-def gate(name):
+def gate(name: Literal["m", "h", "n"]) -> Arrangement:
     """An open voltage-driven gate. Its output is the permissive fraction x."""
     i = ("m", "h", "n").index(name)
     alpha, beta = hh_rates(-0.065)
@@ -117,7 +125,7 @@ def gate(name):
     return fill([fraction, law], router)
 
 
-def sodium_channel():
+def sodium_channel() -> Arrangement:
     """Input (V, sodium chemical potential), output gate fractions (m, h)."""
     pore = process("Na pore", 3, lambda w: jnp.array([-G_NA * w[1]**3 * w[2] * w[0] / F**2, 0, 0]))
     router = wiring("sodium channel wiring", 5, 2, 2, 2,
@@ -126,7 +134,7 @@ def sodium_channel():
     return fill([gate("m"), gate("h"), pore], router)
 
 
-def potassium_channel():
+def potassium_channel() -> Arrangement:
     """Input (V, potassium chemical potential), output gate fraction n."""
     pore = process("K pore", 2, lambda w: jnp.array([-G_K * w[1]**4 * w[0] / F**2, 0]))
     router = wiring("potassium channel wiring", 3, 1, 2, 1,
@@ -134,7 +142,7 @@ def potassium_channel():
     return fill([gate("n"), pore], router)
 
 
-def sodium_potassium_pump(capacity=CAPACITY):
+def sodium_potassium_pump(capacity: float = CAPACITY) -> Arrangement:
     """Input (V, sodium and potassium chemical potentials, H), four load components."""
     law = process("ATPase", 1, lambda w: -capacity * jnp.tanh(w / (2 * RT)))
     def affinity(m, n):
@@ -143,26 +151,27 @@ def sodium_potassium_pump(capacity=CAPACITY):
     return fill([law], wiring("pump affinity", 1, 0, 4, 0, affinity, lambda m: EMPTY))
 
 
-def leak():
+def leak() -> Arrangement:
     law = process("leak", 1, lambda w: -G_L * w)
     return fill([law], wiring("leak drop", 1, 0, 1, 0, lambda m, n: n - E_L, lambda m: EMPTY))
 
 
-def membrane_wiring():
+def membrane_wiring() -> Arrangement:
     """Open slots: four stores, sodium channel, potassium channel, leak, and pump."""
     return wiring("membrane wiring", 9, 7, 0, 2,
                   lambda m, n: jnp.stack([m[i] for i in (0, 1, 0, 2, 0, 0, 1, 2, 3)]),
                   lambda m: jnp.stack([m[0], m[3]]))
 
 
-def membrane(capacity=CAPACITY, clamp=False):
+def membrane(capacity: float = CAPACITY, clamp: bool = False) -> Arrangement:
     stores = [capacitor(), ion_pool("sodium", NA_BATH, .050, clamp),
               ion_pool("potassium", K_BATH, -.077, clamp), atp_pool(clamp)]
     return fill([*stores, sodium_channel(), potassium_channel(), leak(),
                  sodium_potassium_pump(capacity)], membrane_wiring())
 
 
-def amounts(state):
+def amounts(state: Any) -> np.ndarray:
+    """The amount in each store: the nonempty leaves of the composite's state pytree (``Any``)."""
     return np.array([float(a[0]) for a in jax.tree_util.tree_leaves(state) if a.size])
 
 
@@ -171,7 +180,7 @@ STEP_SECONDS = 1e-5
 OUTSIDE = jnp.array([10e-6, 0.0])
 
 
-def process_observations(system, q):
+def process_observations(system: Arrangement, q: Array) -> Tuple[Array, Array]:
     """Read the primitive process ports through this particular tree of tensors and affine wirings."""
     readings = {}
 
@@ -193,7 +202,9 @@ def process_observations(system, q):
     return tuple(jnp.concatenate([readings[name][side] for name in PROCESS_ORDER]) for side in (0, 1))
 
 
-def live_membrane():
+def live_membrane() -> Tuple[
+    Array, Callable[[Array], Array], Callable[[Array], Tuple[Array, Array, Array, Array]], Array,
+]:
     """Flat-state callables for browser export and comparison, backed by ordinary library dynamics."""
     from jax.flatten_util import ravel_pytree
 
@@ -215,7 +226,7 @@ def live_membrane():
     return initial, step, observe, jacobian
 
 
-def record_membrane(steps=1200, stride=5):
+def record_membrane(steps: int = 1200, stride: int = 5) -> dict[str, Any]:
     """Sample an ordinary run for a figure or reference check. The dynamics have no end time."""
     state, step, observe, jacobian = live_membrane()
     step, observe = jax.jit(step), jax.jit(observe)

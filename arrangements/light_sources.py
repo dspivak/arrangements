@@ -18,11 +18,16 @@ Claude Opus 5.5, session 5c9967d2, 2026-11-05.
 
 from __future__ import annotations
 
+from typing import Callable, List, Sequence, Tuple
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement, zero_form
+from jax import Array
+from jax.typing import ArrayLike
+
+from .arrangement import Arrangement, Numbers, zero_form
 from .coalgebra import CotCoalgK
 from .hopfield import _tensor_balanced
 from .light_lattice import edge_ax, edge_ay, face_edges
@@ -38,13 +43,14 @@ SIGN = jnp.array([1.0, 1.0, -1.0, -1.0])
 # ---------------------------------------------------------------------------
 
 
-def rk4_coalg(read, v, tau, s0, Q_dim, label) -> CotCoalgK:
-    """Ch 7 ``def.runge_kutta`` for an affine integrand on an array state."""
+def rk4_coalg(read: Callable[[Array], Array], v: Callable[[Array, Array], Array], tau: float, s0: Numbers, Q_dim: int,
+              label: str) -> CotCoalgK:
+    """Ch 7 ``def.runge_kutta`` for an affine integrand on an array state; ``s0`` the starting state."""
     reads, advances = rk4(read, v, tau)
     return CotCoalgK(Q_dim=Q_dim, init=jnp.asarray(s0, float), reads=reads, advances=advances, label=label)
 
 
-def field_edge(a0, e0, tau) -> Arrangement:
+def field_edge(a0: float, e0: float, tau: float) -> Arrangement:
     """The two-port capacitor as an edge, under Runge--Kutta: state ``(A, E)``, rates ``(E, load on either port)``; it reads out ``(A, E)``."""
     read = lambda s: s
     v = lambda s, xi: jnp.array([s[1], xi[0] + xi[1]])
@@ -53,8 +59,9 @@ def field_edge(a0, e0, tau) -> Arrangement:
                        out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label="edge")
 
 
-def charge_part(x0, v0, tau, m_ch: float = 1.0) -> Arrangement:
-    """A mass reading out position and velocity, under Runge--Kutta; a push on the position coordinates changes the momentum."""
+def charge_part(x0: Numbers, v0: Numbers, tau: float, m_ch: float = 1.0) -> Arrangement:
+    """A mass reading out position and velocity, under Runge--Kutta; a push on the position coordinates changes the momentum.
+    ``x0`` and ``v0``: the starting position and velocity in the plane, two numbers each."""
     read = lambda s: jnp.concatenate([s[:2], s[2:] / m_ch])
     v = lambda s, xi: jnp.concatenate([s[2:] / m_ch, xi[:2]])
     P = rk4_coalg(read, v, tau, list(x0) + [m_ch * v0[0], m_ch * v0[1]], 4, "charge")
@@ -62,20 +69,21 @@ def charge_part(x0, v0, tau, m_ch: float = 1.0) -> Arrangement:
                        out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label="charge")
 
 
-def face_table(N: int):
+def face_table(N: int) -> Array:
     """The four edges of each face, in ``face_edges``'s order."""
     return jnp.asarray([face_edges(N, i, j) for i in range(N) for j in range(N)], dtype=int)
 
 
-def faces_cost_load(table, A):
-    """Springs on ``B = dA``: their load on the flux ports, ``-d^T dA``, and ``B``."""
+def faces_cost_load(table: Array, A: Array) -> Tuple[Array, Array]:
+    """Springs on ``B = dA``: their load on the flux ports, ``-d^T dA``, and ``B``. ``table``: ``face_table(N)``, shape
+    ``(N^2, 4)``; ``A``: the ``2 N^2`` edges' values."""
     B = (A[table] * SIGN).sum(axis=1)
     g = jnp.zeros(A.shape[0])
     g = g.at[table.ravel()].add((B[:, None] * SIGN).ravel())
     return -g, B
 
 
-def whitney(N: int, x):
+def whitney(N: int, x: Array) -> Tuple[Array, Array, Array, Array]:
     """Cell ``(i, j)``, fractions ``(fx, fy)``. The x-edges ``Ax[i, j]``, ``Ax[i, j+1]`` weigh ``(1-fy)``, ``fy``; the y-edges ``Ay[i, j]``, ``Ay[i+1, j]``
     weigh ``(1-fx)``, ``fx``. These are Whitney's 1-forms in a square."""
     xm = jnp.mod(x, N)
@@ -123,14 +131,15 @@ def field_and_contact(N: int, e_ch: float = 1.0) -> Arrangement:
                        out_f=lambda q, m: _z, in_f=lambda q, m, n: _z, omega=omega, label="field_and_contact")
 
 
-def charge_on_lattice(N: int, x0, v0, tau, e_ch: float = 1.0, m_ch: float = 1.0) -> Arrangement:
-    """The closed composite: every edge at rest with ``E = 0``, the charge, and ``field_and_contact`` over them."""
+def charge_on_lattice(N: int, x0: Numbers, v0: Numbers, tau: float, e_ch: float = 1.0, m_ch: float = 1.0) -> Arrangement:
+    """The closed composite: every edge at rest with ``E = 0``, the charge, and ``field_and_contact`` over them. ``x0`` and
+    ``v0`` as in ``charge_part``."""
     NE = 2 * N * N
     parts = [field_edge(0.0, 0.0, tau) for _ in range(NE)] + [charge_part(x0, v0, tau, m_ch)]
     return compose_seq(_tensor_balanced(parts), field_and_contact(N, e_ch))
 
 
-def charge_read(N: int, s):
+def charge_read(N: int, s: object) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """``(A, E, x, p)`` off a state of ``charge_on_lattice``."""
     NE = 2 * N * N
     flat = np.concatenate([np.ravel(np.asarray(x, float)) for x in jax.tree_util.tree_leaves(s) if np.asarray(x).size])
@@ -138,7 +147,7 @@ def charge_read(N: int, s):
     return AE[:, 0], AE[:, 1], flat[2 * NE:2 * NE + 2], flat[2 * NE + 2:2 * NE + 4]
 
 
-def charge_energy(N: int, A, E, p, m_ch: float = 1.0):
+def charge_energy(N: int, A: np.ndarray, E: np.ndarray, p: np.ndarray, m_ch: float = 1.0) -> float:
     """The field's energy and the charge's kinetic energy. A check, read off a state."""
     B = (A[np.asarray(face_table(N))] * np.asarray(SIGN)).sum(axis=1)
     return 0.5 * (E @ E) + 0.5 * (B @ B) + 0.5 * (p @ p) / m_ch
@@ -149,7 +158,7 @@ def charge_energy(N: int, A, E, p, m_ch: float = 1.0):
 # ---------------------------------------------------------------------------
 
 
-def clock_part(tau, w, label: str = "clock") -> Arrangement:
+def clock_part(tau: float, w: float, label: str = "clock") -> Arrangement:
     """A part with a clock: its state is the time; it returns the current ``sin(w t)`` to the edge it hears."""
     P = CotCoalgK(Q_dim=1, init=jnp.array([0.0]), reads=(lambda t: t,), advances=(lambda t, xi: t + tau,), label=label)
 
@@ -177,24 +186,24 @@ def faces_3d(N: int) -> list:
     return faces
 
 
-def lattice3d_wire(N: int, src: int, faces) -> Arrangement:
+def lattice3d_wire(N: int, src: int, faces: Sequence[Sequence[int]]) -> Arrangement:
     """The copy wire: the clock hears the edge ``src``, each face its four edges."""
     route = jnp.asarray([src] + [e for f in faces for e in f], dtype=int)
     return Arrangement(P=trivial_parameter(), in_dim_M=int(route.shape[0]), out_dim_M=3 * N ** 3, in_dim_N=0, out_dim_N=0,
                        out_f=lambda q, m: _z, in_f=lambda q, m, n: m[route], omega=zero_form, label="lattice3d")
 
 
-def source_lattice_3d(N: int, A0, E0, src: int, tau, w) -> Arrangement:
+def source_lattice_3d(N: int, A0: ArrayLike, E0: ArrayLike, src: int, tau: float, w: float) -> Arrangement:
     """The closed composite: the clock part, then ``3 N^3`` edges (Ch 3's mass, one round), then ``3 N^3`` spring faces, under the copy wire. The state's
     leaves are the clock's time and then each edge's ``(A, E)``. The clock goes first: the library's tensor takes a many-round part on the left of a
-    plain one, not the reverse."""
+    plain one, not the reverse. ``A0`` and ``E0``: the ``3 N^3`` edges' starting values."""
     faces = faces_3d(N)
     parts = [clock_part(tau, w)] + [flux_symplectic_edge(float(A0[e]), float(E0[e]), tau) for e in range(3 * N ** 3)]
     parts += [spring_face() for _ in faces]
     return compose_seq(_tensor_balanced(parts), lattice3d_wire(N, src, faces))
 
 
-def curl_3d(A):
+def curl_3d(A: Sequence[np.ndarray]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """``B = dA`` on the three families of faces, the arrays ``A = (Ax, Ay, Az)``, by ``np.roll``. The plain loop's."""
     Ax, Ay, Az = A
     Bxy = Ax + np.roll(Ay, -1, 0) - np.roll(Ax, -1, 1) - Ay
@@ -203,7 +212,7 @@ def curl_3d(A):
     return Bxy, Byz, Bzx
 
 
-def curl_T_3d(B):
+def curl_T_3d(B: Sequence[np.ndarray]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """``d^T`` on the three families of faces. The plain loop's."""
     Bxy, Byz, Bzx = B
     gx = Bxy - np.roll(Bxy, 1, 1) + np.roll(Bzx, 1, 2) - Bzx
@@ -212,7 +221,8 @@ def curl_T_3d(B):
     return gx, gy, gz
 
 
-def loop_step(A, E, t, tau, J):
+def loop_step(A: Sequence[np.ndarray], E: Sequence[np.ndarray], t: float, tau: float,
+              J: Callable[[List[np.ndarray], float, float], None]) -> Tuple[List[np.ndarray], List[np.ndarray], float]:
     """A plain loop's one step, beside ``source_lattice_3d``, for large ``N``: the edge reads out where it is headed, the springs push back there, the clock
     returns its current ``J(E, t, tau)`` (which adds to ``E`` in place); then the charge takes it. Not an arrangement: it stands only where checked
     equal to the composite (``tests/test_light_sources.py``, S1)."""

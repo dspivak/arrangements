@@ -27,17 +27,19 @@ book's ``notes/runs/p73-b-56518228/PREDICTIONS.md``; the results are in ``RESULT
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
+from .arrangement import Arrangement, Numbers
 from .attention import (
-    Transfer, attention_arrangement, signal, spatial_kappa, split_messages, weight, zero_transfer,
+    AttentionArrangement, Cost, Transfer, Transfers, attention_arrangement, signal, spatial_kappa, split_messages,
+    weight, zero_transfer,
 )
 from .coalgebra import configuration
-from .collective import EMPTY, ext, frozen_part, part
+from .collective import EMPTY, Part, ext, frozen_part, part
 from .rvect import euclidean
 from .wiring import compose_seq, tensor_arrangements
 
@@ -73,12 +75,12 @@ def _f(x):
     return jnp.where(pos, jnp.exp(-1.0 / jnp.where(pos, x, 1.0)), 0.0)
 
 
-def smooth_step(x):
+def smooth_step(x: float | Array) -> Array:
     """The ``C^infty`` step: ``0`` for ``x <= 0``, ``1`` for ``x >= 1``, ``f(x) / (f(x) + f(1 - x))`` between."""
     return _f(x) / (_f(x) + _f(1.0 - x))
 
 
-def not_prime(v):
+def not_prime(v: float | Array) -> Array:
     """``c(v)``: ``0`` within a quarter of a prime, ``1`` within a quarter of any other whole number, and the smooth
     step between two neighbouring whole numbers. A smooth function on the line, so a cost can be written with it."""
     n = jnp.floor(v)
@@ -93,7 +95,7 @@ def not_prime(v):
 # ---------------------------------------------------------------------------
 
 
-def piece_part(pi: float, s0: float, *, k: float, mobility: float, label: str):
+def piece_part(pi: float, s0: float, *, k: float, mobility: float, label: str) -> Part:
     """A part that completes its number ``pi`` with how loudly it hears its partner: sends ``(s, 1)``, cost
     ``(k/2)(s - pi - w_in)^2`` with ``w_in = e[1]``, the weight of the message it receives."""
     return part(
@@ -103,7 +105,7 @@ def piece_part(pi: float, s0: float, *, k: float, mobility: float, label: str):
         label=label)
 
 
-def redundant_part(N: float, label: str):
+def redundant_part(N: float, label: str) -> Part:
     """p75's part: no state, always sending ``(N, 1)``."""
     return frozen_part(N, 1.0, label)
 
@@ -117,7 +119,7 @@ def _scalar(k) -> Transfer:
     return Transfer(gamma=k, L=jnp.reshape(k, (1, 1)))
 
 
-def finder_transfers(tau: float):
+def finder_transfers(tau: float) -> Transfers:
     """``T_0j = kappa(l_j)``, ``T_ab = T_ba = kappa(l_a - l_b)``, the rest ``0``; ``q = (l_a, l_b)``."""
     Z = zero_transfer(DH)
 
@@ -132,7 +134,9 @@ def finder_transfers(tau: float):
     return T
 
 
-def finder(parts: Sequence, *, tau: float, placements, mobility: float, label: str):
+def finder(
+    parts: Sequence[Part], *, tau: float, placements: Numbers, mobility: float, label: str,
+) -> Tuple[Arrangement, AttentionArrangement]:
     """The finder with its two parts filled in: ``compose_seq(parts_a (x) part_b, finder.arr())``, an arrangement
     ``I -> B``. Returns ``(arrangement, the attention arrangement)``."""
     a = attention_arrangement(
@@ -144,7 +148,7 @@ def finder(parts: Sequence, *, tau: float, placements, mobility: float, label: s
     return compose_seq(tensor_arrangements([p.arr for p in parts]), a.arr()), a
 
 
-def listener_transfers(n: int, tau: float):
+def listener_transfers(n: int, tau: float) -> Transfers:
     Z = zero_transfer(DH)
 
     def T(q):
@@ -156,7 +160,7 @@ def listener_transfers(n: int, tau: float):
     return T
 
 
-def listener_cost(n: int, tau: float, fixed_c: Optional[Sequence[float]] = None, alpha: float = 1.0):
+def listener_cost(n: int, tau: float, fixed_c: Optional[Sequence[float]] = None, alpha: float = 1.0) -> Cost:
     """``alpha sum_f wt(T_0f m_f) c_f``, with ``c_f = not_prime(val m_f)``, or ``fixed_c[f]`` (p75's cost)."""
     T = listener_transfers(n, tau)
 
@@ -187,7 +191,10 @@ class Scene:
     n: int
 
 
-def scene(finders_: Sequence, *, tau: float, positions, mobility: float, fixed_c=None, alpha: float = 1.0) -> Scene:
+def scene(
+    finders_: Sequence[Tuple[Arrangement, AttentionArrangement]], *, tau: float, positions: Numbers,
+    mobility: float, fixed_c: Optional[Sequence[float]] = None, alpha: float = 1.0,
+) -> Scene:
     """The listener with its finders filled in: ``compose_seq(finder_1 (x) ... (x) finder_n, listener.arr())``.
     ``finders_`` are ``(arrangement, attention arrangement)`` pairs from ``finder``."""
     n = len(finders_)
@@ -212,8 +219,9 @@ def scene(finders_: Sequence, *, tau: float, positions, mobility: float, fixed_c
 EXT = ext()
 
 
-def step_fn(S: Scene):
-    """One step of ``Phi(S.arr)`` on the empty exterior input with zero exterior covector (``collective.step_fn``)."""
+def step_fn(S: Scene) -> Callable[[Any], Any]:
+    """One step of ``Phi(S.arr)`` on the empty exterior input with zero exterior covector (``collective.step_fn``).
+    The state is the composite's pytree, so ``Any``."""
     P, omega = S.arr.P, S.arr.omega
 
     def step(s):
@@ -223,7 +231,7 @@ def step_fn(S: Scene):
     return step
 
 
-def read(S: Scene, q) -> dict:
+def read(S: Scene, q: Numbers) -> dict:
     """From the flat configuration: each finder's parts' states, its placements, its readout ``(h, w)`` from its own
     ``out_f``, and the listener's placements."""
     q = jnp.asarray(q, float)
@@ -238,7 +246,7 @@ def read(S: Scene, q) -> dict:
     return out
 
 
-def trace(S: Scene, steps: int):
+def trace(S: Scene, steps: int) -> Array:
     """``(q_0, q_1, ..., q_steps)``, the flat configurations along the run."""
     f = step_fn(S)
     P = S.arr.P

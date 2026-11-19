@@ -67,12 +67,12 @@ import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import configuration, phase
+from .coalgebra import ParameterRule, configuration, phase
 from .rvect import diagonal
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 
-def lc_cell(L: float, C: float, parameter=phase) -> Arrangement:
+def lc_cell(L: float, C: float, parameter: ParameterRule = phase) -> Arrangement:
     """A single LC cell ``<R^0|R^0> -> <R^1_out | R^0_in>``.
 
     Parameter ``parameter(Q)`` (``phase`` by default, ``configuration`` for the
@@ -119,7 +119,7 @@ def coupling_capacitor(C_c: float) -> Arrangement:
     )
 
 
-def coupled_lc_pair(L: float, C: float, C_c: float, parameter=phase) -> Arrangement:
+def coupled_lc_pair(L: float, C: float, C_c: float, parameter: ParameterRule = phase) -> Arrangement:
     """Two LC cells wired through the stateless coupling box, in ``arr``:
 
         coupled = compose_seq( lc_cell (x) lc_cell,  coupling_capacitor ),
@@ -144,7 +144,7 @@ def coupled_lc_pair(L: float, C: float, C_c: float, parameter=phase) -> Arrangem
 # ---------------------------------------------------------------------------
 
 
-def inductor_cell(L: float, R: float = 0.0, parameter=configuration) -> Arrangement:
+def inductor_cell(L: float, R: float = 0.0, parameter: ParameterRule = configuration) -> Arrangement:
     """The inductor as a configuration cell ``<R^0|R^0> -> <R^1_out | R^0_in>``.
 
     Parameter ``i`` (the current through the inductor), constant scalar sharp
@@ -173,7 +173,7 @@ def inductor_cell(L: float, R: float = 0.0, parameter=configuration) -> Arrangem
     )
 
 
-def capacitor_cell(C: float, parameter=configuration) -> Arrangement:
+def capacitor_cell(C: float, parameter: ParameterRule = configuration) -> Arrangement:
     """The capacitor as a configuration cell ``<R^0|R^0> -> <R^1_out | R^0_in>``:
     parameter ``v`` (the voltage across it), constant scalar sharp ``+1/C``,
     zero forcing, reporting ``v``. (Same convention as logic.py's
@@ -211,7 +211,7 @@ def current_voltage_coupler() -> Arrangement:
     )
 
 
-def lc_conf(L: float, C: float, R: float = 0.0, parameter=configuration) -> Arrangement:
+def lc_conf(L: float, C: float, R: float = 0.0, parameter: ParameterRule = configuration) -> Arrangement:
     """``compose_seq( inductor_cell (x) capacitor_cell, current_voltage_coupler )``.
 
     Parameter base ``R^2 = (i, v)``, sharp ``diag(-1/L, +1/C)``, composite
@@ -239,7 +239,7 @@ def lc_conf(L: float, C: float, R: float = 0.0, parameter=configuration) -> Arra
 # ---------------------------------------------------------------------------
 
 
-def inductor_cell_direct(L: float, R: float = 0.0, parameter=configuration) -> Arrangement:
+def inductor_cell_direct(L: float, R: float = 0.0, parameter: ParameterRule = configuration) -> Arrangement:
     """The inductor with its sharp where it belongs: constant scalar sharp
     ``+1/L``, parameter ``i``, reporting ``i``. The series resistance is the
     cost ``(R/2) i^2``, forcing ``omega = -d((R/2) i^2) = -R i di`` (exact):
@@ -287,7 +287,7 @@ def current_voltage_coupler_direct() -> Arrangement:
     )
 
 
-def lc_conf_direct(L: float, C: float, R: float = 0.0, parameter=configuration) -> Arrangement:
+def lc_conf_direct(L: float, C: float, R: float = 0.0, parameter: ParameterRule = configuration) -> Arrangement:
     """``compose_seq( inductor_cell_direct (x) capacitor_cell, current_voltage_coupler_direct )``.
 
     The DIRECT realization of ``lc_conf``: parameter base ``R^2 = (i, v)`` with

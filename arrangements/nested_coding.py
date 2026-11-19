@@ -31,7 +31,7 @@ the curvature term ``1/2 log det`` of the beliefs' precision.
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import jax.numpy as jnp
 from jax import Array
@@ -71,7 +71,7 @@ def _zeros(n: int, dim_H: int):
 # ---------------------------------------------------------------------------
 
 
-def level1(J: int, K: int, eta: float, init: Array = None) -> AttentionArrangement:
+def level1(J: int, K: int, eta: float, init: Optional[Array] = None) -> AttentionArrangement:
     """L1, arity 1: configuration ``(mu_1..mu_J, l1)``; cost
     ``1/2 e^l1 ||h - mu (x) 1_K||^2 - JK/2 l1`` on the exterior signal ``h``; places ``mu`` in
     coordinates ``0..J-1`` of its child's position."""
@@ -90,7 +90,7 @@ def level1(J: int, K: int, eta: float, init: Array = None) -> AttentionArrangeme
     )
 
 
-def level2(J: int, K: int, eta: float, arity: int = 0, init: Array = None) -> AttentionArrangement:
+def level2(J: int, K: int, eta: float, arity: int = 0, init: Optional[Array] = None) -> AttentionArrangement:
     """L2: configuration ``(nu, l2)``; cost ``1/2 e^l2 sum_j (p_j - nu)^2 - J/2 l2`` on its received
     position ``p``. With ``arity = 1`` it places ``nu`` in coordinate ``J`` of its child's position."""
     dim_H, dim_P = dims(J, K)
@@ -125,7 +125,7 @@ def level3(J: int, K: int, pi0: float, eta0: float) -> AttentionArrangement:
 # ---------------------------------------------------------------------------
 
 
-def level1_publishing(J: int, K: int, eta: float, init: Array = None) -> AttentionArrangement:
+def level1_publishing(J: int, K: int, eta: float, init: Optional[Array] = None) -> AttentionArrangement:
     """L1 with one open slot: the same cost on its received signal, and ``T_01(q) = (1, L(q))``
     with ``L(q) e_0 = (mu, 0, ...)``, so a slot fed ``(e_0, 1)`` makes it send ``mu`` upward."""
     dim_H, dim_P = dims(J, K)
@@ -149,7 +149,7 @@ def level1_publishing(J: int, K: int, eta: float, init: Array = None) -> Attenti
     )
 
 
-def level2_reading(J: int, K: int, eta: float, init: Array = None) -> AttentionArrangement:
+def level2_reading(J: int, K: int, eta: float, init: Optional[Array] = None) -> AttentionArrangement:
     """L2 outer, arity 1: passes the exterior message down by the identity transfer; cost
     ``1/2 e^l2 sum_j (h~_j - nu)^2 - J/2 l2`` on its child's message ``h~``."""
     dim_H, dim_P = dims(J, K)
@@ -203,7 +203,7 @@ def data_box(x: Array, dim_P: int) -> Arrangement:
     )
 
 
-def free_energy(x: Array, mu: Array, l1, nu, l2) -> Array:
+def free_energy(x: Array, mu: Array, l1: float | Array, nu: float | Array, l2: float | Array) -> Array:
     """``F`` of the module docstring, written by hand."""
     x = jnp.asarray(x, dtype=float)
     J, K = x.shape
@@ -224,7 +224,7 @@ def laplace_free_energy(x: Array, q: Array) -> Array:
     return free_energy(x, mu, l1, nu, l2) + 0.5 * logdet
 
 
-def laplace_learner(x: Array, eta: float, init: Array = None) -> Arrangement:
+def laplace_learner(x: Array, eta: float, init: Optional[Array] = None) -> Arrangement:
     """The repair as one closed box: configuration ``(mu, l1, nu, l2)``, Euclidean response,
     exact forcing ``-d(laplace_free_energy)``."""
     J = jnp.asarray(x).shape[0]
@@ -292,7 +292,7 @@ def evidence_cost(q: Array, msg: Array, J: int, integrate_nu: bool = True) -> Ar
     return c + (0.5 * jnp.log(jnp.sum(wp)) if integrate_nu else 0.0)
 
 
-def evidence_reader(J: int, eta: float, integrate_nu: bool = True, init: Array = None) -> Arrangement:
+def evidence_reader(J: int, eta: float, integrate_nu: bool = True, init: Optional[Array] = None) -> Arrangement:
     """L2 as a box ``<0|2J> -> I``: state ``(nu, l2)``, cost ``evidence_cost`` on the arriving messages; exact, so
     its force on each message's weight is pulled back onto whatever sent it."""
     q0 = jnp.zeros(2) if init is None else jnp.asarray(init, dtype=float)
@@ -307,7 +307,7 @@ def evidence_reader(J: int, eta: float, integrate_nu: bool = True, init: Array =
 
 
 def evidence_hierarchy(x: Array, eta: float, integrate_nu: bool = True, init1: float = 0.0,
-                       init2: Array = None) -> Arrangement:
+                       init2: Optional[Array] = None) -> Arrangement:
     """``samples -> L1 -> L2``, closed; state ``((empty, l1), (nu, l2))``."""
     from .wiring import compose_seq
 

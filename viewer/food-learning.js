@@ -118,7 +118,14 @@
   }
   const rk4=(s,h,places,p)=>base.rk4(s,h,places,p,field);
   const maps=(state,place,map=searchMap(state))=>[usualAt(state,place),density(map,place)];
-  const api={DEFAULTS,NR,NC:base.NC,PLACES,FOODS,start,field,rk4,maps,searchMap,usualMemory,learnedMemory,returnRate,casing:base.casing};
+  // The scalar and spatial stores, in their order in the receiver state.
+  const stores = [
+    ['meal', 'Meal', 8], ['yield', 'Usual yield', usual], ['unexplored', 'Unexplored', fresh],
+    ['destination', 'Destination', goal], ['clock', 'Search clock', clock],
+    ['return', 'Return-rate weights', weights], ['eye-contact', 'Eye contact', contact],
+    ['last-empty', 'Last empty', empty], ['time-away', 'Time away', age]
+  ].map(([id, label, start], i, all) => ({id, label, start, end: all[i+1]?.[2] ?? NR}));
+  const api={stores,DEFAULTS,NR,NC:base.NC,PLACES,FOODS,start,field,rk4,maps,searchMap,usualMemory,learnedMemory,returnRate,casing:base.casing};
   if(typeof module!=='undefined' && module.exports)module.exports=api;
   else root.FoodLearning=api;
 })(this);

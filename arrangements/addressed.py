@@ -42,12 +42,12 @@ shown slots have; members of one part, by that part's own hearing in its frame.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import jax.numpy as jnp
 from jax import Array
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .attention import (
     Transfer, add_transfers, apply_transfer, compose_transfers, identity_transfer, zero_transfer,
 )
@@ -76,14 +76,17 @@ def forward(x: Slot, dim_H: int) -> Shown:
     return Shown(place=lambda q, Z: Z[x], up=one, down=one, label=f"fwd{x}")
 
 
-def speaker(key, query, up, down, label: str = "speaker") -> Shown:
+def speaker(key: Callable[[Array], Array], query: Callable[[Array], Array],
+            up: Callable[[Array, Slot], Transfer], down: Callable[[Array, Slot], Transfer],
+            label: str = "speaker") -> Shown:
     """A slot at a place the group sets from its configuration: ``key(q)``, ``query(q)``; it sends
     ``sum_y up(q, y) m_y`` and hands down ``down(q, x)``."""
     return Shown(place=lambda q, Z: (key(q), query(q)), up=lambda q, y, Z: up(q, y),
                  down=lambda q, x, Z: down(q, x), label=label)
 
 
-def centroid_speaker(members: Sequence[Slot], dim_H: int, offset=None, label: str = "centroid") -> Shown:
+def centroid_speaker(members: Sequence[Slot], dim_H: int, offset: Optional[Callable[[Array], Array]] = None,
+                     label: str = "centroid") -> Shown:
     """Between the two: the group speaks for ``members`` from their mean address and mean query (plus
     a configuration-set ``offset(q)``), sending the sum of their messages and handing what it hears to
     each of them."""
@@ -116,7 +119,7 @@ def in_dim(r: int, dim_H: int, dim_P: int) -> int:
     return r * (dim_H + 1) + dim_P
 
 
-def slot_output(k, p, h, w) -> Array:
+def slot_output(k: Numbers, p: Numbers, h: Numbers, w: Numbers) -> Array:
     return jnp.concatenate([jnp.ravel(jnp.asarray(k, float)), jnp.ravel(jnp.asarray(p, float)),
                             jnp.ravel(jnp.asarray(h, float)), jnp.reshape(jnp.asarray(w, float), (1,))])
 
@@ -366,7 +369,7 @@ def substitute(a: AddressedArrangement, parts: Sequence[AddressedArrangement],
 
 
 def kernel_hearing(kernel: Callable[[Array, Array], Array], dim_H: int,
-                   value_map: Callable[[Array, Slot, Slot], Array] = None) -> Hearing:
+                   value_map: Optional[Callable[[Array, Slot, Slot], Array]] = None) -> Hearing:
     """The hearing ``(h, w) |-> kappa(p_x, k_y) (V h, w)``, ``p_x`` the receiver's query and ``k_y`` the
     sender's address: weight ``kappa > 0``, signal map ``kappa V``. It depends on those two places only."""
 
@@ -394,7 +397,7 @@ def dot(scale: float = 1.0) -> Callable[[Array, Array], Array]:
 
 
 def system(r: int, dim_H: int, dim_P: int, P: CotCoalg, emit: Callable[[Array], Array],
-           cost: Callable[[Array, Array], Array] = None, label: str = "") -> Arrangement:
+           cost: Optional[Callable[[Array, Array], Array]] = None, label: str = "") -> Arrangement:
     """A system ``I -> B_r``: its matter ``P``; ``emit(q)`` its slots' outputs; ``cost(q, e)`` a cost
     on its configuration and what it receives ``e in M^r x P``, forcing ``-dk``."""
     c = (lambda q, e: jnp.asarray(0.0)) if cost is None else cost

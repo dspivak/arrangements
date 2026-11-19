@@ -27,7 +27,7 @@ same step for the variance; ``expected_free_energy`` is risk plus ambiguity for 
 
 from __future__ import annotations
 
-from typing import Callable, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -62,7 +62,8 @@ def stepper(arr: Arrangement) -> Callable:
     return jax.jit(step)
 
 
-def run(arr: Arrangement, steps: int, s=None, record: Callable = None):
+def run(arr: Arrangement, steps: int, s: Any = None, record: Optional[Callable[[Any], Any]] = None
+        ) -> Union[Any, Tuple[Any, List[Any]]]:
     """Iterate ``Phi(arr)`` ``steps`` times from ``s`` (default the parameter's init).
 
     With ``record``, also return ``[record(s_n) for n = 0..steps]``."""
@@ -94,7 +95,7 @@ def precision_cost(x: Array, normalizer: bool = True) -> Callable[[Array], Array
 
 
 def precision_learner(x: Array, eta: float, normalizer: bool = True,
-                      init: Array = None) -> Arrangement:
+                      init: Optional[Array] = None) -> Arrangement:
     """The 1-D learner of ``(mu, log Pi)``: Euclidean response, exact forcing ``-dk``."""
     k = precision_cost(x, normalizer)
     q0 = jnp.zeros(2) if init is None else jnp.asarray(init, dtype=float)
@@ -109,7 +110,7 @@ def cholesky_precision(q: Array) -> Array:
     return L @ L.T
 
 
-def precision_learner_2d(X: Array, eta: float, init: Array = None) -> Arrangement:
+def precision_learner_2d(X: Array, eta: float, init: Optional[Array] = None) -> Arrangement:
     """State ``(mu_1, mu_2, a1, a2, b)``; ``k = 1/2 tr(Pi Shat(mu)) - 1/2 log det Pi``,
     ``log det Pi = 2 (a1 + a2)``."""
     X = jnp.asarray(X, dtype=float)
@@ -124,7 +125,7 @@ def precision_learner_2d(X: Array, eta: float, init: Array = None) -> Arrangemen
     return _closed(configuration(euclidean(5, eta), init=q0), lambda q: -k(q), "precision-2d")
 
 
-def two_source_learner(xA: Array, xB: Array, eta: float, init: Array = None) -> Arrangement:
+def two_source_learner(xA: Array, xB: Array, eta: float, init: Optional[Array] = None) -> Arrangement:
     """One mean, one log-precision per source: ``k = sum_s 1/2 Pi_s S_s(mu) - 1/2 ell_s``."""
     xA, xB = jnp.asarray(xA, dtype=float), jnp.asarray(xB, dtype=float)
 
@@ -142,7 +143,7 @@ def two_source_learner(xA: Array, xB: Array, eta: float, init: Array = None) -> 
 # ---------------------------------------------------------------------------
 
 
-def policy_values(G: Array, gamma: float, E: Array = None) -> Tuple[Array, float]:
+def policy_values(G: Array, gamma: float, E: Optional[Array] = None) -> Tuple[Array, float]:
     """``(v, T)`` for ``choice.logit_arrangement``: ``T = 1/gamma``, ``v = -G + T log E``."""
     G = jnp.asarray(G, dtype=float)
     T = 1.0 / gamma
@@ -150,14 +151,14 @@ def policy_values(G: Array, gamma: float, E: Array = None) -> Tuple[Array, float
     return -G + T * logE, T
 
 
-def policy_free_energy(G: Array, T: float, E: Array = None) -> Callable[[Array], Array]:
+def policy_free_energy(G: Array, T: float, E: Optional[Array] = None) -> Callable[[Array], Array]:
     """The chooser's cost ``k(p) = <G, p> - T <log E, p> - T H(p)``."""
     G = jnp.asarray(G, dtype=float)
     logE = jnp.zeros_like(G) if E is None else jnp.log(jnp.asarray(E, dtype=float))
     return lambda p: jnp.dot(G, p) - T * jnp.dot(logE, p) + T * jnp.sum(p * jnp.log(p))
 
 
-def open_chooser(n: int, T: float, dt: float = 1.0, init: Array = None,
+def open_chooser(n: int, T: float, dt: float = 1.0, init: Optional[Array] = None,
                  unilateral: bool = False, shift: float = 0.0) -> Arrangement:
     """The chooser ``<0|n> -> I`` receiving ``G`` forward, with potential ``-<G, p> + T H(p)``.
 
@@ -275,13 +276,17 @@ def expected_free_energy(step: Callable, m: Array, Sig: Array, policy: Sequence[
     return G
 
 
-def G_vector(step, m, Sig, policies, Q, ostar, P) -> Array:
+def G_vector(step: Callable, m: Union[float, Array], Sig: Union[float, Array],
+             policies: Sequence[Sequence[Tuple[float, float]]],
+             Q: float, ostar: float, P: float) -> Array:
     return jnp.stack([expected_free_energy(step, m, Sig, pol, Q, ostar, P) for pol in policies])
 
 
-def planner(policies, Sig: float, x_obs: float, w_ev: float, eta: float, Q: float,
-            ostar: float, P: float, init: float = 0.0, world_arr: Arrangement = None) -> Arrangement:
-    """The part that runs futures, as a box ``I -> <0|n>``: state its belief mean ``m``
+def planner(policies: Sequence[Sequence[Tuple[float, float]]], Sig: float, x_obs: float, w_ev: float, eta: float,
+            Q: float, ostar: float, P: float, init: float = 0.0, world_arr: Optional[Arrangement] = None
+            ) -> Arrangement:
+    """The part that runs futures, as a box ``I -> <0|n>``: ``policies`` lists ``n`` policies, each a sequence of
+    steps ``(u, R)``, the push and the observation noise; state its belief mean ``m``
     (Euclidean response ``eta``), its own evidence potential ``-1/2 w_ev (m - x_obs)^2``, and it
     publishes ``G(m)`` for each policy by running ``Phi(world)`` (``expected_free_energy``); the
     belief variance ``Sig`` is held fixed."""
@@ -301,7 +306,7 @@ def planner(policies, Sig: float, x_obs: float, w_ev: float, eta: float, Q: floa
 # ---------------------------------------------------------------------------
 
 
-def natural_chooser(n: int, T: float, dt: float = 1.0, E: Array = None, init: Array = None,
+def natural_chooser(n: int, T: float, dt: float = 1.0, E: Optional[Array] = None, init: Optional[Array] = None,
                     unilateral: bool = False) -> Arrangement:
     """The chooser ``<0|n> -> I`` in the gauge-fixed natural chart: state ``lambda in R^{n-1}``,
     ``p = softmax(lambda, 0)``, response ``dt`` times the inverse Fisher metric, exact forcing
@@ -359,7 +364,7 @@ def hand(kappa: float, eta: float, init: float = 0.0) -> Arrangement:
     )
 
 
-def predictor(Pi: float, eta: float, goal: Tuple[float, float] = None, top: bool = False,
+def predictor(Pi: float, eta: float, goal: Optional[Tuple[float, float]] = None, top: bool = False,
               unilateral: bool = False, init: float = 0.0) -> Arrangement:
     """A level ``<0|1> -> <0|1>`` (``-> I`` if ``top``): state its prediction ``mu`` of what
     arrives, cost ``1/2 Pi (m - mu)^2`` on the incoming ``m``, plus ``1/2 pi_g (mu - g)^2`` if
@@ -453,8 +458,9 @@ def score_box(R: float, ostar: float, P: float) -> Arrangement:
     return map_box(g, 3, 3, f"score(R={R:g})")
 
 
-def figurine_planner(policies, Sig: float, x_obs: float, w_ev: float, eta: float, Q: float,
-                     ostar: float, P: float, init: float = 0.0, world_arr: Arrangement = None) -> Arrangement:
+def figurine_planner(policies: Sequence[Sequence[Tuple[float, float]]], Sig: float, x_obs: float, w_ev: float,
+                     eta: float, Q: float, ostar: float, P: float, init: float = 0.0,
+                     world_arr: Optional[Arrangement] = None) -> Arrangement:
     """The planner by parts, ``I -> <0|n>``: the belief box, copied to one chain per policy; each step
     of a policy a figurine of the world, then a score box, the running ``G`` carried beside the
     figurine on later steps; each chain presents its ``G``. Equal, by prediction, to ``planner``

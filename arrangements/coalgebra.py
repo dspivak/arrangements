@@ -44,10 +44,11 @@ from CDLM's ``integrator.py`` with their status kept verbatim:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
 import jax.numpy as jnp
 from jax import Array
+from jax.typing import ArrayLike
 
 from .rvect import ReactiveVectorSpace
 
@@ -162,7 +163,7 @@ class CotCoalg:
 # ---------------------------------------------------------------------------
 
 
-def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
+def configuration(Q: ReactiveVectorSpace, init: Optional[Array] = None) -> CotCoalg:
     """The configuration coalgebra on ``(Q, sharp_Q)``: ``S = Q``, one displacement per step.
 
     The state is the position, ``q(s) = s``, and an incoming covector displaces it
@@ -190,7 +191,7 @@ def configuration(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg:
     )
 
 
-def phase(Q: ReactiveVectorSpace, init=None, dt: float = 1.0) -> CotCoalg:
+def phase(Q: ReactiveVectorSpace, init: Optional[Any] = None, dt: float = 1.0) -> CotCoalg:
     """The phase coalgebra on ``(Q, sharp_Q)``: ``S = T^*Q = Q (+) Q^*`` in coordinates.
 
     The state is ``s = (q, xi)``, position and momentum. The presented position is
@@ -236,7 +237,7 @@ def phase(Q: ReactiveVectorSpace, init=None, dt: float = 1.0) -> CotCoalg:
 # ---------------------------------------------------------------------------
 
 
-def damped(Q: ReactiveVectorSpace, damping: float = 0.0, init=None) -> CotCoalg:
+def damped(Q: ReactiveVectorSpace, damping: float = 0.0, init: Optional[Any] = None) -> CotCoalg:
     """The phase coalgebra with the paper's *damping* 1-form added.
 
     The damping 1-form ``ex.damping_one_form`` -- ``zeta(q, xi) = (xi, 0)`` -- is
@@ -278,7 +279,7 @@ def damped(Q: ReactiveVectorSpace, damping: float = 0.0, init=None) -> CotCoalg:
     )
 
 
-def quadratic_drag_kick(v, gyro_block: int):
+def quadratic_drag_kick(v: Array, gyro_block: int) -> Array:
     """Per-gyro quadratic-drag kick ``|v_i| v_i`` in coordinates (block Euclidean norm).
 
     The blog's air drag is a force ``~ -|v| v`` (opposes velocity, magnitude growing
@@ -320,7 +321,9 @@ def quadratic_drag_kick(v, gyro_block: int):
     return (speed * vg).reshape(v.shape)
 
 
-def gyro_kick(v, gamma=0.0, J=None, drag: float = 0.0, gyro_block=None):
+def gyro_kick(v: Array, gamma: Union[float, ArrayLike] = 0.0,
+              J: Optional[Union[ArrayLike, Sequence[Sequence[float]]]] = None,
+              drag: float = 0.0, gyro_block: Optional[int] = None) -> Array:
     """The momentum kick of the gyroscopic and drag 1-forms at velocity ``v``:
     ``-drag * |v| v  -  gamma * (J v)`` (zero when neither is present). Shared by the
     trick realization (``gyro``, ``rk4_gyro``) and the direct one (``phase_on_cotangent``)."""
@@ -333,8 +336,9 @@ def gyro_kick(v, gamma=0.0, J=None, drag: float = 0.0, gyro_block=None):
 
 
 def gyro(
-    Q: ReactiveVectorSpace, damping: float = 0.0, gamma: float = 0.0, J=None,
-    drag: float = 0.0, gyro_block=None, init=None,
+    Q: ReactiveVectorSpace, damping: float = 0.0, gamma: Union[float, ArrayLike] = 0.0,
+    J: Optional[Union[ArrayLike, Sequence[Sequence[float]]]] = None,
+    drag: float = 0.0, gyro_block: Optional[int] = None, init: Optional[Any] = None,
 ) -> CotCoalg:
     """The phase coalgebra with a *damping* and a *gyroscopic* 1-form added.
 
@@ -425,7 +429,7 @@ def gyro(
     )
 
 
-def phase_on_cotangent(Q: ReactiveVectorSpace, damping: float = 0.0, init=None) -> CotCoalg:
+def phase_on_cotangent(Q: ReactiveVectorSpace, damping: float = 0.0, init: Optional[Any] = None) -> CotCoalg:
     """The (damped) phase coalgebra presenting its whole state: base ``T^*Q``.
 
     The DIRECT realization of velocity-dependent forcings (STATUS.md §2, trick vs direct): base
@@ -626,7 +630,7 @@ def as_two_stage(P: CotCoalg) -> CotCoalg2:
     )
 
 
-def at_duration(P: CotCoalg, duration) -> CotCoalg:
+def at_duration(P: CotCoalg, duration: float) -> CotCoalg:
     """``P`` fixed at one duration: its look-ahead and its step over ``duration`` as an ordinary unit
     coalgebra (book P9.5). How a one-round part rides inside a many-round composite: each of its
     rounds is a step of that duration."""
@@ -646,3 +650,9 @@ def _for_duration(P, duration):
     if P.durational is None:
         raise TypeError(f"part {P.label or '?'} has no duration law (durational is None)")
     return P.durational(duration)
+
+
+# What a constructor of an arrangement takes as its ``parameter``: a rule that puts an integrator on a
+# reactive vector space ``Q``, one-stage or many (``configuration``, ``phase``, ``gyro``, ``leapfrog``,
+# ``rk4``, or a ``lambda Q: ...`` fixing their other arguments).
+ParameterRule = Callable[[ReactiveVectorSpace], Union[CotCoalg, CotCoalg2, CotCoalgK]]

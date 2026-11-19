@@ -20,12 +20,15 @@ bankruptcy boundary and finite resources of the external market are not modeled.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from typing import Any, Callable, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement, zero_form
+from jax import Array
+
+from .arrangement import Arrangement, Numbers, zero_form
 from .cascade import gate
 from .coalgebra import configuration
 from .rvect import trivial
@@ -51,7 +54,9 @@ def _terms(values, fractions):
     return jnp.asarray(values), jnp.asarray(fractions)
 
 
-def settlement(output, shares, values, fractions):
+def settlement(
+    output: float | Array, shares: Array | np.ndarray, values: Array | np.ndarray, fractions: Array | np.ndarray,
+) -> Array:
     """Flat array: allocations, gross benefits, payments, net benefits.
 
     This smooth map's domain has output >= 0, shares >= 0, sum(shares) <= 1.
@@ -63,7 +68,7 @@ def settlement(output, shares, values, fractions):
     return jnp.concatenate([quantities, benefits, payments, benefits - payments])
 
 
-def contract(shares, values, payment_fractions, label='contract'):
+def contract(shares: Numbers, values: Numbers, payment_fractions: Numbers, label: str = 'contract') -> Arrangement:
     """A static box receiving one output amount and reporting its settlement."""
     values, fractions = _terms(values, payment_fractions)
     shares = np.asarray(shares, float)
@@ -75,7 +80,10 @@ def contract(shares, values, payment_fractions, label='contract'):
                    lambda m: settlement(m[0], shares, values, fractions), label)
 
 
-def fixed_exchange(output, shares, values, payment_fractions, *, balances=None, dt=1.):
+def fixed_exchange(
+    output: float, shares: Numbers, values: Numbers, payment_fractions: Numbers, *,
+    balances: Optional[Numbers] = None, dt: float = 1.,
+) -> Arrangement:
     """One worker paid by several suppliers: no sales and no creation of cash.
 
     Output is a constant offered each round; states are supplier balances then
@@ -118,11 +126,12 @@ class ContractRun:
                     contracts=m[self.stock_dim:].reshape(n, 8))
 
 
-def piecework(n, *, source=True, wmax=1., tau=.8, source_position=2.5,
-              source_rate=1., value=2., outside_value=2., f0=20.,
-              overhead=2., leak=.1, alpha=1., beta=1., needs=None, lam=.3,
-              a0=.8, p0=.06, mu_a=.1, mu_p=.1, mu_f=.05,
-              legacy_receipts=False, unsold_claim=.1):
+def piecework(n: int, *, source: bool = True, wmax: float = 1., tau: float = .8, source_position: float = 2.5,
+              source_rate: float = 1., value: float = 2., outside_value: float = 2., f0: float = 20.,
+              overhead: float = 2., leak: float = .1, alpha: float = 1., beta: float = 1.,
+              needs: Optional[Numbers] = None, lam: float = .3,
+              a0: float = .8, p0: float = .06, mu_a: float = .1, mu_p: float = .1, mu_f: float = .05,
+              legacy_receipts: bool = False, unsold_claim: float = .1) -> ContractRun:
     """Workers, two suppliers, contracts, a market and cash accounts.
 
     The historical receipt control credits the fund with the old spatially
@@ -223,8 +232,11 @@ def piecework(n, *, source=True, wmax=1., tau=.8, source_position=2.5,
     return ContractRun(arr, n, settlement_box, stock_dim)
 
 
-def runner(model, *, pre=4000, post=6000, initial=None):
+def runner(
+    model: ContractRun, *, pre: int = 4000, post: int = 6000, initial: Any = None,
+) -> Tuple[Any, Callable[[float | Array], Any]]:
     """State after pre steps, and continuation from an externally drained fund.
+    A state (``initial``, and the returned ones) is the composite's pytree of arrays, so ``Any``.
 
     The drain is an intervention between two runs, not an event the model makes.
     Only the fund state is changed; all subsequent operations run in the composite.

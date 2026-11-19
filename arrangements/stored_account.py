@@ -18,19 +18,28 @@ received through chairs whose matter has a dead zone (static friction). This mod
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable
+from typing import Callable, Tuple
 
 import jax.numpy as jnp
 import numpy as np
 
 from .acceptable import BURST
-from .arrangement import Arrangement
+from jax import Array
+
+from .arrangement import Arrangement, Numbers
 from .coalgebra import CotCoalg
 from .two_clocks import matter, person, route, routine, seat, talk
 from .wiring import compose_seq, tensor_arrangements
 
 
-def duty_singular(s, sigma=BURST["sigma"], lam=BURST["lam"], rho=BURST["rho"], z_on=40.0, z_off=20.0):
+def duty_singular(
+    s: Numbers,
+    sigma: float = BURST["sigma"],
+    lam: float = BURST["lam"],
+    rho: float = BURST["rho"],
+    z_on: float = 40.0,
+    z_off: float = 20.0,
+) -> np.ndarray:
     """The fraction of time the switch is on, at a held account ``s``, with the switch instantaneous."""
     s = np.asarray(s, dtype=float)
     up = sigma * s - lam * z_on
@@ -39,13 +48,13 @@ def duty_singular(s, sigma=BURST["sigma"], lam=BURST["lam"], rho=BURST["rho"], z
     return np.where(up > 0, Tm / (Tc + Tm), 0.0)
 
 
-def tabulated(s_grid, d_grid) -> Callable:
+def tabulated(s_grid: Numbers, d_grid: Numbers) -> Callable[[Array], Array]:
     """``d`` as the piecewise-linear interpolation of a table, ``0`` below the table's first account."""
     sg, dg = jnp.asarray(np.asarray(s_grid, float)), jnp.asarray(np.asarray(d_grid, float))
     return lambda s: jnp.where(s < sg[0], 0.0, jnp.interp(s, sg, dg))
 
 
-def friction_chairs(w0, duty: Callable, k: float = BURST["G"] / BURST["a"], a: float = BURST["a"]) -> CotCoalg:
+def friction_chairs(w0: Numbers, duty: Callable, k: float = BURST["G"] / BURST["a"], a: float = BURST["a"]) -> CotCoalg:
     """Both chairs, one integrator on ``R^2``: state the positions; told ``xi`` for a duration ``tau``, they move
     ``tau k d(|xi|^2 / 2a) xi``. One account ``|xi|^2 / 2a`` for the pair: they stick or slide together."""
     def r(xi):
@@ -56,8 +65,10 @@ def friction_chairs(w0, duty: Callable, k: float = BURST["G"] / BURST["a"], a: f
     )
 
 
-def friction_room(duty: Callable, q=(-2.5, 2.5), w=(-2.5, 2.5), **kw) -> Arrangement:
-    """``I -> <1|0>``: people, two-way seats, talk and the routine, chairs with the frictional response."""
+def friction_room(duty: Callable, q: Tuple[float, float] = (-2.5, 2.5), w: Tuple[float, float] = (-2.5, 2.5),
+                  **kw: float) -> Arrangement:
+    """``I -> <1|0>``: people, two-way seats, talk and the routine, chairs with the frictional response. ``q``, ``w``:
+    the people's and the chairs' starting positions; ``kw``: settings that replace ``BURST``'s."""
     p = {**BURST, **kw}
     parts = tensor_arrangements([
         person(q[0], 3), person(q[1], 3),
@@ -124,7 +135,8 @@ def store_pull(kappa: float) -> Arrangement:
 STICK = dict(m=20.0, c_v=40.0, F_k=0.9, v_s=0.002)   # c_v: the floor's viscous drag (BURST's c is talk)
 
 
-def stick_slip_room(q=(-2.5, 2.5), w=(-2.5, 2.5), z0=0.0, **kw) -> Arrangement:
+def stick_slip_room(q: Tuple[float, float] = (-2.5, 2.5), w: Tuple[float, float] = (-2.5, 2.5), z0: float = 0.0,
+                    **kw: float) -> Arrangement:
     """``I -> <1|0>``: the people as in the burst room, the store charged by their strain and leaking, the store
     pulling each chair steadily (``store_pull``), each chair a ``friction_mass``. No switch: the threshold is the
     chairs' static friction ``F_s = kappa * sigma * a / lam`` by default, so that, as in the burst room, nothing moves

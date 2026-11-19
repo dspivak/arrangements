@@ -19,6 +19,7 @@ that file's RESULTS, "Where a forward run could not see the order", says what st
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -72,9 +73,11 @@ def _chairs(eps: float, w, degree: int = 2):
     return [matter(slowed(chair_integrator(w[i]), eps), degree, "chair") for i in range(2)]
 
 
-def room_with_guest(eps: float, mu: float, q=(-2.5, 2.5), w=(-2.5, 2.5), z=1.0, a=1.0, c=3.0, ell=1.0, b=2.6,
-                    w0=(-2.5, 2.5)) -> Arrangement:
-    """The furniture room and its guest. State position ``(q1, q2, w1, w2, z)``."""
+def room_with_guest(eps: float, mu: float, q: Sequence[float] = (-2.5, 2.5), w: Sequence[float] = (-2.5, 2.5),
+                    z: float = 1.0, a: float = 1.0, c: float = 3.0, ell: float = 1.0, b: float = 2.6,
+                    w0: Tuple[float, float] = (-2.5, 2.5)) -> Arrangement:
+    """The furniture room and its guest. State position ``(q1, q2, w1, w2, z)``; ``q``, ``w`` the two people's and the
+    two chairs' starting positions."""
     parts = tensor_arrangements([person(q[0], 4), person(q[1], 4), *_chairs(eps, w), _part(z, 1, "guest part")])
     # wires: p1 x4 (0-3), p2 x4 (4-7), c1 x2 (8,9), c2 x2 (10,11), z (12)
     wired = compose_seq(parts, route(13, [0, 8, 4, 10, 1, 5, 2, 6, 9, 11, 3, 7, 12]))
@@ -83,8 +86,9 @@ def room_with_guest(eps: float, mu: float, q=(-2.5, 2.5), w=(-2.5, 2.5), z=1.0, 
     return replace(compose_seq(wired, couplings), label=f"room_with_guest(eps={eps:g},mu={mu:g})")
 
 
-def room_lamp(eps: float, q=(-2.5, 2.5), w=(-2.5, 2.5), y=1.0, a=1.0, c=3.0, ell=1.0, b=2.6,
-              w0=(-2.5, 2.5)) -> Arrangement:
+def room_lamp(eps: float, q: Sequence[float] = (-2.5, 2.5), w: Sequence[float] = (-2.5, 2.5), y: float = 1.0,
+              a: float = 1.0, c: float = 3.0, ell: float = 1.0, b: float = 2.6,
+              w0: Tuple[float, float] = (-2.5, 2.5)) -> Arrangement:
     """The furniture room beside the lamp. State position ``(q1, q2, w1, w2, y)``."""
     parts = tensor_arrangements([person(q[0], 3), person(q[1], 3), *_chairs(eps, w), _part(y, 1, "lamp")])
     wired = compose_seq(parts, route(11, [0, 6, 3, 8, 1, 4, 2, 5, 7, 9, 10]))
@@ -93,8 +97,9 @@ def room_lamp(eps: float, q=(-2.5, 2.5), w=(-2.5, 2.5), y=1.0, a=1.0, c=3.0, ell
     return replace(compose_seq(wired, couplings), label=f"room_lamp(eps={eps:g})")
 
 
-def room_lamp_guest(eps: float, mu: float, nu: float, q=(-2.5, 2.5), w=(-2.5, 2.5), y=1.0, z=1.0, a=1.0, c=3.0,
-                    ell=1.0, b=2.6, w0=(-2.5, 2.5)) -> Arrangement:
+def room_lamp_guest(eps: float, mu: float, nu: float, q: Sequence[float] = (-2.5, 2.5),
+                    w: Sequence[float] = (-2.5, 2.5), y: float = 1.0, z: float = 1.0, a: float = 1.0, c: float = 3.0,
+                    ell: float = 1.0, b: float = 2.6, w0: Tuple[float, float] = (-2.5, 2.5)) -> Arrangement:
     """The guest reading two sources, the room and the lamp. State position ``(q1, q2, w1, w2, y, z)``."""
     parts = tensor_arrangements([person(q[0], 4), person(q[1], 4), *_chairs(eps, w), _part(y, 2, "lamp"),
                                  _part(z, 1, "guest part")])
@@ -118,7 +123,8 @@ def one_way_seat(a: float = 1.0) -> Arrangement:
     return _reading_coupling(2, 1, lambda m: 0.5 * a * (m[1] - m[0]) ** 2, f"one_way_seat({a:g})")
 
 
-def one_way_room(eps: float, q=(-2.5, 2.5), w=(-2.5, 2.5), a=1.0, c=3.0, ell=1.0) -> Arrangement:
+def one_way_room(eps: float, q: Sequence[float] = (-2.5, 2.5), w: Sequence[float] = (-2.5, 2.5), a: float = 1.0,
+                 c: float = 3.0, ell: float = 1.0) -> Arrangement:
     """The control: chairs with their own well, read one-way by the people. State position ``(q1, q2, w1, w2)``."""
     parts = tensor_arrangements([person(q[0], 3), person(q[1], 3), *_chairs(eps, w)])
     # wires: p1 x3 (0-2), p2 x3 (3-5), c1 x2 (6,7), c2 x2 (8,9)
@@ -127,7 +133,7 @@ def one_way_room(eps: float, q=(-2.5, 2.5), w=(-2.5, 2.5), a=1.0, c=3.0, ell=1.0
     return replace(compose_seq(wired, couplings), label=f"one_way_room(eps={eps:g})")
 
 
-def chairs_alone(eps: float, w=(-2.5, 2.5)) -> Arrangement:
+def chairs_alone(eps: float, w: Sequence[float] = (-2.5, 2.5)) -> Arrangement:
     """The one-way room's source: the chairs and their well, ``I -> <1|0>`` with the routine's port unused.
     State position ``(w1, w2)``."""
     parts = tensor_arrangements(_chairs(eps, w, degree=1))

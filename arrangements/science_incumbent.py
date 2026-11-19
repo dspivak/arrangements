@@ -40,12 +40,15 @@ smooth through ``science_payment.gate`` (per-step changes are far below the gate
 from __future__ import annotations
 
 from functools import partial
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement
+from jax import Array
+
+from .arrangement import Arrangement, Numbers
 from .coalgebra import configuration
 from .functors import Phi
 from .active_inference import _IN_DIR, _IN_POS
@@ -61,8 +64,8 @@ def _p0p1(lam):
     return jnp.exp(-jax.nn.softplus(lam) - jax.nn.softplus(-lam))
 
 
-def reader(d, nA, nB, delta, sigma) -> Arrangement:
-    """The incumbent's reader (module docstring)."""
+def reader(d: float, nA: int, nB: int, delta: Numbers, sigma: float) -> Arrangement:
+    """The incumbent's reader (module docstring). ``delta``: the ``K_FIG`` figures' costs."""
     delta = jnp.asarray(delta, float)
     s = jnp.concatenate([jnp.full(K_FIG, d), jnp.full(K_FIG, -d)])
     dl = jnp.concatenate([delta, delta])
@@ -112,7 +115,7 @@ def _box(dim_in, init, readout, force, label) -> Arrangement:
     )
 
 
-def fund(sigma, F1, hold) -> Arrangement:
+def fund(sigma: float, F1: float, hold: int) -> Arrangement:
     """``F`` moves by ``(sum pay - sigma gF sum seen E) / hold``; publishes ``gF``."""
     def force(q, n_in):
         E, seen, pay = n_in[:NX], n_in[NX:2 * NX], n_in[2 * NX:]
@@ -120,15 +123,17 @@ def fund(sigma, F1, hold) -> Arrangement:
     return _box(2 * NX + N_DEP, 0.0, lambda q: gate(q, F1), force, "excuse fund")
 
 
-def dependent(s0, pi, c, f, s1, hold, label) -> Arrangement:
+def dependent(s0: float, pi: float, c: float, f: float, s1: float, hold: int, label: str) -> Arrangement:
     """Supply ``s`` moves by ``g(s) (pi p0 - c - f) / hold``; publishes its payment ``g(s) f``."""
     return _box(1, s0, lambda q: gate(q, s1) * f,
                 lambda q, n_in: gate(q, s1) * (pi * n_in[:1] - c - f) / hold, label)
 
 
 @partial(jax.jit, static_argnames=("hold", "counts"))
-def incumbent_run(A, B, S0, d, delta, sigma, pi, c, f, s1, F1, hold, counts):
-    """Wire world, reader, fund and dependents (starting supplies ``S0``, length ``N_DEP``); run by ``Phi``.
+def incumbent_run(A: Array, B: Array, S0: Array, d: float, delta: Array, sigma: float, pi: float, c: float, f: float,
+                  s1: float, F1: float, hold: int, counts: int) -> Array:
+    """Wire world, reader, fund and dependents (starting supplies ``S0``, length ``N_DEP``); run by ``Phi``. ``A`` and
+    ``B``: the ``nA`` and ``nB`` draws; ``delta``: the ``K_FIG`` figures' costs.
     Returns per count end: ``lambda``, ``F``, supplies, and the cumulative paid-in and drawn (observed from
     the states, summed step by step; nothing fed back)."""
     nA, nB = A.shape[0], B.shape[0]
@@ -166,8 +171,9 @@ def incumbent_run(A, B, S0, d, delta, sigma, pi, c, f, s1, F1, hold, counts):
     return out          # columns: lambda, F, S (N_DEP), paid, drawn
 
 
-def run_arm(D, seeds=range(10), d=3.0, nA=20, nB=60, s0=7.5, pi=1.0, c=0.5, f=1.0, sigma=0.5, s1=0.1,
-            F1=0.5, hold=400, counts=61):
+def run_arm(D: int, seeds: Iterable[int] = range(10), d: float = 3.0, nA: int = 20, nB: int = 60, s0: float = 7.5,
+            pi: float = 1.0, c: float = 0.5, f: float = 1.0, sigma: float = 0.5, s1: float = 0.1, F1: float = 0.5,
+            hold: int = 400, counts: int = 61) -> np.ndarray:
     """All seeds of one arm (vmapped); ``D`` dependents present, the rest at supply 0."""
     AB = [np.random.default_rng(sd) for sd in seeds]
     AB = [(r.normal(0, 1, nA), r.normal(d, 1, 150)[:nB]) for r in AB]
@@ -178,7 +184,7 @@ def run_arm(D, seeds=range(10), d=3.0, nA=20, nB=60, s0=7.5, pi=1.0, c=0.5, f=1.
     return np.asarray(jax.vmap(g)(A, B))
 
 
-def summarize(out, D, s1=0.1, F1=0.5):
+def summarize(out: np.ndarray, D: int, s1: float = 0.1, F1: float = 0.5) -> List[Dict[str, Optional[float]]]:
     """Per seed: overtake count, last death count, dry count, final F, paid, drawn."""
     res = []
     for o in out:
@@ -213,7 +219,7 @@ J_FS = (0, 4, 16, 64, 256, 1024, 4096)
 J_PMAX = 260
 
 
-def j_candidates(seed, F, q=0.5, counts=61, fmax=4096):
+def j_candidates(seed: int, F: int, q: float = 0.5, counts: int = 61, fmax: int = 4096) -> List[Tuple[int, int, float]]:
     """(admission count n, checks survived G, distance) of every admitted candidate of arm ``F``."""
     r = np.random.default_rng(1000 + seed)
     G = r.geometric(q, size=(counts, fmax)) - 1
@@ -225,7 +231,7 @@ def j_candidates(seed, F, q=0.5, counts=61, fmax=4096):
     return out
 
 
-def j_pairs(cands, nB=60, R=3):
+def j_pairs(cands: Sequence[Tuple[int, int, float]], nB: int = 60, R: int = 3) -> List[Tuple[int, int, float, int]]:
     """Per draw ``j``, the figures among the ``R`` cheapest usable ones admitted by some count:
     ``(draw, admission count, delta, G)``."""
     pairs = []
@@ -238,8 +244,9 @@ def j_pairs(cands, nB=60, R=3):
     return pairs
 
 
-def fixer_reader(d, nA, nB, delta, pair_draw, pair_delta) -> Arrangement:
-    """(i)'s reader with no fund, plus one attachment per (draw, new figure) pair, masked by the in-port."""
+def fixer_reader(d: float, nA: int, nB: int, delta: Numbers, pair_draw: Array, pair_delta: Array) -> Arrangement:
+    """(i)'s reader with no fund, plus one attachment per (draw, new figure) pair, masked by the in-port. ``pair_draw``
+    (integers) and ``pair_delta``: each pair's draw and figure cost, shape ``(P,)``."""
     delta = jnp.asarray(delta, float)
     s = jnp.concatenate([jnp.full(K_FIG, d), jnp.full(K_FIG, -d)])
     dl = jnp.concatenate([delta, delta])
@@ -277,7 +284,8 @@ def fixer_reader(d, nA, nB, delta, pair_draw, pair_delta) -> Arrangement:
 
 
 @partial(jax.jit, static_argnames=("hold", "counts"))
-def fixer_run(A, B, pair_draw, pair_adm, pair_delta, d, delta, hold, counts):
+def fixer_run(A: Array, B: Array, pair_draw: Array, pair_adm: Array, pair_delta: Array, d: float, delta: Array,
+              hold: int, counts: int) -> Tuple[Array, Array]:
     """World (row ``c``: A, B, seen, admitted mask) wired to the reader, run by ``Phi``; ``lambda`` per count
     and the new pairs' final attachments."""
     nA, nB = A.shape[0], B.shape[0]
@@ -301,7 +309,9 @@ def fixer_run(A, B, pair_draw, pair_adm, pair_delta, d, delta, hold, counts):
     return lam, arr.P.position(st)[2 + NX * 2 * K_FIG:]
 
 
-def run_fixer_arm(F, seeds=range(10), d=3.0, nA=20, nB=60, hold=400, counts=61):
+def run_fixer_arm(F: int, seeds: Iterable[int] = range(10), d: float = 3.0, nA: int = 20, nB: int = 60,
+                  hold: int = 400, counts: int = 61
+                  ) -> Tuple[np.ndarray, np.ndarray, List[List[Tuple[int, int, float, int]]]]:
     """All seeds of arm ``F`` (vmapped, pairs padded to ``J_PMAX`` with never-admitted dummies)."""
     As, Bs, PD, PA, PL, pairs_all = [], [], [], [], [], []
     for sd in seeds:

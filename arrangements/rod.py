@@ -20,20 +20,21 @@ distances (rings), so the rod comes to rest on the least-squares or the total-le
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Optional, Sequence
 
 import jax.numpy as jnp
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import configuration, damped
 from .network import fan_box, map_box
 from .rvect import diagonal
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 
-def rod_box(h0: float, th0: float, *, dt: float, drags=None, mass_inertia=None, friction: float = 0.0,
-            n_out: int = 1) -> Arrangement:
-    """The rod ``<0|0> -> <0|2 n_out>``: in syrup (``drags``) or in air (``mass_inertia``, ``friction``)."""
+def rod_box(h0: float, th0: float, *, dt: float, drags: Optional[Numbers] = None,
+            mass_inertia: Optional[Numbers] = None, friction: float = 0.0, n_out: int = 1) -> Arrangement:
+    """The rod ``<0|0> -> <0|2 n_out>``: in syrup (``drags``) or in air (``mass_inertia``, ``friction``). ``drags``
+    and ``mass_inertia`` are each two numbers, for the height and the angle; one of them is given."""
     q0 = jnp.array([h0, th0], dtype=float)
     if drags is not None:
         P = configuration(diagonal(dt / jnp.asarray(drags, dtype=float)), init=q0)

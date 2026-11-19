@@ -67,7 +67,7 @@ state is the flat ``(u, v)``.
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Optional
 
 import jax.numpy as jnp
 from jax import Array
@@ -97,7 +97,7 @@ def log_population(scale: float, dt: float) -> ReactiveVectorSpace:
 # ---------------------------------------------------------------------------
 
 
-def goes_first(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg2:
+def goes_first(Q: ReactiveVectorSpace, init: Optional[Array] = None) -> CotCoalg2:
     """Two-stage coalgebra on ``(Q, sharp_Q)``: the full configuration step
     ``s + sharp_s(xi)`` in round 1, nothing in round 2."""
     s0 = jnp.zeros(Q.dim) if init is None else jnp.asarray(init, dtype=float)
@@ -115,7 +115,7 @@ def goes_first(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg2:
     )
 
 
-def goes_second(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalg2:
+def goes_second(Q: ReactiveVectorSpace, init: Optional[Array] = None) -> CotCoalg2:
     """Two-stage coalgebra on ``(Q, sharp_Q)``: nothing in round 1, the full
     configuration step in round 2, from the covector read at the other boxes' advanced
     positions."""

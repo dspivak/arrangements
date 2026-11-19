@@ -43,7 +43,7 @@ THE COMPOSITE is ``depot . parent(figurines) : I -> <E x R^{1 + B + 6B} | R^0>``
 
 from __future__ import annotations
 
-from typing import NamedTuple, Sequence, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -97,7 +97,7 @@ def bus_figurines(b: int) -> Tuple[int, int, int]:
 # ---------------------------------------------------------------------------
 
 
-def told_response(run, mu_g: float) -> ReactiveVectorSpace:
+def told_response(run: Callable[[Array], Array], mu_g: float) -> ReactiveVectorSpace:
     """``sharp(theta) = mu_g / g'(theta)^2`` on ``R``: the guess moves by ``mu_g`` times a push on it."""
     dg = jax.grad(run)
     return ReactiveVectorSpace(dim=1, sharp_fn=lambda th: jnp.reshape(mu_g / dg(th[0]) ** 2, (1, 1)))
@@ -142,7 +142,7 @@ def sighting_nll() -> Array:
     return jnp.asarray(N)
 
 
-def comparison_nll(e_b, e_other) -> Array:
+def comparison_nll(e_b: float | Array, e_other: float | Array) -> Array:
     """``-log`` likelihood of the other bus's mistake under bus ``b``'s three hypotheses."""
     own = e_other ** 2 / (2 * SIGMA ** 2)
     shared = (e_other - e_b) ** 2 / (2 * SIGMA ** 2)
@@ -240,7 +240,8 @@ def coordinated(arm: Arm, theta0: Sequence[float], priors: Sequence[Sequence[flo
 
 # The composite's state is ``((figurines' states, left-nested), q_parent), beliefs)``.
 
-def thetas(state, n: int) -> Array:
+def thetas(state: Any, n: int) -> Array:
+    """The ``n`` figurines' states, concatenated; ``state`` is the composite's nested-tuple pytree, so ``Any``."""
     figs = state[0][0]
     out = []
     for _ in range(n - 1):
@@ -250,7 +251,7 @@ def thetas(state, n: int) -> Array:
     return jnp.concatenate(out[::-1])
 
 
-def beliefs(state, B: int) -> Array:
+def beliefs(state: Any, B: int) -> Array:
     """The ``B`` beliefs, ``(B, 3)``, read off the depot's state."""
     s = state[1]
     ls = []
@@ -261,7 +262,7 @@ def beliefs(state, B: int) -> Array:
     return jnp.stack([belief_of(l) for l in ls[::-1]])
 
 
-def with_thetas(state, theta: Sequence[float], n: int):
+def with_thetas(state: Any, theta: Sequence[float], n: int) -> Any:
     """The same composite state with the figurines' states replaced (so one compiled composite runs every
     scenario of its arm): the figurines' states are left-nested, ``((th_0, th_1), th_2), ...``."""
     nested = jnp.array([theta[0]], float)
@@ -274,7 +275,9 @@ def guesses(theta: Array, n: int) -> Array:
     return jnp.stack([RUNS[kind(j)](theta[j]) for j in range(n)])
 
 
-def exterior(B: int, t_star: Sequence[float], flag: float = 1.0, sighting=None) -> Array:
+def exterior(
+    B: int, t_star: Sequence[float], flag: float = 1.0, sighting: Optional[Tuple[int, int]] = None,
+) -> Array:
     """The world's input ``(flag, t*_1..t*_B, sightings)``; ``sighting = (bus, o)`` sets one one-hot."""
     s = jnp.zeros((B, 6))
     if sighting is not None:
@@ -282,7 +285,7 @@ def exterior(B: int, t_star: Sequence[float], flag: float = 1.0, sighting=None) 
     return jnp.concatenate([jnp.array([flag]), jnp.asarray(t_star, float), s.reshape(-1)])
 
 
-def step_fn(arr: Arrangement):
+def step_fn(arr: Arrangement) -> Callable[[Any, Array], Tuple[Any, Array]]:
     """One step of ``Phi(arr)`` on the world's input with zero exterior covector (the form ``figurines.step_fn``
     uses)."""
     P, omega = arr.P, arr.omega
@@ -296,7 +299,7 @@ def step_fn(arr: Arrangement):
     return step
 
 
-def report_fn(built: Built):
+def report_fn(built: Built) -> Callable[[Any, Array], Array]:
     """The parent's exterior input the depot computes at a composite state, jitted: the report in the signal
     slots, read through the inner composite's sending map and the depot's backward map."""
     inner, box = built.inner, built.depot
@@ -308,7 +311,10 @@ def report_fn(built: Built):
     return jax.jit(report)
 
 
-def run_rounds(built: Built, arm: Arm, t_star: Sequence[float], rounds: int, sighting=None, state=None):
+def run_rounds(
+    built: Built, arm: Arm, t_star: Sequence[float], rounds: int,
+    sighting: Optional[Tuple[int, int]] = None, state: Any = None,
+) -> Tuple[Dict[str, np.ndarray], Any]:
     """Run ``rounds`` outcome steps; ``sighting = (bus, o)`` arrives every round if given. Returns arrays over
     steps ``0..R`` of the figurines' states, guesses, the beliefs, each bus's prediction and mistake, and the
     report sent on each step (the last is the report that would be sent next), and the final state."""

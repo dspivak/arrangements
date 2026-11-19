@@ -32,7 +32,7 @@ here do not enforce that mathematical domain.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, List, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 import jax.numpy as jnp
 from jax import Array
@@ -85,7 +85,7 @@ def _split_outputs(colors: Sequence[Color], m_out: Array, dim_H: int, dim_P: int
 
 
 def realize(a: AddressedArrangement, colors: Sequence[Color], q: Array, m_out: Array, H_ext: Sequence[Array],
-            p0: Array, upto: int):
+            p0: Array, upto: int) -> Tuple[List[Array], List[List[Array]], List[Array]]:
     """Run rounds ``1..upto``. ``H_ext[l - 1]`` is what the group's shown slots hear from outside at round ``l``.
     Returns, per round, the children's sends (concatenated, as ``a.sigma`` and ``a.rho`` read them); per child, its
     hearing at each round; and per child, its position."""
@@ -175,7 +175,7 @@ def strategy_sends(c: Color, out: Array, l: int, H: Array, dim_H: int, dim_P: in
 
 
 def leaf(c: Color, L: int, dim_H: int, dim_P: int, P: CotCoalg, emit: Callable[[Array], Array],
-         cost: Callable[[Array, Array], Array] = None, label: str = "") -> Arrangement:
+         cost: Optional[Callable[[Array, Array], Array]] = None, label: str = "") -> Arrangement:
     """A system ``I -> B^L_c``: ``emit(q) = [s1, theta]``; ``cost(q, e)``, ``e`` what it hears at every round and its
     position; forcing ``-dk``."""
     k = (lambda q, e: jnp.asarray(0.0)) if cost is None else cost

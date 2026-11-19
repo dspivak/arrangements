@@ -118,14 +118,14 @@ is the pair ``(q_stage, q_wire)`` with ``q_wire`` the wiring's ``R^0``
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import configuration
+from .coalgebra import ParameterRule, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
 from .rvect import constant
@@ -148,7 +148,7 @@ def stage(
     dt: float = 0.01,
     g: Optional[Callable[[Array], Array]] = None,
     label: str = "",
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The unilateral gain stage ``<R^0|R^0> -> <R^1|R^1>``, state ``(v, w)``.
 
@@ -185,7 +185,7 @@ def bilateral_stage(
     dt: float = 0.01,
     g: Optional[Callable[[Array], Array]] = None,
     label: str = "",
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The reciprocal control: same cost, state ``v`` alone, sharp ``[[dt]]``.
 
@@ -244,7 +244,7 @@ def black_amplifier(
     dt: float = 0.01,
     g: Optional[Callable[[Array], Array]] = None,
     unilateral: bool = True,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """``compose_seq(stage, feedback_wire(beta)) : <R^0|R^0> -> <R^1|R^1>``.
 
@@ -262,7 +262,7 @@ def black_amplifier(
     )
 
 
-def amp_state(v: float = 0.0, unilateral: bool = True):
+def amp_state(v: float = 0.0, unilateral: bool = True) -> Tuple[Array, Array]:
     """Initial state of the composite: ``((v, 0), ()) `` for the unilateral stage,
     ``((v,), ())`` for the control -- the stage's state paired with the wiring's
     trivial ``R^0`` state."""
@@ -275,7 +275,7 @@ def amp_state(v: float = 0.0, unilateral: bool = True):
 # ---------------------------------------------------------------------------
 
 
-def stepper(arr: Arrangement):
+def stepper(arr: Arrangement) -> Callable[[Any, Array, Array], Tuple[Array, Array, Any]]:
     """A jitted one-tick map ``(state, e_src, xi_N) -> (out_v, react, state')``.
 
     One application of the ``Phi(arr)`` coalgebra: the reported output, the
@@ -297,7 +297,8 @@ def stepper(arr: Arrangement):
 
 
 def settle(
-    one, state, e_src: float, steps: int, xi_N: Optional[Array] = None
+    one: Callable[[Any, Array, Array], Tuple[Array, Array, Any]], state: Any, e_src: float, steps: int,
+    xi_N: Optional[Array] = None,
 ) -> Tuple[Array, Array, Array]:
     """Iterate the one-tick map at fixed drive ``e_src``; return ``(v, react, state)``.
 

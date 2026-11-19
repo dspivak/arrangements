@@ -42,7 +42,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import configuration
+from .coalgebra import ParameterRule, configuration
 from .rvect import diagonal
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
@@ -96,7 +96,7 @@ def _incidences(
 
 
 def kuramoto_oscillator(
-    omega: float, degree: int, sharp_scale: float = 1.0, parameter=configuration
+    omega: float, degree: int, sharp_scale: float = 1.0, parameter: ParameterRule = configuration
 ) -> Arrangement:
     """The oscillator box ``Osc_i : <R^0|R^0> -> <R^0 | R^{deg}>``.
 
@@ -207,7 +207,7 @@ def kuramoto_arrangement(
     edges: Sequence[Tuple[int, int]],
     coupling: float,
     sharp_scale: float = 1.0,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The closed Kuramoto arrangement, by genuine composition in ``arr``:
 

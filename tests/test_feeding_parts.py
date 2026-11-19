@@ -97,11 +97,15 @@ def test_dragger_field_and_drag():
     w, dt = 0.5, 0.002
     for kappa in (40.0, 160.0):
         part = fp.send(fp.dragger(beta), {0: kappa})
+
+        @jax.jit
+        def advance(s, x):
+            xi_q, _, xi_x = part.omega(part.P.position(s), EMPTY, x)
+            return part.P.step_over(s, xi_q, dt), xi_x
+
         s = part.P.init
         for i in range(4000):
-            x = jnp.array([w * i * dt])
-            xi_q, _, xi_x = part.omega(part.P.position(s), EMPTY, x)
-            s = part.P.step_over(s, xi_q, dt)
+            s, xi_x = advance(s, jnp.array([w * i * dt]))
         np.testing.assert_allclose(xi_x, [-beta * w], rtol=1e-3)
 
 

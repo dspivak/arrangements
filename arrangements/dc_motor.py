@@ -151,7 +151,7 @@ import numpy as np
 from jax import Array
 
 from .arrangement import Arrangement, exact
-from .coalgebra import configuration
+from .coalgebra import ParameterRule, configuration
 from .rvect import constant, trivial
 from .wiring import compose_seq, tensor_arrangements
 
@@ -171,7 +171,7 @@ def motor_monolithic(
     tau: float = 0.0,
     dt: float = 0.01,
     naive_sources: bool = False,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The DC motor as ONE closed box ``<R^0|R^0> -> <R^0|R^0>``.
 
@@ -222,7 +222,7 @@ def motor_monolithic(
 
 
 def electrical_cell(
-    R: float, L: float, V: float = 0.0, dt: float = 0.01, parameter=configuration
+    R: float, L: float, V: float = 0.0, dt: float = 0.01, parameter: ParameterRule = configuration
 ) -> Arrangement:
     """The electrical (armature) cell ``<R^0|R^0> -> <R^1_out | R^0_in>``.
 
@@ -260,7 +260,7 @@ def mechanical_cell(
     dt: float = 0.01,
     locked: bool = False,
     sharp_sign: float = -1.0,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The mechanical (rotor) cell ``<R^0|R^0> -> <R^1_out | R^0_in>``.
 
@@ -342,7 +342,7 @@ def dc_motor(
     tau: float = 0.0,
     dt: float = 0.01,
     locked_rotor: bool = False,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The DC motor by genuine composition in ``arr`` (def.imc):
 
@@ -376,7 +376,7 @@ _SHARP_S = jnp.array([[0.0, 1.0], [-1.0, 0.0]])
 
 def tstar_cell(
     a: float, bq: float, d: float, report: str, dt: float = 0.01, label: str = "",
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """A ``T^*R`` box of the quoted sentence: ``<R^0|R^0> -> <R^1_out | R^0_in>``.
 
@@ -436,7 +436,7 @@ def sentence_pair(
     coeffs_m: Tuple[float, float, float],
     c: float,
     dt: float = 0.01,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The quoted sentence's encoding, verbatim, by genuine composition:
 
@@ -497,7 +497,7 @@ def bateman_coefficients(
 
 def bateman_motor(
     R: float, L: float, K: float, J: float, b: float, dt: float = 0.01,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Tuple[Arrangement, Callable[[Array], Array], Callable[[Array], Array]]:
     """The Bateman salvage of the sentence encoding: ``(arrangement, embed, project)``.
 
@@ -533,7 +533,7 @@ def bateman_motor(
 
 
 def electrical_flow_cell(
-    R: float, L: float, V: float = 0.0, dt: float = 0.01, parameter=configuration
+    R: float, L: float, V: float = 0.0, dt: float = 0.01, parameter: ParameterRule = configuration
 ) -> Arrangement:
     """State ``i`` (the current), sharp ``+dt/L``, cost ``(R/2) i^2 - V i``
     (forcing its negative differential), reporting ``i``."""
@@ -555,7 +555,7 @@ def electrical_flow_cell(
 
 
 def mechanical_flow_cell(
-    b: float, J: float, tau: float = 0.0, dt: float = 0.01, parameter=configuration
+    b: float, J: float, tau: float = 0.0, dt: float = 0.01, parameter: ParameterRule = configuration
 ) -> Arrangement:
     """State ``omega`` (the angular velocity), oppositely-signed sharp
     ``-dt/J``, NEGATED cost ``-((b/2) omega^2 + tau*omega)`` (the
@@ -587,7 +587,7 @@ def dc_motor_flow(
     V: float = 0.0,
     tau: float = 0.0,
     dt: float = 0.01,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """``compose_seq( electrical_flow_cell (x) mechanical_flow_cell, gyrator )``:
     one ``Phi`` tick is exactly the Euler step

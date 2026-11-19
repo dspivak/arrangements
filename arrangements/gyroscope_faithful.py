@@ -32,7 +32,7 @@ is checked against ``rk4_gyro`` in tests/test_rk4_gyro.py.
 
 from __future__ import annotations
 
-from typing import Dict, Sequence
+from typing import Dict, List, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -40,6 +40,7 @@ import numpy as np
 from jax import Array
 
 from .arrangement import Arrangement
+from .coalgebra import ParameterRule
 from .gyroscope import (
     GyroConfig,
     adam_init,
@@ -50,7 +51,7 @@ from .gyroscope import (
     rod_gravity,
 )
 from .interpretation import trivial_omega
-from .pcK import PhiK
+from .pcK import PCMorphismK, PhiK
 from .rk4 import rk4_gyro
 from .rvect import diagonal
 from .wiring import compose_graph
@@ -79,7 +80,8 @@ def make_hex_config(
 
 
 def faithful_arrangement(
-    cfg: GyroConfig, m, kappa, g_grav, L: float = ROD_LENGTH, parameter=rk4_gyro,
+    cfg: GyroConfig, m: float, kappa: float, g_grav: float, L: float = ROD_LENGTH,
+    parameter: ParameterRule = rk4_gyro,
 ) -> Arrangement:
     """The open-port gyro classifier built ON ``compose_graph``.
 
@@ -123,7 +125,7 @@ def faithful_arrangement(
     )
 
 
-def faithful_coalgebra(cfg: GyroConfig, p: Dict[str, Array], h: float = 0.1, L: float = ROD_LENGTH):
+def faithful_coalgebra(cfg: GyroConfig, p: Dict[str, Array], h: float = 0.1, L: float = ROD_LENGTH) -> PCMorphismK:
     """``PhiK`` of the faithful arrangement with the ``rk4_gyro`` parameter (RK4 phase,
     drag + per-gyro precession)."""
     arr = faithful_arrangement(
@@ -202,12 +204,13 @@ def output_readout(p: Dict[str, Array], drive_seq: Array, cfg: GyroConfig, h: fl
     return _rollout_readout(O, forces, cfg, jnp.exp(-p["log_m"]))
 
 
-def make_strokes(n: int, T: int = 16, n_classes: int = 4, seed: int = 0):
+def make_strokes(n: int, T: int = 16, n_classes: int = 4, seed: int = 0) -> Tuple[Array, Array]:
     """Synthetic 2-channel stroke series (generator-as-spec, reproducible from ``seed``).
 
     Class ``c`` is the documented signature: a ``(sin, cos)`` curve of frequency ``1 + c``
     and phase ``c*pi/n_classes`` over ``T`` steps, plus smooth Gaussian noise. No download,
     no provenance question -- an auditor regenerates the exact dataset from ``(seed, spec)``.
+    Returns the series, shape ``(n, T, 2)``, and the class labels, shape ``(n,)``.
     """
     rng = np.random.default_rng(seed)
     y = rng.integers(0, n_classes, n)
@@ -226,22 +229,27 @@ def make_strokes(n: int, T: int = 16, n_classes: int = 4, seed: int = 0):
 # ---------------------------------------------------------------------------
 
 
-def batch_loss(p, xs, ys, cfg, h: float = 0.1, weight_decay: float = 1e-4):
+def batch_loss(p: Dict[str, Array], xs: Array, ys: Array, cfg: GyroConfig, h: float = 0.1,
+               weight_decay: float = 1e-4) -> Array:
+    """Mean cross-entropy of the batch ``xs`` (shape ``(batch, T, 2)``) against the labels ``ys``, plus weight decay."""
     logits = jax.vmap(lambda x: classify(p, x, cfg, h))(xs)
     ce = jnp.mean(jax.vmap(cross_entropy)(logits, ys))
     l2 = sum(jnp.sum(p[k] ** 2) for k in ("W_enc", "W_dec"))
     return ce + weight_decay * l2
 
 
-def accuracy(p, xs, ys, cfg, h: float = 0.1) -> float:
+def accuracy(p: Dict[str, Array], xs: Array, ys: Array, cfg: GyroConfig, h: float = 0.1) -> float:
+    """Fraction of the series ``xs`` (shape ``(n, T, 2)``) classified as their labels ``ys``."""
     logits = jax.vmap(lambda x: classify(p, x, cfg, h))(xs)
     return float(jnp.mean(jnp.argmax(logits, axis=1) == ys))
 
 
-def train(cfg, Xtr, Ytr, *, epochs: int = 10, batch: int = 64, lr: float = 3e-3, h: float = 0.1,
-          seed: int = 0, freeze: Sequence[str] = (), verbose: bool = False):
+def train(cfg: GyroConfig, Xtr: Array, Ytr: Array, *, epochs: int = 10, batch: int = 64, lr: float = 3e-3,
+          h: float = 0.1, seed: int = 0, freeze: Sequence[str] = (),
+          verbose: bool = False) -> Tuple[Dict[str, Array], List[float]]:
     """Minibatch Adam; ``freeze`` zeroes the gradient of the named params (for ablations,
-    e.g. ``freeze=("log_kappa",)`` with tiny initial stiffness keeps the springs off)."""
+    e.g. ``freeze=("log_kappa",)`` with tiny initial stiffness keeps the springs off). ``Xtr`` has shape
+    ``(n, T, 2)``, ``Ytr`` shape ``(n,)``; returns the parameters and the mean loss per epoch."""
     p = init_params(cfg, seed=seed)
     freeze = set(freeze)
     m, v = adam_init(p)

@@ -31,14 +31,14 @@ the target is a deterministic function of the input and the fit is clean.
 
 from __future__ import annotations
 
-from typing import Callable, List, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
 from .arrangement import Arrangement, exact
-from .coalgebra import configuration, phase
+from .coalgebra import ParameterRule, configuration, phase
 from .functors import Phi
 from .interpretation import trivial_omega
 from .learning import parameterized_map, train
@@ -56,7 +56,7 @@ _TRIV = lambda _o: (jnp.zeros(0), jnp.zeros(0))
 
 def oscillator(
     potential: Callable[[Array], Array], dim: int, m: float = 1.0, label: str = "oscillator",
-    parameter=phase,
+    parameter: ParameterRule = phase,
 ) -> Arrangement:
     """A closed autonomous oscillator: base ``Q = R^dim`` (position), sharp
     ``(1/m) I``, on-site potential (a cost) ``U(q)``, forcing ``omega = -dU``.
@@ -163,7 +163,7 @@ def identify(
     eta: float = 6e-3,
     steps: int = 8000,
     seed: int = 0,
-):
+) -> Tuple[Array, Callable[[Array, Array], Array], List[float], PCMorphism, int, float]:
     """Train a net to predict the one-step map of the oscillator ``system``.
 
     Returns ``(params, F, history, O, dim, m)``: the trained weights, the net,
@@ -289,7 +289,7 @@ def wired_identification(
     hidden: int = 32,
     eta: float = 1.5e-4,
     seed: int = 0,
-    init: Array = None,
+    init: Optional[Array] = None,
 ) -> Arrangement:
     """The closed arrangement: a pendulum per start ``(q0, p0)``, two delays each, one parameter box
     for the net's weights (response ``eta``; initial weights ``init``, else drawn from ``seed``), a copy of the net per pendulum predicting the pendulum's
@@ -335,11 +335,11 @@ def wired_identification(
     return compose_seq(compose_seq(compose_seq(parts, route), nets), losses)
 
 
-def wired_weights(arr: Arrangement, state, K: int) -> Array:
+def wired_weights(arr: Arrangement, state: Any, K: int) -> Array:
     """The weights held in the wired arrangement's state."""
     return arr.P.position(state)[5 * K:]
 
 
-def wired_presented(arr: Arrangement, state, K: int) -> Array:
+def wired_presented(arr: Arrangement, state: Any, K: int) -> Array:
     """Each pendulum's presented position."""
     return arr.P.position(state)[:5 * K].reshape(K, 5)[:, 0]

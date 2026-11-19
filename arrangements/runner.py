@@ -81,8 +81,11 @@ WHAT THE DESCRIPTION IS: the compiled flags and layout, not the raw term. The tr
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import List, Sequence
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
+from .arrangement import Arrangement
+
+Scalar = Union[int, float, Fraction]   # the runner is generic over its number type: exact (Fraction) or float
 # ---------------------------------------------------------------------------
 # Nets: closed terms over the kit, as netlists.
 # ---------------------------------------------------------------------------
@@ -92,9 +95,10 @@ BOX_KINDS = ("add", "mul", "exp", "recip")
 UNARY_KINDS = ("exp", "recip")
 
 
-def leaf_width(nd) -> int:
+def leaf_width(nd: Tuple[Any, ...]) -> int:
     """How many wires a leaf presents: a market one per value, a relay three (value, stored
-    covector, ear), every other leaf one."""
+    covector, ear), every other leaf one. ``nd`` is a leaf node of a net: a tuple, its kind first and its
+    data after (strings, numbers, lists), hence ``Any``."""
     if nd[0] == "market":
         return len(nd[1])
     if nd[0] in ("relay", "tape"):
@@ -294,7 +298,7 @@ def present(net: Net, state: dict) -> list:
     return [val[w] for w in net.outputs]
 
 
-def port_covectors(net: Net, state: dict, inputs: Sequence = None) -> list:
+def port_covectors(net: Net, state: dict, inputs: Optional[Sequence] = None) -> list:
     """What the net publishes on its ports this step: each inbox's stored covector `r`, plus, given the
     values `inputs` arriving at the ports this step, what each `pcost` returns on its port."""
     out = [state[w][1] for w in net.inboxes()]
@@ -373,8 +377,9 @@ def ref_step(net: Net, state: dict, inputs: Sequence = (), pushes: Sequence = ()
     return new
 
 
-def to_term(net: Net):
-    """The net as a term: nested tuples over the kit with 'seq' and 'tensor'.
+def to_term(net: Net) -> Tuple[Any, ...]:
+    """The net as a term: nested tuples over the kit with 'seq' and 'tensor' (their entries are strings, ints,
+    lists and further tuples, hence ``Any``).
 
     A net with inboxes carries their k input wires down through every layer ('inwire', k);
     its outputs are presented at the end.
@@ -570,8 +575,9 @@ def _kit():
                 portsplit=portsplit)
 
 
-def denote(term):
-    """The arrangement a term denotes: one clause per kit part, one for 'seq', one for 'tensor'."""
+def denote(term: Tuple[Any, ...]) -> Arrangement:
+    """The arrangement a term denotes: one clause per kit part, one for 'seq', one for 'tensor'. ``term`` is
+    as ``to_term`` returns it."""
     from .wiring import compose_seq, tensor_arrangements
 
     kit = _kit()
@@ -588,8 +594,9 @@ def denote(term):
     return go(term)
 
 
-def flat_state(state) -> list:
-    """A library state (nested pairs of arrays) as a flat list: the leaves' states in order."""
+def flat_state(state: Any) -> list:
+    """A library state (nested pairs of arrays) as a flat list: the leaves' states in order. ``state`` is a
+    pytree of arrays, hence ``Any``."""
     import numpy as np
 
     out = []
@@ -605,7 +612,9 @@ def flat_state(state) -> list:
     return out
 
 
-def library_run(net: Net, steps: int, inputs=None, pushes=None, covectors: bool = False):
+def library_run(net: Net, steps: int, inputs: Optional[Sequence[Sequence[float]]] = None,
+                pushes: Optional[Sequence[Sequence[float]]] = None,
+                covectors: bool = False) -> Union[List[list], Tuple[List[list], List[list]]]:
     """Run the net through the library (`denote`, `Phi`); the flat state after each step.
 
     `inputs[t]` are the values at the net's ports and `pushes[t]` the covectors at its outputs on
@@ -641,7 +650,7 @@ def _inbox_r_positions(net: Net) -> list:
     return where
 
 
-def leaf_cells(nd) -> int:
+def leaf_cells(nd: Tuple[Any, ...]) -> int:
     """How many cells of state a leaf holds."""
     if nd[0] == "const":
         return 0
@@ -687,7 +696,7 @@ def library_run_jit(net: Net, steps: int, check: int = 2, every: int = 1) -> Lis
     return out
 
 
-def couple(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int]):
+def couple(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int]) -> Arrangement:
     """Two nets with ports, wired to each other: b's i-th inbox hears a's output a_to_b[i], and
     a's i-th inbox hears b's output b_to_a[i]. Returns the closed library arrangement."""
     import jax.numpy as jnp
@@ -704,7 +713,7 @@ def couple(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int])
     return compose_seq(tensor_arrangements([A, B]), W)
 
 
-def arrangement_run_jit(A, steps: int, check: int = 2, every: int = 1) -> List[list]:
+def arrangement_run_jit(A: Arrangement, steps: int, check: int = 2, every: int = 1) -> List[list]:
     """Run a closed library arrangement with its step compiled, as `library_run_jit` does for a net."""
     import jax
     import jax.numpy as jnp
@@ -730,7 +739,8 @@ def arrangement_run_jit(A, steps: int, check: int = 2, every: int = 1) -> List[l
     return out
 
 
-def couple_by_hand(net_a: Net, net_b: Net, a_to_b, b_to_a, sa: dict, sb: dict):
+def couple_by_hand(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int], sa: dict,
+                   sb: dict) -> Tuple[dict, dict]:
     """One step of the two coupled nets, by hand: each presents, and publishes on its ports the
     covectors its inboxes stored; then each steps on what it hears, values at its inboxes and
     covectors at its outputs."""
@@ -746,7 +756,7 @@ def couple_by_hand(net_a: Net, net_b: Net, a_to_b, b_to_a, sa: dict, sb: dict):
             ref_step(net_b, sb, [oa[i] for i in a_to_b], pb))
 
 
-def couple_net(net_a: Net, net_b: Net, a_to_b, b_to_a) -> Net:
+def couple_net(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int]) -> Net:
     """The two coupled nets as one net wired by hand: b's nodes after a's, and each inbox made a
     relay listening to the output wire it was coupled to (`Net.hear`). Closed: no ports, no outputs.
     An inbox's node is left in place as the constant 0, so every other index is unchanged."""
@@ -882,7 +892,7 @@ class Program:
         return state
 
 
-def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) -> Program:
+def compile_net(net: Net, zero: Scalar = 0, one: Scalar = 1, cells: Optional[int] = None, length: Optional[int] = None) -> Program:
     """Translate a net into the runner's instructions. `zero`, `one` fix the number type.
 
     `cells` and `length` fit the translation to a runner whose data drum has `cells` cells and
@@ -1134,7 +1144,8 @@ def compile_net(net: Net, zero=0, one=1, cells: int = None, length: int = None) 
 # ---------------------------------------------------------------------------
 
 
-def machine_net(flags, data, a0=0, minus_one=-1) -> Net:
+def machine_net(flags: Sequence[Sequence[Scalar]], data: Sequence[Scalar], a0: Scalar = 0,
+                minus_one: Scalar = -1) -> Net:
     """The runner as a net. With four flag drums it is P34's: five drums, one register, one
     constant, twelve boxes, two pushes. With six (exp and reciprocal added), two more terms move
     the accumulator, each gated so that a flag of 0 computes `exp(0)` and `1/1` and adds nothing:
@@ -1173,7 +1184,7 @@ def machine_net(flags, data, a0=0, minus_one=-1) -> Net:
     return m
 
 
-def machine_run(prog: Program, data: list, a, passes: int = 1):
+def machine_run(prog: Program, data: List[Scalar], a: Scalar, passes: int = 1) -> Scalar:
     """`passes` passes of the flag drums over `data` (changed in place); returns the accumulator.
 
     Steps whose flags are all zero only rotate the drums and are skipped; the arithmetic of a
@@ -1205,7 +1216,7 @@ def machine_run(prog: Program, data: list, a, passes: int = 1):
 # ---------------------------------------------------------------------------
 
 
-def two_tanks(v1=3, v2=1, kappa=Fraction(1, 20)) -> Net:
+def two_tanks(v1: Scalar = 3, v2: Scalar = 1, kappa: Scalar = Fraction(1, 20)) -> Net:
     """Two registers joined by the cost (kappa/2)(v1 - v2)^2: two tanks and a pipe, in the units
     where a tank's response is one. Closed form: v1, v2 = 2 +- (1 - 2 kappa)^k from 3, 1."""
     n = Net()
@@ -1216,7 +1227,7 @@ def two_tanks(v1=3, v2=1, kappa=Fraction(1, 20)) -> Net:
     return n
 
 
-def turner(x0=1, y0=0, eps=Fraction(1, 8)) -> Net:
+def turner(x0: Scalar = 1, y0: Scalar = 0, eps: Scalar = Fraction(1, 8)) -> Net:
     """x' = x + eps y, y' = y - eps x: two pushes, a forcing with no potential."""
     n = Net()
     x, y = n.register(x0), n.register(y0)
@@ -1226,7 +1237,7 @@ def turner(x0=1, y0=0, eps=Fraction(1, 8)) -> Net:
     return n
 
 
-def crossed(x0=1, y0=2) -> Net:
+def crossed(x0: Scalar = 1, y0: Scalar = 2) -> Net:
     """x' = x + y, y' = y + x, each pushed by the other's state itself."""
     n = Net()
     x, y = n.register(x0), n.register(y0)
@@ -1240,7 +1251,7 @@ def crossed(x0=1, y0=2) -> Net:
 # ---------------------------------------------------------------------------
 
 
-def port_runner_net(cells: int, length: int, zero=0, minus_one=-1) -> Net:
+def port_runner_net(cells: int, length: int, zero: Scalar = 0, minus_one: Scalar = -1) -> Net:
     """The runner with an outer port. It hears seven values a step: a load gate, a run gate, four
     flags and a number. While the load gate is 1 the front cell of each of its drums becomes
     what arrived; while the run gate is 1 it runs what its drums hold; it always presents the
@@ -1267,7 +1278,8 @@ def port_runner_net(cells: int, length: int, zero=0, minus_one=-1) -> Net:
     return m
 
 
-def asker_net(prog: Program, passes: int, addresses: Sequence[int], zero=0, one=1, minus_one=-1):
+def asker_net(prog: Program, passes: int, addresses: Sequence[int], zero: Scalar = 0, one: Scalar = 1,
+              minus_one: Scalar = -1) -> Tuple[Net, int, List[int]]:
     """A part that sends `prog` to a port runner, has it run `passes` passes, and keeps the answer.
 
     It is seven drums it sends from (load gate, run gate, four flags, the numbers), one inbox for

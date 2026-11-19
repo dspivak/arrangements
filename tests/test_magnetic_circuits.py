@@ -9,7 +9,7 @@ import time
 import jax
 import numpy as np
 import pytest
-from magnetic_checks import checked_jit, outside_smoothing_discs
+from tests.magnetic_checks import checked_jit, outside_smoothing_discs
 
 pytestmark = pytest.mark.usefixtures("outside_smoothing_discs")
 from arrangements import magnetic_circuits as C, smooth as sm

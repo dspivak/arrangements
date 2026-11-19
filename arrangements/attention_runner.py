@@ -16,10 +16,13 @@ notes/runs/p34-attention-1eda4400/DESIGN.md, §§3–5.
 """
 from __future__ import annotations
 
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
+
 import jax
 import jax.numpy as jnp
+from jax import Array
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .attention import attention_arrangement, transfer, zero_transfer
 from .coalgebra import CotCoalg, configuration
 from .rvect import ReactiveVectorSpace
@@ -60,7 +63,9 @@ def _parent(width, matrix, parameter, gain, label):
     ).arr()
 
 
-def linear_attention(matrix, *, parameter=None, gain=None, label="attention-linear"):
+def linear_attention(matrix: Numbers, *, parameter: Optional[CotCoalg] = None,
+                     gain: Optional[Callable[[Array], Array]] = None,
+                     label: str = "attention-linear") -> Arrangement:
     """A scalar-vector linear map through a genuine unary attention operation.
 
     ``matrix`` has shape (outputs, inputs); one message retains each scalar in
@@ -81,7 +86,8 @@ def linear_attention(matrix, *, parameter=None, gain=None, label="attention-line
     return compose_seq(compose_seq(_encode(n, width), parent), _decode(k, width))
 
 
-def bregman_gain(sender, receiver, potential, temperature=1.0):
+def bregman_gain(sender: Numbers, receiver: Numbers, potential: Callable[[Array], Array],
+                 temperature: float = 1.0) -> Array:
     """exp(-D_potential(sender, receiver)/temperature), with ordered arguments.
 
     The caller supplies a differentiable convex scalar potential on a convex
@@ -97,7 +103,7 @@ def bregman_gain(sender, receiver, potential, temperature=1.0):
     return jnp.exp(-divergence / temperature)
 
 
-def unit_source():
+def unit_source() -> Arrangement:
     """Addition 1: a state-free source of the scalar message (1,1)."""
     return _static(0, 2, lambda q, m: jnp.ones(2), "unit-source", in_N=2)
 
@@ -108,17 +114,17 @@ def _emit(parameter, coefficient, label):
     return compose_seq(compose_seq(unit_source(), parent), _decode(1, 1))
 
 
-def const(value):
+def const(value: float) -> Arrangement:
     return _emit(trivial_parameter(), lambda q: jnp.array(float(value)), "attention-const")
 
 
-def register(initial):
+def register(initial: float) -> Arrangement:
     matter = configuration(ReactiveVectorSpace(1, sharp_fn=lambda q: jnp.eye(1)),
                            init=jnp.array([float(initial)]))
     return _emit(matter, lambda q: q[0], "attention-register")
 
 
-def drum(initial):
+def drum(initial: Numbers) -> Arrangement:
     initial = jnp.asarray(initial, dtype=float)
     if initial.ndim != 1 or initial.size == 0:
         raise ValueError("a drum needs a nonempty one-dimensional cell array")
@@ -128,11 +134,11 @@ def drum(initial):
     return _emit(matter, lambda q: q[0], "attention-drum")
 
 
-def add():
+def add() -> Arrangement:
     return linear_attention([[1.0, 1.0]], label="attention-add")
 
 
-def fan(n, indices):
+def fan(n: int, indices: Sequence[int]) -> Arrangement:
     if n < 0 or any(i < 0 or i >= n for i in indices):
         raise ValueError("fan indices must name an input")
     matrix = jnp.zeros((len(indices), n))
@@ -141,30 +147,31 @@ def fan(n, indices):
     return linear_attention(matrix, label=f"attention-fan[{n}:{tuple(indices)}]")
 
 
-def mul():
+def mul() -> Arrangement:
     """Addition 2: static multiplication, including its ordinary pullback."""
     return _static(2, 1, lambda q, m: m[:1]*m[1:], "multiply")
 
 
-def push():
+def push() -> Arrangement:
     """Addition 3: d dr; force on the donor d is zero."""
     return _static(2, 0, lambda q, m: jnp.zeros(0), "one-way-push",
                    omega=lambda q, m, e: (jnp.zeros_like(q),
                                            jnp.array([0.0, m[0]]), jnp.zeros_like(e)))
 
 
-def cost():
+def cost() -> Arrangement:
     # The input v is routed beside the constant -1, then push(-1,v) gives -dv.
     return compose_seq(tensor_arrangements([const(-1), fan(1, [0])]), push())
 
 
-def kit():
+def kit() -> Dict[str, Callable[..., Arrangement]]:
     return dict(const=const, register=register, drum=drum, add=add,
                 mul=mul, cost=cost, push=push, fan=fan)
 
 
-def denote(term):
+def denote(term: Tuple[Any, ...]) -> Arrangement:
     """Interpret the original eight-part syntax with the constructed kit.
+    A term is a nested tuple ``(head, *args)`` with ``head`` a string, so its arguments are ``Any``.
 
     Compilation is external, as in P34(d). Unknown extensions (e.g. exp,
     reciprocal, inbox) fail instead of silently using the old kit.

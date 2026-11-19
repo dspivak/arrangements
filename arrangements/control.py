@@ -48,7 +48,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import configuration
+from .coalgebra import ParameterRule, configuration
 from .interpretation import trivial_omega
 from .pc import PCMorphism
 from .rvect import ReactiveVectorSpace
@@ -60,7 +60,7 @@ from .wiring import compose_seq, parallel_arrangements, trivial_parameter
 # ---------------------------------------------------------------------------
 
 
-def plant_box(Q: ReactiveVectorSpace, parameter=configuration) -> Arrangement:
+def plant_box(Q: ReactiveVectorSpace, parameter: ParameterRule = configuration) -> Arrangement:
     """The plant ``Part_plant : <R^0|R^0> -> <R^d|R^0>``, ``d = Q.dim``.
 
     Parameter the coalgebra ``parameter(Q)`` on the given reactive vector space
@@ -144,7 +144,7 @@ def impedance_wire(d: int = 1) -> Arrangement:
 
 
 def impedance_arrangement(
-    Q: ReactiveVectorSpace, k: float, parameter=configuration
+    Q: ReactiveVectorSpace, k: float, parameter: ParameterRule = configuration
 ) -> Arrangement:
     """``wire(Part_plant, Part_ctrl) : <R^0|R^0> -> <R^d|R^d>`` by genuine composition.
 
@@ -171,7 +171,7 @@ def impedance_arrangement(
 # ---------------------------------------------------------------------------
 
 
-def impedance_state(s_plant: Any):
+def impedance_state(s_plant: Any) -> Tuple[Tuple[Any, Array], Array]:
     """The composite's state from the plant coalgebra's state.
 
     The parameter is ``(P_plant (x) P_ctrl) (x) P_wire`` with the controller's
@@ -183,7 +183,7 @@ def impedance_state(s_plant: Any):
     return ((s_plant, z), z)
 
 
-def impedance_flat(state: Any):
+def impedance_flat(state: Any) -> Any:
     """Inverse of ``impedance_state``: the plant coalgebra's own state."""
     ((s_plant, _), _) = state
     return s_plant

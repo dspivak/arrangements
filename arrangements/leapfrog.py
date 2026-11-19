@@ -25,13 +25,15 @@ lax monoidal is open (pc2.py).
 
 from __future__ import annotations
 
-import jax.numpy as jnp
+from typing import Optional, Tuple
 
+import jax.numpy as jnp
+from jax import Array
 from .coalgebra import CotCoalg2
 from .rvect import ReactiveVectorSpace
 
 
-def leapfrog(Q: ReactiveVectorSpace, init=None, dt: float = 1.0) -> CotCoalg2:
+def leapfrog(Q: ReactiveVectorSpace, init: Optional[Tuple[Array, Array]] = None, dt: float = 1.0) -> CotCoalg2:
     """The leapfrog (velocity Verlet) two-stage coalgebra on ``(Q, sharp_Q)``,
     ``Store∘S ⇒ cot^{◁2}``; state ``(q, xi)``. Over a duration ``tau`` each round holds its push
     for it: half-kicks of ``tau/2``, a drift of ``tau`` (book P9.5); ``dt`` is the unit step's length."""

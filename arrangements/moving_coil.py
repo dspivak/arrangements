@@ -21,10 +21,13 @@ Claude Fable 5.2, session 2524b69e, 2026-11-10.
 
 from __future__ import annotations
 
+from typing import Callable
+
 import jax
 import jax.numpy as jnp
+from jax import Array
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .light_tank import lift
 from .wiring import compose_seq, tensor_arrangements
 
@@ -47,29 +50,29 @@ def cart(m: float, x0: float, p0: float, rule: str, tau: float, K: int = 1) -> A
                        out_f=lambda q, m_: q, in_f=lambda q, m_, n: _z, omega=zero_form, label=f"cart({m:g})")
 
 
-def mutual(M0: float):
+def mutual(M0: float) -> Callable[[Array], Array]:
     """The chosen profile of the mutual inductance against the separation ``x``."""
     return lambda x: M0 / (1.0 + x * x) ** 1.5
 
 
-def inductance(L1: float, L2: float, M0: float):
+def inductance(L1: float, L2: float, M0: float) -> Callable[[Array], Array]:
     """``x -> [[L1, M(x)], [M(x), L2]]``."""
     M = mutual(M0)
     return lambda x: jnp.array([[L1, M(x)], [M(x), L2]])
 
 
-def field_energy(L1: float, L2: float, M0: float):
+def field_energy(L1: float, L2: float, M0: float) -> Callable[[Array, Array], Array]:
     """``(lam, x) -> lam^T L(x)^{-1} lam / 2``, the energy of the two coils' shared field."""
     Lx = inductance(L1, L2, M0)
     return lambda lam, x: 0.5 * lam @ jnp.linalg.solve(Lx(x), lam)
 
 
-def coils_at(L1: float, L2: float, M0: float, lam0, rule: str, tau: float, K: int = 1) -> Arrangement:
+def coils_at(L1: float, L2: float, M0: float, lam0: Numbers, rule: str, tau: float, K: int = 1) -> Arrangement:
     """Two coils and their shared field, as the book's Ch 6 ``ex.moving_coil`` draws them: state ``(lam1, lam2)``, the flux through
     each. The first coil has both ends on the ground, so its flux never changes; the second runs from a capacitor to the ground
     and rides a cart. It hears ``(q, x)``, the capacitor's voltage and the cart's position. Inclination on its state: ``(0, q)``.
     Pushback: ``-i2`` on the voltage, ``i = L(x)^{-1} lam``, and the force ``-dH/dx`` on the position. With ``M0 = 0`` it is two
-    separate coils and returns no force."""
+    separate coils and returns no force. ``lam0``: the two starting fluxes."""
     H = field_energy(L1, L2, M0)
     dH = jax.grad(H, argnums=(0, 1))
 
@@ -83,10 +86,11 @@ def coils_at(L1: float, L2: float, M0: float, lam0, rule: str, tau: float, K: in
                        label=f"coils_at(L={L1:g},{L2:g};M0={M0:g})")
 
 
-def magnet_past_coil(L1=1.0, L2=1.0, M0=0.5, C=1.0, m=1.0, x0=-6.0, p0=1.5, i0=(1.0, 0.0), s0=0.0,
-                     rule="rk4", tau=0.05, K=1) -> Arrangement:
+def magnet_past_coil(L1: float = 1.0, L2: float = 1.0, M0: float = 0.5, C: float = 1.0, m: float = 1.0,
+                     x0: float = -6.0, p0: float = 1.5, i0: Numbers = (1.0, 0.0), s0: float = 0.0,
+                     rule: str = "rk4", tau: float = 0.05, K: int = 1) -> Arrangement:
     """The closed system of Ch 6 ``ex.moving_coil``: a capacitor and a cart, and over them the two coils. It starts with the
-    currents ``i0`` at separation ``x0``."""
+    currents ``i0`` (two numbers) at separation ``x0``."""
     lam0 = inductance(L1, L2, M0)(x0) @ jnp.asarray(i0, float)
     boxes = tensor_arrangements([tank(C, s0, rule, tau, K), cart(m, x0, p0, rule, tau, K)])
     return compose_seq(boxes, coils_at(L1, L2, M0, lam0, rule, tau, K))

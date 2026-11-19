@@ -70,7 +70,7 @@
   function snapshot(f){
     const nodes=[], wires=[];
     function node(id,parent,label,kind,description,extra={}){
-      nodes.push({id,parent,label,kind,description,renderer:id,...extra});
+      nodes.push({id,parent,label,kind,description,...(MembraneChannels.renderers[id]?{renderer:id}:{}),...extra});
     }
     function wire(source,target,label,value,load,spec){
       wires.push({id:source+'--'+target+'--'+label,source,target,sourcePort:label,
@@ -89,7 +89,8 @@
     for(const [i,x] of ['m','h','n'].entries()){
       node('gate-'+x,i===2?'k-channel':'na-channel','Gate '+x,'box',
         ['Sodium activation.','Sodium availability.','Potassium activation.'][i]+' Its local ODE is d'+x+'/dt = α(V)(1 − '+x+') − β(V)'+x+'. Open the kinetics field to inspect the rate.');
-      node('kinetics-'+x,'gate-'+x,x+' kinetics','field','γ[α(V)(1 − '+x+') − β(V)'+x+'] d'+x+'. Voltage controls the rate and receives zero pushback from this law.');
+      node('kinetics-'+x,'gate-'+x,x+' kinetics','field','γ[α(V)(1 − '+x+') − β(V)'+x+'] d'+x+'. Voltage controls the rate and receives zero pushback from this law.',
+        {dependencyView:true,resultLabel:'Gate rate',result:f.loads[8+2*i],resultUnit:'/s'});
     }
     for(const [i,s] of stores.entries()){
       const [equation,unit]=storeEquations[i],rate=f.total[i]*s.lf;
@@ -104,7 +105,8 @@
     }
     function process(group,map,field,mapLabel,fieldLabel,signal,j,indices,spec,mapDescription,law){
       node(map,group,mapLabel,'operation',mapDescription);
-      node(field,group,fieldLabel,'field',law);
+      node(field,group,fieldLabel,'field',law,{dependencyView:true,
+        resultLabel:'Returning load on '+signal.toLowerCase(),result:f.loads[j]*spec.lf,resultUnit:spec.lu});
       for(const i of indices)storeWire(i,map,j);
       wire(map,field,signal,f.values[j],f.loads[j],spec);
     }

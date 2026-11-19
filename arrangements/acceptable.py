@@ -29,13 +29,14 @@ State position: ``(q1, q2, w1, w2, z, y)``. The room is ``I -> <1|0>``, the rout
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable, Sequence
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import jax
+from jax import Array
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement
+from .arrangement import Arrangement, Numbers
 from .coalgebra import configuration
 from .functors import Phi
 from .interpretation import trivial_omega
@@ -49,8 +50,9 @@ from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 # ---------------------------------------------------------------------------
 
 
-def closed_step(arr: Arrangement, duration: float):
-    """One ``Phi`` step of a closed system ``I -> I`` at ``duration``, compiled, checked against ``Phi`` once."""
+def closed_step(arr: Arrangement, duration: float) -> Callable[[Any], Any]:
+    """One ``Phi`` step of a closed system ``I -> I`` at ``duration``, compiled, checked against ``Phi`` once.
+    The step takes and returns the integrator's state (``Any``: a pytree of arrays)."""
     if arr.in_dim_M or arr.out_dim_M or arr.in_dim_N or arr.out_dim_N:
         raise ValueError("closed_step needs I -> I")
     P, omega, z = arr.P, arr.omega, jnp.zeros(0)
@@ -67,9 +69,9 @@ def closed_step(arr: Arrangement, duration: float):
     return step
 
 
-def timed_closed_step(arr: Arrangement):
+def timed_closed_step(arr: Arrangement) -> Callable[[Any, float], Any]:
     """The step of a closed system ``I -> I`` as a function of ``(s, duration)``, compiled once; checked against
-    ``Phi`` at duration ``0.1``."""
+    ``Phi`` at duration ``0.1``. The state ``s`` is ``Any`` (a pytree of arrays)."""
     if arr.in_dim_M or arr.out_dim_M or arr.in_dim_N or arr.out_dim_N:
         raise ValueError("timed_closed_step needs I -> I")
     P, omega, z = arr.P, arr.omega, jnp.zeros(0)
@@ -85,7 +87,8 @@ def timed_closed_step(arr: Arrangement):
     return step
 
 
-def defect_curve(arr: Arrangement, step, taus, starts, coords=None):
+def defect_curve(arr: Arrangement, step: Callable[[Any, Any], Any], taus: Numbers, starts: Numbers,
+                 coords: Optional[Sequence[int]] = None) -> List[float]:
     """For each ``tau`` in ``taus``: ``max`` over ``starts`` of the max-norm distance, on ``coords``, between one step
     of ``tau`` and two of ``tau/2``; ``step(s, d)`` is the arrangement's step at duration ``d`` (``timed_closed_step``)."""
     coords = list(range(len(np.asarray(starts)[0]))) if coords is None else list(coords)
@@ -110,7 +113,8 @@ def _positions(arr: Arrangement, step, starts):
     return np.asarray(f(jnp.asarray(np.asarray(starts, dtype=float))))
 
 
-def set_position_traced(arr: Arrangement, pos):
+def set_position_traced(arr: Arrangement, pos: Array) -> Any:
+    """The state (``Any``: a pytree shaped like ``arr.P.init``) whose flattened leaves are the vector ``pos``."""
     leaves, treedef = jax.tree_util.tree_flatten(arr.P.init)
     out, i = [], 0
     for leaf in leaves:
@@ -120,7 +124,8 @@ def set_position_traced(arr: Arrangement, pos):
     return jax.tree_util.tree_unflatten(treedef, out)
 
 
-def defect(arr: Arrangement, make_step: Callable[[float], Callable], tau: float, starts, coords=None) -> float:
+def defect(arr: Arrangement, make_step: Callable[[float], Callable], tau: float, starts: Numbers,
+           coords: Optional[Sequence[int]] = None) -> float:
     """``max`` over ``starts`` of the max-norm distance, on ``coords``, between one step of ``tau`` and two of
     ``tau/2``. ``make_step(d)`` returns the arrangement's step at duration ``d``."""
     one, half = make_step(tau), make_step(tau / 2)
@@ -179,7 +184,7 @@ def _identity(k: int) -> Arrangement:
                        label=f"id<0|{k}>")
 
 
-def open_defect(arr: Arrangement, tau: float, xs, vs, speed: float) -> float:
+def open_defect(arr: Arrangement, tau: float, xs: Sequence[float], vs: Sequence[float], speed: float) -> float:
     """Defect of an open part ``<0|1> -> I`` under the contract: its state in ``xs``, its partner's readout in ``vs``
     at the start and, after half the duration, anywhere within ``speed * tau / 2`` of where it was. The part is
     stepped by the dynamics functor with its open box filled by the stateless system reading out the held value
@@ -216,7 +221,7 @@ def _force_coupling(k: int, force, label: str, in_dim: int = 0) -> Arrangement:
     )
 
 
-def gate(y):
+def gate(y: Array) -> Array:
     return 0.5 * (1.0 + jnp.tanh(10.0 * y))
 
 
@@ -259,7 +264,8 @@ BURST = dict(a=1.0, c=3.0, ell=1.0, sigma=0.5, lam=0.0125, theta=30.0, kappa=26.
              eta_w=1.0)
 
 
-def burst_room(q=(-2.5, 2.5), w=(-2.5, 2.5), z0=0.0, y0=-1.43, **kw) -> Arrangement:
+def burst_room(q: Tuple[float, float] = (-2.5, 2.5), w: Tuple[float, float] = (-2.5, 2.5), z0: float = 0.0,
+               y0: float = -1.43, **kw: float) -> Arrangement:
     """``I -> <1|0>``: the burst room (module docstring). Position ``(q1, q2, w1, w2, z, y)``. ``eta_w`` is the chairs'
     response; ``eta_w=0`` holds them where they are (plan P41 (f): the people's transit with the chairs held)."""
     p = {**BURST, **kw}
@@ -286,12 +292,12 @@ def burst_room(q=(-2.5, 2.5), w=(-2.5, 2.5), z0=0.0, y0=-1.43, **kw) -> Arrangem
     return replace(compose_seq(wired, couplings), label="burst_room")
 
 
-def input_step(arr: Arrangement, duration: float):
+def input_step(arr: Arrangement, duration: float) -> Callable[[Any], Any]:
     """The room's step at ``duration`` with the routine ``u`` held, checked against ``Phi`` (``routine_step``)."""
     return routine_step(arr, duration)
 
 
-def timed_input_step(arr: Arrangement, u: float):
+def timed_input_step(arr: Arrangement, u: float) -> Callable[[Any, float], Any]:
     """The step of a room ``I -> <1|0>`` with the routine held at ``u``, as a function of ``(s, duration)``;
     checked against ``Phi`` at duration ``0.004`` (``routine_step``)."""
     routine_step(arr, 0.004, check_inputs=(u, u))
@@ -303,7 +309,8 @@ def timed_input_step(arr: Arrangement, u: float):
     return step
 
 
-def defect_per_state(arr: Arrangement, step, taus, starts, coords):
+def defect_per_state(arr: Arrangement, step: Callable[[Any, Any], Any], taus: Numbers, starts: Numbers,
+                     coords: Sequence[int]) -> np.ndarray:
     """Array ``[state, tau]`` of the max-norm distance on ``coords`` between one step of ``tau`` and two of
     ``tau/2``, from each start position."""
     cidx = jnp.asarray(list(coords))

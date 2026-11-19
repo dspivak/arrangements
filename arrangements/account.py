@@ -21,7 +21,7 @@ The cascade's pieces (``cascade.py``) with a third channel, ``H = R^3``: supply,
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -126,9 +126,10 @@ def market(r: float) -> Arrangement:
         label="market")
 
 
-def one_level(workers: List[Part], *, positions, mobility: float, tau: float, fund: dict,
+def one_level(workers: List[Part], *, positions: Sequence[float], mobility: float, tau: float, fund: dict,
               src: Optional[Part], src_position: float, r: float) -> Arrangement:
-    """``market(r)`` after a fund layer after a collective of ``workers`` (and ``src``)."""
+    """``market(r)`` after a fund layer after a collective of ``workers`` (and ``src``); ``positions``: one per
+    worker."""
     parts = list(workers) + ([src] if src is not None else [])
     pos = list(positions) + ([src_position] if src is not None else [])
     mob = [mobility] * len(workers) + ([0.0] if src is not None else [])

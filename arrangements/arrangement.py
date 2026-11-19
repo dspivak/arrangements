@@ -30,16 +30,21 @@ reactive vector space ``Q`` and a potential ``U``) in CDLM's companion.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Tuple
+from typing import Callable, Sequence, Tuple, Union
 
 import jax
 from jax import Array
+from jax.typing import ArrayLike
 
 from .coalgebra import CotCoalg
 from .rvect import SmoothMap
 
 
 OneForm = Callable[..., Tuple[Array, ...]]  # (x_1, ..., x_k) -> (xi_1, ..., xi_k)
+
+# An argument a constructor turns into an array (``jnp.asarray``): a number, a list of numbers, a list of such
+# lists (a matrix), or an array; its shape is said in the constructor's docstring.
+Numbers = Union[ArrayLike, Sequence[float], Sequence[Sequence[float]]]
 
 
 @dataclass(frozen=True)

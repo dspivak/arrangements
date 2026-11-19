@@ -54,7 +54,7 @@ def cautious(P: CotCoalg, allows: Callable[[Any, Array, Any], Array], label: Opt
                     label=label or f"cautious({P.label})", timed_step=timed_step, look_ahead=P.look_ahead)
 
 
-def allowed(state) -> bool:
+def allowed(state: Any) -> bool:
     """Whether the step that produced ``state`` was allowed: no leaf is ``nan``."""
     return all(bool(jnp.all(jnp.isfinite(x))) for x in jax.tree_util.tree_leaves(state))
 

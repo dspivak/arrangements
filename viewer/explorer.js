@@ -27,13 +27,17 @@
       html('p',{class:'ex-subtitle'},title,'Follow values out and loads back. Open a box to see what is inside.');
       if(options.sceneURL)html('a',{href:options.sceneURL,class:'ex-link'},header,options.sceneLabel||'Original animation');
       const controls=html('div',{class:'ex-controls'},this.el);
-      this.play=this.button(controls,'Play',()=>this.setRunning(!this.running),'ex-play');
-      this.play.disabled=!adapter.step;
-      this.button(controls,'One step',()=>{this.setRunning(false);this.advance(.02);this.refresh();}).disabled=!adapter.step;
-      this.button(controls,'Start over',()=>{this.setRunning(false);adapter.reset?.();this.refresh();}).disabled=!adapter.reset;
+      if (options.playback) {
+        controls.append(options.playback.controls);
+      } else {
+        this.play=this.button(controls,'Play',()=>this.setRunning(!this.running),'ex-play');
+        this.play.disabled=!adapter.step;
+        this.button(controls,'One step',()=>{this.setRunning(false);this.advance(.02);this.refresh();}).disabled=!adapter.step;
+        this.button(controls,'Start over',()=>{this.setRunning(false);adapter.reset?.();this.refresh();}).disabled=!adapter.reset;
+        const speedLabel=html('label',{},controls,'Speed '),speed=html('select',{'aria-label':'Playback speed'},speedLabel);
+        for(const x of [.5,1,2,4])html('option',{value:x},speed,x+'×');speed.value='1';speed.onchange=()=>{this.speed=+speed.value;};
+      }
       this.time=html('output',{class:'ex-time'},controls);
-      const speedLabel=html('label',{},controls,'Speed '),speed=html('select',{'aria-label':'Playback speed'},speedLabel);
-      for(const x of [.5,1,2,4])html('option',{value:x},speed,x+'×');speed.value='1';speed.onchange=()=>{this.speed=+speed.value;};
       const styleLabel=html('label',{},controls,'View '),style=html('select',{'aria-label':'Drawing style'},styleLabel);
       html('option',{value:'illustrated'},style,'Illustrated');html('option',{value:'wiring'},style,'Wiring');
       style.onchange=()=>{this.style=style.value;this.render();};
@@ -88,11 +92,15 @@
         }
         this.raf=requestAnimationFrame(this.tick);
       };
-      this.raf=requestAnimationFrame(this.tick);
+      if(adapter.step && !options.playback)this.raf=requestAnimationFrame(this.tick);
     }
     button(parent,label,action,cls=''){const b=html('button',{type:'button',class:cls},parent,label);b.onclick=action;return b;}
     say(text,error=false){this.status.textContent=text;this.status.classList.toggle('ex-error',error);}
-    setRunning(on){this.running=on;this.play.textContent=on?'Pause':'Play';this.el.dataset.playing=String(on);this.last=0;}
+    setRunning(on){
+      if(this.options.playback)this.options.playback.setPlaying(on);
+      if(this.play)this.play.textContent=on?'Pause':'Play';
+      this.running=on;this.el.dataset.playing=String(on);this.last=0;
+    }
     advance(dt){this.adapter.step?.(dt);if(this.adapter.ended?.())this.setRunning(false);}
     act(fn){try{fn();this.persist();this.selection.clear();this.focusWire=null;this.focusSignal=null;this.render();}catch(error){this.say(error.message,true);}}
     persist(){if(this.storageKey)try{localStorage.setItem(this.storageKey,JSON.stringify({...this.model.save(),placements:this.placements,zoom:this.zoom}));}catch{}}
@@ -160,7 +168,12 @@
       this.suppressClick=d.id;setTimeout(()=>{this.suppressClick=null;},0);
       this.persist();this.render();this.say(cancel?'Move cancelled.':d.didMove?'Position saved. Click to open; drag to move.':'Leave space between parts; position unchanged.');
     }
-    refresh(){this.model.update(this.adapter.snapshot());for(const id of this.selection)if(!this.model.nodes.has(id))this.selection.delete(id);this.render();}
+    refresh(){
+      if(this.options.playback){
+        this.running=this.options.playback.playing;
+        this.el.dataset.playing=String(this.running);
+      }
+      this.model.update(this.adapter.snapshot());for(const id of this.selection)if(!this.model.nodes.has(id))this.selection.delete(id);this.render();}
     enter(id){if(this.model.enter(id)){this.selection.clear();this.focusWire=null;this.focusSignal=null;this.focusNode=null;this.persist();this.render();}}
     choose(node,event){
       if(this.suppressClick===node.id)return;
@@ -185,10 +198,10 @@
       const branches=w.branches||[w],selected=this.focusSignal?E.signalKey(w)===this.focusSignal:branches.some(b=>b.id===this.focusWire);
       const g=svg('g',{role:'button',tabindex:0,'data-wire':w.id,'data-trunk':String(trunk),
         'aria-label':w.label+'; inspect value and returning load',opacity:this.focusWire&&!selected?.16:1},parent);
-      const reading=w.label+' · value '+E.format(w.value)+' · returning load '+E.format(w.load);
+      const reading=w.label+(w.argument===false?' · receives load ':' · value '+E.format(w.value)+' · returning load ')+E.format(w.load);
       svg('title',{},g,reading);g.setAttribute('aria-label',reading);
       svg('path',{d,fill:'none',stroke:'white','stroke-width':12,'stroke-linejoin':'round'},g);
-      for(const kind of ['value','load']){
+      for(const kind of w.argument===false?['load']:['value','load']){
         const color=E.color(w[kind],w[kind+'Scale'],kind);
         const magnitude=E.magnitude(w[kind]),forward=kind==='value',sign=forward?1:-1;
         const lane=svg('g',{'data-flow-track':kind,'data-level':magnitude==null?'unknown':magnitude===0?'zero':'nonzero'},g);
@@ -205,6 +218,21 @@
       svg('path',{d,fill:'none',stroke:'transparent','stroke-width':12},g);
       const select=()=>{this.focusWire=branches[0].id;this.focusSignal=trunk?E.signalKey(w):null;this.focusNode=null;this.render();};
       g.onclick=select;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}};
+    }
+    // The stretch of a wire inside a compact mark, from its labeled terminal to the mark itself:
+    // the same value and load tracks as drawWire, so both are seen to reach the map or the field.
+    drawLead(parent,w,tracks){
+      const selected=this.focusSignal?E.signalKey(w)===this.focusSignal:(w.branches||[w]).some(b=>b.id===this.focusWire);
+      const g=svg('g',{'data-lead':w.id,opacity:this.focusWire&&!selected?.16:1},parent);
+      for(const kind of w.argument===false?['load']:['value','load']){
+        const magnitude=E.magnitude(w[kind]),forward=kind==='value',sign=forward?1:-1;
+        svg('path',{d:tracks[kind],fill:'none',stroke:E.color(w[kind],w[kind+'Scale'],kind),'stroke-width':selected?3.5:2.5,
+          'stroke-linejoin':'round','stroke-linecap':'round',
+          'stroke-dasharray':magnitude==null?'2 5':magnitude===0?'4 3':'none'},g);
+        if(magnitude>0)svg('path',{d:tracks[kind],fill:'none',stroke:forward?'#084675':'#963816',
+          'stroke-width':selected?5.5:4.5,'stroke-linecap':'round','stroke-dasharray':'4 56',
+          class:'ex-pulse'+(forward?'':' ex-back'),'stroke-dashoffset':-sign*((this.model.scene.time||0)%3)*20},g);
+      }
     }
     rendererFor(node){return this.renderers[node.renderer]||this.renderers[node.kind];}
     drawAnimation(group,node,width,height){
@@ -240,8 +268,8 @@
       this.model.ancestors(this.model.scope).forEach((n,i)=>{if(i)html('span',{},this.crumbs,'/');this.button(this.crumbs,n.label,()=>this.enter(n.id));});
       this.renderScopeAnimation();
       this.canvas.replaceChildren();this.canvas.setAttribute('viewBox',`0 0 ${width} ${height}`);
-      this.canvas.style.width=this.drag?.active?width*this.drag.scale+'px':this.zoom==='fit'?'100%':width*Number(this.zoom)+'px';
-      this.canvas.style.minWidth=this.drag?.active||this.zoom!=='fit'?'0':'';
+      this.canvas.style.width=this.drag?.active?width*this.drag.scale+'px':this.zoom==='fit'?`min(100%, ${width}px)`:width*Number(this.zoom)+'px';
+      this.canvas.style.minWidth=this.drag?.active||this.zoom!=='fit'?'0':Math.min(600,width)+'px';
       this.canvas.style.minHeight=this.drag?.active||this.zoom!=='fit'?'0':'';
       const wireLayer=svg('g',{},this.canvas);
       // The current scope is an opened arrangement. Its ports lie on its boundary.
@@ -263,29 +291,45 @@
           svg('text',{x:left?8:-8,y:-7,'text-anchor':left?'start':'end',class:'ex-port-label',stroke:'white','stroke-width':3,'paint-order':'stroke'},g,label);
         }else{
           if(node.kind==='box')svg('rect',{x:-p.w/2,y:-p.h/2,width:p.w,height:p.h,rx:this.style==='wiring'?0:12,fill:selected?'#e0effa':'#f5f9fc',stroke:selected?'#1474ab':'#a9becf','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
-          else if(node.kind==='operation'||node.kind==='field')svg('circle',{r:p.radius,fill:selected?'#e0effa':node.kind==='field'?'#f8e8dc':'#eef1f4',stroke:selected?'#1474ab':'#c4cdd5','stroke-width':selected?3:1,class:'ex-focus-ring'},g);
+          else if(p.radius){
+            for(const port of [...p.inputs,...p.outputs]){
+              const left=port.side==='in',px=port.x-p.x,py=port.y-p.y;
+              const bend=p.glyphX+(left?-1:1)*(p.radius+10);
+              // The value and its load run on from the terminal into the mark, on the wire's own two tracks.
+              const T={x:px,y:py},B={x:bend,y:py},K={x:bend,y:port.glyphY},G={x:port.glyphX,y:port.glyphY};
+              const segments=left?[{a:T,b:B},{a:B,c:B,d:K,b:G}]:[{a:G,c:K,d:B,b:B},{a:B,b:T}];
+              this.drawLead(g,port.wires.length>1?E.forkWire(port.wires.flatMap(w=>w.branches||[w])):port.wires[0],E.geometry.wireTracks(segments));
+            }
+            svg('circle',{cx:p.glyphX,r:p.radius,fill:selected?'#e0effa':node.kind==='field'?'#f8e8dc':'#eef1f4',
+              stroke:selected?'#1474ab':'#91a1af','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
+          }
+          // A store is one blue box, the book's fill for a part that only stores a state
+          // (articulating.tex, matterfillcolor = valuecolor!10); it has no fictitious input port.
+          else if(node.kind==='state')svg('rect',{x:-p.w/2,y:-p.h/2,width:p.w,height:p.h,rx:this.style==='wiring'?0:12,fill:selected?'#d5d5f5':'#e6e6f9',stroke:selected?'#1474ab':'#4d4dd2','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
           else if(selected)svg('ellipse',{rx:85,ry:54,fill:'#e0effa',stroke:'#1474ab','stroke-dasharray':'4 4',class:'ex-focus-ring'},g);
-          // State has no rectangular frame and no fictitious input port.
           if(this.style==='illustrated'&&this.rendererFor(node)){
-            const animation=svg('g',{transform:node.kind==='state'?`translate(0,${-p.h/2+40}) scale(.7)`:'scale(.62)'},g);
+            const animation=svg('g',{transform:node.kind==='state'?`translate(0,${-p.h/2+40}) scale(.7)`:p.radius?`translate(${p.glyphX},0) scale(.43)`:'scale(.62)'},g);
             this.drawAnimation(animation,node,p.w,p.h);
           }else if(node.kind==='state'){
             const v=E.magnitude(node.value)||0;
             svg('line',{x1:-58,x2:58,y1:0,y2:0,stroke:'#c1d5e4','stroke-width':4},g);
             svg('circle',{cx:48*Math.tanh(v/5),cy:0,r:9,fill:'#237bab'},g);
             svg('text',{y:25,'text-anchor':'middle',class:'ex-secondary'},g,E.format(node.value).slice(0,28));
-          }else{
-            svg('text',{y:4,'text-anchor':'middle',class:'ex-secondary'},g,hasChildren?'Open':node.kind==='operation'?'Map':node.kind==='field'?'Field':'');
+          }else if(hasChildren){
+            svg('text',{y:4,'text-anchor':'middle',class:'ex-secondary'},g,'Open');
+          }else if(node.symbol){
+            svg('text',{x:p.glyphX??0,y:4,'text-anchor':'middle',class:'ex-secondary'},g,node.symbol);
           }
           for(const port of [...p.inputs,...p.outputs]){
             const px=port.x-p.x,py=port.y-p.y,left=port.side==='in';
-            if(node.kind==='state')svg('line',{x1:-64,x2:64,y1:py,y2:py,stroke:'#b9cedd','stroke-width':2},g);
+            if(node.kind==='state')svg('line',{x1:-64,x2:p.w/2,y1:py,y2:py,stroke:'#b9cedd','stroke-width':2},g);
             const mark=svg('g',{'data-port':port.key,'data-side':port.side,role:'button',tabindex:0,'aria-label':port.label+' '+port.side+' port; follow readout'},g);
             svg('circle',{cx:px,cy:py,r:10,fill:'transparent'},mark);
             svg('circle',{cx:px,cy:py,r:4,fill:'white',stroke:'#386b88','stroke-width':1.6},mark);
             svg('title',{},mark,port.label+' · '+(left?'input':'output'));
             const text=node.kind==='state'?E.format(port.wires[0].value):port.label;
-            svg('text',{x:node.kind==='state'?0:px+(left?9:-9),y:py-6,'text-anchor':node.kind==='state'?'middle':left?'start':'end',class:'ex-port-label'},mark,text.length>16?text.slice(0,14)+'…':text);
+            // A store's readout is written under its line; above it would sit on the stored value (y=25).
+            svg('text',{x:node.kind==='state'?0:px+(left?9:-9),y:node.kind==='state'?py+15:py-6,'text-anchor':node.kind==='state'?'middle':left?'start':'end',class:'ex-port-label'},mark,!p.radius && text.length>16?text.slice(0,14)+'…':text);
             const selectPort=e=>{e.stopPropagation();this.focusSignal=port.wires[0].signal;this.focusWire=port.wires[0].branches[0].id;this.focusNode=null;this.render();};
             mark.onclick=selectPort;mark.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectPort(e);}};
           }
@@ -309,7 +353,49 @@
       this.sidebar.replaceChildren();
       const n=this.model.nodes.get(this.focusNode),w=this.model.scene.wires.find(w=>w.id===this.focusWire);
       html('h2',{},this.sidebar,n?.label||w?.label||this.model.nodes.get(this.model.scope).label);
+      const all=this.model.scene.wires;
+      const sourceOf=node=>{
+        const seen=new Set();
+        while(node?.kind==='boundary'&&!seen.has(node.id)){
+          seen.add(node.id);
+          const upstream=all.filter(edge=>edge.target===node.id);
+          if(upstream.length!==1)break;
+          node=this.model.nodes.get(upstream[0].source);
+        }
+        return node;
+      };
+      const producer=sourceOf(n || ((this.focusSignal||this.focusNode) && w && this.model.nodes.get(w.source)));
+      if(producer?.kind==='operation'||producer?.kind==='field'){
+        const inputs=new Map(all.filter(edge=>edge.target===producer.id&&edge.argument!==false).map(edge=>[E.signalKey(edge),edge]));
+        const outputs=new Map(all.filter(edge=>edge.source===producer.id).map(edge=>[E.signalKey(edge),edge]));
+        if(outputs.size>1&&!this.focusSignal){
+          html('h3',{},this.sidebar,'Readouts');
+          for(const [signal,edge] of outputs)this.button(this.sidebar,edge.label,()=>{
+            this.focusNode=null;this.focusSignal=signal;this.focusWire=edge.id;this.render();
+          });
+        }else if(producer.dependencyView||producer.kind==='operation'||outputs.size){
+          const possible=producer.possibleInputs||outputs.size>1||(producer.kind==='field'&&!producer.dependencyView);
+          const label=outputs.size>1?w.label:producer.label;
+          html('h3',{},this.sidebar,(possible?'Possible inputs to ':'Inputs to ')+label);
+          if(!inputs.size)html('p',{},this.sidebar,possible?'No input readouts recorded':'Constant for this arrangement');
+          for(const edge of inputs.values()){
+            const source=sourceOf(this.model.nodes.get(edge.source));
+            const button=this.button(this.sidebar,edge.label,()=>{
+              this.enter(source.parent);
+              this.focusNode=source.id;this.focusSignal=null;this.focusWire=null;this.render();
+            });
+            button.title='Inspect '+source.label;
+          }
+          if(producer.result!==undefined){
+            html('h3',{},this.sidebar,producer.resultLabel||'Result');
+            html('output',{},this.sidebar,E.format(producer.result)+(producer.resultUnit?' '+producer.resultUnit:''));
+          }
+        }
+      }
       if(n){
+        for(const reading of n.observations||[]){
+          html('h3',{},this.sidebar,reading.label);html('output',{},this.sidebar,E.format(reading.value));
+        }
         if(n.description)html('p',{},this.sidebar,n.description);
         for(const [key,label] of [['value','State'],['configuration','Readout'],['inclination','Total inclination']])if(n[key]!==undefined){html('h3',{},this.sidebar,label);html('output',{},this.sidebar,E.format(n[key]));}
       }
@@ -333,7 +419,7 @@
       for(const wire of E.aggregate(wires)){
         const row=html('div',{class:'ex-wire-detail'},this.sidebar);html('strong',{},row,wire.label);
         if(this.focusSignal)html('p',{},row,'To '+(this.model.nodes.get(wire.target)?.label||'the boundary'));
-        for(const [key,label] of [['value','Value'],['load',wire.inclination?'Inclination':'Returning load']]){
+        for(const [key,label] of [['value',wire.argument===false?'Coordinate value':'Value'],['load',wire.inclination?'Inclination':'Returning load']]){
           const line=html('label',{},row,label+' ');html('output',{},line,E.format(wire[key]));
           html('div',{class:'ex-scale'},row,'High color at |'+key+'| ≥ '+(wire[key+'Scale']??1)+(wire[key+'Unit']?' '+wire[key+'Unit']:''));
         }
@@ -341,7 +427,7 @@
         if(wire.branches.length>1)html('p',{},row,'The '+wire.branches.length+' internal contributions add to this returning load.');
       }
     }
-    destroy(){this.destroyed=true;cancelAnimationFrame(this.raf);if(this.zoomFrame)cancelAnimationFrame(this.zoomFrame);clearTimeout(this.zoomSaveTimer);this.persist();window.removeEventListener('pointermove',this.onDragMove);window.removeEventListener('pointerup',this.onDragEnd);window.removeEventListener('pointercancel',this.onDragCancel);for(const cleanup of this.cleanups)cleanup();this.cleanups=[];this.adapter.dispose?.();this.el.remove();}
+    destroy(){this.options.playback?.setPlaying(false);this.destroyed=true;cancelAnimationFrame(this.raf);if(this.zoomFrame)cancelAnimationFrame(this.zoomFrame);clearTimeout(this.zoomSaveTimer);this.persist();window.removeEventListener('pointermove',this.onDragMove);window.removeEventListener('pointerup',this.onDragEnd);window.removeEventListener('pointercancel',this.onDragCancel);for(const cleanup of this.cleanups)cleanup();this.cleanups=[];this.adapter.dispose?.();this.el.remove();}
   }
   E.View=View;
 })(globalThis);

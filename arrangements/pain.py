@@ -37,10 +37,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Callable, Optional, Sequence
 
 import jax
 import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
 
 from .arrangement import Arrangement, exact
 from .attention import input_dim, make_input, message, msg_dim
@@ -102,7 +104,7 @@ def source(s: float, label: str = "source") -> Part:
     return frozen_part([s, 0.0, 0.0], 0.0, label, dim_H=DH3)
 
 
-def phi(f, f_half: float, width: float):
+def phi(f: ArrayLike, f_half: float, width: float) -> Array:
     """The fund's fixed reading of its balance: even odds at ``f_half``."""
     return jax.nn.sigmoid(-(f - f_half) / width)
 
@@ -194,8 +196,8 @@ class Whole:
 TAU = 0.8
 
 
-def whole(workers, *, fund: dict, r: float, src: Part, src_position: float = 2.5,
-          positions=None, mobility: float = 0.1, tau: float = TAU) -> Whole:
+def whole(workers: Sequence[Part], *, fund: dict, r: float, src: Part, src_position: float = 2.5,
+          positions: Optional[Sequence[float]] = None, mobility: float = 0.1, tau: float = TAU) -> Whole:
     """``market(r)`` after a fund layer after a collective of ``workers`` and ``src``."""
     n = len(workers)
     positions = [0.06] * n if positions is None else list(positions)
@@ -207,8 +209,8 @@ def whole(workers, *, fund: dict, r: float, src: Part, src_position: float = 2.5
     return Whole(compose_seq(u, market(r)), n, u, 2 if fund.get("reserve") is None else 3)
 
 
-def closed_step(arr: Arrangement):
-    """One step of the closed whole."""
+def closed_step(arr: Arrangement) -> Callable[[Any], Any]:
+    """One step of the closed whole (the state is ``Any``: the composite's pytree of arrays)."""
     P, omega = arr.P, arr.omega
 
     def step(s):

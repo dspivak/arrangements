@@ -27,13 +27,15 @@ Predictions and verdicts: book repo, ``notes/runs/p27-copying-dfb252e2/``; tests
 
 from __future__ import annotations
 
-from typing import Callable, Sequence, Tuple
+from typing import Any, Callable, List, Sequence, Tuple
+
+from jax import Array
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import CotCoalg, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
@@ -41,8 +43,9 @@ from .rvect import diagonal
 from .wiring import compose_seq, parallel_arrangements, trivial_parameter
 
 
-def voice(eta_w: float, eta_theta: float, init) -> Arrangement:
-    """The voice ``V : I -> <0 | 1>``: a window of its last two values, and a pitch."""
+def voice(eta_w: float, eta_theta: float, init: Numbers) -> Arrangement:
+    """The voice ``V : I -> <0 | 1>``: a window of its last two values, and a pitch. ``init``: the starting
+    ``(w1, w2, theta)``."""
 
     def sing(q):
         w1, w2, theta = q
@@ -97,12 +100,12 @@ def ear() -> Arrangement:
     )
 
 
-def singing_along(eta_w: float, eta_theta: float, init) -> Arrangement:
-    """``W = E . (V (x) id_2) : <0 | 2> -> I``; the external input is ``(s, K)``."""
+def singing_along(eta_w: float, eta_theta: float, init: Numbers) -> Arrangement:
+    """``W = E . (V (x) id_2) : <0 | 2> -> I``; the external input is ``(s, K)``. ``init`` as in ``voice``."""
     return compose_seq(parallel_arrangements(voice(eta_w, eta_theta, init), identity(2)), ear())
 
 
-def voice_q(state) -> np.ndarray:
+def voice_q(state: Any) -> np.ndarray:
     """The voice's ``(w1, w2, theta)`` from ``W``'s state ``((s_V, s_id), s_E)``."""
     return np.asarray(state[0][0])
 
@@ -135,7 +138,8 @@ def driven_step(arr: Arrangement, check_inputs: Sequence = ()) -> Callable:
     return step
 
 
-def run(arr: Arrangement, step: Callable, state, schedule: Sequence[Tuple[float, float]]):
+def run(arr: Arrangement, step: Callable[[Any, Array], Any], state: Any, schedule: Sequence[Tuple[float, float]]
+        ) -> Tuple[Any, np.ndarray, np.ndarray, np.ndarray]:
     """Run ``W`` on the environment's schedule of ``(s, K)``; return the final state and, per step, ``(q, y, s, K)``."""
     qs, ys = [], []
     for m in schedule:
@@ -147,12 +151,12 @@ def run(arr: Arrangement, step: Callable, state, schedule: Sequence[Tuple[float,
     return state, np.array(qs), np.array(ys), sched
 
 
-def tone(omega: float, amp: float = 1.0, phase: float = 0.0, t0: int = 0):
+def tone(omega: float, amp: float = 1.0, phase: float = 0.0, t0: int = 0) -> Callable[[int], float]:
     """The source's value at step ``t``: ``amp sin(omega (t0 + t) + phase)``."""
     return lambda t: amp * np.sin(omega * (t0 + t) + phase)
 
 
-def schedule(source: Callable[[int], float], steps: int, K: float = 1.0):
+def schedule(source: Callable[[int], float], steps: int, K: float = 1.0) -> List[Tuple[float, float]]:
     """The environment's schedule: ``source`` at loudness ``K`` for ``steps`` steps (``K = 0``: silence, ``s = 0``)."""
     return [((source(t) if K else 0.0), K) for t in range(steps)]
 
@@ -162,7 +166,7 @@ def pitch(theta: float) -> float:
     return float(np.arccos(np.clip(theta / 2.0, -1.0, 1.0)))
 
 
-def loudness(q) -> float:
+def loudness(q: Numbers) -> float:
     """The amplitude the window holds: ``sqrt((w1^2 - theta w1 w2 + w2^2) / sin(omega)^2)``, the recurrence's invariant."""
     w1, w2, theta = q
     return float(np.sqrt(max(w1 * w1 - theta * w1 * w2 + w2 * w2, 0.0) / max(1.0 - theta * theta / 4.0, 1e-300)))
@@ -239,10 +243,12 @@ def contacts(n: int, g: float, one_way: bool = False) -> Arrangement:
     return compose_seq(pair_wire(n), row)
 
 
-def template(a0, b0, alpha: float = 4.0, g: float = 1.0, eta: float = 0.05, one_way: bool = False) -> Arrangement:
+def template(a0: Sequence[float], b0: Sequence[float], alpha: float = 4.0, g: float = 1.0, eta: float = 0.05,
+             one_way: bool = False) -> Arrangement:
     """``W = C . ((A_1 (x) .. (x) A_n) (x) (B_1 (x) .. (x) B_n) (x) id_1) : <0 | 1> -> I``; the external input is ``K``.
 
-    The source parts have depth ``alpha``, the copy parts depth 1.
+    The source parts have depth ``alpha``, the copy parts depth 1. ``a0`` and ``b0``: the ``n`` source and ``n`` copy
+    parts' starting positions.
     """
     n = len(a0)
     A = [two_well(alpha, eta, a) for a in a0]
@@ -255,13 +261,13 @@ def template(a0, b0, alpha: float = 4.0, g: float = 1.0, eta: float = 0.05, one_
     return compose_seq(parallel_arrangements(row, identity(1)), C)
 
 
-def template_states(arr: Arrangement, state, n: int):
+def template_states(arr: Arrangement, state: Any, n: int) -> Tuple[np.ndarray, np.ndarray]:
     """The source and copy rows ``(a, b)`` read off ``W``'s state by its position."""
     q = np.asarray(arr.P.position(state))
     return q[:n], q[n:2 * n]
 
 
-def run_scan(step: Callable, state, inputs):
+def run_scan(step: Callable[[Any, Array], Any], state: Any, inputs: Numbers) -> Any:
     """``step`` folded over ``inputs`` (one external input per step) by ``jax.lax.scan``; returns the final state."""
     def body(s, m):
         return step(s, m), None
@@ -269,7 +275,7 @@ def run_scan(step: Callable, state, inputs):
     return final
 
 
-def template_init(arr: Arrangement, a0, b0):
+def template_init(arr: Arrangement, a0: Sequence[float], b0: Sequence[float]) -> Any:
     """``W``'s state with the source row at ``a0`` and the copy row at ``b0`` (the parts' leaves come first, in order)."""
     leaves, tree = jax.tree_util.tree_flatten(arr.P.init)
     vals = list(a0) + list(b0)
@@ -284,7 +290,7 @@ def template_init(arr: Arrangement, a0, b0):
 # ---------------------------------------------------------------------------
 
 
-def oscillator(lam: float, eta: float, init) -> CotCoalg:
+def oscillator(lam: float, eta: float, init: Numbers) -> CotCoalg:
     """The oscillator's matter (book Ch 3 ``ex.oscillator``, ``eqn.osc_integrator``): states ``(alpha, nu)``.
 
     ``alpha`` is the angle, a point of the circle ``R / 2 pi Z`` (held here as a real number; only ``sin`` and ``cos``
@@ -295,6 +301,7 @@ def oscillator(lam: float, eta: float, init) -> CotCoalg:
     ``tau nu``, so steps of any durations adding to ``t`` land where one step of ``t`` does (David, 2026-10-20: "what you
     see when you do smaller time steps is just a more precise version"). The angle moves by ``lam`` times the force, as a
     parameter does; the angular frequency gains ``eta`` times it, as the mass's momentum gains the impulse.
+    ``init``: the starting ``(alpha, nu)``.
     """
     def timed_step(s, xi, tau):
         alpha, nu = s[0], s[1]
@@ -311,10 +318,11 @@ def oscillator(lam: float, eta: float, init) -> CotCoalg:
     )
 
 
-def osc(lam: float, eta: float, init, amp: float = 1.0) -> Arrangement:
+def osc(lam: float, eta: float, init: Numbers, amp: float = 1.0) -> Arrangement:
     """The system ``osc : I -> <0 | 1>`` (book Ch 3 ``ex.oscillator``): the oscillator's matter in the box of the static
     arrangement whose forward map sends the configuration ``q`` on the circle to ``amp sin q``; effort field 0, so a
-    force ``xi`` at the output reaches the matter only by the transpose of that map's differential, ``xi amp cos q``."""
+    force ``xi`` at the output reaches the matter only by the transpose of that map's differential, ``xi amp cos q``.
+    ``init``: the starting ``(alpha, nu)``."""
     return Arrangement(
         P=oscillator(lam, eta, init),
         in_dim_M=0,
@@ -328,19 +336,20 @@ def osc(lam: float, eta: float, init, amp: float = 1.0) -> Arrangement:
     )
 
 
-def copy_pair(eta_w: float, eta_theta: float, init_original, init_copy) -> Arrangement:
+def copy_pair(eta_w: float, eta_theta: float, init_original: Numbers, init_copy: Numbers) -> Arrangement:
     """``W = C . (V_orig (x) V_copy (x) id_1) : <0 | 1> -> I``; the external input is the coupling ``K``.
 
     Two ``osc`` (book Ch 3 ``ex.oscillator``) of one kind, the same matter, started at different angular frequencies. The coupling ``C`` is
     ``contact_one_way(1)`` on ``(x, y, K)``: the forcing ``K (x - y)`` on the copy's value ``y`` and nothing on the
     original's ``x`` (Ch 2's waterfall), so the original receives no force and runs as a free oscillator; while
     ``K = 1`` the copy's angular frequency is pulled to the original's, and at ``K = 0`` each runs on its own.
+    ``init_original`` and ``init_copy``: each oscillator's starting ``(alpha, nu)``.
     """
     V = parallel_arrangements(osc(eta_w, eta_theta, init_original), osc(eta_w, eta_theta, init_copy))
     return compose_seq(parallel_arrangements(V, identity(1)), contact_one_way(1.0))
 
 
-def copy_pair_q(arr: Arrangement, state):
+def copy_pair_q(arr: Arrangement, state: Any) -> Tuple[np.ndarray, np.ndarray]:
     """The original's and the copy's states ``(alpha, nu)``, read off ``W``'s state ``(((s_orig, s_copy), _), _)``."""
     (s_orig, s_copy), _ = state[0]
     return np.asarray(s_orig), np.asarray(s_copy)
@@ -376,18 +385,18 @@ def copier_wire() -> Arrangement:
     )
 
 
-def copy_pair_out(eta_w: float, eta_theta: float, init_original, init_copy) -> Arrangement:
+def copy_pair_out(eta_w: float, eta_theta: float, init_original: Numbers, init_copy: Numbers) -> Arrangement:
     """The system ``copier : I -> <1 | 2>`` of book Ch 3 ``ex.copying_learner``: ``copier_wire`` with its boxes filled by
     the original ``osc``, the copy ``osc`` and ``couple``. The signal ``kappa`` arrives at its external input, and the
     original's value ``x`` and the copy's ``y`` are sent out (David, 2026-10-19: "neither of these two X's and Y's are
     exported out, so how am I even hearing any of this stuff?"). With the force ``0`` at its outputs it steps as
-    ``copy_pair`` told ``K = kappa``."""
+    ``copy_pair`` told ``K = kappa``. ``init_original`` and ``init_copy`` as in ``copy_pair``."""
     boxes = parallel_arrangements(
         parallel_arrangements(osc(eta_w, eta_theta, init_original), osc(eta_w, eta_theta, init_copy)), couple())
     return compose_seq(boxes, copier_wire())
 
 
-def copier_q(arr: Arrangement, state):
+def copier_q(arr: Arrangement, state: Any) -> Tuple[np.ndarray, np.ndarray]:
     """The original's and the copy's states ``(alpha, nu)``, read off ``copier``'s state ``(((s_orig, s_copy), _), _)``."""
     (s_orig, s_copy), _ = state[0]
     return np.asarray(s_orig), np.asarray(s_copy)

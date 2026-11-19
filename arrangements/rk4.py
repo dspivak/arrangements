@@ -34,14 +34,18 @@ composite take their rounds together, so RK4 parts run as RK4 on the whole.
 
 from __future__ import annotations
 
+from typing import Any, Optional
+
 import jax.numpy as jnp
 
+from .arrangement import Numbers
 from .coalgebra import CotCoalgK, gyro_kick
 from .rvect import ReactiveVectorSpace
 
 
-def rk4(Q: ReactiveVectorSpace, h: float = 0.1, init=None) -> CotCoalgK:
+def rk4(Q: ReactiveVectorSpace, h: float = 0.1, init: Optional[Any] = None) -> CotCoalgK:
     """The classical RK4 four-stage coalgebra on ``(Q, sharp_Q)``, ``Store∘S ⇒ cot^{◁4}`` (step ``h``).
+    ``init`` is the initial state, a position array (a pytree, hence ``Any``); ``None`` takes the default.
 
     The macro-state is the position ``x``; intermediates carry ``x`` together with the
     rates ``kᵢ`` collected so far. Each ``advance`` evaluates the rate at the *same*
@@ -100,10 +104,11 @@ def rk4(Q: ReactiveVectorSpace, h: float = 0.1, init=None) -> CotCoalgK:
 
 
 def rk4_gyro(
-    Q: ReactiveVectorSpace, h: float = 0.1, drag: float = 0.0, gamma: float = 0.0,
-    J=None, gyro_block=None, init=None,
+    Q: ReactiveVectorSpace, h: float = 0.1, drag: float = 0.0, gamma: Numbers = 0.0,
+    J: Optional[Numbers] = None, gyro_block: Optional[int] = None, init: Optional[Any] = None,
 ) -> CotCoalgK:
     """Classical RK4 on the gyro *phase* system, an ``pc^(4)`` coalgebra (rmk.multistage).
+    ``init`` is the initial state ``(q, xi)`` (a pytree, hence ``Any``); ``None`` takes the default.
 
     The faithful-machine integrator: it carries the *same* forces as ``coalgebra.gyro``
     (springs and rod gravity in the forcing ``omega``, quadratic drag and gyroscopic
@@ -138,7 +143,8 @@ def rk4_gyro(
                    durational=lambda tau: rk4_gyro(Q, h * tau, drag, gamma, J, gyro_block, init))
 
 
-def rk4_gyro_on_cotangent(Q: ReactiveVectorSpace, h: float = 0.1, init=None) -> CotCoalgK:
+def rk4_gyro_on_cotangent(Q: ReactiveVectorSpace, h: float = 0.1,
+                          init: Optional[Any] = None) -> CotCoalgK:
     """RK4 on the phase system with base ``T^*Q`` (the DIRECT realization, cf.
     ``coalgebra.phase_on_cotangent``): the state ``(q, xi)`` presents ``(q, xi)`` itself
     at each stage, so the arrangement's forcing on ``Q x Q^*`` may depend on the

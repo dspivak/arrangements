@@ -45,13 +45,13 @@ The entry model of §12b (O1, O2) is in :mod:`arrangements.commons_entry`.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, OneForm, exact, zero_form
 from .coalgebra import configuration
 from .rvect import ReactiveVectorSpace, constant
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
@@ -196,7 +196,7 @@ def extractor(par: Params, x0: float, label: str = "Ext") -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def stateless_coupler(arity: int, omega, label: str) -> Arrangement:
+def stateless_coupler(arity: int, omega: OneForm, label: str) -> Arrangement:
     """A stateless ``arity``-port coupler ``<R^0|R^arity> -> <R^0|R^0>``.
 
     ``omega(q, e, n_in)`` returns the covector triple; its ``M^+`` component is the
@@ -358,18 +358,19 @@ def commons(
     return replace(wired, label=label or f"commons[{kind}](N={N})")
 
 
-def open_access(par: Params, N: int, **kw) -> Arrangement:
-    """Wiring 2 (§5)."""
+def open_access(par: Params, N: int, **kw: Any) -> Arrangement:
+    """Wiring 2 (§5). ``kw``: ``commons``'s ``R0``, ``x0`` and ``label``."""
     return commons(par, N, **kw)
 
 
-def governed(par: Params, N: int, s: float, **kw) -> Arrangement:
-    """Wiring 1 (§4): open access **plus** one exact ``N``-ary coupler."""
+def governed(par: Params, N: int, s: float, **kw: Any) -> Arrangement:
+    """Wiring 1 (§4): open access **plus** one exact ``N``-ary coupler. ``kw``: ``commons``'s ``R0``, ``x0`` and ``label``."""
     return commons(par, N, s=s, **kw)
 
 
-def insulated(par: Params, N: int, Rhat: float, **kw) -> Arrangement:
-    """Wiring 3 (§6): open access with each catch coupler's one-form made stale."""
+def insulated(par: Params, N: int, Rhat: float, **kw: Any) -> Arrangement:
+    """Wiring 3 (§6): open access with each catch coupler's one-form made stale. ``kw``: ``commons``'s ``R0``, ``x0`` and
+    ``label``."""
     return commons(par, N, Rhat=Rhat, **kw)
 
 
@@ -378,7 +379,7 @@ def insulated(par: Params, N: int, Rhat: float, **kw) -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def closed_step(arr: Arrangement):
+def closed_step(arr: Arrangement) -> Callable[[Any], Any]:
     """One step of ``Phi(arr)`` for a closed arrangement, as in ``tests/test_rendezvous.py``.
 
     For ``in_dim_M = out_dim_M = 0`` and a zero exterior covector the interpretation's
@@ -429,7 +430,7 @@ def split(q: Array) -> Tuple[float, Array]:
 # ---------------------------------------------------------------------------
 
 
-def composite_port_form(arr: Arrangement):
+def composite_port_form(arr: Arrangement) -> Callable[[Array], Array]:
     """The composite forcing as a one-form on the configuration ``Q = R^{1+N}``.
 
     For a closed arrangement the configuration coordinates *are* the ports
@@ -441,7 +442,7 @@ def composite_port_form(arr: Arrangement):
     return lambda q: arr.omega(q, EMPTY, EMPTY)[0]
 
 
-def d_omega(form):
+def d_omega(form: Callable[[Array], Array]) -> Callable[[Array], Array]:
     """``(d omega)_{ij} = d_i F_j - d_j F_i``, the antisymmetric part of ``DF``."""
 
     def at(q):
@@ -451,6 +452,6 @@ def d_omega(form):
     return at
 
 
-def returned_covector(cpl: Arrangement):
+def returned_covector(cpl: Arrangement) -> Callable[[Array], Array]:
     """``F(e)``: a stateless coupler's forcing restricted to its ports."""
     return lambda e: cpl.omega(EMPTY, e, EMPTY)[1]

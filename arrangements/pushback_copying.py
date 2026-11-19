@@ -48,15 +48,19 @@ converge: the tests, ``tests/test_pushback_copying.py``, check the stated step.
 
 For agents: the head before 2026-11-13 is in ``notes/P31-B-CH3-HISTORY-2026-11-13.md``.
 """
+from typing import Callable, Tuple
+
 import jax
 import jax.numpy as jnp
-
+from jax import Array
 from .arrangement import Arrangement
 from .coalgebra import CotCoalg
 from .wiring import trivial_parameter
 
 
-def pushback_copy(material, output, inclination, input_dim, output_dim):
+def pushback_copy(material: CotCoalg, output: Callable[[Array], Array],
+                  inclination: Callable[[Array, Array], Tuple[Array, Array]],
+                  input_dim: int, output_dim: int) -> Arrangement:
     """The book's ``copier : I -> <V | W x V>`` from the data it asks one to choose (``ex.copying_pushback``).
 
     ``material`` is the integrator (Q,S,r,u), ``output(q)`` is o(q), and ``inclination(q, v)`` is
@@ -94,7 +98,7 @@ def pushback_copy(material, output, inclination, input_dim, output_dim):
         label="pushback_copy")
 
 
-def pushback_comparator(input_dim, output_dim):
+def pushback_comparator(input_dim: int, output_dim: int) -> Arrangement:
     """The book's ``compare : <V | W> (x) <V | W x V> -> <V x R | W x W>`` (``eqn.copy_general_interface``).
 
     The last external input is the signal kappa, switching both teaching loads. Since v' = 0 both internal inputs

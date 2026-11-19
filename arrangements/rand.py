@@ -46,7 +46,7 @@ import jax.numpy as jnp
 from jax import Array
 from jax.tree_util import tree_map
 
-from .arrangement import Arrangement
+from .arrangement import Arrangement, Numbers
 from .coalgebra import CotCoalg
 from .rvect import ReactiveVectorSpace
 
@@ -245,7 +245,7 @@ def lift(P: CotCoalg, kind: type) -> CotCoalgR:
     )
 
 
-def kicked_configuration(Q: ReactiveVectorSpace, weights, kicks, init: Array = None) -> CotCoalgR:
+def kicked_configuration(Q: ReactiveVectorSpace, weights: Numbers, kicks: Numbers, init: Optional[Array] = None) -> CotCoalgR:
     """The configuration step followed by a finite random kick:
     ``s |-> s + sharp_s(xi_Q) + kicks[i]`` with probability ``weights[i]``."""
     weights, kicks = jnp.asarray(weights, dtype=float), jnp.asarray(kicks, dtype=float)
@@ -257,7 +257,7 @@ def kicked_configuration(Q: ReactiveVectorSpace, weights, kicks, init: Array = N
     )
 
 
-def euler_maruyama(Q: ReactiveVectorSpace, temperature: float, init: Array = None) -> CotCoalgR:
+def euler_maruyama(Q: ReactiveVectorSpace, temperature: float, init: Optional[Array] = None) -> CotCoalgR:
     """The configuration step plus a Gaussian kick of covariance ``2 T sharp_s``:
 
         s |-> s + sharp_s(xi_Q) + sqrt(2T) L_s z,   L_s L_s^T = sharp_s,  z ~ gamma_d.
@@ -286,7 +286,7 @@ def euler_maruyama(Q: ReactiveVectorSpace, temperature: float, init: Array = Non
                      kind=GaussianRV, label=f"EM(T={temperature:g})", timed_step=timed_step)
 
 
-def euler_maruyama_cov(Q: ReactiveVectorSpace, temperature: float, init: Array = None) -> CotCoalgR:
+def euler_maruyama_cov(Q: ReactiveVectorSpace, temperature: float, init: Optional[Array] = None) -> CotCoalgR:
     """Euler--Maruyama on ``rand_N``: over a duration ``tau`` the random variable
     ``(d, 2 T tau sharp_s, z |-> s + tau sharp_s(xi_Q) + z)``.
 
@@ -337,7 +337,7 @@ def key_sampler(seed: int) -> Sampler:
                    step=lambda t, i: jax.random.split(t)[0], label=f"key({seed})")
 
 
-def replay_sampler(samples) -> Sampler:
+def replay_sampler(samples: Numbers) -> Sampler:
     """A deterministic sampler that answers the ``t``-th demand with ``samples[t]``."""
     samples = jnp.asarray(samples)
     return Sampler(init=jnp.asarray(0), draw=lambda t, i: samples[t],

@@ -53,14 +53,14 @@ bettor. The composite is ``bettor . copy . parent(driver (x) vehicle (x) route) 
 
 from __future__ import annotations
 
-from typing import NamedTuple, Sequence, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
-
-from .arrangement import Arrangement, zero_form
+from jax.typing import ArrayLike
+from .arrangement import Arrangement, Numbers, zero_form
 from .attention import input_dim, make_input, message, msg_dim, spatial_arrangement, spatial_config
 from .coalgebra import configuration
 from .rvect import constant, euclidean
@@ -87,7 +87,7 @@ class Arm(NamedTuple):
     loss: str = "squared"     # "squared": e^2/2; "cliff": a minute late is the bus, early costs nothing here
 
 
-def cliff(e, c_late: float = 5.0, w: float = 0.1):
+def cliff(e: ArrayLike, c_late: float = 5.0, w: float = 0.1) -> Array:
     """A bus loss: ``c_late w softplus(e / w)``, about ``c_late`` per minute late and about ``0`` early (the
     waiting is the plan's inconvenience); smoothed over ``w`` minutes so it has a slope (P37 (b)(ii), 70fcc5f2,
     at David's "the opposite makes no sense. what's happening to cause it?")."""
@@ -251,20 +251,24 @@ def belief_system(model: Model, arm: Arm) -> Arrangement:
 # The composite's state is ``((((th_d, th_v), th_r), q_parent), ()), m)``: the figurines' states, the
 # parent's configuration, the copy's empty state, the margin.
 
-def thetas(state) -> Array:
+def thetas(state: Any) -> Array:
+    """The three figurines' parameters, concatenated (``state``: the composite's state, a pytree of arrays,
+    hence ``Any``)."""
     (((a, b), c), _), _ = state[0]
     return jnp.concatenate([a, b, c])
 
 
-def placements(state) -> Array:
+def placements(state: Any) -> Array:
+    """The three placements (``state``: the composite's state, a pytree of arrays, hence ``Any``)."""
     return state[0][0][1][:3]
 
 
-def margin(state) -> Array:
+def margin(state: Any) -> Array:
+    """The margin (``state``: the composite's state, a pytree of arrays, hence ``Any``)."""
     return state[1][0]
 
 
-def exterior(flag: float = 0.0, t_star: float = 0.0, account=None) -> Array:
+def exterior(flag: float = 0.0, t_star: float = 0.0, account: Optional[Tuple[Numbers, Numbers]] = None) -> Array:
     """The world's input: the parent's ``(m_0, p_0 = 0)``, then ``(flag, t*)`` for the bettor. With
     ``account = (a, f)``, ``m_0 = ((a f, f), 1)``; else ``0_M``."""
     if account is None:
@@ -275,9 +279,10 @@ def exterior(flag: float = 0.0, t_star: float = 0.0, account=None) -> Array:
     return jnp.concatenate([make_input(m0, jnp.zeros(DP)), jnp.array([flag, t_star])])
 
 
-def step_fn(arr: Arrangement):
+def step_fn(arr: Arrangement) -> Callable[[Any, Array], Tuple[Any, Array]]:
     """One step of ``Phi(arr)`` on the exterior input ``ext`` with zero exterior covector, specialized to
-    the configuration component of the forcing (the form ``listener.step_fn`` uses)."""
+    the configuration component of the forcing (the form ``listener.step_fn`` uses). The step maps
+    ``(state, ext)`` to ``(next state, configuration forcing)``; a state is a pytree of arrays, hence ``Any``."""
     P, omega = arr.P, arr.omega
 
     @jax.jit
@@ -289,7 +294,7 @@ def step_fn(arr: Arrangement):
 
 
 def run_rounds(arr: Arrangement, truth: Sequence[float], rounds: int, steps: int = 10,
-               account_flags=None, state=None):
+               account_flags: Optional[Numbers] = None, state: Any = None) -> Tuple[Dict[str, np.ndarray], Any]:
     """Run ``rounds`` rounds of ``steps`` steps; the outcome arrives on each round's last step, with the
     account's components ``truth * account_flags`` if flags are given. Returns arrays over steps
     ``0..T`` of the figurines' states, placements, the margin, the prediction, and the final state."""
@@ -312,8 +317,9 @@ def run_rounds(arr: Arrangement, truth: Sequence[float], rounds: int, steps: int
     return {k: np.array(v) for k, v in out.items()}, s
 
 
-def prediction_at(s) -> Array:
-    """``t_hat = sum_j kappa_j g_j(theta_j)`` read off the composite's state (what the parent sends)."""
+def prediction_at(s: Any) -> Array:
+    """``t_hat = sum_j kappa_j g_j(theta_j)`` read off the composite's state (what the parent sends); ``s`` is
+    that state, a pytree of arrays, hence ``Any``."""
     th, p = thetas(s), placements(s)
     g = jnp.stack([RUNS[j](th[j]) for j in range(3)])
     return jnp.sum(jnp.exp(-p ** 2 / (2.0 * TAU)) * g)

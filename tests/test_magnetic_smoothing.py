@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from arrangements import magnets as M
-from magnetic_checks import checked_jit, outside_smoothing_discs
+from tests.magnetic_checks import checked_jit, outside_smoothing_discs
 
 
 @pytest.mark.parametrize('field,bare', [

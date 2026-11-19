@@ -39,7 +39,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, zero_form
-from .coalgebra import CotCoalg
+from .coalgebra import CotCoalg, CotCoalgK
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 EMPTY = jnp.zeros(0)
@@ -53,31 +53,59 @@ Term = Tuple[str, Callable[[Array], Array], Callable[[Array], Array]]
 # ---------------------------------------------------------------------------
 
 
-def rod_segment(capacity: float, initial: float, label: str = "rod segment") -> Arrangement:
-    """A rod-segment integrand ``1 -> <0|1>``: stores one number, sends it out, and moves it
-    at ``1/capacity`` times the load that comes back (book Ch 6 ``ex.tangent_heat``)."""
+def _integrator(init: Array, read: Callable[[Array], Array], response: Callable[[Array, Array], Array],
+                stages: int, h: float, label: str) -> CotCoalg | CotCoalgK:
+    """An integrator whose state moves at ``response(state, load)``, by one Euler round of
+    length ``h`` (``stages == 1``) or the four rounds of classical Runge-Kutta (``stages == 4``).
+
+    The same scheme as ``feeding._parameter``. A tensor of parts built with one ``stages`` and
+    ``h`` steps as that scheme applied to the whole, since each round every part reads out at
+    its own stage point and receives the load computed from all the readouts.
+    """
+    init = jnp.asarray(init, dtype=float)
+    if stages == 1:
+        advance = lambda s, xi, tau: s + tau * response(s, xi)
+        return CotCoalg(len(read(init)), init, read, lambda s, xi: advance(s, xi, h), label,
+                        timed_step=lambda s, xi, tau: advance(s, xi, h * tau))
+    if stages != 4:
+        raise ValueError("one Euler round or four Runge-Kutta rounds")
+
+    def mid(s, index: int, scale: float) -> Array:
+        x, ks = s
+        return x + h * scale * ks[index]
+
+    reads = (read, lambda s: read(mid(s, 0, .5)), lambda s: read(mid(s, 1, .5)), lambda s: read(mid(s, 2, 1.)))
+    advances = (lambda s, xi: (s, (response(s, xi),)),
+                lambda s, xi: (s[0], s[1] + (response(mid(s, 0, .5), xi),)),
+                lambda s, xi: (s[0], s[1] + (response(mid(s, 1, .5), xi),)),
+                lambda s, xi: s[0] + h / 6 * (s[1][0] + 2 * s[1][1] + 2 * s[1][2] + response(mid(s, 2, 1.), xi)))
+    return CotCoalgK(len(read(init)), init, reads, advances, label=label,
+                     durational=lambda tau: _integrator(init, read, response, 4, h * tau, label))
+
+
+def rod_segment(capacity: float, initial: float | Sequence[float] | Array, label: str = "rod segment", *,
+                stages: int = 1, h: float = 1.0) -> Arrangement:
+    """A rod-segment integrand ``1 -> <0|n>``: stores a number, sends it out, and moves it at
+    ``1/capacity`` times the load that comes back (book Ch 6 ``ex.tangent_heat``).
+
+    ``initial`` a number gives one store (``n = 1``); an array of ``n`` numbers gives ``n``
+    stores of the one capacity, side by side, drawn as one box.
+    """
     if capacity <= 0:
         raise ValueError("a rod segment's capacity is positive")
-
-    def advance(s: Array, xi: Array, duration: float) -> Array:
-        return s + duration * xi / capacity
-
-    P = CotCoalg(1, jnp.array([float(initial)]), lambda s: s,
-                 lambda s, xi: advance(s, xi, 1.0), label, timed_step=advance)
-    return Arrangement(P, 0, 0, 0, 1, lambda q, m: q, lambda q, m, n: EMPTY, zero_form, label)
+    init = jnp.atleast_1d(jnp.asarray(initial, dtype=float))
+    P = _integrator(init, lambda s: s, lambda s, xi: xi / capacity, stages, h, label)
+    return Arrangement(P, 0, 0, 0, init.shape[0], lambda q, m: q, lambda q, m, n: EMPTY, zero_form, label)
 
 
-def mass(m: float, position: float, momentum: float = 0.0, label: str = "mass") -> Arrangement:
+def mass(m: float, position: float, momentum: float = 0.0, label: str = "mass", *,
+         stages: int = 1, h: float = 1.0) -> Arrangement:
     """A mass ``1 -> <0|1>``: stores ``(q, p)``, sends out ``q`` and forgets ``p``, and
     responds to a load ``xi`` by ``(p/m, xi)`` (book Ch 6 ``exc.tangent_mass``)."""
     if m <= 0:
         raise ValueError("a mass is positive")
-
-    def advance(s: Array, xi: Array, duration: float) -> Array:
-        return s + duration * jnp.array([s[1] / m, xi[0]])
-
-    P = CotCoalg(1, jnp.array([float(position), float(momentum)]), lambda s: s[:1],
-                 lambda s, xi: advance(s, xi, 1.0), label, timed_step=advance)
+    P = _integrator(jnp.array([float(position), float(momentum)]), lambda s: s[:1],
+                    lambda s, xi: jnp.stack([s[1] / m, xi[0]]), stages, h, label)
     return Arrangement(P, 0, 0, 0, 1, lambda q, m_out: q, lambda q, m_out, n: EMPTY, zero_form, label)
 
 
@@ -86,11 +114,15 @@ def mass(m: float, position: float, momentum: float = 0.0, label: str = "mass") 
 # ---------------------------------------------------------------------------
 
 
-def push(label: str = "push") -> Arrangement:
+def push(label: str = "push", width: int = 1) -> Arrangement:
     """The stateless box ``1 -> <2|0>`` with inputs ``(F, x)`` and inclination field ``F dx``:
-    it pushes back ``F`` through ``x`` and ``0`` through ``F`` (note ``sec.push``)."""
-    return Arrangement(trivial_parameter(), 0, 0, 2, 0, lambda q, m: EMPTY, lambda q, m, n: EMPTY,
-                       lambda q, m, n: (EMPTY, EMPTY, jnp.stack([jnp.zeros_like(n[0]), n[0]])), label)
+    it pushes back ``F`` through ``x`` and ``0`` through ``F`` (note ``sec.push``).
+
+    With ``width = n`` it is ``n`` of them side by side, drawn as one box: inputs
+    ``(F_1..F_n, x_1..x_n)``, field ``sum_j F_j dx_j``.
+    """
+    return Arrangement(trivial_parameter(), 0, 0, 2 * width, 0, lambda q, m: EMPTY, lambda q, m, n: EMPTY,
+                       lambda q, m, n: (EMPTY, EMPTY, jnp.concatenate([jnp.zeros(width), n[:width]])), label)
 
 
 def transfer(label: str, inner_in: int, inner_out: int, outer_in: int, outer_out: int,
@@ -117,17 +149,21 @@ def pushes(label: str, dim: int, terms: Sequence[Term]) -> Arrangement:
 
     One ``push`` per term, fed by the circles ``c_i`` and ``h_i`` (note ``eqn.push_term``,
     ``eqn.pullback_term``). No derivative of a coefficient appears, because ``push`` is
-    load-free at ``F``. With no terms it is the zero field on ``R^dim``.
+    load-free at ``F``. With no terms it is the zero field on ``R^dim``. A target ``h_i`` with
+    ``n`` components gets a ``push`` of that width, and its coefficient has ``n`` components
+    too (or one, used for each).
     """
     if not terms:
         return Arrangement(trivial_parameter(), 0, 0, dim, 0, lambda q, m: EMPTY,
                            lambda q, m, n: EMPTY, zero_form, label)
-    boxes = [push(f"push: {name}") for name, _, _ in terms]
+    widths = [int(jnp.ravel(h(jnp.zeros(dim))).shape[0]) for _, _, h in terms]
+    boxes = [push(f"push: {name}", n) for (name, _, _), n in zip(terms, widths)]
 
     def route(m: Array, v: Array) -> Array:
-        return jnp.stack([f(v) for _, c, h in terms for f in (c, h)])
+        return jnp.concatenate([x for (_, c, h), n in zip(terms, widths)
+                                for x in (jnp.broadcast_to(jnp.ravel(c(v)), (n,)), jnp.ravel(h(v)))])
 
-    return fill(boxes, transfer(label, 2 * len(terms), 0, dim, 0, route))
+    return fill(boxes, transfer(label, 2 * sum(widths), 0, dim, 0, route))
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +217,8 @@ def spring(label: str = "spring") -> Arrangement:
                              ("stiffening", lambda v: -0.5 * v[1] ** 2, lambda v: v[0])])
 
 
-def dragger(beta: float, memory: float = 0.0, label: str = "dragger") -> Arrangement:
+def dragger(beta: float, memory: float = 0.0, label: str = "dragger", *,
+            stages: int = 1, h: float = 1.0) -> Arrangement:
     """The dragger ``1 -> <2|1>`` (note ``eqn.dragger``): a memory of capacity ``beta`` and a
     spring stretched between the position ``x`` it reads and the memory ``z``.
 
@@ -189,10 +226,11 @@ def dragger(beta: float, memory: float = 0.0, label: str = "dragger") -> Arrange
     ``-d(k (x - z)^2 / 2)`` and the memory moves at ``k (x - z) / beta``.
     """
     wiring = transfer(label, 2, 1, 2, 1, lambda m, n: jnp.stack([n[0], n[1] - m[0]]), lambda m: m)
-    return fill([rod_segment(beta, memory, "memory"), spring()], wiring)
+    return fill([rod_segment(beta, memory, "memory", stages=stages, h=h), spring()], wiring)
 
 
-def damper(beta: float, kappa_return: float, stroke: float = 0.0, label: str = "damper") -> Arrangement:
+def damper(beta: float, kappa_return: float, stroke: float = 0.0, label: str = "damper", *,
+           stages: int = 1, h: float = 1.0) -> Arrangement:
     """The damper ``1 -> <2|0>`` (note ``eqn.damper``): a dragger whose memory, its stroke
     ``z``, a spring sent the constant stiffness ``kappa_return`` pulls back to ``0``.
 
@@ -202,30 +240,38 @@ def damper(beta: float, kappa_return: float, stroke: float = 0.0, label: str = "
     """
     back = send(spring("return spring"), {0: kappa_return})
     wiring = transfer(label, 3, 1, 2, 0, lambda m, n: jnp.stack([n[0], n[1], m[0]]))
-    return fill([dragger(beta, stroke), back], wiring)
+    return fill([dragger(beta, stroke, stages=stages, h=h), back], wiring)
 
 
-def motor(capacity: float, label: str = "motor") -> Arrangement:
+def motor(capacity: float, label: str = "motor", width: int = 1) -> Arrangement:
     """The motor ``1 -> <4|0>`` (note ``eqn.motor``) for a store of the given capacity.
 
     Inputs: the battery ``b``, the store ``q``, the push ``tau``, and the load ``P`` the rest
     of the arrangement puts on the store. Field ``tau dq - tau (tau + P) / capacity db``: the
     store moves at ``(tau + P) / capacity``, so the battery pays the power ``tau`` times that
     rate. Load-free at ``tau`` and ``P``. It must be sent the true ``P``.
+
+    With ``width = n`` it drives ``n`` stores of the one capacity from the one battery:
+    inputs ``(b, q_1..q_n, tau_1..tau_n, P_1..P_n)``, the field the sum of the ``n`` motors'.
     """
     if capacity <= 0:
         raise ValueError("the driven store's capacity is positive")
-    return pushes(label, 4, [("drive", lambda v: v[2], lambda v: v[1]),
-                             ("pay", lambda v: -v[2] * (v[2] + v[3]) / capacity, lambda v: v[0])])
+    n = width
+    return pushes(label, 1 + 3 * n,
+                  [("drive", lambda v: v[1 + n:1 + 2 * n], lambda v: v[1:1 + n]),
+                   ("pay", lambda v: -jnp.sum(v[1 + n:1 + 2 * n] * (v[1 + n:1 + 2 * n] + v[1 + 2 * n:])) / capacity,
+                    lambda v: v[0])])
 
 
-def motor_at_rate(capacity: float, label: str = "motor at a rate") -> Arrangement:
+def motor_at_rate(capacity: float, label: str = "motor at a rate", width: int = 1) -> Arrangement:
     """A motor that drives its store at a chosen rate ``u``: inputs ``(b, q, u, P)``, the motor
     sent the push ``capacity * u - P``. The battery pays ``capacity u^2 - P u`` (note
-    ``sec.general``, the paragraph after ``eqn.motor``)."""
-    wiring = transfer(label, 4, 0, 4, 0,
-                      lambda m, n: jnp.stack([n[0], n[1], capacity * n[2] - n[3], n[3]]))
-    return fill([motor(capacity)], wiring)
+    ``sec.general``, the paragraph after ``eqn.motor``). ``width`` as for ``motor``."""
+    n = width
+    wiring = transfer(label, 1 + 3 * n, 0, 1 + 3 * n, 0,
+                      lambda m, v: jnp.concatenate([v[:1 + n], capacity * v[1 + n:1 + 2 * n] - v[1 + 2 * n:],
+                                                    v[1 + 2 * n:]]))
+    return fill([motor(capacity, width=n)], wiring)
 
 
 def sweep(capacity: float, radius: float, nu: float, gamma: float, label: str = "sweep") -> Arrangement:

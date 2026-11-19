@@ -63,14 +63,14 @@ hypotheses is David's candidate reading, an analogy here (the note's §1).
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Any, Callable, Collection, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from .arrangement import Arrangement
+from .arrangement import Arrangement, Numbers
 from .choice import _closed, belief_arrangement, belief_to_distribution, choice_step
 from .coalgebra import configuration
 from .functors import Phi
@@ -135,7 +135,7 @@ def abundance_share(y: Array) -> Array:
     return jnp.exp(y - jnp.max(y)) / jnp.sum(jnp.exp(y - jnp.max(y)))
 
 
-def run_two_scales(xs: Sequence[float], mus: Array):
+def run_two_scales(xs: Sequence[float], mus: Array) -> Tuple[Array, Array, Array]:
     """Run mind, tensor population and single-box population on one stream from uniform starts.
 
     Returns ``(lams, ys_tensor, ys_single)``, each with ``len(xs) + 1`` rows."""
@@ -157,14 +157,14 @@ def run_two_scales(xs: Sequence[float], mus: Array):
 LOG2PI = float(jnp.log(2.0 * jnp.pi))
 
 
-def k_hold(S_A: float, S_B: float, ell):
+def k_hold(S_A: float, S_B: float, ell: Union[float, Array]) -> Array:
     """Mean cost per datum pair of holding ``h``: ``1/2 S_A + 1/2 e^ell S_B - 1/2 ell + log 2 pi``."""
     return 0.5 * S_A + 0.5 * jnp.exp(ell) * S_B - 0.5 * ell + LOG2PI
 
 
-def holder_chooser(K_hold, K_drop: float, c: float, T: float, learn: bool,
-                   dt: float = 0.08, eta: float = 1.0, B: float = None) -> Arrangement:
-    """The {hold, drop} chooser, closed. ``K_hold`` is a function of ``ell``; with ``learn=False``
+def holder_chooser(K_hold: Callable[[Union[float, Array]], Array], K_drop: float, c: float, T: float, learn: bool,
+                   dt: float = 0.08, eta: float = 1.0, B: Optional[float] = None) -> Arrangement:
+    """The {hold, drop} chooser, closed. ``K_hold`` is a function of ``ell`` (a number to a number); with ``learn=False``
     the state is ``p`` only and ``K_hold(0)`` is used (``Pi_B = 1``); with ``learn=True`` the state is
     ``(p, ell)`` with ``ell`` descended (Euclidean, ``eta``), starting at 0."""
     B = K_drop + 2.0 * T if B is None else B
@@ -227,7 +227,7 @@ def account_community(Y0: Array, W: Array, alpha: float, beta: float, loglik: Ar
     )
 
 
-def community_run(arr: Arrangement, steps: int, m: int, n: int):
+def community_run(arr: Arrangement, steps: int, m: int, n: int) -> Array:
     """``Y`` after each step, ``steps + 1`` arrays of shape ``(m, n)``."""
     _, rec = run(arr, steps, record=lambda z: z[:-1].reshape(m, n))
     return jnp.stack(rec)
@@ -288,7 +288,7 @@ def drift_filter(M: Array, L: Array, p: Array) -> Arrangement:
     )
 
 
-def run_variation(xs, mus, eps: float, start: Array):
+def run_variation(xs: Sequence[float], mus: Numbers, eps: float, start: Array) -> Tuple[Array, Array]:
     """Population and mind on one stream; returns ``(Ns, ps)``, ``len(xs) + 1`` rows each."""
     mus = jnp.asarray(mus, dtype=float)
     M = mutation_matrix(len(mus), eps)
@@ -305,7 +305,7 @@ def run_variation(xs, mus, eps: float, start: Array):
 # --- test (e): an idea against a rival ----------------------------------------
 
 
-def rival_chooser(n: Array, S: Array, learned: tuple, T: float, dt, eta: Array, Bshift,
+def rival_chooser(n: Array, S: Array, learned: tuple, T: float, dt: float, eta: Array, Bshift: float,
                   p0: Array, ell0: Array) -> Arrangement:
     """``n = (n_A, n_B)``; ``S[i, X]`` the mean square of source ``X`` about ``h_i``'s value;
     ``learned`` the (i, X) pairs whose trust is a descended box (the rest fixed at ``Pi = 1``)."""
@@ -327,7 +327,7 @@ def rival_chooser(n: Array, S: Array, learned: tuple, T: float, dt, eta: Array, 
     return _closed(P, U, f"rival({len(learned)} trust boxes)")
 
 
-def rival_closed_K(n, S, learned) -> np.ndarray:
+def rival_closed_K(n: Sequence[float], S: np.ndarray, learned: Collection[Tuple[int, int]]) -> np.ndarray:
     """``K_i*`` with every learned trust at its rest ``1/S`` (for the gauge constant ``B`` only)."""
     out = np.zeros(2)
     for i in (0, 1):
@@ -340,10 +340,11 @@ def rival_closed_K(n, S, learned) -> np.ndarray:
     return out
 
 
-def rival_settle_fn(learned: tuple, T: float, steps: int = None):
+def rival_settle_fn(learned: tuple, T: float, steps: Optional[int] = None) -> Callable[..., Any]:
     """A jitted ``(state, n, S, dt, eta, Bshift[, steps]) -> state`` running ``steps`` steps of
     ``Phi(rival_chooser(...))`` from ``state = (p, ell)`` (or ``p`` with no trust boxes). With
-    ``steps=None`` here, the step count is a (traced) argument."""
+    ``steps=None`` here, the step count is a (traced) argument. The state, ``(p, ell)`` or ``p``, is a pytree of
+    arrays, so the function returns ``Any``."""
 
     def settle_(state, n, S, dt, eta, Bshift, steps_=steps):
         p0, ell0 = (state if learned else (state, jnp.zeros(0)))
@@ -379,7 +380,7 @@ def translate_beliefs(Y: Array, inc: Array) -> Array:
     return choice_step(Phi(arr), arr.P.init).reshape(Y.shape)
 
 
-def stats_inc(mus: np.ndarray, N, S) -> np.ndarray:
+def stats_inc(mus: np.ndarray, N: Numbers, S: Numbers) -> np.ndarray:
     """Log-likelihood of ``N`` draws with sum ``S`` under ``N(mu_i, 1)``, less the part common to all
     ``i``: ``mu_i S - N mu_i^2 / 2`` (broadcasts over leading axes of ``N``, ``S``)."""
     N = np.asarray(N, float)[..., None]
@@ -387,13 +388,14 @@ def stats_inc(mus: np.ndarray, N, S) -> np.ndarray:
     return mus * S - N * mus ** 2 / 2.0
 
 
-def weights(y: np.ndarray, mask: np.ndarray = None) -> np.ndarray:
+def weights(y: np.ndarray, mask: Optional[np.ndarray] = None) -> np.ndarray:
     y = np.where(mask, y, -np.inf) if mask is not None else y
     e = np.exp(y - np.max(y, axis=-1, keepdims=True))
     return e / e.sum(axis=-1, keepdims=True)
 
 
-def run_summaries(draws: np.ndarray, mus: np.ndarray, A: np.ndarray, provenance: bool, extra: int):
+def run_summaries(draws: np.ndarray, mus: np.ndarray, A: np.ndarray, provenance: bool,
+                  extra: int) -> Tuple[List[np.ndarray], list]:
     """Summaries arms. ``draws[t, j]``; ``A`` the 0/1 adjacency. Returns per step (after ``T`` draw
     steps and ``extra`` steps with no draws): ``Ys`` (m, n), and for provenance the paper sets, else the
     accumulated ``(N, S)``."""
@@ -428,7 +430,8 @@ def run_summaries(draws: np.ndarray, mus: np.ndarray, A: np.ndarray, provenance:
     return Ys, held
 
 
-def run_conclusions(draws, mus, A, slices, replicate: bool, K=2, r=5, c=0.1):
+def run_conclusions(draws: np.ndarray, mus: np.ndarray, A: np.ndarray, slices: Sequence[Sequence[int]],
+                    replicate: bool, K: int = 2, r: int = 5, c: float = 0.1) -> Tuple[list, list]:
     """Conclusions arms. Returns per step the masked weights (m, n) and each holder's held set."""
     T, m = draws.shape
     n = len(mus)
@@ -477,7 +480,7 @@ def run_conclusions(draws, mus, A, slices, replicate: bool, K=2, r=5, c=0.1):
     return W_out, H_out
 
 
-def run_bounded_mind(draws, mus, slice_):
+def run_bounded_mind(draws: np.ndarray, mus: np.ndarray, slice_: Sequence[int]) -> list:
     """One mind with ``K = len(slice_)`` fixed hypotheses and every holder's draws each step."""
     T, m = draws.shape
     y = jnp.zeros(len(mus))

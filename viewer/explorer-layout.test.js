@@ -42,11 +42,31 @@ function check(project,options){
   for(const f of g.forks){close(f.start,f.port);assert.ok(f.end.x>f.start.x);assert.equal(f.end.y,f.start.y);}
   return g;
 }
-test('each casing has six output ports; receiver has eighteen inputs and two outputs',()=>{
-  const m=new E.Model(A.adapter().snapshot()),g=check(m.project());
-  assert.equal(g.positions.get('receiver').inputs.length,18);assert.equal(g.positions.get('receiver').outputs.length,2);
-  for(let i=0;i<3;i++)assert.equal(g.positions.get('casing-'+i).outputs.length,6);
-  assert.equal(g.edges.length,20);
+test('the receiver keeps its seven named inputs and outputs as casings enter the world',()=>{
+  let reference;
+  for(const places of [[],[0],[0,1],[0,1,3,5]]){
+    const model=new E.Model(A.adapter({places,foods:places.map(()=>10)}).snapshot());
+    const layout=check(model.project()),body=layout.positions.get('receiver');
+    const ports=[body.inputs,body.outputs].map(side=>side.map(port=>port.key));
+    assert.deepEqual(ports.map(side=>side.length),[7,7]);
+    if(reference)assert.deepEqual(ports,reference);
+    reference=ports;
+    for(let i=0;i<places.length;i++)assert.equal(layout.positions.get('casing-'+i).outputs.length,6);
+  }
+});
+test('the food-learning receiver has the same ports with zero, one and four casings',()=>{
+  const L=require('./food-learning.js');
+  let reference;
+  for(const places of [[],[0],[0,1,3,5]]){
+    const sc=A.observeLearning(L.start(places,places.map(()=>10)),places,L.DEFAULTS);
+    const model=new E.Model(sc),body=check(model.project()).positions.get('receiver');
+    const ports=[body.inputs,body.outputs].map(side=>side.map(port=>port.key));
+    assert.deepEqual(ports.map(side=>side.length),[7,7]);
+    if(reference)assert.deepEqual(ports,reference);
+    reference=ports;
+    model.enter('receiver');check(model.project());
+    model.enter('memory');check(model.project());
+  }
 });
 test('every feeding level has connected horizontal endpoints and clears unrelated parts',()=>{
   const m=new E.Model(A.adapter().snapshot());let levels=0;
@@ -75,21 +95,27 @@ test('a shared output has one fork and a separate returning load on each branch'
   assert.ok(port.wires.some(w=>w.load===0));assert.ok(port.wires.every(w=>Number.isFinite(w.load)));
 });
 test('inconsistent values on one output and distinct readouts joined at one input are rejected',()=>{
-  const scene=A.adapter().snapshot(),wire=scene.wires[0],same=scene.wires.find(w=>w!==wire&&E.signalKey(w)===E.signalKey(wire));
+  const scene=A.adapter().snapshot(),wire=scene.wires.find(w=>w.source==='battery' && w.label==='Battery');
+  const same=scene.wires.find(w=>w!==wire&&E.signalKey(w)===E.signalKey(wire));
   assert.ok(same);same.value=wire.value+1;assert.throws(()=>E.validate(scene),/Conflicting values/);
-  const sc=A.adapter().snapshot(),target=sc.wires[0].target,ws=sc.wires.filter(w=>w.target===target);
+  const sc=A.adapter().snapshot(),ws=sc.wires.filter(w=>w.target==='grip-rate');
   ws[0].targetPort='input';ws[1].targetPort='input';assert.throws(()=>E.validate(sc),/Distinct readouts/);
 });
 test('moving a part reroutes every crossing wire, preserves port order, and leaves observations unchanged',()=>{
   const m=new E.Model(A.adapter().snapshot()),p=m.project(),before=JSON.stringify(p),initial=G.layout(p);
   const original=initial.positions.get('casing-0').outputs.map(p=>p.key);
-  for(const placements of [{'casing-0':{x:335,y:187}},{'casing-0':{x:1090,y:1000},receiver:{x:800,y:421}}]){
+  const start=initial.positions.get('casing-0'),body=initial.positions.get('receiver');
+  for(const placements of [
+    {'casing-0':{x:start.x+32,y:start.y}},
+    {'casing-0':{x:body.x,y:initial.height+120},receiver:{x:body.x+140,y:body.y}}
+  ]){
     const moved=check(p,{placements});
     assert.deepEqual(moved.positions.get('casing-0').outputs.map(p=>p.key),original);
-    assert.notEqual(moved.edges[0].path,initial.edges[0].path);
+    const edge=g=>g.edges.find(e=>e.source==='casing-0');
+    assert.notEqual(edge(moved).path,edge(initial).path);
     assert.equal(JSON.stringify(p),before);
   }
-  assert.throws(()=>G.layout(p,{placements:{receiver:{x:290,y:421}}}),/Leave space/);
+  assert.throws(()=>G.layout(p,{placements:{receiver:{x:start.x,y:start.y}}}),/Leave space/);
 });
 test('tiny pinch events produce gentle continuous zoom independent of event grouping',()=>{
   let small=1;for(let i=0;i<10;i++)small=G.wheelZoom(small,-2);
@@ -99,4 +125,23 @@ test('tiny pinch events produce gentle continuous zoom independent of event grou
   assert.ok(Math.abs(small-1)<1e-12,'opposite pinch restores size away from limits');
   assert.equal(G.wheelZoom(1,1e6),.25);assert.equal(G.wheelZoom(1,-1e6),4);
   assert.equal(G.wheelZoom(1,1,1),G.wheelZoom(1,16,0));
+});
+
+test('an operation with many true inputs uses compact marks and individually spaced terminals',()=>{
+  const sizes=[];
+  for(const count of [1,6,26]){
+    const sc={version:1,root:'r',nodes:[{id:'r',kind:'box'},{id:'sum',parent:'r',kind:'operation',label:'Sum'}],wires:[]};
+    for(let i=0;i<count;i++){
+      sc.nodes.push({id:'i'+i,parent:'r',kind:'boundary',side:'in',label:'Input '+i});
+      sc.wires.push({id:'w'+i,source:'i'+i,target:'sum',label:'Input '+i,value:i,load:0});
+    }
+    const sum=check(new E.Model(sc).project()).positions.get('sum');
+    for(const port of sum.inputs){
+      assert.ok(Math.abs(Math.hypot(port.glyphX-sum.glyphX,port.glyphY)-sum.radius)<1e-8);
+      assert.ok(port.x<sum.x+port.glyphX);
+    }
+    sizes.push(sum);
+  }
+  assert.equal(sizes[0].radius,sizes[2].radius);
+  assert.ok(sizes[2].w < 150 && sizes[2].h > sizes[0].h);
 });

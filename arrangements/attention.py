@@ -59,7 +59,7 @@ from typing import Callable, List, NamedTuple, Optional, Sequence, Tuple
 import jax.numpy as jnp
 from jax import Array
 
-from .arrangement import Arrangement, exact
+from .arrangement import Arrangement, Numbers, exact
 from .coalgebra import CotCoalg, configuration
 from .rvect import euclidean, trivial
 
@@ -79,7 +79,7 @@ def input_dim(dim_H: int, dim_P: int) -> int:
     return dim_H + 1 + dim_P
 
 
-def message(h, w) -> Array:
+def message(h: Numbers, w: Numbers) -> Array:
     """The message ``m = (h, w) in M = H x W``."""
     return jnp.concatenate(
         [jnp.ravel(jnp.asarray(h, float)), jnp.reshape(jnp.asarray(w, float), (1,))]
@@ -101,7 +101,7 @@ def weight(m: Array) -> Array:
     return m[-1]
 
 
-def make_input(m: Array, p) -> Array:
+def make_input(m: Array, p: Numbers) -> Array:
     """The input ``e = (m, p) in E = M x P``."""
     return jnp.concatenate([m, jnp.ravel(jnp.asarray(p, float))])
 
@@ -183,7 +183,7 @@ class Transfer(NamedTuple):
     L: Array      # (dim_H, dim_H) signal map
 
 
-def transfer(gamma, L) -> Transfer:
+def transfer(gamma: Numbers, L: Numbers) -> Transfer:
     return Transfer(gamma=jnp.asarray(gamma, float), L=jnp.asarray(L, float))
 
 
@@ -682,7 +682,7 @@ def spatial_Q_dim(n: int, dim_H: int, dim_P: int) -> int:
     return n * dim_P + n * dim_H * dim_H
 
 
-def spatial_config(positions, values) -> Array:
+def spatial_config(positions: Numbers, values: Numbers) -> Array:
     """A configuration ``q = (p_1, ..., p_n, V_1, ..., V_n)`` of ``Q_n``, flattened."""
     return jnp.concatenate(
         [jnp.ravel(jnp.asarray(positions, float)), jnp.ravel(jnp.asarray(values, float))]

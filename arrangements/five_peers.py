@@ -45,14 +45,15 @@ Everything here is the agents' construction of the book's example (Claude Opus 5
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Any, Sequence
 
 import jax
 import jax.numpy as jnp
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .attention import (
-    AttentionArrangement, Transfer, attention_arrangement, input_dim, message, msg_dim, zero_transfer,
+    AttentionArrangement, Cost, Transfer, TransferMatrix, attention_arrangement, input_dim, message, msg_dim,
+    zero_transfer,
 )
 from .coalgebra import configuration
 from .rand import CotCoalgR, GaussianRV, key_sampler, seed
@@ -96,18 +97,18 @@ def _values(m_out: jnp.ndarray) -> jnp.ndarray:
     return jnp.reshape(m_out, (N, MDIM))[:, 0]
 
 
-def expected_cost(sigma2: float):
+def expected_cost(sigma2: float) -> Cost:
     """The parent's cost ``sum_j k_j(q)``: reads no message, uses the variances."""
     return lambda q, m_out, n_in: jnp.sum(person_costs(q, sigma2))
 
 
-def realized_cost(q, m_out, n_in):
+def realized_cost(q: jnp.ndarray, m_out: jnp.ndarray, n_in: jnp.ndarray) -> jnp.ndarray:
     """The parent's cost ``sum_j (sum_i P_ji(q) h_i - h_0)^2``: each person's heard value minus the number that
     came in from outside, squared. No variance enters."""
     return jnp.sum((weights(q) @ _values(m_out) - n_in[0]) ** 2)
 
 
-def transfers(q: jnp.ndarray):
+def transfers(q: jnp.ndarray) -> TransferMatrix:
     """``T[j][i]`` for ``i, j`` in ``0..5``: ``T_{gamma, gamma id}``, ``gamma = exp(-d(k_i, k_j))``, between persons;
     ``0`` to and from the outside (index ``0``) and on the diagonal."""
     G = gains(q)
@@ -125,8 +126,9 @@ def transfers(q: jnp.ndarray):
     return tuple(rows)
 
 
-def parent(cost, places, eta: float) -> AttentionArrangement:
-    """The 5-ary attention arrangement: matter the five places, placement ``l_j = k_j``, the hearing above."""
+def parent(cost: Cost, places: Numbers, eta: float) -> AttentionArrangement:
+    """The 5-ary attention arrangement: matter the five places, placement ``l_j = k_j``, the hearing above. ``cost``:
+    ``expected_cost(sigma2)`` or ``realized_cost``; ``places``: the five starting places."""
     return attention_arrangement(
         N, DH, DP,
         placement=lambda q: jnp.reshape(q, (N, DP)),
@@ -174,8 +176,8 @@ def exterior(x: float, p0: float = 0.0) -> jnp.ndarray:
     return jnp.concatenate([message(x, 1.0), jnp.array([p0])])
 
 
-def places_of(state) -> jnp.ndarray:
-    """The five places from a composite state."""
+def places_of(state: Any) -> jnp.ndarray:
+    """The five places from a composite state (``state`` is a pytree of nested tuples, so ``Any``)."""
     return state[0][1]
 
 

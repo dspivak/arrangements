@@ -42,6 +42,8 @@ from typing import Any
 
 import numpy as np
 
+from .arrangement import Numbers
+
 VIEWER = Path(__file__).resolve().parent.parent / "viewer"
 PLAYER = VIEWER / "player.html"
 PLACEHOLDER = "/*SCENE*/null"
@@ -50,7 +52,7 @@ STAGE_PLACEHOLDER = "/*STAGE*/"
 LIVE = VIEWER / "live.html"
 
 
-def series(a) -> list:
+def series(a: Numbers) -> list:
     """A numpy or jax array, or a list, as nested lists of floats rounded for the page."""
     return np.round(np.asarray(a, dtype=float), 6).tolist()
 
@@ -113,7 +115,7 @@ def to_html(scene: dict[str, Any], player: Path | None = None) -> str:
                 .replace("{{TITLE}}", html.escape(scene["title"])))
 
 
-def write_html(scene: dict[str, Any], path, player: Path | None = None) -> Path:
+def write_html(scene: dict[str, Any], path: str | Path, player: Path | None = None) -> Path:
     """Write the self-contained page for ``scene`` to ``path``; returns the path."""
     path = Path(path)
     path.write_text(to_html(scene, player))

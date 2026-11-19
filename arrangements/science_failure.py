@@ -43,12 +43,14 @@ the world's table lookup (``draw_source``, as stage 1), and ``R``, which is smoo
 from __future__ import annotations
 
 from functools import partial
+from typing import Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
-from .arrangement import Arrangement
+from .arrangement import Arrangement, Numbers
 from .coalgebra import configuration
 from .functors import Phi
 from .rvect import euclidean
@@ -57,7 +59,7 @@ from .science_native import _IN_DIR, _IN_POS, draw_source, neighbours, wire_boxe
 Z0 = 0.5
 
 
-def report(z):
+def report(z: Array) -> Array:
     """The failure report ``exp(-z0/z)`` for ``z > 0``, else 0 (safe under autodiff). Cut at
     ``z = z0/700``, where the report is below ``1e-304``: without the cut, a tiny positive ``z`` gives
     ``0 * inf = NaN`` in the readout's derivative, which ``compose_seq``'s pullback evaluates (times a zero
@@ -67,7 +69,7 @@ def report(z):
 
 
 @jax.custom_jvp
-def report_shortfall(x):
+def report_shortfall(x: Array) -> Array:
     """§4's report, ``exp(-x0/x)`` for ``x > 0``, else 0: exactly C-infinity, no cut."""
     pos = x > 0
     return jnp.where(pos, jnp.exp(-Z0 / jnp.where(pos, x, 1.0)), 0.0)
@@ -82,10 +84,11 @@ def _report_shortfall_jvp(primals, tangents):
     return report_shortfall(x), d * t
 
 
-def failure_holder(p0, wj, mus, dt: float, arm: str, eps: float, beta: float, tau_inv: int,
+def failure_holder(p0: Array, wj: Array, mus: Array, dt: float, arm: str, eps: float, beta: float, tau_inv: int,
                    label: str = "holder", form: str = "tally") -> Arrangement:
     """A holder ``I -> <d 2n + 1 | 2n>``: state ``(p, z, a)``, out-port ``(c, R)``, in-ports its ``d``
-    neighbours' ``(c, R)`` and its draw."""
+    neighbours' ``(c, R)`` and its draw. ``p0``: the starting weights, length ``n``; ``wj``: the ``d`` neighbours'
+    weights; ``mus``: the ``n`` hypotheses' means."""
     n = p0.shape[0]
     d = wj.shape[0]
 
@@ -138,9 +141,11 @@ def failure_holder(p0, wj, mus, dt: float, arm: str, eps: float, beta: float, ta
     )
 
 
-def failure_community(draws, A, mus, slices, dt, hold, arm, eps, beta, tau_inv, form="tally") -> Arrangement:
+def failure_community(draws: Array, A: np.ndarray, mus: Array, slices: Sequence[Sequence[int]], dt: float, hold: int,
+                      arm: str, eps: float, beta: float, tau_inv: int, form: str = "tally") -> Arrangement:
     """World plus ``m`` failure holders wired by adjacency ``A`` (each reads all ``2n`` coordinates of each
-    neighbour's out-port), closed by ``wire_boxes``."""
+    neighbour's out-port), closed by ``wire_boxes``. ``draws[t, j]``: holder ``j``'s draw at step ``t``; ``slices[j]``:
+    the hypotheses holder ``j`` starts on, as indices into ``mus``."""
     T, m = draws.shape
     n = mus.shape[0]
     nb = neighbours(A)
@@ -176,7 +181,9 @@ def _failure_run(draws, mus, dt, A_key, slices, hold, arm, eps, beta, tau_inv, f
     return traj, lo, dev
 
 
-def failure_run(draws, A, mus, slices, dt, hold, arm, eps, beta, tau, form="tally"):
+def failure_run(draws: Numbers, A: Numbers, mus: Numbers, slices: Sequence[Sequence[int]], dt: float, hold: int,
+                arm: str, eps: float, beta: float, tau: float,
+                form: str = "tally") -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Over seeds (``draws`` of shape ``(seeds, T, m)``): ``p``, ``z``, ``a``, ``b`` after each draw, each
     ``(seeds, T, m, n)``; the minimum weight and ``max |sum p - 1|`` over every step of ``Phi``."""
     A_key = tuple(tuple(int(v) for v in row) for row in np.asarray(A))

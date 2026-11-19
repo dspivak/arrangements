@@ -307,7 +307,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import CotCoalg, configuration
+from .coalgebra import CotCoalg, ParameterRule, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
 from .pc import PCMorphism
@@ -485,7 +485,7 @@ def free_energy(x_eq: Array) -> Callable[[Array], Array]:
 
 def crn_arrangement(
     alpha: Array, beta: Array, kf: Array, kb: Array, x_eq: Array, dt: float = 1.0,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The closed arrangement ``(parameter(R^n, dt*K(x)), !, !, -dF) : I -> I`` (module docstring, 1).
 
@@ -512,7 +512,7 @@ def crn_arrangement(
 
 def crn_dynamics(
     alpha: Array, beta: Array, kf: Array, kb: Array, x_eq: Array, dt: float = 1.0,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> PCMorphism:
     """``Phi`` of the monolithic reaction-network arrangement."""
     return Phi(crn_arrangement(alpha, beta, kf, kb, x_eq, dt, parameter))
@@ -572,7 +572,7 @@ def _incidences(
     return degrees, perm
 
 
-def species_box(x_eq_i: float, degree: int, dt: float = 1.0, parameter=configuration) -> Arrangement:
+def species_box(x_eq_i: float, degree: int, dt: float = 1.0, parameter: ParameterRule = configuration) -> Arrangement:
     """The species box ``Sp_i : <R^0|R^0> -> <R^0 | R^{degree}>``.
 
     Parameter ``parameter(Q_i)``, ``Q_i = R`` holding the concentration
@@ -665,7 +665,7 @@ def unimolecular_arrangement(
     kb: Sequence[float],
     x_eq: Array,
     dt: float = 1.0,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The closed unimolecular network, by genuine composition in ``arr``:
 
@@ -700,7 +700,7 @@ def unimolecular_dynamics(
     kb: Sequence[float],
     x_eq: Array,
     dt: float = 1.0,
-    parameter=configuration,
+    parameter: ParameterRule = configuration,
 ) -> PCMorphism:
     """``Phi`` of the compositional unimolecular arrangement."""
     return Phi(unimolecular_arrangement(n_species, edges, kf, kb, x_eq, dt, parameter))
@@ -777,7 +777,7 @@ def petri_incidences(m: Array, n: Array) -> List[List[int]]:
 
 
 def petri_transition_box(
-    m_local: Array, r_t: float, dt: float = 1.0, label: str = "Trans", parameter=configuration,
+    m_local: Array, r_t: float, dt: float = 1.0, label: str = "Trans", parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The doubled transition box ``<R^0|R^0> -> <R^{S_t} | R>`` (module docstring, 4).
 
@@ -850,7 +850,7 @@ def petri_wire(m: Array, n: Array, x0: Array) -> Arrangement:
 
 
 def petri_arrangement(
-    m: Array, n: Array, r: Array, x0: Array, dt: float = 1.0, parameter=configuration,
+    m: Array, n: Array, r: Array, x0: Array, dt: float = 1.0, parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The closed Petri net, by genuine composition in ``arr``:
 
@@ -872,7 +872,7 @@ def petri_arrangement(
 
 
 def petri_dynamics(
-    m: Array, n: Array, r: Array, x0: Array, dt: float = 1.0, parameter=configuration,
+    m: Array, n: Array, r: Array, x0: Array, dt: float = 1.0, parameter: ParameterRule = configuration,
 ) -> PCMorphism:
     """``Phi`` of the Petri-net arrangement."""
     return Phi(petri_arrangement(m, n, r, x0, dt, parameter))
@@ -946,7 +946,7 @@ def petri_log_incidences(m: Array, n: Array) -> Tuple[List[int], List[int]]:
     return degrees, perm
 
 
-def petri_log_species_box(degree: int, dt: float = 1.0, parameter=configuration) -> Arrangement:
+def petri_log_species_box(degree: int, dt: float = 1.0, parameter: ParameterRule = configuration) -> Arrangement:
     """The doubled species box ``<R^0|R^0> -> <R^0 | R^{2 degree}>``.
 
     Parameter ``parameter(R^2, sharpR)`` with the transistor sharp ``(xi, xi')
@@ -1044,7 +1044,7 @@ def petri_log_wire(m: Array, n: Array) -> Arrangement:
 
 
 def petri_log_arrangement(
-    m: Array, n: Array, r: Array, dt: float = 1.0, parameter=configuration,
+    m: Array, n: Array, r: Array, dt: float = 1.0, parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The closed log-coordinate Petri net, by genuine composition in ``arr``:
 
@@ -1074,7 +1074,7 @@ def petri_log_arrangement(
 
 
 def petri_log_dynamics(
-    m: Array, n: Array, r: Array, dt: float = 1.0, parameter=configuration,
+    m: Array, n: Array, r: Array, dt: float = 1.0, parameter: ParameterRule = configuration,
 ) -> PCMorphism:
     """``Phi`` of the log-coordinate Petri-net arrangement."""
     return Phi(petri_log_arrangement(m, n, r, dt, parameter))
@@ -1124,7 +1124,7 @@ def log_mass_action_step(
 
 
 def mass_action_arrangement(
-    alpha: Array, beta: Array, kf: Array, kb: Array, dt: float = 1.0, parameter=configuration,
+    alpha: Array, beta: Array, kf: Array, kb: Array, dt: float = 1.0, parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The closed arrangement ``(parameter(R^n, dt * I), !, !, V^flat) : I -> I`` (module docstring, 6).
 
@@ -1160,7 +1160,7 @@ def mass_action_arrangement(
 
 
 def mass_action_dynamics(
-    alpha: Array, beta: Array, kf: Array, kb: Array, dt: float = 1.0, parameter=configuration,
+    alpha: Array, beta: Array, kf: Array, kb: Array, dt: float = 1.0, parameter: ParameterRule = configuration,
 ) -> PCMorphism:
     """``Phi`` of the direct mass-action arrangement."""
     return Phi(mass_action_arrangement(alpha, beta, kf, kb, dt, parameter))

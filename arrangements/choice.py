@@ -85,7 +85,7 @@ one's "determinism is the obstruction" was too strong and is withdrawn there.
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -149,7 +149,7 @@ def _closed(P: CotCoalg, U: Callable[[Array], Array], label: str) -> Arrangement
     )
 
 
-def logit_arrangement(v: Array, T: float, dt: float = 1.0, init: Array = None) -> Arrangement:
+def logit_arrangement(v: Array, T: float, dt: float = 1.0, init: Optional[Array] = None) -> Arrangement:
     """The chooser: Shahshahani response, exact forcing ``d(<v,p> + T H(p))`` (docstring).
 
     ``T = 0`` drops the entropy term and gives the replicator step for the linear
@@ -163,7 +163,7 @@ def logit_arrangement(v: Array, T: float, dt: float = 1.0, init: Array = None) -
 
 
 def logit_arrangement_euclidean(
-    v: Array, T: float, eta: float = 1.0, init: Array = None
+    v: Array, T: float, eta: float = 1.0, init: Optional[Array] = None
 ) -> Arrangement:
     """The negative control: the same cost, forcing, wiring and interface with the
     Euclidean response ``eta * I``. Its stationary point is ``gibbs_weights(v, T)``,
@@ -207,7 +207,7 @@ def evidence(v: Array, T: float) -> Array:
     return (v[:-1] - v[-1]) / T
 
 
-def belief_arrangement(v: Array, T: float, init: Array = None) -> Arrangement:
+def belief_arrangement(v: Array, T: float, init: Optional[Array] = None) -> Arrangement:
     """Stage (a)'s arrangement on the categorical family: natural chart, inverse-Fisher
     response, affine forcing ``-dk`` for ``k(lambda) = -<t, mu(lambda)>``. One step at
     duration 1 from ``lambda = 0`` (the uniform belief) lands on ``logit(v, T)`` exactly."""
@@ -225,7 +225,7 @@ def belief_to_distribution(lam: Array) -> Array:
 
 
 def mean_chart_affine_arrangement(
-    v: Array, T: float, dt: float = 1.0, init: Array = None
+    v: Array, T: float, dt: float = 1.0, init: Optional[Array] = None
 ) -> Arrangement:
     """The mean chart's Euler jump on the AFFINE cost, with no entropy term: the same
     response as ``logit_arrangement`` and the same forcing as ``belief_arrangement``.
@@ -252,7 +252,7 @@ def choice_step(O: PCMorphism, s: Array) -> Array:
     return new_s
 
 
-def settle(arr: Arrangement, steps: int, s: Array = None) -> Array:
+def settle(arr: Arrangement, steps: int, s: Optional[Array] = None) -> Array:
     """Iterate ``Phi(arr)`` for ``steps`` steps from ``s`` (default the parameter's init)."""
     O = Phi(arr)
     s = arr.P.init if s is None else jnp.asarray(s, dtype=float)
@@ -261,7 +261,7 @@ def settle(arr: Arrangement, steps: int, s: Array = None) -> Array:
     return s
 
 
-def trajectory(arr: Arrangement, steps: int, s: Array = None) -> Array:
+def trajectory(arr: Arrangement, steps: int, s: Optional[Array] = None) -> Array:
     """The states visited, ``steps + 1`` of them, starting from ``s``."""
     O = Phi(arr)
     s = arr.P.init if s is None else jnp.asarray(s, dtype=float)
@@ -277,7 +277,7 @@ def trajectory(arr: Arrangement, steps: int, s: Array = None) -> Array:
 # ---------------------------------------------------------------------------
 
 
-def collapsing_chooser(n: int, init: Array = None) -> CotCoalgR:
+def collapsing_chooser(n: int, init: Optional[Array] = None) -> CotCoalgR:
     """The chooser that stores its choice: weights the current distribution, outcomes the
     ``n`` vertices. Each branch is a constant map, so this is a ``(cot(Q) tri rand)``-coalgebra
     in ``poly(SmSet)`` with no extension. It is absorbing: at ``e_i`` the weights are ``e_i``.
@@ -291,7 +291,7 @@ def collapsing_chooser(n: int, init: Array = None) -> CotCoalgR:
     )
 
 
-def reporting_chooser(Q: ReactiveVectorSpace, init: Array = None) -> CotCoalgR:
+def reporting_chooser(Q: ReactiveVectorSpace, init: Optional[Array] = None) -> CotCoalgR:
     """The chooser that records its choice but keeps the distribution as state.
 
     State ``(p, e)``: the distribution and the vertex last drawn. The step moves ``p`` by the
@@ -389,7 +389,7 @@ def game_potential(A: Array, T: float) -> Callable[[Array], Array]:
     return U
 
 
-def game_arrangement(A: Array, T: float, dt: float = 1.0, init: Array = None) -> Arrangement:
+def game_arrangement(A: Array, T: float, dt: float = 1.0, init: Optional[Array] = None) -> Arrangement:
     """The basin chooser: Shahshahani response, exact forcing ``d((1/2) p^T A p + T H(p))``.
 
     ``A`` must be symmetric, as for ``replicator_arrangement``: for a non-symmetric payoff the
@@ -453,7 +453,7 @@ def committed_share(a: float, T: float) -> float:
 # ---- deciding, and locating a basin boundary by experiment ----
 
 
-def decide(arr: Arrangement, p0: Array, max_steps: int = 40000, tol: float = 1e-10):
+def decide(arr: Arrangement, p0: Array, max_steps: int = 40000, tol: float = 1e-10) -> Tuple[int, int]:
     """Run until one share exceeds ``1 - tol`` (or the state settles) and report
     ``(winner, steps)``; ``winner`` is ``-1`` if nothing committed within ``max_steps``."""
     O = Phi(arr)
@@ -524,7 +524,7 @@ def rest_points_2(A: Array, T: float, grid: int = 20001) -> Array:
 # commitment is worth the name.
 
 
-def pushed_chooser(A: Array, T: float, dt: float = 1.0, init: Array = None,
+def pushed_chooser(A: Array, T: float, dt: float = 1.0, init: Optional[Array] = None,
                    publish: bool = True) -> Arrangement:
     """The chooser of ``game_arrangement`` made open: domain interface ``<0|1>``, so it receives
     one number ``b`` forward, and potential ``U(q) + b (q_1 - q_2)``.
@@ -597,7 +597,7 @@ def composite_choice_state(arr: Arrangement, steps: int, which: int = 1) -> Arra
     return s[which] if isinstance(s, tuple) else s
 
 
-def choice_chain(b: float, A: Array, T: float, dt: float = 1.0, init: Array = None,
+def choice_chain(b: float, A: Array, T: float, dt: float = 1.0, init: Optional[Array] = None,
                  eta: float = 0.3, y0: float = 0.5) -> Arrangement:
     """``pusher(b) -> pushed_chooser -> follower``, a closed composite ``I -> I`` in ``arr``: one box
     whose state feeds the chooser's values, and one box downstream reading its choice."""
@@ -607,7 +607,7 @@ def choice_chain(b: float, A: Array, T: float, dt: float = 1.0, init: Array = No
     )
 
 
-def chain_states(s):
+def chain_states(s: Tuple[Tuple[Any, Array], Array]) -> Tuple[Array, Array]:
     """``(p, y)`` out of ``choice_chain``'s nested paired state ``((R^0, p), y)``."""
     inner, y = s
     return inner[1], y
@@ -644,13 +644,13 @@ def locate_pushed_boundary(b: float, A: Array, T: float, dt: float, rounds: int 
     return 0.5 * (lo + hi)
 
 
-def push_chain(b: float, A: Array, T: float, dt: float = 1.0, init: Array = None) -> Arrangement:
+def push_chain(b: float, A: Array, T: float, dt: float = 1.0, init: Optional[Array] = None) -> Arrangement:
     """``pusher(b) -> pushed_chooser(mute)``: a closed two-box composite, the chooser pushed from
     upstream with nothing downstream reading it. This is the case whose boundary is
     ``pushed_boundary(a, b)`` exactly; ``choice_chain`` adds a reader and the reader pushes back."""
     return compose_seq(pusher(b), pushed_chooser(A, T, dt=dt, init=init, publish=False))
 
 
-def push_states(s):
+def push_states(s: Tuple[Any, Array]) -> Array:
     """``p`` out of ``push_chain``'s paired state ``(R^0, p)``."""
     return s[1]

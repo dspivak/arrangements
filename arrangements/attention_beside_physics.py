@@ -26,7 +26,7 @@ force, once per ``Phi`` step).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -81,26 +81,26 @@ class Block:
 # ---------------------------------------------------------------------------
 
 
-def kqv(bk: Block, w, l: int, a: int, x: Array):
+def kqv(bk: Block, w: Dict[str, Array], l: int, a: int, x: Array) -> Tuple[Array, Array, Array]:
     return w[f"K{l}{a}"] @ x, w[f"Q{l}{a}"] @ x / jnp.sqrt(bk.dk), w[f"V{l}{a}"] @ x
 
 
-def embed(w, i: int, obs: Array) -> Array:
+def embed(w: Dict[str, Array], i: int, obs: Array) -> Array:
     """``x0_i = obs e + pi_i``."""
     return obs * w["e"] + w["pi"][i]
 
 
-def layer_one(bk: Block, w, x0: Array, means) -> Array:
+def layer_one(bk: Block, w: Dict[str, Array], x0: Array, means: Sequence[Array]) -> Array:
     """``x1`` from ``x0`` and the heads' layer-1 means: residual, then a one-layer MLP."""
     xh = x0 + sum(w[f"O0{a}"] @ means[a] for a in range(bk.heads))
     return xh + w["W2"] @ jnp.tanh(w["W1"] @ xh + w["b1"])
 
 
-def token_sends(bk: Block, w, l: int, x: Array) -> Array:
+def token_sends(bk: Block, w: Dict[str, Array], l: int, x: Array) -> Array:
     return jnp.concatenate([slot_output(*kqv(bk, w, l, a, x), 1.0) for a in range(bk.heads)])
 
 
-def head_means(bk: Block, w, l: int, x: Array, heard: Array):
+def head_means(bk: Block, w: Dict[str, Array], l: int, x: Array, heard: Array) -> List[Array]:
     """Each head's mean over what it heard plus the token's own positive self-term (A1's suboperad form: the group
     never makes a token hear itself). The cone domain of P53 (j) keeps the denominator positive."""
     means = []
@@ -122,7 +122,7 @@ def token_color(bk: Block) -> Color:
     return Color(bk.heads, bk.d + bk.n, strategy, label="token")
 
 
-def answer(bk: Block, w, x0: Array, e: Array) -> Array:
+def answer(bk: Block, w: Dict[str, Array], x0: Array, e: Array) -> Array:
     """``U x2 + c`` from the token's embedding and what its heads heard at both rounds."""
     hd = heard_dim(bk.heads, bk.dv)
     x1 = layer_one(bk, w, x0, head_means(bk, w, 0, x0, e[:hd]))
@@ -202,7 +202,7 @@ def wired_attention(
     m: float = 1.0,
     eta: float = 1.5e-4,
     seed: int = 0,
-    init: Array = None,
+    init: Optional[Array] = None,
 ) -> Arrangement:
     """The closed arrangement: per start a pendulum and ``h`` delays, one weights box, a route, a predictor per
     pendulum. Leaves in order: per pendulum ``[pendulum, delay_1, ..., delay_h]``, then the weights; its position is
@@ -237,15 +237,16 @@ def wired_attention(
     return compose_seq(compose_seq(parts, route), preds)
 
 
-def wired_weights(arr: Arrangement, state, K: int, bk: Block = Block()) -> Array:
+def wired_weights(arr: Arrangement, state: Any, K: int, bk: Block = Block()) -> Array:
+    """The trained weights from a composite state (``state`` is the composite's pytree, so ``Any``)."""
     return arr.P.position(state)[(1 + 2 * bk.h) * K:(1 + 2 * bk.h) * K + bk.n]
 
 
-def wired_presented(arr: Arrangement, state, K: int, bk: Block = Block()) -> Array:
+def wired_presented(arr: Arrangement, state: Any, K: int, bk: Block = Block()) -> Array:
     return arr.P.position(state)[:(1 + 2 * bk.h) * K].reshape(K, 1 + 2 * bk.h)[:, 0]
 
 
-def wired_windows(arr: Arrangement, state, K: int, bk: Block = Block()) -> Array:
+def wired_windows(arr: Arrangement, state: Any, K: int, bk: Block = Block()) -> Array:
     """Each pendulum's delayed positions, oldest first, ``(K, h)``: what its tokens hear."""
     pos = arr.P.position(state)[:(1 + 2 * bk.h) * K].reshape(K, 1 + 2 * bk.h)
     return pos[:, [1 + 2 * (bk.h - 1 - t) for t in range(bk.h)]]
@@ -288,7 +289,7 @@ def direct_loss(bk: Block, W: Array, windows: Array, labels: Array, freeze_keys:
 
 
 def held_out_error(bk: Block, W: Array, *, n_traj: int = 8, T: int = 40, seed: int = 101, m: float = 1.0,
-                   q_amp: float = 1.0, p_amp: float = 1.0):
+                   q_amp: float = 1.0, p_amp: float = 1.0) -> Tuple[float, float]:
     """Mean one-step error of the trained predictor on held-out runs of the open pendulum (starts ``q0`` uniform in
     ``[-q_amp, q_amp]`` and ``p0`` in ``[-p_amp, p_amp]``, ``seed``; by default ``[-1, 1]^2``, as
     ``tests/test_system_id.py`` computes them for the MLP), and "no change"'s: an ordinary calculation beside the
@@ -359,7 +360,7 @@ class SelectionBlock:
         return out
 
 
-def embed_sel(w: Dict[str, Array], tag, value: Array) -> Array:
+def embed_sel(w: Dict[str, Array], tag: int | Array, value: Array) -> Array:
     """``x0 = value * e + e_tag[tag]``: the reading's value times ``e`` plus its identity's embedding."""
     return value * w["e"] + w["e_tag"][jnp.asarray(tag, jnp.int32)]
 
@@ -511,8 +512,8 @@ def wired_attention_selection(
     m: float = 1.0,
     eta: float = 1.5e-4,
     seed: int = 0,
-    perm: Array = None,
-    init: Array = None,
+    perm: Optional[Array] = None,
+    init: Optional[Array] = None,
 ) -> Arrangement:
     """The closed selection arrangement: per unit a target pendulum A and a distractor B (each ``npend`` delays), one
     shared permutation counter, one shared weights box, a route that delivers each token its reading's value and tag
@@ -560,24 +561,24 @@ def wired_attention_selection(
     return compose_seq(compose_seq(parts, route), preds)
 
 
-def wired_sel_presented(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+def wired_sel_presented(arr: Arrangement, state: Any, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
     """A's presented positions, shape ``(K,)``."""
     pu = _pos_unit(bk.npend)
     return arr.P.position(state)[:K * pu].reshape(K, pu)[:, 0]
 
 
-def wired_sel_presented_B(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+def wired_sel_presented_B(arr: Arrangement, state: Any, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
     """B's presented positions, shape ``(K,)``."""
     pu = _pos_unit(bk.npend)
     return arr.P.position(state)[:K * pu].reshape(K, pu)[:, 1]
 
 
-def wired_sel_weights(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+def wired_sel_weights(arr: Arrangement, state: Any, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
     off = K * _pos_unit(bk.npend) + bk.ntokens
     return arr.P.position(state)[off:off + bk.n]
 
 
-def wired_sel_windows(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+def wired_sel_windows(arr: Arrangement, state: Any, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
     """The reading values in id order, ``(K, ntokens)`` (A's older first, then B's)."""
     pos = arr.P.position(state)
     pu, npend, ntokens = _pos_unit(bk.npend), bk.npend, bk.ntokens
@@ -586,13 +587,14 @@ def wired_sel_windows(arr: Arrangement, state, K: int, bk: SelectionBlock = Sele
     return pos[jnp.asarray(idx)].reshape(K, ntokens)
 
 
-def wired_sel_perm(arr: Arrangement, state, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
+def wired_sel_perm(arr: Arrangement, state: Any, K: int, bk: SelectionBlock = SelectionBlock()) -> Array:
     off = K * _pos_unit(bk.npend)
     return arr.P.position(state)[off:off + bk.ntokens].astype(jnp.int32)
 
 
 def held_out_error_selection(bk: SelectionBlock, W: Array, *, n_traj: int = 8, T: int = 40, seed: int = 101,
-                             perm_seed: int = 102, m: float = 1.0, q_amp: float = 1.0, p_amp: float = 1.0):
+                             perm_seed: int = 102, m: float = 1.0, q_amp: float = 1.0,
+                             p_amp: float = 1.0) -> Tuple[float, float]:
     """Mean one-step error of the trained block on held-out runs of both open pendulums (A the target): the window is
     A's and B's last ``npend`` positions permuted by a held-out schedule, the target A's next position. "No change" is
     ``a_t ~ a_{t-1}``. An ordinary calculation beside the arrangement."""
@@ -626,8 +628,8 @@ def wired_identification_selection(
     hidden: int = 32,
     eta: float = 1.5e-4,
     seed: int = 0,
-    perm: Array = None,
-    init: Array = None,
+    perm: Optional[Array] = None,
+    init: Optional[Array] = None,
 ) -> Arrangement:
     """The MLP arm: the same two pendulums, delays and permutation counter, one MLP reading the flat window (each
     reading its value and one-hot identity) and predicting A's next position, with a one-way loss."""
@@ -679,9 +681,10 @@ def wired_identification_selection(
     return compose_seq(compose_seq(compose_seq(parts, route), nets), losses)
 
 
-def held_out_error_mlp_selection(F, params: Array, *, npend: int = 2, n_traj: int = 8, T: int = 40,
+def held_out_error_mlp_selection(F: Callable[[Array, Array], Array], params: Array, *, npend: int = 2,
+                                 n_traj: int = 8, T: int = 40,
                                  seed: int = 101, perm_seed: int = 102, m: float = 1.0,
-                                 q_amp: float = 1.0, p_amp: float = 1.0):
+                                 q_amp: float = 1.0, p_amp: float = 1.0) -> Tuple[float, float]:
     """The MLP arm's held-out one-step error on the flat window; "no change" beside it."""
     from .functors import Phi
     from .system_id import oscillator, trajectory

@@ -1,6 +1,6 @@
 """Feeding as a composite in IMC's Cartesian tangent subcategory.
 
-The source and receiver are the factors of feeding-imc.tex, eqn.feed. Objects
+The spatial coupling takes a fixed receiver beside its casing sources (feeding-imc.tex, eqn.feed). Objects
 are interfaces, morphisms are Arrangement values, composition and tensor are
 the library constructors. No new categorical construction is claimed.
 Their integrators read configurations, forgetting mass momenta. The existing
@@ -8,24 +8,38 @@ Phi / PhiK interpretation computes the inclination; the parameter responds.
 The browser's factored field is checked against this composite, including its
 six source-output loads. A zero eye capacity is a browser limiting convention,
 not a rod-segment integrator, so the library requires positive capacities.
+
+The casings (``source``) and the receiver's body and motors (``_body``) are composed by
+``compose_seq`` and ``tensor_arrangements`` from the note's general parts, in
+``feeding_composed.py`` and ``feeding_parts.py`` (book P109 (e), 2026-11-19). The spatial
+coupling and the mouth's two organs are still single boxes with their fields typed out.
+``source_by_hand`` and ``_body_by_hand`` are the earlier single boxes, kept as checks.
 """
 from __future__ import annotations
+import functools
 import jax
 import jax.numpy as jnp
-from .arrangement import Arrangement, exact
+from jax.flatten_util import ravel_pytree
+from .arrangement import Arrangement, exact, zero_form
 from .coalgebra import CotCoalg, CotCoalgK
-from .wiring import compose_seq, tensor_arrangements, trivial_parameter
+from .wiring import compose_seq, parallel_arrangements, tensor_arrangements, trivial_parameter
 
 DEFAULTS = dict(m=1., g=2., beta=.2, kappa=40., x0=0., R=.5, kappa0=100., b0=1., f0=.1,
                 lgrip=2., lpry=2., leat=2., a1=.2, a2=.6, alpha=.8, cgrip=.02, ctear=.3,
                 xg=-.4, kg=400., eps=.05, Rh=.5, clift=.02, llift=2., M=.25, betac=.4,
                 kappac=40., ktau=.16, A=6., omega=.6, gam=.05, lam=3., w=.5, csee=.002, fr=.1,
-                kd=4000., bd=40., kr=10., epsd=.01, B=8., nup=.1, gamp=.005, cpat=.002, kexp=.1, memoryDrive=.2, memoryCost=.001, searchSeed=37)
+                kd=4000., bd=40., kr=10., epsd=.01, B=8., nup=.1, gamp=.005, cpat=.002, kexp=.1,
+                latchRate=40., latchCost=.0001, memoryDrive=.2, memoryCost=.001, searchSeed=37)
 
 def theta(t):
     # Safe branches prevent inactive 1/0 branches poisoning derivatives.
+    # exp(-1/x) is below 1e-304 for x < 1/700, so it is taken as 0 there. That changes no
+    # value above 1e-304 and keeps every derivative finite: with the cut at 0, a derivative
+    # at a tiny positive x is 0 * inf in floating point (the first below 1e-154, the second
+    # below 1e-77), and a composite pulls back through one more derivative of each circle
+    # than a field typed out by hand takes.
     def rho(x):
-        return jnp.where(x > 0, jnp.exp(-1 / jnp.where(x > 0, x, 1.)), 0.)
+        return jnp.where(x > 1/700, jnp.exp(-1 / jnp.where(x > 1/700, x, 1.)), 0.)
     a, b = rho(t), rho(1-t)
     return a/(a+b)
 
@@ -34,7 +48,7 @@ def near(u, radius):
 
 def _parameter(init, indices, response, stages, h, label):
     init = jnp.asarray(init, dtype=float)
-    read = lambda s: s[jnp.asarray(indices)]
+    read = lambda s: s[jnp.asarray(indices, dtype=int)]
     if stages == 1:
         advance = lambda s, xi, tau: s+tau*response(s, xi)
         return CotCoalg(len(indices), init, read, lambda s, xi: advance(s, xi, h), label,
@@ -53,7 +67,18 @@ def _parameter(init, indices, response, stages, h, label):
                     durational=lambda tau: _parameter(init,indices,response,4,h*tau,label))
 
 def source(place, food=10., *, parameters=None, stages=1, h=1.):
-    """Nullary source with six outputs: food, opening, access, height, red, place."""
+    """Nullary source with six outputs: food, opening, access, height, red, place.
+
+    Composed by the library from the note's parts (``feeding_composed.source``): three
+    integrands, gravity, the air's dragger and the ground's spring and damper.
+    """
+    from .feeding_composed import source as composed
+    return composed(place, food, parameters=parameters, stages=stages, h=h)
+
+
+def source_by_hand(place, food=10., *, parameters=None, stages=1, h=1.):
+    """The same source as one box, its summed field typed out. Kept only as a check on
+    ``source`` (``tests/test_feeding_composed.py``); the model does not use it."""
     p={**DEFAULTS, **(parameters or {})}
     def response(s, xi):
         return jnp.array([xi[0],xi[1],s[3]/p['m'],xi[2],xi[3]/p['beta'],xi[4]/p['bd']])
@@ -148,8 +173,19 @@ def _food_memory(q, grip, live, seen, eat, p):
     return rates, p['memoryDrive']*jnp.tanh((target-y)/1.5)
 
 
-def receiver(count, *, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
-    """Consumes six outputs of each source; reads out battery and grip."""
+def _body(*, parameters, stages, h, learning, memory, cart):
+    """Body stores and motors. Its seven inputs summarize the current encounter.
+
+    Composed by the library from the note's parts (``feeding_composed.body``): gripper,
+    lever, wheels, the eye's sweep and one motor per memory store, with their stores.
+    """
+    from .feeding_composed import body as composed
+    return composed(parameters=parameters, stages=stages, h=h, learning=learning, memory=memory, cart=cart)
+
+
+def _body_by_hand(*, parameters, stages, h, learning, memory, cart):
+    """The same body as one box, its summed field typed out. Kept only as a check on
+    ``_body`` (``tests/test_feeding_composed.py``); the model does not use it."""
     p={**DEFAULTS, **(parameters or {})}
     if learning:
         zeros = jnp.zeros(len(CENTRES))
@@ -168,33 +204,13 @@ def receiver(count, *, parameters=None, stages=1, h=1., learning=False, memory=N
     def response(s,xi):
         main=jnp.array([xi[0],xi[1]/p['cgrip'],xi[2]/p['clift'],s[4]/p['M'],xi[3],xi[4]/p['betac'],xi[5]/p['csee'],xi[6]/p['csee']])
         capacity = p['memoryCost'] if learning else p['cpat']
-        return jnp.concatenate([main,xi[7:strokes]/capacity,xi[strokes:]/p['bd']])
-    init=[6. if learning else 3.,-1.,p['xg'],cart,0.,cart,0.,p['A']]+extra+[0.]*count
+        return jnp.concatenate([main,xi[7:]/capacity])
+    init=[6. if learning else 3.,-1.,p['xg'],cart,0.,cart,0.,p['A']]+extra
     P=_parameter(init,[0,1,2,3]+list(range(5,len(init))),response,stages,h,'receiver integrator')
-    def attachment(q, m):
-        b,l,h,y,zw,r,sc=q[:7]
-        cost=0.
-        for k in range(count):
-            f,a,e,x,red,place=m[6*k:6*k+6];u=x-h
-            za=q[strokes+k];da=u-za
-            cost+=.5*theta(l)*near(u,p['R'])*near(y-place,p['Rh'])*(p['kappa0']*u*u+p['kd']*da*da)+.5*p['kr']*za*za
-        return cost
-    attachment_grad=jax.grad(attachment,argnums=(0,1))
     def omega(q,m,n):
         b,l,h,y,zw,r,sc=q[:7]; live=theta(b/p['b0']);hold=theta(l)
-        dq,dm=attachment_grad(q,m);qq=-dq;mm=-dm
-        pl,ph=qq[1],qq[2]
-        seen=0.;climb=0.;keep=0.;eaten=0.
-        for k in range(count):
-            f,a,e,x,red,place=m[6*k:6*k+6]
-            delta=(y+r-place)/p['w'];bell=jnp.exp(-delta*delta)
-            seen+=red*bell;climb+=red*(-2*delta/p['w'])*bell
-            keep+=near(x-h,p['R'])*near(y-place,p['Rh'])*theta((f-p['f0'])/p['f0'])
-            mouth=live*near(x-p['x0'],p['R'])*near(y-place,p['Rh'])*hold
-            pry=p['lpry']*mouth*(1-a);eat=p['leat']*mouth*e*f
-            eaten+=eat
-            mm=mm.at[6*k].add(-eat).at[6*k+1].add(pry)
-            qq=qq.at[0].add(p['alpha']*eat-p['ctear']*pry)
+        seen,climb,keep,pl,ph,_,eaten=n
+        qq=jnp.zeros_like(q)
         grip=p['lgrip']*live*(keep*(2-l)-(1-keep)*(l+1))
         lift=p['llift']*live*(hold*(p['x0']-h)+(1-hold)*(p['xg']-h))
         grip_torque=p['cgrip']*grip-pl;lift_torque=p['clift']*lift-ph
@@ -216,40 +232,167 @@ def receiver(count, *, parameters=None, stages=1, h=1., learning=False, memory=N
         qq=qq.at[7:strokes].add(capacity*rates).at[0].add(-capacity*jnp.dot(rates,rates))
         spring=p['kappac']*(y-zw);torque=live*(p['ktau']*seen*r+free*search)
         qq=qq.at[3].add(-spring).at[4].add(spring+torque).at[0].add(-torque*(spring+torque)/p['betac'])
-        return qq,mm,jnp.zeros(0)
-    return Arrangement(P,0,6*count,0,2,lambda q,m:q[:2],lambda q,m,n:jnp.zeros(0),omega,label='food-learning receiver' if learning else 'receiver')
+        return qq,jnp.zeros_like(m),jnp.zeros_like(n)
+    return Arrangement(P,0,0,7,5,lambda q,m:q[jnp.array([0,1,2,3,5])],
+                       lambda q,m,n:jnp.zeros(0),omega,label='body and motors')
+
+
+def _mouth_organ(name, width, capacity, battery_per_unit, flow_index, battery_scale):
+    """Expose this organ's available effort and settle its realized flow at the battery."""
+    def output(q, body):
+        effort = capacity * theta(body[0]/battery_scale) * theta(body[1])
+        return jnp.append(body, effort)
+
+    def exchange(q, body, surroundings):
+        load = jnp.zeros_like(body).at[0].set(battery_per_unit * surroundings[flow_index])
+        return jnp.zeros_like(q), load, jnp.zeros_like(surroundings)
+
+    return Arrangement(trivial_parameter(), 7, width, 7, width+1, output,
+                       lambda q,m,n:n, exchange, label=name)
+
+
+def receiver(*, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
+    """One receiver. The interface, organs and stores are independent of its partners."""
+    p = {**DEFAULTS, **(parameters or {})}
+    body = _body(parameters=p, stages=stages, h=h, learning=learning, memory=memory, cart=cart)
+    opener = _mouth_organ('opener', 5, p['lpry'], -p['ctear'], 5, p['b0'])
+    digestor = _mouth_organ('digestor', 6, p['leat'], p['alpha'], 6, p['b0'])
+    return compose_seq(compose_seq(body, opener), digestor)
+
+
+def _encounter(count, p, stages, h):
+    """Spatial coupling outside the body. Each contact owns its stroke and latch."""
+    def respond(s,xi):
+        return jnp.concatenate([xi[:count]/p['bd'],xi[count:]/p['latchCost']])
+    strokes = _parameter([0.]*(2*count), list(range(2*count)), respond,
+                         stages, h, 'contact strokes and latches')
+
+    def contacts(m):
+        return m[7:].reshape((count, 6)).T
+
+    def engagement(z):
+        return theta((z[count:]-.3)/.2)
+
+    def spring_energy(z, m):
+        _, grip, tip, cart, _, _, _ = m[:7]
+        _, _, _, height, _, place = contacts(m)
+        stretch = height - tip
+        gate = engagement(z)*theta(grip)*near(stretch,p['R'])*near(cart-place,p['Rh'])
+        stroke = z[:count]
+        return .5*jnp.sum(gate*(p['kappa0']*stretch**2+p['kd']*(stretch-stroke)**2)+p['kr']*stroke**2)
+
+    spring_grad = jax.grad(spring_energy, argnums=(0,1))
+
+    def available(m):
+        food, _, _, height, _, place = contacts(m)
+        return near(height-m[2],p['R'])*near(m[3]-place,p['Rh'])*theta((food-p['f0'])/p['f0'])
+
+    def latch_rates(z,m):
+        _, _, _, height, _, place = contacts(m)
+        offered = available(m)
+        score = offered/(1+((height-m[2])/p['R'])**2+((m[3]-place)/p['Rh'])**2)
+        others = ~jnp.eye(count,dtype=bool)
+        first = jnp.prod(jnp.where(others,theta((score[:,None]-score[None,:])/.05),1.),axis=1)
+        latch = z[count:]
+        free = jnp.prod(jnp.where(others,1-theta(latch/.3),1.),axis=1)
+        held = theta((m[1]+.8)/.4)
+        selected = engagement(z)
+        acquire = theta((offered-.15)/.15)*first*(1-held)
+        retain = 1-(1-offered)*(1-held)
+        target = free*((1-selected)*acquire+selected*retain)
+        return p['latchRate']*theta(m[0]/p['b0'])*(target-latch)
+
+    def flows(z,m):
+        food, opening, access, height, _, place = contacts(m)
+        reach = near(m[3]-place,p['Rh'])
+        contact = engagement(z)*reach*near(height-p['x0'],p['R'])
+        return m[5]*contact*(1-opening), m[6]*contact*access*food
+
+    def inputs(z,m,n):
+        _, _, _, cart, look, _, _ = m[:7]
+        _, _, _, _, red, place = contacts(m)
+        offset = (cart+look-place)/p['w']
+        signal = red*jnp.exp(-offset**2)
+        keep = jnp.sum(engagement(z)*available(m))
+        loads = -spring_grad(z,m)[1]
+        opened,eaten = flows(z,m)
+        return jnp.array([signal.sum(),jnp.sum(-2*offset*signal/p['w']),keep,
+                          loads[1],loads[2],opened.sum(),eaten.sum()])
+
+    def exchange(z,m,n):
+        dz,dm = spring_grad(z,m)
+        opened,eaten = flows(z,m)
+        loads = (-dm).at[7::6].add(-eaten).at[8::6].add(opened)
+        rate = latch_rates(z,m)
+        torque = p['latchCost']*rate+dz[count:]
+        loads = loads.at[0].add(-jnp.dot(torque,rate))
+        return (-dz).at[count:].add(torque),loads,jnp.zeros_like(n)
+
+    return Arrangement(strokes,7,7+6*count,0,2,lambda z,m:m[:2],inputs,exchange,
+                       label='spatial coupling')
+
+
+def couple(body, casings, *, parameters=None, stages=1, h=1.):
+    """Put this receiver instance in an environment containing the given casing instances."""
+    p = {**DEFAULTS, **(parameters or {})}
+    casings = list(casings)
+    sources = tensor_arrangements(casings) if casings else Arrangement(
+        trivial_parameter(),0,0,0,0,lambda q,m:m,lambda q,m,n:n,zero_form,label='no casings')
+    return compose_seq(parallel_arrangements(body,sources), _encounter(len(casings),p,stages,h))
+
+
+def add_casing(body, casings, state, new_casing, *, parameters=None, stages=1, h=1.):
+    """Between complete steps, insert one new source and a free contact into the live world."""
+    casings = tuple(casings)
+    count = len(casings)
+    (body_state, sources), contacts = state
+    if contacts.shape != (2*count,):
+        raise ValueError("expected a stroke and latch for each existing casing")
+    expanded = couple(body, (*casings,new_casing), parameters=parameters, stages=stages, h=h)
+    sources = (sources,new_casing.P.init) if count else new_casing.P.init
+    contacts = jnp.concatenate([jnp.append(contacts[:count],0.),jnp.append(contacts[count:],0.)])
+    return expanded, ((body_state,sources),contacts)
 
 def feeding(places=(4.,-8.,8.), foods=(.05,10.,10.), *, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
-    """Tensor sources, then fill the receiver's internal interfaces."""
+    """Put a fixed receiver and the casing sources side by side in a spatial coupling."""
     if len(places)!=len(foods):raise ValueError('One food per casing')
     p={**DEFAULTS,**(parameters or {})}
-    for key in ['m','M','beta','betac','cgrip','clift','csee','cpat','bd','b0','f0','fr','R','Rh','w','eps','epsd']:
+    for key in ['m','M','beta','betac','cgrip','clift','csee','cpat','bd','b0','f0','fr','R','Rh','w','eps','epsd','latchCost','latchRate']:
         if p[key]<=0:raise ValueError(f'{key} must be positive')
     if p['a2']<=p['a1']:raise ValueError('a2 must exceed a1')
     if learning:
         if p['memoryCost'] <= 0: raise ValueError('memoryCost must be positive')
     parts=[source(x,f,parameters=p,stages=stages,h=h) for x,f in zip(places,foods)]
-    if parts:
-        sources=tensor_arrangements(parts)
-    else:
-        from .arrangement import zero_form
-        sources=Arrangement(trivial_parameter(),0,0,0,0,lambda q,m:m,lambda q,m,n:n,zero_form,label='no casings')
-    return compose_seq(sources,receiver(len(places),parameters=p,stages=stages,h=h,learning=learning,memory=memory,cart=cart))
+    body=receiver(parameters=p,stages=stages,h=h,learning=learning,memory=memory,cart=cart)
+    return couple(body,parts,parameters=p,stages=stages,h=h)
+
+_PATROL_STATE = 10   # the receiver's state without learning: eight body numbers and the two patrol stores
+
+
+@functools.lru_cache(maxsize=None)
+def _unravel(learning):
+    """How a flat list of numbers nests into the receiver's state and into one casing's:
+    read off the composites' own starting states, whatever parts they are composed from."""
+    return (ravel_pytree(receiver(learning=learning).P.init)[1], ravel_pytree(source(0.).P.init)[1])
+
 
 def pack_state(flat, count):
-    """The browser state in the library tensor's actual nesting."""
-    flat=jnp.asarray(flat)
-    nr=len(flat)-7*count
-    sources=jnp.zeros(0) if not count else flat[nr:nr+6]
-    for k in range(1,count):sources=(sources,flat[nr+7*k:nr+6+7*k])
-    receiver_state=jnp.concatenate([flat[:nr],jnp.array([flat[nr+6+7*k] for k in range(count)])])
-    return sources,receiver_state
+    """The browser state in the library tensor's actual nesting.
+
+    The browser's order: the receiver's numbers (battery, grip, tip, cart, its momentum,
+    wheel, look, scan, memory), then per casing its six (food, opening, height, momentum,
+    air memory, ground stroke), its contact stroke and its latch.
+    """
+    flat=jnp.asarray(flat, dtype=float)
+    nr=len(flat)-8*count
+    as_body,as_source=_unravel(nr!=_PATROL_STATE)
+    sources=jnp.zeros(0) if not count else as_source(flat[nr:nr+6])
+    for k in range(1,count):sources=(sources,as_source(flat[nr+8*k:nr+6+8*k]))
+    return (as_body(flat[:nr]),sources),jnp.concatenate([flat[nr+6::8],flat[nr+7::8]])
 
 def unpack_state(state, count):
-    sources,receiver_state=state
-    parts=[]
-    for _ in range(count-1):sources,right=sources;parts.insert(0,right)
-    if count:parts.insert(0,sources)
-    nr=len(receiver_state)-count
-    full=[jnp.concatenate([part,receiver_state[nr+k:nr+k+1]]) for k,part in enumerate(parts)]
-    return jnp.concatenate([receiver_state[:nr]]+full)
+    (body,sources),strokes=state
+    receiver_state=ravel_pytree(body)[0]
+    parts=ravel_pytree(sources)[0].reshape((count,6)) if count else []
+    full=[jnp.concatenate([part,strokes[k:k+1],strokes[count+k:count+k+1]]) for k,part in enumerate(parts)]
+    return jnp.concatenate([receiver_state]+full)

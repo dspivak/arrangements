@@ -45,7 +45,9 @@ from typing import Callable, Optional, Sequence, Tuple
 
 import jax.numpy as jnp
 
-from .arrangement import Arrangement, exact, zero_form
+from jax import Array
+
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .light_tank import lift
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
@@ -53,12 +55,12 @@ _z = jnp.zeros(0)
 MAGNETIC, CONTACT = 0, 1
 
 
-def g(d):
+def g(d: Array) -> Array:
     """The magnetic field of one long straight wire carrying unit current, at the displacement ``d`` from it: ``-(1/2 pi) ln |d|``."""
     return -jnp.log(jnp.sum(d * d, axis=-1)) / (4.0 * jnp.pi)
 
 
-def contact(d, sigma):
+def contact(d: Array, sigma: float) -> Array:
     """The contact field of one bumper of unit strength and size ``sigma``, at the displacement ``d`` from it: ``(sigma / |d|)^6``. A
     chosen shape, steep and short: it stands for two things not fitting in one place, and is not taken from a source."""
     return (sigma * sigma / jnp.sum(d * d, axis=-1)) ** 3
@@ -180,11 +182,12 @@ def _mass_rule(mass, drag, k):
     return lambda s, xi: jnp.concatenate([s[k:] / mass, xi - drag * s[k:]])
 
 
-def plane(bodies: Sequence[Body], q0, p0, mass, rule: str = "rk4", tau: float = 0.01, K: int = 1,
-          cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> Arrangement:
+def plane(bodies: Sequence[Body], q0: Numbers, p0: Numbers, mass: Numbers, rule: str = "rk4", tau: float = 0.01,
+          K: int = 1, cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> Arrangement:
     """The arrangement that carries the positions in its own integrator: one frictionless mass per cart, with configuration
     ``(x, y, angle)``; ``mass`` lists each cart's ``(m, m, inertia)``, and ``drag`` is the rate at which a cart loses momentum to what
-    it rolls on. Its in-transfer is ``_transfer``'s. It has no inclination field of its own."""
+    it rolls on. Its in-transfer is ``_transfer``'s. It has no inclination field of its own. ``q0``, ``p0`` and ``mass``: each of
+    the ``c`` carts' starting configuration, momentum and ``(m, m, inertia)``, shape ``(c, 3)`` or ``3c`` numbers."""
     n_in, n_out, received, c = _transfer(bodies, cart_of)
     mass = jnp.asarray(mass, float).reshape(3 * c)
     s0 = jnp.concatenate([jnp.asarray(q0, float).reshape(3 * c), jnp.asarray(p0, float).reshape(3 * c)])
@@ -194,15 +197,17 @@ def plane(bodies: Sequence[Body], q0, p0, mass, rule: str = "rk4", tau: float = 
                        label=f"plane({c})")
 
 
-def system(bodies: Sequence[Body], q0, p0, mass, rule: str = "rk4", tau: float = 0.01, K: int = 1,
-           cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> Arrangement:
-    """The closed composite ``plane . (body_1 || ... || body_n)``."""
+def system(bodies: Sequence[Body], q0: Numbers, p0: Numbers, mass: Numbers, rule: str = "rk4", tau: float = 0.01,
+           K: int = 1, cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> Arrangement:
+    """The closed composite ``plane . (body_1 || ... || body_n)``; ``q0``, ``p0`` and ``mass`` as in ``plane``."""
     return compose_seq(tensor_arrangements([b.box for b in bodies]), plane(bodies, q0, p0, mass, rule, tau, K, cart_of, drag))
 
 
-def cart(mass, q0, p0, rule: str = "rk4", tau: float = 0.01, K: int = 1, drag: float = 0.0) -> Arrangement:
+def cart(mass: Numbers, q0: Numbers, p0: Numbers, rule: str = "rk4", tau: float = 0.01, K: int = 1, drag: float = 0.0
+         ) -> Arrangement:
     """One cart as a part of its own: a frictionless mass with configuration ``(x, y, angle)`` and ``mass = (m, m, inertia)``. It
-    reads out its configuration on one output; what comes back there is the force and the torque on it."""
+    reads out its configuration on one output; what comes back there is the force and the torque on it. ``q0``, ``p0``: its
+    starting configuration and momentum, three numbers each."""
     mass = jnp.asarray(mass, float)
     s0 = jnp.concatenate([jnp.asarray(q0, float), jnp.asarray(p0, float)])
     P = lift(rule, lambda s: s[:3], _mass_rule(mass, drag, 3), s0, 3, tau, K)
@@ -219,9 +224,10 @@ def field(bodies: Sequence[Body], cart_of: Optional[Sequence[int]] = None) -> Ar
                        omega=zero_form, label=f"field({c})")
 
 
-def system_of_carts(bodies: Sequence[Body], q0, p0, mass, rule: str = "rk4", tau: float = 0.01, K: int = 1,
-                    cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> Arrangement:
-    """The closed composite ``field . (body_1 || ... || body_n || cart_1 || ... || cart_c)``: every cart independent."""
+def system_of_carts(bodies: Sequence[Body], q0: Numbers, p0: Numbers, mass: Numbers, rule: str = "rk4", tau: float = 0.01,
+                    K: int = 1, cart_of: Optional[Sequence[int]] = None, drag: float = 0.0) -> Arrangement:
+    """The closed composite ``field . (body_1 || ... || body_n || cart_1 || ... || cart_c)``: every cart independent.
+    ``q0``, ``p0`` and ``mass``: shape ``(c, 3)``, one row per cart, as in ``cart``."""
     q0, p0, mass = jnp.asarray(q0, float), jnp.asarray(p0, float), jnp.asarray(mass, float)
     carts = [cart(mass[i], q0[i], p0[i], rule, tau, K, drag) for i in range(q0.shape[0])]
     return compose_seq(tensor_arrangements([b.box for b in bodies] + carts), field(bodies, cart_of))

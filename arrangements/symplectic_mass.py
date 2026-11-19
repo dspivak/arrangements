@@ -19,9 +19,12 @@ agree; with different masses the closed step stops preserving area (also tested)
 
 from __future__ import annotations
 
-import jax.numpy as jnp
+from typing import Optional, Tuple
 
-from .arrangement import Arrangement
+import jax.numpy as jnp
+from jax import Array
+
+from .arrangement import Arrangement, Numbers
 from .coalgebra import CotCoalg, phase
 from .rvect import diagonal
 
@@ -32,9 +35,10 @@ def _no_inputs(q, m_out, n_in):
     return jnp.zeros(0)
 
 
-def mass_system(m: float, init=None, kappa: float = None) -> Arrangement:
+def mass_system(m: float, init: Optional[Tuple[Array, Array]] = None, kappa: Optional[float] = None) -> Arrangement:
     """The frictionless mass as a system ``1 -> (1, R)``; with ``kappa`` set, closed by a spring
-    of cost ``kappa x^2 / 2`` at its look-ahead instead (a system ``1 -> 1``)."""
+    of cost ``kappa x^2 / 2`` at its look-ahead instead (a system ``1 -> 1``). ``init``: the phase state
+    ``(q, p)``, two arrays of length 1 (zeros if ``None``)."""
     P = phase(diagonal(jnp.array([1.0 / m])), init=init)
     if kappa is None:
         return Arrangement(
@@ -51,7 +55,7 @@ def mass_system(m: float, init=None, kappa: float = None) -> Arrangement:
     )
 
 
-def symplectic_integrator(m: float, init=None) -> CotCoalg:
+def symplectic_integrator(m: float, init: Optional[Numbers] = None) -> CotCoalg:
     """The ?-box: states ``(q, p)``, look-ahead ``(q + tau p/m, p)``, update ``(q, p) + tau J xi``."""
     s0 = jnp.zeros(2) if init is None else jnp.asarray(init, dtype=float)
 
@@ -69,8 +73,10 @@ def symplectic_integrator(m: float, init=None) -> CotCoalg:
     )
 
 
-def regrouped_system(m: float, init=None, kappa: float = None, m_kinetic: float = None) -> Arrangement:
-    """The ?-box with the kinetic box ``-dE`` on its ``p`` output, transferring out ``q + tau p/m``.
+def regrouped_system(m: float, init: Optional[Numbers] = None, kappa: Optional[float] = None,
+                     m_kinetic: Optional[float] = None) -> Arrangement:
+    """The ?-box with the kinetic box ``-dE`` on its ``p`` output, transferring out ``q + tau p/m``. ``init``: the
+    state ``(q, p)``, a vector of length 2 (zeros if ``None``).
 
     With ``kappa`` set, a spring of cost ``kappa x^2 / 2`` at that output closes it (a system ``1 -> 1``).
     ``m_kinetic`` is the mass in ``E`` (default ``m``), to test what happens when the two differ.

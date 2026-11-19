@@ -60,7 +60,7 @@ it is recorded in ``notes/COMMONS-RESULTS.md`` as a strain.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -193,7 +193,7 @@ def entry_system(
     return replace(composite, label=f"{label}(N={N})")
 
 
-def unpack(q: Array, N: int):
+def unpack(q: Array, N: int) -> Tuple[Array, Array, Array]:
     """``q |-> (R, x, l)`` with ``l`` the ``N`` extractor placements (the resource's is ``q[1+N]``)."""
     q = jnp.asarray(q)
     return q[0], q[1:1 + N], q[2 + N:2 + 2 * N]
@@ -223,8 +223,9 @@ def effective_N(q: Array, N: int, tau: float) -> float:
 # ---------------------------------------------------------------------------
 
 
-def closed_step(arr: Arrangement, e=EXTERIOR):
-    """One step of a system closed by the fixed exterior input ``e`` (``tests/test_rendezvous.py``)."""
+def closed_step(arr: Arrangement, e: Array = EXTERIOR) -> Callable[[Any], Any]:
+    """One step of a system closed by the fixed exterior input ``e`` (``tests/test_rendezvous.py``).
+    The state is the parameter's own (a pytree), so ``Any``."""
     P, omega = arr.P, arr.omega
 
     @jax.jit
@@ -235,7 +236,7 @@ def closed_step(arr: Arrangement, e=EXTERIOR):
     return step
 
 
-def run(arr: Arrangement, steps: int, every: int = 1, e=EXTERIOR) -> Array:
+def run(arr: Arrangement, steps: int, every: int = 1, e: Array = EXTERIOR) -> Array:
     """The configuration trajectory, as one compiled ``lax.scan`` sampled at stride ``every``."""
     step, P = closed_step(arr, e), arr.P
 
@@ -247,7 +248,7 @@ def run(arr: Arrangement, steps: int, every: int = 1, e=EXTERIOR) -> Array:
     return jnp.concatenate([P.position(P.init)[None, :], qs])[::every]
 
 
-def settle(arr: Arrangement, steps: int, e=EXTERIOR) -> Array:
+def settle(arr: Arrangement, steps: int, e: Array = EXTERIOR) -> Array:
     step, P = closed_step(arr, e), arr.P
     s = jax.lax.fori_loop(0, steps, lambda _i, st: step(st), P.init)
     return P.position(s)
@@ -296,7 +297,9 @@ def zero_rent_threshold(par: Params, R: float, kappa: float = 1.0, power: float 
     return par.p * kappa ** (2.0 - power) * R ** 2 / (2.0 * par.gamma)
 
 
-def entry_count(par: Params, a: float, N_max: int, threshold=marginal_threshold) -> int:
+def entry_count(
+    par: Params, a: float, N_max: int, threshold: Callable[[Params, float], float] = marginal_threshold,
+) -> int:
     """The largest ``n <= N_max`` that ``threshold`` still admits, with the stock settling.
 
     ``n`` fully-placed entrants settle the stock at ``R*(n) = K beta_n/(1+beta_n)``; the

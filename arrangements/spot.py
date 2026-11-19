@@ -22,12 +22,12 @@ where there's like lots of stuff floating around." The chemistry is Gray and Sco
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import configuration
 from .reaction_network import reaction_box
 from .rvect import diagonal
@@ -106,9 +106,10 @@ def balanced_tensor(parts: Sequence[Arrangement]) -> Arrangement:
     return parallel_arrangements(balanced_tensor(parts[:mid]), balanced_tensor(parts[mid:]))
 
 
-def spot_ring(u0, v0, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512, Dv: float = 0.256,
+def spot_ring(u0: Numbers, v0: Numbers, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512, Dv: float = 0.256,
               dt: float = 0.5) -> Arrangement:
-    """The closed ring ``ring_wire . (cells (x) exchanges (x) reactions (x) joints)``, cells at ``(u0, v0)``."""
+    """The closed ring ``ring_wire . (cells (x) exchanges (x) reactions (x) joints)``, cells at ``(u0, v0)``, two vectors
+    with one entry per cell."""
     N = len(u0)
     boxes = ([cell_box(u0[i], v0[i], dt) for i in range(N)]
              + [exchange_box(F, k) for _ in range(N)]
@@ -117,7 +118,7 @@ def spot_ring(u0, v0, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512, Dv
     return compose_seq(balanced_tensor(boxes), ring_wire(N))
 
 
-def seed(N: int, width: int = 10):
+def seed(N: int, width: int = 10) -> Tuple[np.ndarray, np.ndarray]:
     """The run's start: ``width`` cells at the ring's middle at ``(0.5, 0.25)``, the rest at the reservoir's ``(1, 0)``."""
     u, v = np.ones(N), np.zeros(N)
     c = N // 2
@@ -126,13 +127,14 @@ def seed(N: int, width: int = 10):
     return u, v
 
 
-def amounts(arr: Arrangement, state):
-    """``(u, v)``, each an array over the cells, read off the ring's position."""
+def amounts(arr: Arrangement, state: Any) -> Tuple[np.ndarray, np.ndarray]:
+    """``(u, v)``, each an array over the cells, read off the ring's position (``state`` is the ring's
+    integrator state, a pytree of arrays, hence ``Any``)."""
     q = np.asarray(arr.P.position(state))
     return q[0::2], q[1::2]
 
 
-def spots(v, threshold: float = 0.1):
+def spots(v: Numbers, threshold: float = 0.1) -> List[Tuple[int, int]]:
     """The spots: maximal runs of cells around the ring with builder above ``threshold``, as ``(start, end)`` pairs."""
     m = np.asarray(v) > threshold
     N = len(m)
@@ -150,7 +152,8 @@ def spots(v, threshold: float = 0.1):
     return runs
 
 
-def numpy_step(u, v, *, F=0.04, k=0.06, Du=0.512, Dv=0.256, dt=0.5):
+def numpy_step(u: np.ndarray, v: np.ndarray, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512,
+               Dv: float = 0.256, dt: float = 0.5) -> Tuple[np.ndarray, np.ndarray]:
     """The same step written as one numpy formula, for checking the composite against (not a model of its own)."""
     lu = np.roll(u, 1) + np.roll(u, -1) - 2 * u
     lv = np.roll(v, 1) + np.roll(v, -1) - 2 * v
@@ -158,7 +161,7 @@ def numpy_step(u, v, *, F=0.04, k=0.06, Du=0.512, Dv=0.256, dt=0.5):
     return u + dt * (Du * lu - r + F * (1 - u)), v + dt * (Dv * lv + r - (F + k) * v)
 
 
-def state_at(arr: Arrangement, u, v):
+def state_at(arr: Arrangement, u: np.ndarray, v: np.ndarray) -> Any:
     """The ring's state with the cells at ``(u, v)`` (the cells' leaves come first, in order; the rest are empty)."""
     import jax
 
@@ -168,7 +171,7 @@ def state_at(arr: Arrangement, u, v):
     return jax.tree_util.tree_unflatten(tree, new)
 
 
-def run_counting(step, state, steps: int, every: int):
+def run_counting(step: Callable[[Any], Any], state: Any, steps: int, every: int) -> Tuple[Any, List[Any]]:
     """``step`` taken ``steps`` times by ``jax.lax.scan`` in blocks of ``every``; returns the final state and the state
     after each block (as a list)."""
     import jax
@@ -281,9 +284,10 @@ def pattern_ring_wire(N: int) -> Arrangement:
     )
 
 
-def pattern_ring(u0, v0, p0, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512, Dv: float = 0.256,
-                 Dp: float = 0.256, eps: float = 0.0, dt: float = 0.5) -> Arrangement:
-    """The closed ring ``pattern_ring_wire . (cells (x) exchanges (x) reactions (x) wells (x) joints)``."""
+def pattern_ring(u0: Numbers, v0: Numbers, p0: Numbers, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512,
+                 Dv: float = 0.256, Dp: float = 0.256, eps: float = 0.0, dt: float = 0.5) -> Arrangement:
+    """The closed ring ``pattern_ring_wire . (cells (x) exchanges (x) reactions (x) wells (x) joints)``, cells at
+    ``(u0, v0, p0)``, three vectors with one entry per cell."""
     N = len(u0)
     boxes = ([pattern_cell_box(u0[i], v0[i], p0[i], dt) for i in range(N)]
              + [pattern_exchange_box(F, k) for _ in range(N)]
@@ -293,7 +297,8 @@ def pattern_ring(u0, v0, p0, *, F: float = 0.04, k: float = 0.06, Du: float = 0.
     return compose_seq(balanced_tensor(boxes), pattern_ring_wire(N))
 
 
-def pattern_seed(N: int, signs, centers=None, width: int = 10, medium: float = 0.0):
+def pattern_seed(N: int, signs: Sequence[float], centers: Optional[Sequence[int]] = None, width: int = 10,
+                 medium: float = 0.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The run's start: a ``seed`` spot of ``width`` cells at each center, its cells at ``p = sign``; every other cell at
     the reservoir's ``(1, 0)`` and ``p = medium``. One center defaults to the ring's middle, two to opposite sides."""
     if centers is None:
@@ -305,13 +310,13 @@ def pattern_seed(N: int, signs, centers=None, width: int = 10, medium: float = 0
     return u, v, p
 
 
-def pattern_amounts(arr: Arrangement, state):
+def pattern_amounts(arr: Arrangement, state: Any) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """``(u, v, p)``, each an array over the cells, read off the ring's position."""
     q = np.asarray(arr.P.position(state))
     return q[0::3], q[1::3], q[2::3]
 
 
-def pattern_state_at(arr: Arrangement, u, v, p):
+def pattern_state_at(arr: Arrangement, u: np.ndarray, v: np.ndarray, p: np.ndarray) -> Any:
     """The ring's state with the cells at ``(u, v, p)``."""
     import jax
 
@@ -321,13 +326,15 @@ def pattern_state_at(arr: Arrangement, u, v, p):
     return jax.tree_util.tree_unflatten(tree, new)
 
 
-def spot_signs(v, p, threshold: float = 0.1):
+def spot_signs(v: np.ndarray, p: np.ndarray, threshold: float = 0.1) -> List[float]:
     """Each spot's mean pattern over its cells, in the order ``spots`` gives them."""
     N = len(v)
     return [float(np.mean(np.take(p, range(a, a + (b - a) % N + 1), mode="wrap"))) for a, b in spots(v, threshold)]
 
 
-def numpy_pattern_step(u, v, p, *, F=0.04, k=0.06, Du=0.512, Dv=0.256, Dp=0.256, eps=0.0, dt=0.5):
+def numpy_pattern_step(u: np.ndarray, v: np.ndarray, p: np.ndarray, *, F: float = 0.04, k: float = 0.06,
+                       Du: float = 0.512, Dv: float = 0.256, Dp: float = 0.256, eps: float = 0.0,
+                       dt: float = 0.5) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The same step as one numpy formula, for checking the composite against (not a model of its own)."""
     lap = lambda x: np.roll(x, 1) + np.roll(x, -1) - 2 * x
     r = (1 + eps * p) * u * v * v

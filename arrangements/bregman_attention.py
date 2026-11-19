@@ -6,13 +6,18 @@ separate supplied data. The caller warrants convexity, smoothness and domain
 membership; this constructor does not infer them from sample values.
 Composition and dynamics use the existing attention operad and Phi.
 """
+from typing import Callable, Optional, Tuple
+
 import jax
 import jax.numpy as jnp
+from jax import Array
 
-from .attention import Transfer, attention_arrangement, zero_cost, zero_transfer
+from .attention import (AttentionArrangement, Cost, Placement, Transfer, attention_arrangement, zero_cost,
+                        zero_transfer)
+from .coalgebra import CotCoalg
 
 
-def divergence(potential, sender, receiver):
+def divergence(potential: Callable[[Array], Array], sender: Array, receiver: Array) -> Array:
     """D_phi(sender, receiver), differentiating only at the receiver.
 
     Both arguments must be in the potential's domain. A finite boundary value
@@ -23,9 +28,13 @@ def divergence(potential, sender, receiver):
             - jnp.vdot(jax.grad(potential)(receiver), sender - receiver))
 
 
-def bregman_arrangement(n, dim_H, dim_P, *, parameter, placement, endpoints,
-                        potential=None, divergence_fn=None, values=None,
-                        cost=zero_cost, label="Bregman-attention"):
+def bregman_arrangement(n: int, dim_H: int, dim_P: int, *, parameter: Optional[CotCoalg],
+                        placement: Placement,
+                        endpoints: Callable[[Array, int, int], Tuple[Array, Array]],
+                        potential: Optional[Callable[[Array], Array]] = None,
+                        divergence_fn: Optional[Callable[[Array, Array], Array]] = None,
+                        values: Optional[Callable[[Array], Array]] = None,
+                        cost: Cost = zero_cost, label: str = "Bregman-attention") -> AttentionArrangement:
     """Build an attention parent with ordered divergence on each transfer.
 
     endpoints(q, i, j) gives (sender, receiver) feature vectors for T_ij,

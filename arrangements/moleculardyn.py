@@ -74,12 +74,13 @@ trivial parameters of the pair boxes and the wiring, so its state is
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable, List, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
+from .coalgebra import ParameterRule
 from .interpretation import interpretation, trivial_omega
 from .leapfrog import leapfrog
 from .polynomial import nest_left, unnest_left
@@ -93,7 +94,7 @@ from .wiring import compose_seq, graph_wire, tensor_arrangements, trivial_parame
 
 
 def particle_box(
-    mass: float, dt: float, n_pairs: int, dim: int = 1, parameter=leapfrog
+    mass: float, dt: float, n_pairs: int, dim: int = 1, parameter: ParameterRule = leapfrog
 ) -> Arrangement:
     """The particle ``Part_i : <R^0|R^0> -> <R^{dim*n_pairs}|R^0>``.
 
@@ -195,7 +196,7 @@ def md_arrangement(
     sigma: float,
     dt: float,
     dim: int = 1,
-    parameter=leapfrog,
+    parameter: ParameterRule = leapfrog,
 ) -> Arrangement:
     """The closed MD arrangement: particles wired into LJ pair boxes.
 
@@ -246,7 +247,7 @@ def md_potential(
 # ---------------------------------------------------------------------------
 
 
-def md_state(num_particles: int, num_pairs: int, q: Array, xi: Array = None):
+def md_state(num_particles: int, num_pairs: int, q: Array, xi: Optional[Array] = None) -> Tuple[Any, Array]:
     """The composite's state from flat ``q`` (and ``xi``) over ``(R^dim)^N``.
 
     ``(nest_left([s_1, ..., s_N, z, ..., z]), z)`` with ``s_i = q_i`` for the
@@ -263,7 +264,7 @@ def md_state(num_particles: int, num_pairs: int, q: Array, xi: Array = None):
     return (nest_left(blocks + [z] * num_pairs), z)
 
 
-def md_flat(state, num_particles: int, num_pairs: int):
+def md_flat(state: Tuple[Any, Array], num_particles: int, num_pairs: int) -> Union[Array, Tuple[Array, Array]]:
     """Inverse of ``md_state``: flat ``q`` (configuration) or ``(q, xi)`` (phase/leapfrog)."""
     parts, _ = state
     blocks = unnest_left(parts, num_particles + num_pairs)[:num_particles]

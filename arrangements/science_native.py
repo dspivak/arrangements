@@ -47,14 +47,14 @@ field ``p * (g - <g, p>)`` as a NON-EXACT data forcing, and the exact seed ``d(e
 from __future__ import annotations
 
 from functools import partial
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .coalgebra import configuration
 from .functors import Phi
 from .active_inference import _IN_DIR, _IN_POS
@@ -137,7 +137,8 @@ def neighbours(W: np.ndarray) -> List[List[int]]:
 # --- test (c) native -----------------------------------------------------------
 
 
-def community_native(Y0: Array, X: Array, W: np.ndarray, alpha, beta, mus: Array, arm: str) -> Arrangement:
+def community_native(Y0: Array, X: Array, W: np.ndarray, alpha: float, beta: float, mus: Array, arm: str
+                     ) -> Arrangement:
     """World plus ``m`` holder boxes, wired by ``W`` (``W[j, k] > 0``: ``j`` reads ``k``'s account at
     weight ``W[j, k]``). ``X[t, j]`` is holder ``j``'s draw at step ``t``."""
     m, n = Y0.shape
@@ -174,7 +175,8 @@ def _community_native_run(Y0, X, mus, W_key, alpha, beta, arm, steps):
     return run_positions(arr, steps)[:, 1:].reshape(steps + 1, m, n)
 
 
-def community_native_run(Y0, X, W, alpha, beta, mus, arm, steps):
+def community_native_run(Y0: Numbers, X: Numbers, W: Numbers, alpha: float, beta: float, mus: Numbers, arm: str,
+                         steps: int) -> Array:
     """``Y`` at steps ``0..steps``, shape ``(steps + 1, m, n)``."""
     W_key = tuple(tuple(float(v) for v in row) for row in np.asarray(W))
     return _community_native_run(jnp.asarray(Y0, float), jnp.asarray(X, float), jnp.asarray(mus, float),
@@ -237,7 +239,8 @@ def _summaries_native_run(draws, mus, A_key, arm, steps):
     return run_positions(arr, steps)
 
 
-def summaries_native_run(draws, A, mus, arm, steps):
+def summaries_native_run(draws: Numbers, A: Numbers, mus: Numbers, arm: str,
+                         steps: int) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     """Holders' beliefs ``y`` at steps ``0..steps``, shape ``(steps + 1, m, n)``, and the journal's
     ``(N, S)`` (``None`` outside the journal arm)."""
     draws = jnp.asarray(draws, float)
@@ -309,10 +312,10 @@ def conclusion_holder(p0: Array, wj: Array, mus: Array, dt: float, arm: str, fra
     )
 
 
-def conclusions_native(draws: Array, A: np.ndarray, mus: Array, slices, dt: float, hold: int, arm: str,
-                       frame: str, eps: float, alpha: float, tau_inv: int) -> Arrangement:
+def conclusions_native(draws: Array, A: np.ndarray, mus: Array, slices: Sequence[Sequence[int]], dt: float, hold: int,
+                       arm: str, frame: str, eps: float, alpha: float, tau_inv: int) -> Arrangement:
     """World (each draw held ``hold`` steps) plus ``m`` conclusion holders wired by adjacency ``A``,
-    neighbours averaged."""
+    neighbours averaged. ``slices[j]``: the hypotheses holder ``j`` starts on, as indices into ``mus``."""
     T, m = draws.shape
     n = mus.shape[0]
     nb = neighbours(A)
@@ -348,7 +351,9 @@ def _conclusions_run(draws, mus, dt, A_key, slices, hold, arm, frame, eps, alpha
     return traj, lo, dev
 
 
-def conclusions_native_run(draws, A, mus, slices, dt, hold, arm, frame, eps, alpha, tau):
+def conclusions_native_run(draws: Numbers, A: Numbers, mus: Numbers, slices: Sequence[Sequence[int]], dt: float,
+                           hold: int, arm: str, frame: str, eps: float, alpha: float,
+                           tau: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Over a batch of seeds (``draws`` of shape ``(seeds, T, m)``): each holder's weights after each draw
     ``(seeds, T, m, n)``, the minimum weight and ``max |sum p - 1|`` over every step of ``Phi``."""
     A_key = tuple(tuple(int(v) for v in row) for row in np.asarray(A))
@@ -401,7 +406,8 @@ def excuse_reader(T: int, K: int, delta: Array, D: float, theta0: float, w: floa
 
 
 @partial(jax.jit, static_argnames=("T", "K", "hold", "kappa"))
-def excuses_native_run(T, K, delta, y, ruled, hold, D, theta0, w, v, kappa, eta, dt, a0):
+def excuses_native_run(T: int, K: int, delta: Array, y: Array, ruled: Array, hold: int, D: float, theta0: float,
+                       w: float, v: float, kappa: float, eta: float, dt: float, a0: float) -> Tuple[Array, Array]:
     """World + reader wired and run by ``Phi``; ``(theta, A)`` at the end of each incident."""
     arr = wire_boxes([excuse_world(T, K, y, ruled, hold),
                       excuse_reader(T, K, delta, D, theta0, w, v, kappa, eta, dt, a0)],
@@ -492,7 +498,8 @@ def rival_excuse_reader(d: float, nA: int, nB: int, K: int, delta: Array, v: flo
 
 
 @partial(jax.jit, static_argnames=("K", "hard", "arm", "forcing", "hold"))
-def rival_excuses_run(A, B, d, delta, v, K, hard, arm, forcing, hold, dt_a=0.02, a0=0.01):
+def rival_excuses_run(A: Array, B: Array, d: float, delta: Array, v: float, K: int, hard: bool, arm: str,
+                      forcing: str, hold: int, dt_a: float = 0.02, a0: float = 0.01) -> Array:
     """World (row ``c``: the A draws, the B draws, ``seenB_j = 1`` for ``j < c``; ``c = 0..nB``) plus the
     reader; ``lambda`` at the end of each B count ``0..nB``."""
     nA, nB = A.shape[0], B.shape[0]

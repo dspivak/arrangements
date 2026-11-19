@@ -36,14 +36,15 @@ as the belief's response makes one descent step the Kalman update exactly.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
+from jax.typing import ArrayLike
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .attention import AttentionArrangement, attention_arrangement, zero_transfer
 from .coalgebra import CotCoalg, phase
 from .functors import closed_step
@@ -56,7 +57,7 @@ from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 # ---------------------------------------------------------------------------
 
 
-def model_step(k, m: float, tau) -> Array:
+def model_step(k: ArrayLike, m: float, tau: ArrayLike) -> Array:
     """``F_{k,tau}``: the ``phase`` integrator's duration-``tau`` step for the oscillator ``(q, p)``,
     ``(q, p) |-> (q + tau p/m, p - tau k (q + tau p/m))``; the identity at ``tau = 0``, ``F`` at ``tau = 1``."""
     return jnp.array([[1.0, tau / m], [-tau * k, 1.0 - tau * tau * k / m]])
@@ -222,10 +223,10 @@ def belief(
     P: np.ndarray,
     *,
     m: float = 1.0,
-    mu0=(0.0, 0.0),
+    mu0: Numbers = (0.0, 0.0),
     k_hat0: float = 0.1,
     lambda0: float = 0.0,
-    G=None,
+    G: Optional[Numbers] = None,
     newton: bool = False,
     eta_k: float = 0.0,
     eta_lambda: float = 0.0,
@@ -312,7 +313,7 @@ def open_system(osc: Arrangement, noise: Arrangement) -> Arrangement:
     return compose_seq(parts, route)
 
 
-def oscillator_state(s) -> Array:
+def oscillator_state(s: Any) -> Array:
     """The oscillator's stored ``(q, p)`` inside a state of ``closed_system`` or ``open_system``
     (states nest left: ``(((osc, noise), sensor), belief), wiring``)."""
     y = s
@@ -321,9 +322,10 @@ def oscillator_state(s) -> Array:
     return jnp.concatenate([y[0], y[1]])      # y is the phase state (q, p)
 
 
-def frame_fn(arr: Arrangement, D: int, check: int = 2):
+def frame_fn(arr: Arrangement, D: int, check: int = 2) -> Callable[[Any], Any]:
     """One frame of ``arr``: a step of duration 1 then ``D`` steps of duration 0, compiled; each step checked
-    against ``Phi`` on its first ``check`` steps by ``closed_step``."""
+    against ``Phi`` on its first ``check`` steps by ``closed_step``. The state is ``Any``: the composite's
+    nested tuple of arrays."""
     step1 = closed_step(arr, check=check, duration=1.0)
     step0 = closed_step(arr, check=check, duration=0.0) if D > 0 else None
 
@@ -360,9 +362,9 @@ def draw_noise(sigma_w: float, sigma_v: float, n: int, seed: int) -> Tuple[np.nd
 
 def build(
     *,
-    k: float = 0.1, m: float = 1.0, x0=(1.0, 0.0), sigma_w: float = 0.05, sigma_v: float = 0.1,
-    mu0=(0.0, 0.0), D: int = 0, T: int = 200, seed: int = 0,
-    G=None, newton: bool = False, k_hat0: Optional[float] = None, lambda0: Optional[float] = None,
+    k: float = 0.1, m: float = 1.0, x0: Sequence[float] = (1.0, 0.0), sigma_w: float = 0.05, sigma_v: float = 0.1,
+    mu0: Numbers = (0.0, 0.0), D: int = 0, T: int = 200, seed: int = 0,
+    G: Optional[Numbers] = None, newton: bool = False, k_hat0: Optional[float] = None, lambda0: Optional[float] = None,
     eta_k: float = 0.0, eta_lambda: float = 0.0,
 ) -> Dict[str, object]:
     """The closed system at these settings, with its Kalman data, noise and open counterpart.

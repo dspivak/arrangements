@@ -51,13 +51,16 @@ account is still published; only its supply stops.
 from __future__ import annotations
 
 from functools import partial
-from typing import Tuple
+from typing import Optional, Tuple
+
+from jax import Array
+from jax.typing import ArrayLike
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement
+from .arrangement import Arrangement, Numbers
 from .coalgebra import configuration
 from .rvect import euclidean
 from .science_native import draw_source, run_positions, wire_boxes
@@ -96,9 +99,11 @@ def hub(m: int) -> np.ndarray:
     return W
 
 
-def bettor(y0, s0: float, wj, H, logH, n_bettors: int, alpha_agree, alpha_evid, beta, c,
-           label: str = "bettor") -> Arrangement:
-    """A bettor box ``I -> <m K + n | K>`` (module docstring)."""
+def bettor(y0: Array, s0: float, wj: Array, H: Array, logH: Array, n_bettors: int, alpha_agree: float,
+           alpha_evid: float, beta: float, c: float, label: str = "bettor") -> Arrangement:
+    """A bettor box ``I -> <m K + n | K>`` (module docstring). ``y0``: its starting belief, shape ``(K,)``; ``wj``: how
+    much it hears each of the ``m`` bettors, shape ``(m,)``; ``H`` and ``logH``: the hypotheses and their logs, shape
+    ``(K, n)``."""
     K, n = H.shape
     m = n_bettors
 
@@ -122,8 +127,10 @@ def bettor(y0, s0: float, wj, H, logH, n_bettors: int, alpha_agree, alpha_evid, 
     )
 
 
-def market(Y0, outcomes_onehot, W, alpha_agree, alpha_evid, beta, c, s0=1.0) -> Arrangement:
-    """The closed composite: world plus ``m`` bettors, every bettor wired to every account and the race."""
+def market(Y0: Array, outcomes_onehot: Array, W: Array, alpha_agree: float, alpha_evid: float, beta: float, c: float,
+           s0: float = 1.0) -> Arrangement:
+    """The closed composite: world plus ``m`` bettors, every bettor wired to every account and the race. ``Y0``: shape
+    ``(m, K)``; ``outcomes_onehot``: shape ``(T, n)``; ``W``: who hears whom, shape ``(m, m)``."""
     m, K = Y0.shape
     n = outcomes_onehot.shape[1]
     H = jnp.asarray(hypotheses(n), float)
@@ -143,8 +150,9 @@ def _market_run(Y0, X1h, W, alpha_agree, alpha_evid, beta, c, s0, steps):
     return pos[:, :, :K], pos[:, :, K]
 
 
-def market_run(Y0s, Xs, W, alpha_agree=0.0, alpha_evid=0.0, beta=0.0, c=0.0, s0=1.0,
-               steps=None) -> Tuple[np.ndarray, np.ndarray]:
+def market_run(Y0s: Numbers, Xs: ArrayLike, W: Numbers, alpha_agree: float = 0.0, alpha_evid: float = 0.0,
+               beta: float = 0.0, c: float = 0.0, s0: float = 1.0, steps: Optional[int] = None
+               ) -> Tuple[np.ndarray, np.ndarray]:
     """Over seeds (``Y0s (S, m, K)``, outcome indices ``Xs (S, T)``): ``Y (S, steps+1, m, K)`` and supplies
     ``S (S, steps+1, m)``, by ``Phi`` on the wired composite (vmapped over seeds)."""
     Xs = np.asarray(Xs)
@@ -157,7 +165,7 @@ def market_run(Y0s, Xs, W, alpha_agree=0.0, alpha_evid=0.0, beta=0.0, c=0.0, s0=
     return np.asarray(Y), np.asarray(S)
 
 
-def seeds(n_seeds: int = 20, m: int = 10, T: int = 200, hub_wrong: bool = False):
+def seeds(n_seeds: int = 20, m: int = 10, T: int = 200, hub_wrong: bool = False) -> Tuple[np.ndarray, np.ndarray]:
     """The fixed seeds: ``Y0 = rng.normal(size=(m, 4))``, then ``rng.choice(4, T, p=H_0)``."""
     pi = hypotheses()[0]
     Y0s, Xs = [], []
@@ -182,7 +190,7 @@ def locked_wrong(Y_final: np.ndarray, truth: int = 0) -> bool:
 # --- §7 correction: the dead fall apart -------------------------------------------------------------
 
 
-def gate(s, s1: float):
+def gate(s: ArrayLike, s1: float) -> Array:
     """Smooth step: 0 for ``s <= 0``, 1 for ``s >= s1``, ``C^infinity``, all derivatives 0 at 0."""
     x = s / s1
     a = jnp.where(x > 0, jnp.exp(-1.0 / jnp.where(x > 0, x, 1.0)), 0.0)
@@ -190,11 +198,11 @@ def gate(s, s1: float):
     return a / (a + b)
 
 
-def bettor_gated(y0, s0, wj, H, logH, n_bettors: int, alpha_agree, alpha_evid, beta, c, r, s1,
-                 label: str = "bettor") -> Arrangement:
+def bettor_gated(y0: Array, s0: float, wj: Array, H: Array, logH: Array, n_bettors: int, alpha_agree: float,
+                 alpha_evid: float, beta: float, c: float, r: float, s1: float, label: str = "bettor") -> Arrangement:
     """A §7 bettor ``I -> <m (K+1) + n | K+1>``: out-port ``(g(s) log q, g(s))``; its reading and talk gated
     by its own ``g``, its belief dissolving toward uniform at ``(1 - g) r``; listeners average over the
-    living (the note's §7 "Numbers fixed before code")."""
+    living (the note's §7 "Numbers fixed before code"). The arrays as in ``bettor``."""
     K, n = H.shape
     m = n_bettors
 
@@ -226,9 +234,10 @@ def bettor_gated(y0, s0, wj, H, logH, n_bettors: int, alpha_agree, alpha_evid, b
     )
 
 
-def market_gated(Y0, S0, outcomes_onehot, W, alpha_agree, alpha_evid, beta, c, r, s1) -> Arrangement:
+def market_gated(Y0: Array, S0: Array, outcomes_onehot: Array, W: Array, alpha_agree: float, alpha_evid: float,
+                 beta: float, c: float, r: float, s1: float) -> Arrangement:
     """World plus ``m`` §7 bettors (starting supplies ``S0``, one per bettor), every bettor wired to every
-    gated account and the race."""
+    gated account and the race. The arrays as in ``market``; ``S0``: shape ``(m,)``."""
     m, K = Y0.shape
     n = outcomes_onehot.shape[1]
     H = jnp.asarray(hypotheses(n), float)
@@ -248,7 +257,9 @@ def _market_gated_run(Y0, X1h, W, alpha_agree, alpha_evid, beta, c, r, s1, s0, s
     return pos[:, :, :K], pos[:, :, K]
 
 
-def market_gated_run(Y0s, Xs, W, alpha_agree=0.0, alpha_evid=0.0, beta=0.0, c=0.0, r=0.1, s1=0.01, s0=1.0):
+def market_gated_run(Y0s: Numbers, Xs: ArrayLike, W: Numbers, alpha_agree: float = 0.0, alpha_evid: float = 0.0,
+                     beta: float = 0.0, c: float = 0.0, r: float = 0.1, s1: float = 0.01, s0: float = 1.0
+                     ) -> Tuple[np.ndarray, np.ndarray]:
     """``market_run`` for the §7 bettors."""
     Xs = np.asarray(Xs)
     X1h = jax.nn.one_hot(jnp.asarray(Xs), N_HORSES, dtype=float)
@@ -258,7 +269,8 @@ def market_gated_run(Y0s, Xs, W, alpha_agree=0.0, alpha_evid=0.0, beta=0.0, c=0.
     return np.asarray(Y), np.asarray(S)
 
 
-def listener_sensitivity(Y, S, x1h, W, alpha_agree, alpha_evid, beta, c, r, s1):
+def listener_sensitivity(Y: Numbers, S: Numbers, x1h: Array, W: Numbers, alpha_agree: float, alpha_evid: float,
+                         beta: float, c: float, r: float, s1: float) -> np.ndarray:
     """Jacobian of the composite's forcing in the composite's state at bettor states ``(Y, S)``, as an
     ``(m, K, m, K+1)`` array: ``[j, :, k, :]`` is how bettor ``j``'s belief forcing moves with bettor ``k``'s
     state."""

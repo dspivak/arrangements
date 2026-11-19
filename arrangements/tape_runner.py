@@ -47,7 +47,8 @@ All exact over `Fraction`.
 from __future__ import annotations
 
 from collections import defaultdict
-
+from fractions import Fraction
+from typing import Callable, Optional, Union
 from . import runner as R
 
 ADDR_OPS = ("LOAD", "STORE", "ADD", "MUL", "XCHG", "SETL", "SETR")
@@ -122,7 +123,8 @@ class TapeProgram:
         return state
 
 
-def compile_tape(net: R.Net, zero=0, one=1) -> TapeProgram:
+def compile_tape(net: R.Net, zero: Union[int, float, Fraction] = 0,
+                 one: Union[int, float, Fraction] = 1) -> TapeProgram:
     """Translate a closed net over the kit and the tape (const, register, drum, tape, add, mul,
     cost, push) into U's program: `runner.compile_net`'s straight-line part, its cells addressed by
     walking instead of by timing, then each tape's two moves and its sweep, then END."""
@@ -338,7 +340,9 @@ class _Poly:
         return out
 
 
-def tape_runner_net(prog: TapeProgram = None, gstate: dict = None, window: int = 0, one=1, minus_one=-1) -> R.Net:
+def tape_runner_net(prog: Optional[TapeProgram] = None, gstate: Optional[dict] = None, window: int = 0,
+                    one: Union[int, float, Fraction] = 1,
+                    minus_one: Union[int, float, Fraction] = -1) -> R.Net:
     """U as one closed net over the kit and the tape. Its boxes and pushes are the same for every
     guest; `prog` and `gstate` set only its leaves' initial values (blank without them). `window` is
     the width of each tape in the library (`runner._kit`). `net.names` gives the wires: for each
@@ -510,7 +514,8 @@ def _only(d, name):
     return ks[0]
 
 
-def tape_runner_run(u: UState, guest_steps: int = 1, boundary=None, max_steps: int = None) -> UState:
+def tape_runner_run(u: UState, guest_steps: int = 1, boundary: Optional[Callable[[UState], None]] = None,
+                    max_steps: Optional[int] = None) -> UState:
     """Run U from `u` (changed in place) until `guest_steps` passes have ended (REWIND reaching the
     start), or past `max_steps` of U's steps. One phase at a time: the steps that only walk are
     counted, not taken. `boundary(u)` is called after every phase."""
@@ -662,7 +667,8 @@ def trail() -> R.Net:
     return n
 
 
-def blend(third=None, quarter=None) -> R.Net:
+def blend(third: Optional[Union[int, float, Fraction]] = None,
+          quarter: Optional[Union[int, float, Fraction]] = None) -> R.Net:
     """A tape moved by fractions, so every cell blends with its neighbors: left by 1/3, right by
     1/4. A register x is pushed by the cell under the head, and a cost x * cell charges both, so the
     tape is written through the chain rule as well as by a push."""

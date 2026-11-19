@@ -46,7 +46,7 @@ Claude Fable 5.1, session ec5ece87, 2026-09-29.
 from __future__ import annotations
 
 import itertools
-from typing import Any, Callable, Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -94,7 +94,7 @@ def standard_code() -> Tuple[List[str], Dict[str, str]]:
     return [c for c in codons if std[c] != "*"], std
 
 
-def neighbour_pairs(sense: Sequence[str], weight=fh_weight) -> List[Tuple[int, int, float]]:
+def neighbour_pairs(sense: Sequence[str], weight: Callable[[int, str, str], float] = fh_weight) -> List[Tuple[int, int, float]]:
     """Unordered pairs of sense codons one base apart, with their weight.
 
     The ONLY place the adjacency of the code is written. No matrix is formed: the caller gets
@@ -113,7 +113,7 @@ def neighbour_pairs(sense: Sequence[str], weight=fh_weight) -> List[Tuple[int, i
     return out
 
 
-def scaled_pairs(pairs: Sequence[Tuple[int, int, float]], n_codons: int):
+def scaled_pairs(pairs: Sequence[Tuple[int, int, float]], n_codons: int) -> List[Tuple[int, int, float]]:
     """The script's per-codon normalization `W /= W.sum() / N`, applied pairwise.
 
     `W.sum()` over the script's symmetric matrix is twice the sum of the unordered weights.
@@ -123,7 +123,7 @@ def scaled_pairs(pairs: Sequence[Tuple[int, int, float]], n_codons: int):
     return [(i, j, w / s) for i, j, w in pairs]
 
 
-def aa_distance(pr: Dict[str, float] = None, aas: str = AAS) -> Array:
+def aa_distance(pr: Optional[Dict[str, float]] = None, aas: str = AAS) -> Array:
     """`D_{a,a'} = (PR_a - PR_{a'})^2`, the slip box's only knowledge of amino acids."""
     pr = POLAR_REQUIREMENT if pr is None else pr
     x = jnp.array([pr[a] for a in aas])
@@ -248,7 +248,7 @@ def tensor_all(parts: Sequence[Arrangement], label: str = "tensor_all") -> Arran
 # ---------------------------------------------------------------------------
 
 
-def code_arrangement(y0: Array, pairs, D: Array, beta: float, gamma: float,
+def code_arrangement(y0: Array, pairs: Sequence[Tuple[int, int, float]], D: Array, beta: float, gamma: float,
                      dt: float, slip: bool = True, repertoire: bool = True,
                      definiteness: bool = True) -> Arrangement:
     """The closed arrangement `I -> I` of the whole code. `y0` is `(n_codons, K)` log-odds.

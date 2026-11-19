@@ -29,11 +29,11 @@ the composite configuration so that runs can be read level by level.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, Callable, List, Optional, Sequence
 
 import jax
 import jax.numpy as jnp
-
+from jax import Array
 from .arrangement import Arrangement
 from .attention import input_dim, make_input, message, msg_dim
 from .coalgebra import configuration
@@ -60,7 +60,7 @@ def source(s: float, label: str = "source") -> Part:
     return frozen_part([s, 0.0], 0.0, label, dim_H=DH2)
 
 
-def gate(f, wmax: float, K: float, eps: float = 0.05):
+def gate(f: Array, wmax: float, K: float, eps: float = 0.05) -> Array:
     """``g(f) = wmax u / (K + u)``, ``u = eps softplus(f / eps)``: smooth, near 0 for
     ``f <= 0``, saturating at ``wmax``."""
     u = eps * jax.nn.softplus(f / eps)
@@ -133,7 +133,7 @@ def leaf(w: Part) -> Unit:
     return Unit(part=w, depth=0)
 
 
-def unit(children: List[Unit], *, positions, mobilities, tau: float, fund: dict,
+def unit(children: List[Unit], *, positions: Sequence[float], mobilities: Sequence[float], tau: float, fund: dict,
          src: Optional[Part] = None, src_position: float = 0.0, label: str = "unit") -> Unit:
     """A collective of ``children`` (and ``src`` at ``src_position``, fixed), wrapped by a fund
     layer with parameters ``fund`` (``f0, mu, wmax, K, c0``)."""
@@ -149,7 +149,7 @@ def unit(children: List[Unit], *, positions, mobilities, tau: float, fund: dict,
                 depth=1 + max(c.depth for c in children))
 
 
-def read(u: Unit, q) -> dict:
+def read(u: Unit, q: Array) -> dict:
     """The configuration of ``u`` read level by level: ``{'fund', 'positions', 'children'}``
     for a unit, ``{'a'}`` for a worker. Layout: the collective's parts in order, then its
     parent's placements and value maps, then the fund."""
@@ -165,7 +165,7 @@ def read(u: Unit, q) -> dict:
             "fund": q[-1]}
 
 
-def closed_step(arr: Arrangement, e_ext):
+def closed_step(arr: Arrangement, e_ext: Array) -> Callable[[Any], Any]:
     """One step of the arrangement on a constant exterior input (``e_ext`` empty when closed)."""
     P, omega = arr.P, arr.omega
 

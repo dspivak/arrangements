@@ -22,6 +22,7 @@ import html
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence, Union
 
 from arrangements.animate import VIEWER, to_html
 from arrangements.scenes import SCENES
@@ -99,13 +100,13 @@ li p {{ margin: .2rem 0 0; color: var(--muted); }}
 </main>"""
 
 
-def index_body(pages=PAGES) -> str:
+def index_body(pages: Sequence[Page] = PAGES) -> str:
     items = "\n".join(
         f'<li><a href="{p.name}.html">{html.escape(p.title)}</a><p>{html.escape(p.blurb)}</p></li>' for p in pages)
     return INDEX.format(items=items)
 
 
-def build(out, pages=PAGES) -> list[Path]:
+def build(out: Union[str, Path], pages: Sequence[Page] = PAGES) -> list[Path]:
     """Write every page, ``index.html`` and ``pages.json`` (name, title, book section) into ``out``."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)

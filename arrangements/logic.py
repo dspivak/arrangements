@@ -91,14 +91,14 @@ at ``Phi*`` time.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable, List, Sequence, Tuple
+from typing import Any, Callable, List, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import CotCoalg, configuration
+from .coalgebra import CotCoalg, ParameterRule, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
 from .rvect import ReactiveVectorSpace, constant, euclidean, trivial
@@ -113,7 +113,7 @@ KERNEL_SHARP = jnp.array([[0.0, 1.0], [0.0, 0.0]])
 
 _IN_POS = (jnp.zeros(0), trivial_omega(0))
 
-Parameter = Callable[[ReactiveVectorSpace], CotCoalg]
+Parameter = ParameterRule  # an integrator kind: ``configuration``, ``phase``, ``rk4`` (tests pass ``rk4``), ...
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ Parameter = Callable[[ReactiveVectorSpace], CotCoalg]
 # ---------------------------------------------------------------------------
 
 
-def flat_of(state) -> Array:
+def flat_of(state: Any) -> Array:
     """The composite state's coordinates, its leaves in tensor order.
 
     A composite's parameter is a tensor of coalgebras (``CotCoalg.tensor``), so
@@ -134,7 +134,7 @@ def flat_of(state) -> Array:
     return jnp.concatenate([jnp.ravel(x) for x in jax.tree_util.tree_leaves(state)])
 
 
-def state_of(arr: Arrangement, flat: Array):
+def state_of(arr: Arrangement, flat: Array) -> Any:
     """The state of ``arr``'s parameter with coordinates ``flat`` (inverse of ``flat_of``)."""
     flat = jnp.asarray(flat, float)
     leaves, treedef = jax.tree_util.tree_flatten(arr.P.init)
@@ -355,7 +355,7 @@ def nand_wire() -> Arrangement:
 
 def nand_gate(
     c: float = 0.02, device: Callable[..., Arrangement] = mosfet,
-    parameter: Parameter = configuration, **fet,
+    parameter: Parameter = configuration, **fet: float,
 ) -> Arrangement:
     """``nand_wire(P1, P2, N1, N2, node_out, node_mid, rail)``, by genuine composition.
 
@@ -363,7 +363,8 @@ def nand_gate(
     port (the reported output-node voltage).  Its forcing is *not* written by
     hand -- ``compose_seq`` pulls back and sums the four device forcings at the
     port voltages the wiring delivers (notes/DESIGN.md §2).  ``device`` selects the
-    realization (``mosfet``, the trick, or ``mosfet_direct``).
+    realization (``mosfet``, the trick, or ``mosfet_direct``). ``fet``: the device's numbers, ``mosfet``'s ``kappa``,
+    ``beta``, ``Vt``, ``Vsat`` and ``sharpness``, the same in the gates below.
     """
     boxes = [
         device("p", label="P1", parameter=parameter, **fet),
@@ -420,7 +421,7 @@ def inverter_wire() -> Arrangement:
 
 def inverter(
     c: float = 0.02, device: Callable[..., Arrangement] = mosfet,
-    parameter: Parameter = configuration, **fet,
+    parameter: Parameter = configuration, **fet: float,
 ) -> Arrangement:
     """``inverter_wire(P, N, node_out, rail)``: a ``<R^1|R^1>`` system, ``Q = R^6``."""
     boxes = [
@@ -439,7 +440,7 @@ def inverter_state(v_out: float, vdd: float = 1.0) -> Array:
 
 def inverter_chain(
     K: int, c: float = 0.02, device: Callable[..., Arrangement] = mosfet,
-    parameter: Parameter = configuration, **fet,
+    parameter: Parameter = configuration, **fet: float,
 ) -> Arrangement:
     """``chain_wire(K)(inv, ..., inv)``: ``K`` inverters in series, ``<R^1|R^1>``.
 
@@ -491,7 +492,7 @@ def latch_wire() -> Arrangement:
 
 def sr_latch(
     c: float = 0.02, device: Callable[..., Arrangement] = mosfet,
-    parameter: Parameter = configuration, **fet,
+    parameter: Parameter = configuration, **fet: float,
 ) -> Arrangement:
     """``latch_wire(nand, nand)``: a ``<R^2|R^2>`` system, by genuine composition."""
     g = nand_gate(c, device=device, parameter=parameter, **fet)

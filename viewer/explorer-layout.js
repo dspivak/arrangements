@@ -148,22 +148,37 @@
     }
     for(const n of inner){const p=positions.get(n.id),count=Math.max(p.inputs.length,p.outputs.length);
       p.column=column.get(n.id);p.w=n.kind==='state'?156:260;p.h=Math.max(132,(count+1)*22);
-      if(n.kind==='operation'||n.kind==='field'){p.w=p.h=Math.max(132,(count+1)*24);p.radius=p.w/2;}
+      if(n.kind==='box'){
+        const labelWidth=ports=>ports.reduce((w,port)=>Math.max(w,Math.min(16,port.label.length)*6.7+16),0);
+        p.w=Math.max((n.label??n.id).length*8+16,labelWidth(p.inputs)+labelWidth(p.outputs)+(n.renderer?90:48),90);
+        p.h=Math.max(n.renderer?102:54,count*22+26);
+      }
+      if(n.kind==='operation'||n.kind==='field'){
+        // The mark has a fixed size. Its labeled terminals occupy their own
+        // rows. Adding an argument extends only that list of terminals.
+        p.radius=n.renderer?34:15;
+        const labelWidth=ports=>ports.reduce((width,port)=>
+          Math.max(width,port.label.length*6.7+18),0);
+        const left=labelWidth(p.inputs),right=labelWidth(p.outputs);
+        p.w=Math.max(left+2*p.radius+right,(n.label??n.id).length*7.8+8);
+        p.glyphX=(left-right)/2;
+        p.h=Math.max(2*p.radius+10,count*20+12);
+      }
       if(n.kind==='state')p.h=Math.max(132,100+count*24);
     }
     const columns=[...new Set(inner.map(n=>column.get(n.id)))].sort((a,b)=>a-b),groups=columns.map(c=>inner.filter(n=>column.get(n.id)===c).sort((a,b)=>(a.row??0)-(b.row??0)));
-    const heights=groups.map(ns=>ns.reduce((s,n)=>s+positions.get(n.id).h+80,0)-80);
+    const heights=groups.map(ns=>ns.reduce((s,n)=>s+positions.get(n.id).h+68,0)-68);
     const incoming=boundaries.filter(n=>n.side==='in'||(!n.side&&positions.get(n.id).outputs.length>0)),outgoing=boundaries.filter(n=>!incoming.includes(n));
-    let height=Math.max(500,Math.max(0,...heights)+220,Math.max(incoming.length,outgoing.length)*26+140);
+    let height=Math.max(270,Math.max(0,...heights)+152,Math.max(incoming.length,outgoing.length)*26+140);
     let x=160;
     for(const ns of groups){const width=Math.max(...ns.map(n=>positions.get(n.id).w));let y=(height-heights[groups.indexOf(ns)])/2;
-      for(const n of ns){const p=positions.get(n.id);p.x=x+width/2;p.y=y+p.h/2;y+=p.h+80;}x+=width+210;
+      for(const n of ns){const p=positions.get(n.id);p.x=x+width/2;p.y=y+p.h/2;y+=p.h+68;}x+=width+148;
     }
-    let width=Math.max(760,x-210+160);
+    let width=Math.max(420,x-148+160);
     for(const n of inner){const p=positions.get(n.id);p.orderY=p.y;
       const moved=options.placements?.[n.id];if(!moved)continue;
       if(!Number.isFinite(moved.x)||!Number.isFinite(moved.y))throw Error('Invalid saved position');
-      p.x=Math.max(150+p.w/2,moved.x);p.y=Math.max(90+p.h/2,moved.y);
+      p.x=Math.max(150+p.w/2,moved.x);p.y=Math.max(76+p.h/2,moved.y);
       width=Math.max(width,p.x+p.w/2+160);height=Math.max(height,p.y+p.h/2+110);
     }
     for(let i=0;i<inner.length;i++)for(let j=i+1;j<inner.length;j++){
@@ -180,8 +195,13 @@
         ports.forEach((port,i)=>{
           let dy=(i-(ports.length-1)/2)*22,dx=p.w/2;
           if(p.kind==='boundary'){dy=0;dx=0;}
-          else if(p.kind==='state'){dy=-p.h/2+100+i*24;dx=64;}
-          else if(p.radius){dy=(i-(ports.length-1)/2)*20;dx=Math.sqrt(p.radius*p.radius-dy*dy);}
+          else if(p.kind==='state'){dy=-p.h/2+100+i*24;dx=p.w/2;}  // the port sits on the store's blue box
+          else if(p.radius){
+            dy=(i-(ports.length-1)/2)*20;
+            const angle=ports.length===1?0:((i/(ports.length-1))-.5)*1.9;
+            port.glyphX=p.glyphX+(side==='in'?-1:1)*p.radius*Math.cos(angle);
+            port.glyphY=p.radius*Math.sin(angle);
+          }
           port.side=side;port.x=p.x+(side==='in'?-dx:dx);port.y=p.y+dy;
         });
       }
@@ -212,6 +232,6 @@
     }
     return {positions,width,height,edges,forks};
   }
-  E.layout=layout;E.wheelZoom=wheelZoom;E.geometry={sample,path,inside,trackOffset};
+  E.layout=layout;E.wheelZoom=wheelZoom;E.geometry={sample,path,inside,trackOffset,wireTracks};
   if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom};
 })(globalThis);

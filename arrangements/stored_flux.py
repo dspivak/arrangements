@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import jax.numpy as jnp
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .light_tank import lift
 from .wiring import trivial_parameter
 
@@ -55,9 +55,10 @@ def coil(L: float, phi0: float, rule: str, tau: float, K: int = 1) -> Arrangemen
     return _hears(P, 2, lambda phi, m: (jnp.array([m[0] - m[1]]), jnp.array([-phi[0] / L, phi[0] / L])), f"coil({L:g})")
 
 
-def coils(Lmat, phi0, rule: str, tau: float, K: int = 1) -> Arrangement:
+def coils(Lmat: Numbers, phi0: Numbers, rule: str, tau: float, K: int = 1) -> Arrangement:
     """Coils sharing a field as one part: state the flux through each, ``phi``; coil ``k`` runs from the voltage ``m[k]`` to
-    ground. Rate ``m``, pushback ``-Lmat^{-1} phi``."""
+    ground. Rate ``m``, pushback ``-Lmat^{-1} phi``. ``Lmat``: the ``n x n`` inductance matrix; ``phi0``: the ``n``
+    starting fluxes."""
     Linv = jnp.linalg.inv(jnp.asarray(Lmat, float))
     n = Linv.shape[0]
     P = lift(rule, lambda s: s, lambda s, xi: xi, phi0, n, tau, K)

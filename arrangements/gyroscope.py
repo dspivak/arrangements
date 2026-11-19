@@ -55,17 +55,18 @@ Two realizations of the same dynamics live here (STATUS.md §2, trick vs direct)
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from .arrangement import Arrangement, exact
-from .coalgebra import gyro, gyro_kick, phase_on_cotangent
+from .arrangement import Arrangement, Numbers, exact
+from .coalgebra import ParameterRule, gyro, gyro_kick, phase_on_cotangent
 from .functors import Phi
 from .interpretation import trivial_omega
+from .pc import PCMorphism
 from .rvect import constant
 
 _IN_POS = (jnp.zeros(0), trivial_omega(0))
@@ -161,7 +162,8 @@ class GyroConfig:
         return len(self.out_idx)
 
 
-def make_config(rows: int = 3, cols: int = 4, **kw) -> GyroConfig:
+def make_config(rows: int = 3, cols: int = 4, **kw: Any) -> GyroConfig:
+    """A ``GyroConfig`` on a ``rows x cols`` grid; ``kw`` are further ``GyroConfig`` fields (of mixed types, hence ``Any``)."""
     edges, in_gyros, out_gyros = grid_graph(rows, cols)
     in_idx = tuple(2 * v + c for v in in_gyros for c in (0, 1))
     out_idx = tuple(2 * v + c for v in out_gyros for c in (0, 1))
@@ -176,7 +178,7 @@ def make_config(rows: int = 3, cols: int = 4, **kw) -> GyroConfig:
 # ---------------------------------------------------------------------------
 
 
-def rod_gravity(g: float, L: float, margin: float = 1e-3):
+def rod_gravity(g: float, L: float, margin: float = 1e-3) -> Callable[[Array], Array]:
     """Nonlinear rod-gravity on-site potential for a 2-D gyro (the blog's rod geometry).
 
     A gyro tip displaced by ``q`` (horizontal, ``r = |q|``) on a rod of length ``L`` sits
@@ -215,7 +217,7 @@ def rod_gravity(g: float, L: float, margin: float = 1e-3):
     return U
 
 
-def gyro_potential(cfg: GyroConfig, kappa: Array, grav_k: Array):
+def gyro_potential(cfg: GyroConfig, kappa: Array, grav_k: Array) -> Callable[[Array, Array, Array], Array]:
     """The gyro network's cost ``U(q, m_out, n_in) = springs + on-site gravity - drive``
     on ``Q x M^+ x N^-`` (CDLM's sign: a cost). Its forcing is ``omega = -dU``
     (``exact``); both realizations below derive theirs from it."""
@@ -245,7 +247,7 @@ def _gyro_rvect(cfg: GyroConfig, inv_mass: Array):
 
 
 def gyro_arrangement(
-    cfg: GyroConfig, inv_mass: Array, kappa: Array, grav_k: Array, parameter=gyro,
+    cfg: GyroConfig, inv_mass: Array, kappa: Array, grav_k: Array, parameter: ParameterRule = gyro,
 ) -> Arrangement:
     """The 2-D gyro network as one ``Arrangement`` (CDLM sec.graph_laplacian at R^2,
     written directly), with an open force port on the input gyros.
@@ -261,7 +263,8 @@ def gyro_arrangement(
     This is the TRICK realization (STATUS.md §2, trick vs direct): the forcing is exact on ``Q`` and
     the velocity-dependent damping, gyroscopic and drag 1-forms live inside the
     parameter's step (``coalgebra.gyro``). See ``gyro_arrangement_on_cotangent`` for
-    the direct one.
+    the direct one. Shapes: ``inv_mass`` one per gyro, ``(V,)``; ``kappa`` one per edge, ``(len(cfg.edges),)``, or one
+    number; ``grav_k`` one number (a 0-d array), as ``physics_params`` makes them.
     """
     Q = _gyro_rvect(cfg, inv_mass)
     out_idx = jnp.asarray(cfg.out_idx)
@@ -284,7 +287,8 @@ def gyro_arrangement(
 
 def gyro_arrangement_on_cotangent(
     cfg: GyroConfig, inv_mass: Array, kappa: Array, grav_k: Array,
-    gamma=0.0, J=None, drag=0.0, gyro_block=None, parameter=phase_on_cotangent,
+    gamma: Numbers = 0.0, J: Optional[Numbers] = None, drag: float = 0.0, gyro_block: Optional[int] = None,
+    parameter: ParameterRule = phase_on_cotangent,
 ) -> Arrangement:
     """The same gyro network with its gyroscopic and drag terms written as a forcing.
 
@@ -302,7 +306,10 @@ def gyro_arrangement_on_cotangent(
     non-exact forcing, which def.imc allows and CDLM's potential-only arrangement did
     not (hence the trick). For a constant sharp it agrees with ``gyro_arrangement``
     under ``gyro(Q, c, gamma, J, drag, gyro_block)`` step for step
-    (tests/test_gyroscope.py); the readout and the input port are unchanged.
+    (tests/test_gyroscope.py); the readout and the input port are unchanged. ``inv_mass``, ``kappa``, ``grav_k``
+    as in ``gyro_arrangement``. ``gamma``: a number, or one per
+    coordinate; ``J``: a ``2V x 2V`` matrix (no precession if ``None``); ``gyro_block``: the size of a gyro's block
+    for the drag (no drag if ``None``).
     """
     Q = _gyro_rvect(cfg, inv_mass)
     n = Q.dim
@@ -341,7 +348,7 @@ def physics_params(cfg: GyroConfig, kappa0: float = 0.3, grav0: float = 0.1, gam
     }
 
 
-def coalgebra(cfg: GyroConfig, phys: Dict[str, Array]):
+def coalgebra(cfg: GyroConfig, phys: Dict[str, Array]) -> PCMorphism:
     """``Phi`` of the gyro arrangement at the given physics params, with the ``gyro``
     coalgebra (damping ``cfg.damping``, precession ``phys["gamma"]``, ``cfg.J``) as
     parameter."""
@@ -360,7 +367,7 @@ def coalgebra(cfg: GyroConfig, phys: Dict[str, Array]):
 # ---------------------------------------------------------------------------
 
 
-def init_params(cfg: GyroConfig, seed: int = 0, **phys_kw) -> Dict[str, Array]:
+def init_params(cfg: GyroConfig, seed: int = 0, **phys_kw: float) -> Dict[str, Array]:
     """All trainable parameters: encoder, decoder, and the physics."""
     rng = np.random.default_rng(seed)
     p = dict(physics_params(cfg, **phys_kw))
@@ -426,11 +433,13 @@ def accuracy(params: Dict[str, Array], xs: Array, ys: Array, cfg: GyroConfig) ->
 # ---------------------------------------------------------------------------
 
 
-def adam_init(params):
+def adam_init(params: Dict[str, Array]) -> Tuple[Dict[str, Array], Dict[str, Array]]:
     return {k: jnp.zeros_like(v) for k, v in params.items()}, {k: jnp.zeros_like(v) for k, v in params.items()}
 
 
-def adam_step(params, grads, m, v, t, lr=3e-3, b1=0.9, b2=0.999, eps=1e-8):
+def adam_step(params: Dict[str, Array], grads: Dict[str, Array], m: Dict[str, Array], v: Dict[str, Array],
+              t: int, lr: float = 3e-3, b1: float = 0.9, b2: float = 0.999,
+              eps: float = 1e-8) -> Tuple[Dict[str, Array], Dict[str, Array], Dict[str, Array]]:
     new_p, new_m, new_v = {}, {}, {}
     for k in params:
         new_m[k] = b1 * m[k] + (1 - b1) * grads[k]
@@ -445,8 +454,8 @@ def train(
     cfg: GyroConfig,
     Xtr: Array, Ytr: Array, Xva: Array, Yva: Array,
     *, epochs: int = 30, batch: int = 128, lr: float = 3e-3, seed: int = 0, verbose: bool = True,
-    freeze: Sequence[str] = (), init_kw: Dict = None,
-):
+    freeze: Sequence[str] = (), init_kw: Optional[Dict] = None,
+) -> Tuple[Dict[str, Array], List[Dict[str, float]]]:
     """Train the gyro classifier with minibatch Adam; return ``(params, history)``.
 
     ``freeze`` holds parameter keys whose gradient is zeroed (held at their init) --
@@ -490,7 +499,7 @@ def train(
 _UCI = "https://archive.ics.uci.edu/ml/machine-learning-databases/pendigits/pendigits"
 
 
-def load_pendigits(cache_dir: str = None):
+def load_pendigits(cache_dir: Optional[str] = None) -> Tuple[Array, Array, Array, Array]:
     """Load UCI PenDigits, downloading/caching on first use.
 
     Each sample is a stroke of 8 ``(x, y)`` pen points (the dataset's resampled
@@ -535,7 +544,7 @@ def render_stroke(points: Array, width: int = 22, height: int = 11) -> str:
     return "\n".join("".join(row) for row in grid)
 
 
-def show_predictions(params: Dict[str, Array], cfg: GyroConfig, X: Array, Y: Array, n: int = 6, seed: int = 7):
+def show_predictions(params: Dict[str, Array], cfg: GyroConfig, X: Array, Y: Array, n: int = 6, seed: int = 7) -> None:
     """Print per-digit accuracy and a few held-out strokes with ``true -> guess``."""
     pred = np.asarray(jnp.argmax(jax.vmap(lambda x: classify(params, x, cfg))(X), axis=1))
     true = np.asarray(Y)
@@ -552,7 +561,7 @@ def show_predictions(params: Dict[str, Array], cfg: GyroConfig, X: Array, Y: Arr
         print(render_stroke(X[i]))
 
 
-def main(rows: int = 4, cols: int = 5, epochs: int = 60, seed: int = 0):
+def main(rows: int = 4, cols: int = 5, epochs: int = 60, seed: int = 0) -> None:
     """Train the harmonic gyro surrogate on PenDigits (``python -m arrangements.gyroscope``).
 
     Trains the gyro network (``Phi`` with the ``gyro`` coalgebra) on PenDigits and
@@ -679,8 +688,8 @@ def online_classifier(cfg: GyroConfig, params: Dict[str, Array], xs: Array, ys: 
     return compose_seq(compose_seq(compose_seq(parts, drive), head), loss)
 
 
-def online_weights(arr: Arrangement, state) -> Array:
-    """The decoder's weights in the online classifier's state."""
+def online_weights(arr: Arrangement, state: Any) -> Array:
+    """The decoder's weights in the online classifier's state (``state`` is a pytree of arrays, hence ``Any``)."""
     leaves = jax.tree_util.tree_leaves(state)
     return leaves[4]
 

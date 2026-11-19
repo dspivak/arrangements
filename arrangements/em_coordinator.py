@@ -34,12 +34,13 @@ THE COMPOSITE is ``coordinator . parent(figurines) : I -> <E x R^{B+2} | R^0>``;
 
 from __future__ import annotations
 
-from typing import NamedTuple, Sequence
+from typing import Any, Callable, Dict, NamedTuple, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
+from jax.typing import ArrayLike
 
 from .arrangement import Arrangement
 from .attention import input_dim, make_input, message, msg_dim, spatial_arrangement, spatial_config
@@ -83,7 +84,7 @@ def incidence(B: int) -> Array:
     return jnp.asarray(A), jnp.asarray(N)
 
 
-def observations(G: Array, n_in: Array, B: int, A: Array):
+def observations(G: Array, n_in: Array, B: int, A: Array) -> Tuple[Array, Array]:
     """``y`` from the record ``G`` and the world's ``(t*, flag, o)``; the sighting row is masked by the flag
     (its noise made huge when absent, so it carries nothing)."""
     t_star, flag, o = n_in[:B], n_in[B], n_in[B + 1]
@@ -92,25 +93,26 @@ def observations(G: Array, n_in: Array, B: int, A: Array):
     return jnp.concatenate([y_bus, jnp.array([y_s])]), flag
 
 
-def sigma_of(v: Array, A: Array, N: Array, flag) -> Array:
+def sigma_of(v: Array, A: Array, N: Array, flag: ArrayLike) -> Array:
     N_eff = N.at[-1].set(jnp.where(flag > 0.5, N[-1], 1e12))
     return A @ jnp.diag(v) @ A.T + jnp.diag(N_eff)
 
 
-def e_step(v: Array, y: Array, A: Array, N: Array, flag) -> Array:
+def e_step(v: Array, y: Array, A: Array, N: Array, flag: ArrayLike) -> Array:
     """The posterior mean of every latent error given everything seen: ``diag(v) A^T Sigma^{-1} y``."""
     Sigma = sigma_of(v, A, N, flag)
     return v * (A.T @ jnp.linalg.solve(Sigma, y))
 
 
-def marginal_cost(v: Array, y: Array, A: Array, N: Array, flag) -> Array:
+def marginal_cost(v: Array, y: Array, A: Array, N: Array, flag: ArrayLike) -> Array:
     """``-log p(y | v, G)`` up to a constant: the negative joint log-likelihood of every observation."""
     Sigma = sigma_of(v, A, N, flag)
     Si_y = jnp.linalg.solve(Sigma, y)
     return 0.5 * y @ Si_y + 0.5 * jnp.linalg.slogdet(Sigma)[1]
 
 
-def expected_complete_cost(v_new: Array, y_new: Array, v: Array, y: Array, A: Array, N: Array, flag) -> Array:
+def expected_complete_cost(v_new: Array, y_new: Array, v: Array, y: Array, A: Array, N: Array,
+                           flag: ArrayLike) -> Array:
     """EM's ``Q``: the expectation, under the posterior at ``(v, y)``, of the complete-data cost
     ``-log p(y_new, eps | v_new)``. Fisher's identity: its gradient at ``(v_new, y_new) = (v, y)`` is
     ``marginal_cost``'s (test 0)."""
@@ -199,8 +201,9 @@ def coordinated(arm: Arm, theta0: Sequence[float], split0: Sequence[float], G0: 
     return Built(compose_seq(inner, box), inner, box)
 
 
-def coordinator_state(state, arm: Arm):
-    """``(split, V, G)`` read off the composite's state (``G`` is ``None`` without a record)."""
+def coordinator_state(state: Any, arm: Arm) -> Tuple[Array, Array, Optional[Array]]:
+    """``(split, V, G)`` read off the composite's state (``G`` is ``None`` without a record).
+    The state is ``Any``: the composite's nested tuple of arrays."""
     s = state[1]
     if arm.memory == "record":
         (l, Lam), G = s
@@ -214,7 +217,7 @@ def exterior(B: int, t_star: Sequence[float], sighting: bool, o: float) -> Array
     return jnp.concatenate([jnp.asarray(t_star, float), jnp.array([1.0 if sighting else 0.0, o])])
 
 
-def report_fn(built: Built):
+def report_fn(built: Built) -> Callable[[Any, Array], Array]:
     inner, box = built.inner, built.box
 
     def report(s, ext):
@@ -225,8 +228,8 @@ def report_fn(built: Built):
 
 
 def run_rounds(built: Built, arm: Arm, t_star: Sequence[float], rounds: int, sighting: bool, o: float,
-               state=None):
-    """Run ``rounds`` outcome steps. Returns arrays over steps ``0..R`` of the figurines' states, guesses, the split,
+               state: Optional[Any] = None) -> Tuple[Dict[str, np.ndarray], Any]:
+    """Run ``rounds`` outcome steps. A state is ``Any``: the composite's nested tuple of arrays. Returns arrays over steps ``0..R`` of the figurines' states, guesses, the split,
     the doubt, the covector the cost sends on the split, and the report, and the final state."""
     arr = built.arr
     step, report = step_fn(arr), report_fn(built)

@@ -22,9 +22,13 @@ Claude Opus 5.5, session 5c9967d2, 2026-11-05.
 
 from __future__ import annotations
 
+from typing import Any, Callable, Literal, Sequence, Tuple, Union
+
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
+from jax.typing import ArrayLike
 
 from .arrangement import Arrangement, exact, zero_form
 from .coalgebra import CotCoalgK
@@ -41,13 +45,16 @@ SIGN = jnp.array([1.0, 1.0, -1.0, -1.0])
 # ``v(s, load)`` the tangent response.
 # ---------------------------------------------------------------------------
 
+# A rule's rounds, ``(reads, advances)``: what ``CotCoalgK`` takes as its ``reads`` and ``advances``.
+Rounds = Tuple[Tuple[Callable[[Any], Array], ...], Tuple[Callable[[Any, Array], Any], ...]]
 
-def euler(read, v, tau):
+
+def euler(read: Callable[[Array], Array], v: Callable[[Array, Array], Array], tau: float) -> Rounds:
     """One round, the plain step: ``(reads, advances)``."""
     return ((read,), (lambda s, xi: s + tau * v(s, xi),))
 
 
-def rk4(read, v, tau):
+def rk4(read: Callable[[Array], Array], v: Callable[[Array, Array], Array], tau: float) -> Rounds:
     """Ch 7 ``def.runge_kutta``, four rounds: ``(reads, advances)``. The intermediate is (s, the rates so far)."""
     A = (0.5, 0.5, 1.0)
 
@@ -79,7 +86,7 @@ def rk4(read, v, tau):
     return ((r0, r1, r2, r3), (a0, a1, a2, a3))
 
 
-def midpoint(read, v, tau, K):
+def midpoint(read: Callable[[Array], Array], v: Callable[[Array, Array], Array], tau: float, K: int) -> Rounds:
     """P76's rule, K rounds: read out a trial midpoint, receive there, improve the trial; the last round steps. The intermediate is
     (s, trial). K = 1 is ``euler``."""
     if K == 1:
@@ -103,8 +110,10 @@ def midpoint(read, v, tau, K):
     return ((r0,) + (r,) * (K - 1), (a0,) + (a,) * (K - 2) + (last,))
 
 
-def lift(rule, read, v, s0, Q_dim, tau, K=1) -> CotCoalgK:
-    """The integrator of ``rule`` (``"euler"``, ``"rk4"`` or ``"mid"``; ``K`` is the midpoint's rounds) on an affine integrand."""
+def lift(rule: Literal["euler", "rk4", "mid"], read: Callable[[Array], Array], v: Callable[[Array, Array], Array],
+         s0: Union[ArrayLike, Sequence[float]], Q_dim: int, tau: float, K: int = 1) -> CotCoalgK:
+    """The integrator of ``rule`` (``"euler"``, ``"rk4"`` or ``"mid"``; ``K`` is the midpoint's rounds) on an affine integrand.
+    ``s0`` is the starting state, a vector (a list of floats or an array)."""
     if rule == "euler":
         reads, advances = euler(read, v, tau)
     elif rule == "rk4":
@@ -121,13 +130,13 @@ def lift(rule, read, v, s0, Q_dim, tau, K=1) -> CotCoalgK:
 # ---------------------------------------------------------------------------
 
 
-def tank_edge(P) -> Arrangement:
+def tank_edge(P: CotCoalgK) -> Arrangement:
     """``sec.kcl``'s capacitor at capacitance 1 on an edge: it reads out its voltage and receives a current."""
     return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
                        out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label="cap")
 
 
-def coil_face(P) -> Arrangement:
+def coil_face(P: CotCoalgK) -> Arrangement:
     """A coil with four voltage ports: state its flux ``B``, internal inclination the signed sum of the voltages, pushback ``-+B`` on
     the ports. At two ports with signs (+, -) it is ``magnetism.coil_draft(1, now=True)``."""
 
@@ -142,14 +151,16 @@ READ_1 = lambda s: s
 V_1 = lambda s, xi: xi
 
 
-def tank_lattice(N, E0, B0, rule, tau, K=1) -> Arrangement:
-    """The closed composite ``lattice_wire(N)(edges, faces)`` with each part stepped by ``rule``."""
+def tank_lattice(N: int, E0: ArrayLike, B0: ArrayLike, rule: Literal["euler", "rk4", "mid"], tau: float,
+                 K: int = 1) -> Arrangement:
+    """The closed composite ``lattice_wire(N)(edges, faces)`` with each part stepped by ``rule``. ``E0`` holds the ``2 N^2``
+    edges' starting voltages, ``B0`` the ``N^2`` faces' starting fluxes."""
     parts = [tank_edge(lift(rule, READ_1, V_1, [E0[e]], 1, tau, K)) for e in range(2 * N * N)]
     parts += [coil_face(lift(rule, READ_1, V_1, [B0[f]], 1, tau, K)) for f in range(N * N)]
     return compose_seq(_tensor_balanced(parts), lattice_wire(N))
 
 
-def tank_edge_stagger(s0, tau) -> Arrangement:
+def tank_edge_stagger(s0: float, tau: float) -> Arrangement:
     """Two rounds: round 1 reads out the voltage and discards the load; round 2 reads out the voltage and steps by the current that
     came back."""
     P = CotCoalgK(Q_dim=1, init=jnp.asarray([s0], float), reads=(READ_1, READ_1),
@@ -157,7 +168,7 @@ def tank_edge_stagger(s0, tau) -> Arrangement:
     return tank_edge(P)
 
 
-def coil_face_stagger(s0, tau) -> Arrangement:
+def coil_face_stagger(s0: float, tau: float) -> Arrangement:
     """Two rounds: round 1 reads out ``B``, moves it by the inclination; round 2 reads out the new ``B``, whose pushback is the new
     current, and keeps it."""
     P = CotCoalgK(Q_dim=1, init=jnp.asarray([s0], float), reads=(READ_1, READ_1),
@@ -165,8 +176,9 @@ def coil_face_stagger(s0, tau) -> Arrangement:
     return coil_face(P)
 
 
-def tank_lattice_stagger(N, E0, B0, tau) -> Arrangement:
-    """Coil first, capacitors second: Yee's scheme. Equal under ``g`` to the one-round flux lattice at the same ``tau``."""
+def tank_lattice_stagger(N: int, E0: ArrayLike, B0: ArrayLike, tau: float) -> Arrangement:
+    """Coil first, capacitors second: Yee's scheme. Equal under ``g`` to the one-round flux lattice at the same ``tau``.
+    ``E0`` and ``B0`` as in ``tank_lattice``."""
     parts = [tank_edge_stagger(E0[e], tau) for e in range(2 * N * N)]
     parts += [coil_face_stagger(B0[f], tau) for f in range(N * N)]
     return compose_seq(_tensor_balanced(parts), lattice_wire(N))
@@ -177,7 +189,7 @@ def tank_lattice_stagger(N, E0, B0, tau) -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def flux_edge(P) -> Arrangement:
+def flux_edge(P: CotCoalgK) -> Arrangement:
     """An edge of the flux lattice, on an integrator with state ``(A, xi)``; it reads out one value."""
     return Arrangement(P=P, in_dim_M=0, out_dim_M=0, in_dim_N=0, out_dim_N=1,
                        out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label="mass")
@@ -199,7 +211,7 @@ READ_2 = lambda s: s[:1]
 V_2 = lambda s, xi: jnp.array([s[1], xi[0]])
 
 
-def flux_symplectic_edge(a0, x0, tau) -> Arrangement:
+def flux_symplectic_edge(a0: float, x0: float, tau: float) -> Arrangement:
     """Ch 3's mass, ``eqn.mass_duration_update``, one round."""
     P = CotCoalgK(Q_dim=1, init=jnp.asarray([a0, x0], float),
                   reads=(lambda s: jnp.array([s[0] + tau * s[1]]),),
@@ -207,8 +219,10 @@ def flux_symplectic_edge(a0, x0, tau) -> Arrangement:
     return flux_edge(P)
 
 
-def flux_lattice(N, A0, X0, rule, tau, K=1) -> Arrangement:
-    """The closed mass-and-spring composite, each edge stepped by ``rule`` (or ``"symplectic"``, the mass's own one round)."""
+def flux_lattice(N: int, A0: ArrayLike, X0: ArrayLike, rule: Literal["euler", "rk4", "mid", "symplectic"], tau: float,
+                 K: int = 1) -> Arrangement:
+    """The closed mass-and-spring composite, each edge stepped by ``rule`` (or ``"symplectic"``, the mass's own one round).
+    ``A0`` and ``X0`` hold the ``2 N^2`` edges' starting positions and momenta."""
     if rule == "symplectic":
         edges = [flux_symplectic_edge(A0[e], X0[e], tau) for e in range(2 * N * N)]
     else:
@@ -222,7 +236,7 @@ def flux_lattice(N, A0, X0, rule, tau, K=1) -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def curl_matrix(N) -> np.ndarray:
+def curl_matrix(N: int) -> np.ndarray:
     """``d`` from edges to faces, ``B = dA``, in ``face_edges``'s signs."""
     C = np.zeros((N * N, 2 * N * N))
     for i in range(N):
@@ -233,7 +247,7 @@ def curl_matrix(N) -> np.ndarray:
     return C
 
 
-def grad_matrix(N) -> np.ndarray:
+def grad_matrix(N: int) -> np.ndarray:
     """``d`` from nodes to edges. Gauss: ``(div E)_n`` is the transpose of this applied to ``E``; ``curl_matrix @ grad_matrix = 0``."""
     D = np.zeros((2 * N * N, N * N))
     for i in range(N):
@@ -247,34 +261,35 @@ def grad_matrix(N) -> np.ndarray:
     return D
 
 
-def flux_to_tank(N, A, xi):
-    """The map ``g(A, xi) = (E, B) = (xi, dA)`` from the flux lattice's states to the tank lattice's."""
+def flux_to_tank(N: int, A: ArrayLike, xi: ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
+    """The map ``g(A, xi) = (E, B) = (xi, dA)`` from the flux lattice's states to the tank lattice's. ``A`` and ``xi`` have
+    ``2 N^2`` entries; ``E`` has ``2 N^2``, ``B`` has ``N^2``."""
     return np.asarray(xi), curl_matrix(N) @ np.asarray(A)
 
 
-def leaves(s) -> np.ndarray:
+def leaves(s: Any) -> np.ndarray:
     """The state's nonempty leaves, flat."""
     return np.concatenate([np.ravel(np.asarray(x, float)) for x in jax.tree_util.tree_leaves(s) if np.asarray(x).size])
 
 
-def tank_read(N, s):
+def tank_read(N: int, s: Any) -> Tuple[np.ndarray, np.ndarray]:
     """``(E, B)`` off a state of the tank lattice."""
     x = leaves(s)
     return x[: 2 * N * N], x[2 * N * N:]
 
 
-def flux_read(s):
+def flux_read(s: Any) -> Tuple[np.ndarray, np.ndarray]:
     """``(A, xi)`` off a state of the flux lattice."""
     x = leaves(s).reshape(-1, 2)
     return x[:, 0], x[:, 1]
 
 
-def energy_tank(E, B):
-    """``E^2 / 2 + B^2 / 2``."""
+def energy_tank(E: np.ndarray, B: np.ndarray) -> float:
+    """``E^2 / 2 + B^2 / 2``, of the ``2 N^2`` edge voltages and the ``N^2`` face fluxes."""
     return 0.5 * E @ E + 0.5 * B @ B
 
 
-def mode_start(N, kx_index=1, ky_index=0):
+def mode_start(N: int, kx_index: int = 1, ky_index: int = 0) -> Tuple[np.ndarray, float]:
     """An eigenmode's flux ``B = cos(k . r)``, with ``E = 0``, and its ``omega = 2 sqrt(sin^2(kx/2) + sin^2(ky/2))``."""
     k = (2 * np.pi * kx_index / N, 2 * np.pi * ky_index / N)
     B = np.array([np.cos(k[0] * i + k[1] * j) for i in range(N) for j in range(N)])

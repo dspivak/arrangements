@@ -23,8 +23,9 @@ from typing import Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
+from jax import Array
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import configuration
 from .commons import EMPTY, closed_step, stateless_coupler
 from .lotka_volterra import log_population
@@ -67,7 +68,7 @@ def web(sp: Sequence[Arrangement], edges: Sequence[Tuple[int, int, float, float]
     return compose_seq(tensor_arrangements(list(sp)), compose_seq(copy(len(sp), idx), couplers))
 
 
-def log_states(arr: Arrangement, steps: int):
+def log_states(arr: Arrangement, steps: int) -> Array:
     step, P = closed_step(arr), arr.P
 
     def body(s, _):
@@ -78,7 +79,8 @@ def log_states(arr: Arrangement, steps: int):
     return jnp.concatenate([P.position(P.init)[None, :], qs])
 
 
-def by_hand(r, c, edges, x0, dt, steps):
+def by_hand(r: Numbers, c: Numbers, edges: Sequence[Tuple[int, int, float, float]], x0: Numbers, dt: float,
+            steps: int) -> Array:
     """The equations written out: ``du_i = dt (r_i - c_i x_i - sum_eaters beta x_j + sum_prey delta x_k)``."""
     r, c = jnp.asarray(r), jnp.asarray(c)
 

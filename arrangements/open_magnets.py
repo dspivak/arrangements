@@ -7,12 +7,15 @@ No force law is duplicated: both use magnets._received.
 
 GPT-6, d5e53279, 2026-11-11; book plan P76 (j).
 """
+from typing import Optional, Sequence
+
 from .magnets import FIELDS, _carts, _frame, _received
 from .smooth import R, SmoothArrangement, compose_seq, tensor, zero_form
 from .wiring import trivial_parameter
 
 
-def open_field(n, cart_of=None, held=None):
+def open_field(n: int, cart_of: Optional[Sequence[int]] = None,
+               held: Optional[Sequence[int]] = None) -> SmoothArrangement:
     """Static arrangement on bodies and free carts, with held carts as inputs.
 
     ``held=None`` holds all carts. Otherwise ``held`` lists cart indices in the
@@ -36,6 +39,8 @@ def open_field(n, cart_of=None, held=None):
         in_f=in_f, omega=zero_form, label=f"openField({c},held={held})")
 
 
-def open_system(bodies, cart_of=None, held=None, carts=()):
+def open_system(bodies: Sequence[SmoothArrangement], cart_of: Optional[Sequence[int]] = None,
+                held: Optional[Sequence[int]] = None,
+                carts: Sequence[SmoothArrangement] = ()) -> SmoothArrangement:
     """Fill open_field with bodies and any free-cart parts in cart-index order."""
     return compose_seq(tensor(list(bodies)+list(carts)),open_field(len(bodies),cart_of,held))

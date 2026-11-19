@@ -13,16 +13,25 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, Dict, Optional, Sequence, Union
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 
+from .arrangement import Arrangement
 from .interpretation import interpretation, trivial_omega
+from .smooth import SmoothArrangement
 
 
-def inspect(arr, state=None, *, values=None, incoming=None, inputs=None,
-            loads=None, duration=None, round_index=0):
+def inspect(arr: Union[Arrangement, SmoothArrangement], state: Any = None, *, values: Any = None,
+            incoming: Any = None, inputs: Any = None, loads: Any = None,
+            duration: Optional[float] = None, round_index: int = 0) -> Dict[str, Any]:
     """Observe one interpretation round at ``state`` without advancing it.
+
+    ``state`` is a state of the arrangement's integrator (a pytree of arrays); ``values``, ``incoming``,
+    ``inputs`` and ``loads`` are arrays or a one-form for an array arrangement and a plot/point pair, a
+    one-form, a tuple and a callback for a smooth one, so they are ``Any``.
 
     ``values`` are M outputs, ``incoming`` their one-form on M inputs;
     ``inputs`` are N inputs, ``loads`` the covector on N outputs. Defaults are
@@ -62,8 +71,44 @@ def _read(parameter, state, duration, round_index):
     return parameter.position_at(state, duration)
 
 
-def inspect_smooth(arr, state=None, *, values=None, incoming=None, inputs=None,
-                   loads=None, duration=None, round_index=0):
+def _smooth_inputs(fn, q, m, n, results, inward):
+    """Trace numeric ports as whole values. A function-valued port stays opaque."""
+    from ._explorer_inputs import coordinate_inputs
+    parts = (q, *m, *n) if inward else (q, *m)
+    ports = [('q', i) for i in range(len(q))]
+    ports += [('mo', i) for i in range(len(m))]
+    if inward:
+        ports += [('ni', i) for i in range(len(n))]
+    rows = []
+    for i, result in enumerate(results):
+        try:
+            arrays = tuple(jnp.asarray(v) for v in parts)
+            if any(callable(x) for x in jax.tree.leaves(result)):
+                raise TypeError('function-valued output')
+            source = ports[:len(q)]
+            for port, x in zip(ports[len(q):], arrays[1:]):
+                source.extend([port] * x.size)
+            def one(*args):
+                values = tuple(args[1:1+len(m)])
+                if inward:
+                    return fn(args[0], values, tuple(args[1+len(m):]))[i]
+                return fn(args[0], values)[i]
+            supports = coordinate_inputs(one, arrays, [np.size(x) for x in jax.tree.leaves(result)])
+            inputs = set()
+            uncertain = False
+            for leaf in supports:
+                for indices, bound in leaf:
+                    inputs.update(source[j] for j in indices)
+                    uncertain |= bound
+            rows.append(([port for port in ports if port in inputs], uncertain))
+        except (TypeError, ValueError):
+            rows.append((ports, True))
+    return rows
+
+
+def inspect_smooth(arr: SmoothArrangement, state: Any = None, *, values: Any = None,
+                   incoming: Any = None, inputs: Any = None, loads: Any = None,
+                   duration: Optional[float] = None, round_index: int = 0) -> Dict[str, Any]:
     """Observe a smooth-interface arrangement on the plots its runner presents.
 
     ``values`` is the actual (plot, point) pair, ``incoming`` its 1-form,
@@ -95,9 +140,12 @@ def inspect_smooth(arr, state=None, *, values=None, incoming=None, inputs=None,
     # Input-side covectors are measured on the constant point plot unless an
     # adapter supplies a richer plot. These zero-dimensional components are
     # not evidence that the full covector vanishes.
-    return dict(label=arr.label or 'Smooth arrangement', configuration=q, state=state,
-                inclination=inclination, m_out=p(u), m_load=source_load,
-                m_in=in_m, m_in_load=None, n_out=out_plot(out_at), n_load=xi,
+    m, out = p(u), out_plot(out_at)
+    dependencies = {'no': _smooth_inputs(arr.out_f, q, m, inputs, out, False),
+                    'mi': _smooth_inputs(arr.in_f, q, m, inputs, in_m, True)}
+    return dict(transfer_inputs=dependencies, label=arr.label or 'Smooth arrangement', configuration=q, state=state,
+                inclination=inclination, m_out=m, m_load=source_load,
+                m_in=in_m, m_in_load=None, n_out=out, n_load=xi,
                 n_in=inputs, n_in_load=None, children=[], operation='smooth primitive; loads on presented plots')
 
 
@@ -111,6 +159,7 @@ def _inspect(arr, q, state, m, incoming, n, xi):
                   n_in=n, n_in_load=returned(n), children=[], operation='primitive')
     tree = arr.construction
     if not tree:
+        record['maps'] = _array_maps(arr, record)
         return record
     operation, a, b = tree
     record['operation'] = operation
@@ -132,14 +181,56 @@ def _inspect(arr, q, state, m, incoming, n, xi):
     return record
 
 
-def scene(record, *, title=None, time=0):
-    """Convert a trace to the same version-1 protocol used by live JS adapters.
+_SIDES = {'mo': ('Internal output', 'm_out', 'm_load'), 'mi': ('Internal input', 'm_in', 'm_in_load'),
+          'ni': ('External input', 'n_in', 'n_in_load'), 'no': ('External output', 'n_out', 'n_load'),
+          'q': ('Configuration', 'configuration', 'inclination')}
 
-    Each primitive has unboxed dynamic state and four named boundary sides.
-    Composite factors can be entered; interface connections retain both the
-    value and its corresponding load. Numeric arrays remain arrays in JSON.
-    """
+
+def _coordinate(side, i, size):
+    name = _SIDES[side][0]
+    return name if size == 1 else f'{name} {i+1}'
+
+
+def _array_maps(arr, r):
+    """Keep the actual pullback on each transfer branch apart from the local one-form."""
+    from ._explorer_inputs import coordinate_inputs
+    q, m, n = r['configuration'], r['m_out'], r['n_in']
+    args = (q, m, n)
+    sources = [(side, i) for side, xs in zip(('q','mo','ni'), args) for i in range(xs.size)]
+    maps = []
+    for side, fn, xs in [('no', arr.out_f, args[:2]), ('mi', arr.in_f, args)]:
+        _, key, lk = _SIDES[side]
+        size = r[key].size
+        if not size:
+            continue
+        pullback = jax.vjp(fn, *xs)[1] if np.any(r[lk]) else None
+        supports, = coordinate_inputs(fn, xs, [size])
+        for i, (support, uncertain) in enumerate(supports):
+            loads = np.zeros(sum(x.size for x in xs))
+            if r[lk][i] != 0:
+                seed = jnp.zeros_like(r[lk]).at[i].set(r[lk][i])
+                loads = np.concatenate([np.asarray(part) for part in pullback(seed)])
+            # Custom pullbacks may act on coordinates unused in the forward calculation.
+            inputs = [(sources[j], j in support, float(loads[j])) for j in sorted(set(support) | set(np.flatnonzero(loads)))]
+            maps.append(dict(side=side, index=i, inputs=inputs, uncertain=uncertain))
+    coeffs = arr.omega(*args)
+    supports = coordinate_inputs(arr.omega, args, [x.size for x in args])
+    for side, values, rows in zip(('q','mo','ni'), coeffs, supports):
+        for i, (support, uncertain) in enumerate(rows):
+            value = float(values[i])
+            if not support and not uncertain and value == 0:
+                continue
+            target = sources.index((side,i))
+            inputs = [(sources[j], j in support, value if j == target else 0.)
+                      for j in sorted(set(support) | {target})]
+            maps.append(dict(side=side, index=i, inputs=inputs, uncertain=uncertain, coefficient=value))
+    return maps
+
+
+def scene(record: Dict[str, Any], *, title: Optional[str] = None, time: float = 0) -> Dict[str, Any]:
+    """Draw individual transfer results and the local one-form using the measured port loads."""
     nodes, wires = [], []
+
     def data(value):
         if value is None:
             return None
@@ -150,62 +241,119 @@ def scene(record, *, title=None, time=0):
         if isinstance(value, (tuple, list)):
             return [data(v) for v in value]
         return np.asarray(value).tolist()
-    def node(id, parent, label, kind='box', **kw):
+
+    def node(id, parent, label, kind, **kw):
         nodes.append(dict(id=id, parent=parent, label=label, kind=kind, **kw))
-    def wire(id, source, target, value, load, label, **ports):
-        if not isinstance(value, (tuple, list)) or len(value):
-            if isinstance(value, (np.ndarray, jax.Array)) and value.size == 0:
-                return
-            wires.append(dict(id=id, source=source, target=target, label=label,
-                              value=data(value), load=data(load), valueScale=1, loadScale=1,
-                              **ports, description=('Load components on the supplied plot; not a scalar field-wire load.'
-                                           if record['operation'].startswith('smooth') else '')))
+
+    def wire(source, target, label, value, load, **kw):
+        wires.append(dict(id=f'{source}>{target}:{label}', source=source, target=target, label=label,
+                          value=data(value), load=data(load), valueScale=1, loadScale=1, **kw))
+
+    def port(id, side, i):
+        return id + ('/state' if side == 'q' else f'/{side}/{i}')
+
     def visit(r, id, parent):
-        node(id, parent, r['label'], description=r['operation'])
-        for side, label in [('mi', 'Internal inputs'), ('mo', 'Internal outputs'),
-                            ('ni', 'External inputs'), ('no', 'External outputs')]:
-            node(id+'/'+side, id, label, 'boundary', side='in' if side in ('mo','ni') else 'out')
+        node(id, parent, r['label'], 'box', description=r['operation'])
+        for side, (name, key, lk) in _SIDES.items():
+            if side != 'q':
+                for i in range(len(r[key])):
+                    node(port(id, side, i), id, _coordinate(side, i, len(r[key])), 'boundary',
+                         side='in' if side in ('mo','ni') else 'out')
         if r['children']:
             a, b = r['children']
-            visit(a, id+'/a', id); visit(b, id+'/b', id)
+            visit(a, id+'/a', id)
+            visit(b, id+'/b', id)
+
+            def connect(from_id, from_side, to_id, to_side, trace, side, from_offset=0, to_offset=0):
+                _, key, lk = _SIDES[side]
+                for i, value in enumerate(trace[key]):
+                    parent_side = to_side if to_id == id else from_side
+                    if to_id == id or from_id == id:
+                        offset = to_offset if to_id == id else from_offset
+                        label = _coordinate(parent_side, offset+i, len(r[_SIDES[parent_side][1]]))
+                    else:
+                        label = _coordinate(side, i, len(trace[key]))
+                    wire(port(from_id, from_side, from_offset+i), port(to_id, to_side, to_offset+i),
+                         label, value, trace[lk][i])
+
             if r['operation'] == 'compose':
-                wire(id+'/middle-out', id+'/a/no', id+'/b/mo', a['n_out'], b['m_load'], 'Intermediate outputs')
-                wire(id+'/middle-in', id+'/b/mi', id+'/a/ni', b['m_in'], a['n_in_load'], 'Intermediate inputs')
-                for side, child, key, lk, rev in [
-                    ('mo','a','m_out','m_load',False), ('mi','a','m_in','m_in_load',True),
-                    ('ni','b','n_in','n_in_load',False), ('no','b','n_out','n_load',True)]:
-                    ends = (id+'/'+side, id+'/'+child+'/'+side)
-                    wire(id+'/'+side, *(ends[::-1] if rev else ends), r[key], r[lk], side)
+                connect(id+'/a','no',id+'/b','mo',a,'no')
+                connect(id+'/b','mi',id+'/a','ni',b,'mi')
+                for side, child in [('mo','a'),('mi','a'),('ni','b'),('no','b')]:
+                    inner = id+'/'+child
+                    src, dst = (id, inner) if side in ('mo','ni') else (inner,id)
+                    connect(src,side,dst,side,r,side)
             else:
-                for side, key, lk, rev in [('mo','m_out','m_load',False),('mi','m_in','m_in_load',True),
-                                          ('ni','n_in','n_in_load',False),('no','n_out','n_load',True)]:
-                    # A product's two coordinates are different readouts, not
-                    # two copies of one wire. Show the split/join as a static map.
-                    operation=id+'/'+side+'-product'
-                    node(operation,id,'Assemble product' if rev else 'Read product coordinates','operation')
-                    ends=(id+'/'+side,operation)
-                    wire(id+'/'+side,*(ends[::-1] if rev else ends),r[key],r[lk],side)
-                    for child,rr in [('a',a),('b',b)]:
-                        ends=(operation,id+'/'+child+'/'+side)
-                        wire(id+'/'+child+'-'+side,*(ends[::-1] if rev else ends),rr[key],rr[lk],
-                             side+' · '+child,sourcePort=child if not rev else side)
-        else:
-            node(id+'/coupling', id, 'Transfers and inclination field', 'field')
-            if np.asarray(r['configuration']).size:
-                node(id+'/state', id, 'Internal state', 'state', value=data(r['state']),
-                     configuration=data(r['configuration']), inclination=data(r['inclination']))
-                wire(id+'/readout', id+'/state', id+'/coupling', r['configuration'], r['inclination'], 'Configuration / inclination')
-            for side, key, lk, rev in [('mo','m_out','m_load',False),('mi','m_in','m_in_load',True),
-                                      ('ni','n_in','n_in_load',False),('no','n_out','n_load',True)]:
-                ends = (id+'/'+side, id+'/coupling')
-                wire(id+'/'+side, *(ends[::-1] if rev else ends), r[key], r[lk], side)
+                for side in ('mo','mi','ni','no'):
+                    offset = 0
+                    for child, trace in [('a',a),('b',b)]:
+                        inner = id+'/'+child
+                        if side in ('mo','ni'):
+                            connect(id,side,inner,side,trace,side,from_offset=offset)
+                        else:
+                            connect(inner,side,id,side,trace,side,to_offset=offset)
+                        offset += len(trace[_SIDES[side][1]])
+            return
+        if np.size(r['configuration']):
+            node(id+'/state', id, 'Internal state', 'state', value=data(r['state']),
+                 configuration=data(r['configuration']), inclination=data(r['inclination']))
+        if 'maps' not in r:
+            opaque(r, id)
+            return
+        for row in r['maps']:
+            side, i = row['side'], row['index']
+            _, key, lk = _SIDES[side]
+            label = _coordinate(side, i, len(r[key]))
+            field = 'coefficient' in row
+            name = ('Inclination on ' if side == 'q' else 'Load on ') + label.lower() if field else label
+            op = f'{id}/map/{side}/{i}'
+            node(op, id, name, 'field' if field else 'operation', possibleInputs=row['uncertain'],
+                 result=row['coefficient'] if field else data(r[key][i]), dependencyView=True,
+                 description='Contribution of the local inclination field.' if field else
+                             ('Out-transfer.' if side == 'no' else 'In-transfer.'))
+            for (src, j), argument, load in row['inputs']:
+                values = r[_SIDES[src][1]]
+                wire(port(id,src,j), op, _coordinate(src,j,len(values)), values[j], load,
+                     argument=argument, inclination=src=='q')
+            if not field:
+                wire(op, port(id,side,i), label, r[key][i], r[lk][i])
+
+    def opaque(r, id):
+        # A smooth output covector is already on its presenting plot. Splitting
+        # it among output values would invent coordinate loads. Keep it intact.
+        smooth = r['operation'].startswith('smooth')
+        plot = id+'/loads'
+        description = ('Observed components on the supplied plots. An output load belongs to the whole '
+                       'presenting plot.' if smooth else 'Total observed loads for this recorded primitive.')
+        node(plot, id, 'Loads on the plots' if smooth else 'Observed loads', 'field', description=description,
+             observations=[dict(label=label, value=data(r[key])) for label,key in
+                           [('Configuration inclination','inclination'),('Internal output load','m_load'),
+                            ('External output load','n_load'),('Internal input load','m_in_load'),
+                            ('External input load','n_in_load')]])
+        for side in ('no','mi'):
+            _, key, lk = _SIDES[side]
+            for i, result in enumerate(r[key]):
+                label = _coordinate(side,i,len(r[key]))
+                op = f'{id}/map/{side}/{i}'
+                sides = ('q','mo') if side == 'no' else ('q','mo','ni')
+                if 'transfer_inputs' in r:
+                    inputs, bound = r['transfer_inputs'][side][i]
+                else:
+                    inputs = [(src,j) for src in sides for j in range(len(r[_SIDES[src][1]]))]
+                    bound = True
+                node(op,id,label,'operation',result=data(result),possibleInputs=bound,dependencyView=True,
+                     description=('Only possible inputs could be determined.' if bound else
+                                  'Coordinate dependencies of the transfer on the presented values.'))
+                for src, j in inputs:
+                    values = r[_SIDES[src][1]]
+                    wire(port(id,src,j), op, _coordinate(src,j,len(values)), values[j], None)
+                wire(op, port(id,side,i), label, result, None)
+
     visit(record, 'root', None)
-    connected = {end for w in wires for end in (w['source'], w['target'])}
-    nodes = [n for n in nodes if n['kind'] not in ('boundary','operation') or n['id'] in connected]
     return dict(version=1, title=title or record['label'], root='root', time=time, nodes=nodes, wires=wires)
 
 
-def write_html(frames, path):
+def write_html(frames: Union[Dict[str, Any], Sequence[Dict[str, Any]]], path: Union[str, Path]) -> Path:
     """A portable offline explorer for one snapshot or a recorded run."""
     frames = [frames] if isinstance(frames, dict) else list(frames)
     if not frames:

@@ -72,7 +72,7 @@ def _laplacian_pinned(v):
     return aug[:-2] - 2.0 * aug[1:-1] + aug[2:]
 
 
-def demo_gradient_descent():
+def demo_gradient_descent() -> None:
     m, n = 3, 2
     dim = n * m + n
     F = lambda q, x: q[: n * m].reshape(n, m) @ x + q[n * m:]
@@ -86,7 +86,7 @@ def demo_gradient_descent():
     print(f"  gradient descent (conf):    loss {hist[0]:.3f} -> {hist[-1]:.1e},  weight error {W_err:.1e}")
 
 
-def demo_newton():
+def demo_newton() -> None:
     k = lambda q: jnp.exp(q[0]) - q[0]   # minimized at 0
     O = Phi(_closed(configuration(inverse_hessian(k, 1)), k))
     q, xs = jnp.array([2.0]), [2.0]
@@ -96,7 +96,7 @@ def demo_newton():
     print("  newton (conf, Newton sharp): x = " + " -> ".join(f"{v:.1e}" for v in xs) + "   (-> min at 0)")
 
 
-def demo_wave():
+def demo_wave() -> None:
     K, m, kappa = 5, 1.5, 0.9
     O = Phi(compose_chain([_harmonic(phase, m, kappa)] * K))
     rng = np.random.default_rng(0)
@@ -115,7 +115,7 @@ def demo_wave():
     print(f"  wave (phase):               discrete-wave residual {res:.1e}  (exact recurrence)")
 
 
-def demo_heat():
+def demo_heat() -> None:
     K, T, m, kappa = 9, 500, 1.0, 0.2
     O = Phi(compose_chain([_harmonic(configuration, m, kappa)] * K))
     rng = np.random.default_rng(4)
@@ -128,7 +128,7 @@ def demo_heat():
     print(f"  heat (conf):                peak |q| {peak0:.2f} -> {float(np.max(np.abs(np.asarray(q)))):.1e}  (dissipates to equilibrium)")
 
 
-def demo_leapfrog():
+def demo_leapfrog() -> None:
     from arrangements.leapfrog import leapfrog
     from arrangements.pc2 import Phi2
     K, m, kappa = 5, 1.5, 0.9
@@ -144,7 +144,7 @@ def demo_leapfrog():
     print(f"  wave (leapfrog, pc^(2)):   peak |q| {peak0:.2f} -> max {peak:.2f} over 400 steps  (bounded -- stable)")
 
 
-def demo_rk4():
+def demo_rk4() -> None:
     # RK4 as one pc^(4) instance: four force evaluations per macro-tick. On the
     # flow qdot = -A q the global error falls like h^4 (4th order).
     from arrangements.pcK import PhiK
@@ -164,7 +164,7 @@ def demo_rk4():
     print(f"  rk4 (pc^(4)):              error {e8:.1e} -> {e16:.1e} as h halves  (ratio {e8 / e16:.0f} ~ 16, i.e. 4th order)")
 
 
-def demo_optimizers():
+def demo_optimizers() -> None:
     # One convex cost, three parameters: the optimizer IS the coalgebra.
     A = jnp.diag(jnp.array([1.0, 3.0, 9.0]))
     k = lambda q: 0.5 * q @ (A @ q)
@@ -182,21 +182,21 @@ def demo_optimizers():
     print(f"  optimizers (one well, 3 coalgebras):  |q| after 600 -> descent {c:.0e},  phase {p:.2f} (oscillates),  momentum {d:.0e}")
 
 
-def demo_pinn():
+def demo_pinn() -> None:
     from arrangements.pinn import solve_deep_ritz
     u, u_star, hist, x = solve_deep_ritz(steps=3000, seed=0)
     rel = float(np.linalg.norm(np.asarray(u) - np.asarray(u_star)) / np.linalg.norm(np.asarray(u_star)))
     print(f"  pinn (deep Ritz, Poisson, conf):     energy {hist[0]:.3f} -> {hist[-1]:.3f},  rel error vs discrete solution {rel:.1%}")
 
 
-def demo_system_id():
+def demo_system_id() -> None:
     from arrangements.system_id import identify, one_step_error, PENDULUM
     params, F, hist, O, dim, m = identify(PENDULUM, steps=2000, seed=1)
     err, base = one_step_error(params, F, O, dim, m, seed=101)
     print(f"  system id (pendulum: phase -> net):  one-step error {err:.3f}  vs no-change baseline {base:.3f}")
 
 
-def demo_gyroscope():
+def demo_gyroscope() -> None:
     # A network of 2-D gyros (springs + gravity + damping + gyroscopic precession),
     # with the ``gyro`` parameter, trained to classify strokes -- a harmonic surrogate
     # inspired by Bull & Achour. Here on a fast synthetic 2-class stroke task.
@@ -216,7 +216,7 @@ def demo_gyroscope():
     print("    (harmonic surrogate inspired by Bull & Achour; `python -m arrangements.gyroscope` -> ~0.83 at 3x4, ~0.87 at 4x5)")
 
 
-def demo_faithful():
+def demo_faithful() -> None:
     # The faithful Bull & Achour machine (gyroscope_faithful.py): hex springs from the prism
     # wiring, nonlinear rod gravity, quadratic drag + per-gyro precession, RK4 (pc^(4)). The
     # headline is the springs->0 ablation, NOT accuracy -- a one-line categorical wiring fact.
@@ -232,7 +232,7 @@ def demo_faithful():
     print("    (springs->0 severs input->output: the blog's 'Take 1' as a wiring fact; no accuracy claim)")
 
 
-def main():
+def main() -> None:
     print("arrangements: worked examples (one functor Phi; the integrator is the arrangement's parameter)\n")
     print("configuration parameters -- descent dynamics:")
     demo_gradient_descent()

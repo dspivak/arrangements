@@ -22,9 +22,12 @@ schedule; ``Phi`` of it, paired with a sampler (``rand.seed``), runs the whole. 
 
 from __future__ import annotations
 
+from typing import Optional
+
 from dataclasses import replace
 
 import jax.numpy as jnp
+from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
 from .coalgebra import configuration
@@ -34,7 +37,7 @@ from .rvect import euclidean
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 
-def k_com(q, u):
+def k_com(q: Array, u: Array) -> Array:
     """The committed reader's cost: two wells at ``q = +-1``, tilted by the note ``u``."""
     return 0.25 * (q ** 2 - 1.0) ** 2 - u * q
 
@@ -105,8 +108,8 @@ def mean_box(N: int) -> Arrangement:
     return compose_seq(plus_box(N), map_box(lambda v: v / N, 1, 1, f"/{N}"))
 
 
-def population(N: int, eta: float, T: float, eta2: float, members_arr: Arrangement = None,
-               reader: Arrangement = None) -> Arrangement:
+def population(N: int, eta: float, T: float, eta2: float, members_arr: Optional[Arrangement] = None,
+               reader: Optional[Arrangement] = None) -> Arrangement:
     """``<0|0> -> <1|0>``: the members, the note copied to them, their mean, and ``R2`` reading it.
 
     ``members_arr`` (default ``members(N, ...)``) may be any ``<0|0> -> <N|N>``; ``reader`` (default

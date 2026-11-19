@@ -111,7 +111,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact
-from .coalgebra import CotCoalg, configuration
+from .coalgebra import CotCoalg, ParameterRule, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
 from .pc import PCMorphism
@@ -166,7 +166,7 @@ def replicator_arrangement(
     )
 
 
-def replicator_dynamics(A: Array, dt: float = 1.0, parameter=configuration) -> PCMorphism:
+def replicator_dynamics(A: Array, dt: float = 1.0, parameter: ParameterRule = configuration) -> PCMorphism:
     """``Phi`` of the (trick) replicator arrangement: the closed pc-morphism."""
     return Phi(replicator_arrangement(A, dt, parameter))
 
@@ -275,7 +275,7 @@ def log_replicator_arrangement(
     )
 
 
-def log_replicator_dynamics(A: Array, dt: float = 1.0, parameter=configuration) -> PCMorphism:
+def log_replicator_dynamics(A: Array, dt: float = 1.0, parameter: ParameterRule = configuration) -> PCMorphism:
     """``Phi`` of the log-coordinate replicator arrangement. The state is
     ``y = log x``; step it with ``replicator_step`` and read fractions off as
     ``exp(y)``, which are positive by construction."""

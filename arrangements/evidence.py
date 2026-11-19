@@ -31,8 +31,9 @@ from typing import Callable, List, NamedTuple, Optional, Sequence, Tuple
 
 import jax.numpy as jnp
 from jax import Array
+from jax.typing import ArrayLike
 
-from .arrangement import Arrangement, exact
+from .arrangement import Arrangement, Numbers, exact
 from .coalgebra import CotCoalg, configuration
 from .rvect import euclidean
 
@@ -71,7 +72,7 @@ def disagreement(inputs: Sequence[Array]) -> Array:
     return sum(log_normalizer(x) for x in inputs) - log_normalizer(total)
 
 
-def datum(y, precision) -> Array:
+def datum(y: Numbers, precision: ArrayLike) -> Array:
     """The own evidence of a datum ``y`` seen with precision ``precision``: ``(precision y, precision)``."""
     y = jnp.ravel(jnp.asarray(y, float))
     return jnp.concatenate([precision * y, jnp.reshape(precision, (1,))])

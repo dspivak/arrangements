@@ -6,8 +6,12 @@ Extracted from the book's a330db6f and 0676663f experiments (2026-11-11).
 """
 from __future__ import annotations
 
+from typing import Any, Callable, Literal, Tuple
+
 import jax
 import jax.numpy as jnp
+from jax import Array
+
 
 from .arrangement import Arrangement, exact, zero_form
 from .coalgebra import CotCoalg, configuration
@@ -25,11 +29,11 @@ PRETRAINED = jnp.array([1.3555143971688006, -0.5768814956932359,
                        0.039326516587624566, -1.160580009612816])
 
 
-def holder(parameter, label):
+def holder(parameter: CotCoalg, label: str) -> Arrangement:
     return Arrangement(parameter, 0, 0, 0, parameter.Q_dim,
                        lambda q, m: q, lambda q, m, n: Z, zero_form, label)
 
-def participant(mass=1.0):
+def participant(mass: float = 1.0) -> Arrangement:
     def update(s, covector, dt):
         x, v = s
         acceleration = covector[0] / mass
@@ -39,16 +43,16 @@ def participant(mass=1.0):
                          f"mass={mass:g}/held-force", timed_step=update)
     return holder(parameter, "particle(x,v)" if mass == 1.0 else f"particle(x,v;mass={mass:g})")
 
-def clock_part():
+def clock_part() -> Arrangement:
     parameter = CotCoalg(1, jnp.zeros(1), lambda s: s,
                          lambda s, xi: s+1, "clock",
                          timed_step=lambda s, xi, dt: s+dt)
     return holder(parameter, "clock(t)")
 
-def command(theta, x, v, t):
+def command(theta: Array, x: float, v: float, t: float) -> Array:
     return jnp.dot(theta, jnp.array([1.0, x, v, t]))
 
-def build_execution(mass=1.0):
+def build_execution(mass: float = 1.0) -> Arrangement:
     fixed = holder(configuration(euclidean(4, 0.0)), "frozen-controller-coefficients")
     parts = parallel_arrangements(parallel_arrangements(participant(mass), clock_part()), fixed)
 
@@ -64,26 +68,26 @@ def build_execution(mass=1.0):
                              force, "affine-command(x,v,t;theta)")
     return compose_seq(parts, controller)
 
-def execution_state(theta, initial=jnp.zeros(2)):
+def execution_state(theta: Array, initial: Array = jnp.zeros(2)) -> Any:
     return (((initial, jnp.zeros(1)), theta), Z)
 
-def unpack(state):
+def unpack(state: Any) -> Tuple[Array, Array, Array]:
     (((xv, clock), theta), _) = state
     return xv, clock[0], theta
 
-def scorer(velocity_weight=1.0):
+def scorer(velocity_weight: float = 1.0) -> Arrangement:
     def potential(q, final, n):
         return -0.5*((final[0]-1.0)**2 + velocity_weight*final[1]**2)
     return Arrangement(trivial_parameter(), 0, 2, 0, 0,
                        lambda q, m: Z, lambda q, m, n: Z,
                        exact(potential), f"terminal-score(position=1,velocity-weight={velocity_weight})")
 
-def static(fn, din, dout, label):
+def static(fn: Callable[[Array], Array], din: int, dout: int, label: str) -> Arrangement:
     return Arrangement(trivial_parameter(), 0, din, 0, dout,
                        lambda q,m: fn(m), lambda q,m,n: Z, zero_form, label)
 
 
-def run_step(arr):
+def run_step(arr: Arrangement) -> Callable[..., Any]:
     machine = Phi(arr)
     def step(state, context=Z, duration=1.0):
         return machine.with_state(state).run_one(
@@ -91,7 +95,7 @@ def run_step(arr):
     return step
 
 
-def imaginary_execution():
+def imaginary_execution() -> Arrangement:
     # Inverse mass is an independent frozen coordinate, not a trainable force source.
     def move(s, xi, dt):
         x,v,a = s
@@ -113,14 +117,14 @@ IMAGINED = imaginary_execution()
 IMAGINE_STEP = run_step(IMAGINED)
 
 
-def imagine(theta, context):
+def imagine(theta: Array, context: Array) -> Array:
     a,x,v,t = context[:4]
     state = (((jnp.array([x,v,a]),jnp.array([t])),theta),Z)
     final = jax.lax.fori_loop(0,20,lambda i,s:IMAGINE_STEP(s,Z,context[4+i]),state)
     return final[0][0][0][:2]
 
 
-def model_learner():
+def model_learner() -> Arrangement:
     # Context: previous x,v, command, duration, observed next x,v.
     weights = holder(configuration(euclidean(1,0.5)), 'inverse-mass-holder')
     def prediction_and_target(m):
@@ -142,11 +146,11 @@ def model_learner():
 
 MODEL = model_learner()
 _MODEL_STEP = run_step(MODEL)
-def MODEL_STEP(a, context, duration=1.0):
+def MODEL_STEP(a: Any, context: Array, duration: float = 1.0) -> Any:
     return _MODEL_STEP((a,Z),context,duration)[0]
 
 
-def controller_learner(cut=False):
+def controller_learner(cut: bool = False) -> Arrangement:
     # A context snapshot is carried by frozen parameter coordinates, so composing
     # holder, rollout and scorer differentiates only the four controller coefficients.
     def update(s,xi,dt):
@@ -168,13 +172,13 @@ CONTROL = controller_learner()
 CONTROL_STEP = run_step(CONTROL)
 
 
-def improve(theta,context,count,duration=1.0):
+def improve(theta: Array, context: Array, count: int, duration: float = 1.0) -> Array:
     state = ((jnp.concatenate([theta,context]),Z),Z)
     state = jax.lax.fori_loop(0,count,lambda i,s:CONTROL_STEP(s,Z,duration),state)
     return state[0][0][:4]
 
 
-def computer(kind,count,initial):
+def computer(kind: Literal['model', 'controller'], count: int, initial: Array) -> Arrangement:
     n = len(initial)
     c = 6 if kind == 'model' else 24
     def update(s,xi,dt):
@@ -191,7 +195,7 @@ def computer(kind,count,initial):
                        f'{kind}-computer[{count} updates; {inner.label}]')
 
 
-def physical(mass):
+def physical(mass: float) -> Arrangement:
     def move(s,xi,dt):
         x,v = s[:2]
         u = xi[0]
@@ -201,7 +205,8 @@ def physical(mass):
     return holder(P,f'actual-particle-and-transition(mass={mass})')
 
 
-def online(mass,budget,correct=True,learn=True,cold=False,split_command=False):
+def online(mass: float, budget: int, correct: bool = True, learn: bool = True,
+           cold: bool = False, split_command: bool = False) -> Arrangement:
     k = budget if learn else 0
     def advance(s,xi,dt):
         shifted = jnp.concatenate([s[3:],jnp.zeros(1)])
@@ -232,11 +237,11 @@ def online(mass,budget,correct=True,learn=True,cold=False,split_command=False):
     return compose_seq(parts,router)
 
 
-def observations(arr,state):
+def observations(arr: Arrangement, state: Any) -> Array:
     return arr.out_f(arr.P.position(state),Z)
 
 
-def evaluate(mass,theta):
+def evaluate(mass: float, theta: Array) -> Tuple[Array, Array]:
     arr = build_execution(mass)
     step = run_step(arr)
     state = execution_state(theta)
@@ -252,7 +257,7 @@ def evaluate(mass,theta):
 
 
 
-def timing_learner(cut=False):
+def timing_learner(cut: bool = False) -> Arrangement:
     weights=holder(configuration(euclidean(1,.2)),'timing-parameter')
     def choice(m):
         w=jax.nn.sigmoid(m[0])

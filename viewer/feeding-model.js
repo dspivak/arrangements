@@ -1,9 +1,9 @@
 // The feeding arrangement of the book's background/feeding-imc/feeding-imc.tex, as its differential equation:
 // a receiver on a cart on a line, with a lever, an eye and a patrol, and any number of casings resting on the ground.
 // Receiver state [b, l, h, y, my, zc, r, s, eta, zeta]: battery, grip, lever tip height, cart position, cart momentum,
-// wheel, look distance, scan, patrol point, patrol's second coordinate. Casing k adds [f, a, x, mu, z, zg, za]: food,
-// opening, height, vertical momentum, air memory, the ground damper's memory, and the attachment damper's memory
-// (the last is the receiver's, kept beside its casing); its place p_k on the line is fixed. Each rate is the
+// wheel, look distance, scan, patrol point, patrol's second coordinate. Each site adds the casing's food, opening,
+// height, vertical momentum, air and ground memories, followed by the external contact's stroke and latch.
+// The casing's place on the line is fixed. Each rate is the
 // integrand's tangent response to its own component of the summed inclination field; `field` also returns the gates
 // and rates so the page can show the calculation.
 // Checked against the book's background/feeding-imc/check_episode.py (ordinary code, not the library):
@@ -19,9 +19,9 @@
     A: 6, omega: 0.6, gam: 0.05, lam: 3, w: 0.5, csee: 0.002, fr: 0.1,
     // the contact dampers (ground and attachment) and the patrol
     kd: 4000, bd: 40, kr: 10, epsd: 0.01,
-    B: 8, nup: 0.1, gamp: 0.005, cpat: 0.002, kexp: 0.1,
+    B: 8, nup: 0.1, gamp: 0.005, cpat: 0.002, kexp: 0.1, latchRate: 40, latchCost: 0.0001,
   };
-  const NR = 10, NC = 7;
+  const NR = 10, NC = 8;
   // David's screenshot of 2026-11-18: full casings at -8 and +8, an empty one at 4, the cart at 0
   const PLACES = [4, -8, 8];
   const FOODS = [0.05, 10, 10];
@@ -31,7 +31,7 @@
     return s;
   }
   // a casing resting on the ground, its memories unstretched
-  const casing = (food, P = DEFAULTS) => [food, 0, P.xg, 0, P.xg, 0, 0];
+  const casing = (food, P = DEFAULTS) => [food, 0, P.xg, 0, P.xg, 0, 0, 0];
   const START = start(PLACES, FOODS);
 
   const rho = t => (t > 0 ? Math.exp(-1 / t) : 0);
@@ -42,6 +42,41 @@
     return (da * (a + c) - a * (da - dc)) / ((a + c) * (a + c));
   };
   const near = (u, R) => { const t = (R * R - u * u) / (0.75 * R * R); return [theta(t), dtheta(t) * (-2 * u) / (0.75 * R * R)]; };
+
+  function encounter(s, places, P, receiverSize = NR) {
+    const tip = s[2], cart = s[3], live = theta(s[0]/P.b0);
+    const stillHolding = theta((s[1]+.8)/.4);
+    const grip = [], mouth = [], engaged = [], engageSlope = [], latchRate = [], available = [], score = [], latch = [], firstChoice = [], unblocked = [];
+    for (let k = 0; k < places.length; k++) {
+      const i = receiverSize+NC*k, height = s[i+2], horizontal = near(cart-places[k], P.Rh)[0];
+      grip.push(horizontal*near(height-tip, P.R)[0]);
+      mouth.push(horizontal*near(height-P.x0, P.R)[0]);
+      latch.push(s[i+7]);
+      engaged.push(theta((latch[k]-.3)/.2));
+      engageSlope.push(dtheta((latch[k]-.3)/.2)/.2);
+      available.push(grip[k]*theta((s[i]-P.f0)/P.f0));
+      score.push(available[k]/(1+((height-tip)/P.R)**2+((cart-places[k])/P.Rh)**2));
+    }
+    for (let i=0; i<places.length; i++) {
+      let first = 1, free = 1;
+      for (let j=0; j<places.length; j++) if (i!==j) {
+        first *= theta((score[i]-score[j])/.05);
+        free *= 1-theta(latch[j]/.3);
+      }
+      firstChoice.push(first); unblocked.push(free);
+      const acquire = theta((available[i]-.15)/.15)*first*(1-stillHolding);
+      const retain = 1-(1-available[i])*(1-stillHolding);
+      const target = free*((1-engaged[i])*acquire+engaged[i]*retain);
+      latchRate.push(P.latchRate*live*(target-latch[i]));
+    }
+    return {grip, mouth, engaged, engageSlope, latchRate, available, score, firstChoice, unblocked};
+  }
+
+  // The single opener and digestor expose their available effort to the surroundings.
+  function mouthEfforts(battery, grip, P) {
+    const active = theta(battery/P.b0)*theta(grip);
+    return {opening: P.lpry*active, digestion: P.leat*active};
+  }
 
   function field(s, places, P, learner) {
     const [b, l, h, y, my, zc, r, sc, eta, zeta] = s;
@@ -69,30 +104,34 @@
     const torque = live * (P.ktau * seen * r + free * search);
     // the lever: grip toward a full casing at its tip, lift toward the mouth while holding
     let K = 0;
+    const contact = encounter(s, places, P), mouth = mouthEfforts(b, l, P);
     for (let k = 0; k < n; k++) {
       const f = s[NR + NC * k], x = s[NR + NC * k + 2];
-      K += near(x - h, P.R)[0] * near(y - places[k], P.Rh)[0] * theta((f - P.f0) / P.f0);
+      K += contact.engaged[k]*contact.grip[k] * theta((f - P.f0) / P.f0);
     }
     const grip = P.lgrip * live * (K * (2 - l) - (1 - K) * (l + 1));
     const lift = P.llift * live * (hold * (P.x0 - h) + (1 - hold) * (P.xg - h));
-    let dJl = 0, dJh = 0, Fy = 0, eatAll = 0, pryAll = 0, attach = 0, ground = 0, damp = 0;
+    let dJl = 0, dJh = 0, Fy = 0, eatAll = 0, pryAll = 0, attach = 0, ground = 0, damp = 0, latchPay=0, latchLoss=0;
     const rates = [], casings = [];
     for (let k = 0; k < n; k++) {
       const [f, a, x, mu, z, zg, za] = s.slice(NR + NC * k, NR + NC * (k + 1));
       // the attachment: a spring and a damper on the stretch u, both gated by the grip and nearness
       const u = x - h, da = u - za;
       const [nv, dnv] = near(u, P.R), [nh, dnh] = near(y - places[k], P.Rh);
-      const G = hold * nv * nh, W = P.kappa0 * u * u + P.kd * da * da;
-      const dJx = G * (P.kappa0 * u + P.kd * da) + 0.5 * hold * dnv * nh * W;
-      dJl += 0.5 * dhold * nv * nh * W;
+      const selected = contact.engaged[k], G = selected * hold * nv * nh, W = P.kappa0 * u * u + P.kd * da * da;
+      const dJx = G * (P.kappa0 * u + P.kd * da) + 0.5 * selected * hold * dnv * nh * W;
+      dJl += 0.5 * selected * dhold * nv * nh * W;
       dJh -= dJx;
-      Fy -= 0.5 * hold * nv * dnh * W;
+      Fy -= 0.5 * selected * hold * nv * dnh * W;
       attach += 0.5 * G * W + 0.5 * P.kr * za * za;
       const zaDot = (G * P.kd * da - P.kr * za) / P.bd;
-      const atMouth = live * near(x - P.x0, P.R)[0] * nh * hold;
+      const atMouth = selected * live * hold * contact.mouth[k];
       const access = theta((a - P.a1) / (P.a2 - P.a1));
-      const pry = P.lpry * atMouth * (1 - a);
-      const eat = P.leat * atMouth * access * f;
+      const pry = mouth.opening * selected * contact.mouth[k] * (1 - a);
+      const eat = mouth.digestion * selected * contact.mouth[k] * access * f;
+      const latchDot=contact.latchRate[k], friction=P.latchCost*latchDot*latchDot;
+      latchLoss+=friction;
+      latchPay+=friction+.5*contact.engageSlope[k]*hold*nv*nh*W*latchDot;
       // the ground: a spring gated over eps and a damper gated over epsd, below the surface
       const v = x - P.xg, dg = v - zg;
       const tg = theta(-v / P.eps), dtg = dtheta(-v / P.eps) * (-1 / P.eps);
@@ -102,8 +141,8 @@
       const zgDot = (P.kd * td * dg - P.kr * zg) / P.bd;
       const delta = x - z;
       const force = -dJx - P.m * P.g - P.kappa * delta - dJg;
-      rates.push(-eat, pry, mu / P.m, force, P.kappa * delta / P.beta, zgDot, zaDot);
-      casings.push({ red: reds[k], access, pry, eat, force, atMouth });
+      rates.push(-eat, pry, mu / P.m, force, P.kappa * delta / P.beta, zgDot, zaDot, latchDot);
+      casings.push({ red: reds[k], access, pry, eat, force, atMouth, selected });
       eatAll += eat; pryAll += pry;
       damp += P.bd * (zgDot * zgDot + zaDot * zaDot);
     }
@@ -113,11 +152,12 @@
       grip: (P.cgrip * grip + dJl) * grip, lift: (P.clift * lift + dJh) * lift,
       drive: torque * wheel, eye: P.csee * (lookR * lookR + lookS * lookS), patrol: P.cpat * (patE * patE + patZ * patZ),
     };
-    const bdot = P.alpha * eatAll - P.ctear * pryAll - pay.grip - pay.lift - pay.drive - pay.eye - pay.patrol;
+    pay.contact=latchPay;
+    const bdot = P.alpha * eatAll - P.ctear * pryAll - pay.grip - pay.lift - pay.drive - pay.eye - pay.patrol-latchPay;
     const rate = [bdot, grip, lift, my / P.M, Fy - P.kappac * stretch, wheel, lookR, lookS, patE, patZ].concat(rates);
     let energy = b + my * my / (2 * P.M) + 0.5 * P.kappac * stretch * stretch + attach + ground;
     let loss = P.cgrip * grip * grip + P.clift * lift * lift + P.betac * wheel * wheel + pay.eye + pay.patrol
-      + P.ctear * pryAll + (1 - P.alpha) * eatAll + damp;
+      + P.ctear * pryAll + (1 - P.alpha) * eatAll + damp + latchLoss;
     for (let k = 0; k < n; k++) {
       const [f, , x, mu, z] = s.slice(NR + NC * k, NR + NC * k + 5);
       energy += f + mu * mu / (2 * P.m) + P.m * P.g * x + 0.5 * P.kappa * (x - z) * (x - z);
@@ -135,7 +175,7 @@
     return s.map((si, i) => si + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
   }
 
-  const api = { DEFAULTS, NR, NC, PLACES, FOODS, START, start, casing, theta, dtheta, field, rk4 };
+  const api = { DEFAULTS, NR, NC, PLACES, FOODS, START, start, casing, theta, dtheta, encounter, mouthEfforts, field, rk4 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Feeding = api;
 })(this);

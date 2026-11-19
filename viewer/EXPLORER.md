@@ -20,7 +20,7 @@ with gesture distance, with small deltas combined into one render per frame;
 it does not jump a preset on every trackpad event. Scroll zoom keeps the point under the
 pointer fixed as far as the page's scroll bounds permit. Fork dots mark shared
 readouts, with returning loads summed on the trunk.
-Each wire has two tracks that meet at its ports. Blue arrows point from source
+Each wire can display two tracks that meet at its ports. A coordinate that only receives a load shows its amber track. Blue arrows point from source
 to target. Amber arrows point back toward the source. During playback, marks
 travel along each nonzero track in its arrow's direction. The arrows stay
 visible when paused and with reduced motion. Zero is dashed and missing numeric
@@ -60,7 +60,9 @@ Node for geometry tests.
 frame timestamps. Multi-round adapters should emit a complete round's
 observations, identifying the round in their description. For a live model
 that already owns its clock, omit `step` and invoke `refresh` from that clock;
-the view disables its playback controls in that mode.
+the view disables its playback controls in that mode. To use that clock's own
+controls, pass `options.playback` with a `controls` element, a `playing` getter
+and `setPlaying(on)`. They stay available at every depth.
 
 A snapshot uses this versioned protocol:
 
@@ -102,9 +104,16 @@ or `null` for unavailable; numeric observations must be finite. Functions and
 other structured values need a meaningful sample/summary supplied by the model;
 the viewer cannot assign them a canonical scalar magnitude.
 
+Selecting a single-result map shows its inputs. Select an input to inspect its
+source, including through intermediate boundary ports. A field with a single
+known result can supply `dependencyView: true`, `result`, `resultLabel` and
+`resultUnit`. A wire marked `argument: false` carries its returning load without
+appearing in the result's argument list. Use `possibleInputs: true` for a
+conservative list when coordinate dependencies cannot be determined.
+
 Optional node fields include `description`, `renderer`, and layout hints
 `column` and `row`. Hints are ignored when regrouping would cause overlap.
-The shared layout sizes parts for their port counts, aligns boundary ports,
+Static maps and fields use compact circles. Their labeled terminals fan into the mark. Additional arguments extend the rows vertically. The shared layout aligns boundary ports,
 uses horizontal endpoint tangents, and routes around other parts and their
 titles. Unboxed states have visible readout marks; wires meet those marks.
 An adapter can append application data to a node or snapshot; feeding supplies
@@ -151,9 +160,16 @@ write_html(scene(observation, time=t), 'example-explorer.html')
 
 `inspect` uses the existing polynomial interpretation and never advances the
 integrator. Array arrangements retain their actual `compose_seq` and tensor
-construction trees automatically. Opaque primitives expose their interface
-sides, internal state and inclined coupling; internal parts cannot be recovered
-from arbitrary Python closures. Add a scene adapter to expose those parts.
+construction trees automatically. Every Cartesian transfer result and local
+field coefficient has its own mark. Tensor factors connect coordinate by
+coordinate. The diagram follows data flow through array arithmetic, slicing
+and coordinate routing, so an input remains visible when its present
+derivative is zero. Unknown coordinate rules are labeled **Possible inputs**.
+The transfer branches carry the actual pullbacks from the model. A field
+coefficient can supply a load on a coordinate without reading its value.
+Its input list shows the arguments of the coefficient. These marks describe
+the computations inside the primitive. Named internal parts require a
+construction tree or a scene adapter.
 All existing constructors still work: the optional `construction` metadata has
 no role in their dynamics, equality or printed representation.
 
@@ -163,7 +179,8 @@ many-round integrator using that round's actual carrier state. Smooth-interface
 arrangements use `inspect_smooth` through the same `inspect` entry point: pass
 the source `(plot, point)`, its one-form, the external input tuple, and a `loads`
 callback that supplies the covector on the published output plot. Loads there
-are plot components, not scalar field-wire forces. Unspecified input-side
+remain together under **Loads on the plots**. Numeric transfers show their
+traced inputs, and function-valued ports show the possible arguments. Unspecified input-side
 components are marked unavailable. Model-specific adapters may supply richer
 plots and sampled field animations. This is an API for every kind of runnable
 example; this run equips feeding and tests the array, multi-round and smooth
@@ -177,19 +194,40 @@ same navigation, grouping and inspection controls as the live example.
 
 `arrangements/feeding.py` builds sources and receiver using library tensor and
 composition, with source readouts in the order food, opening, access, height,
-red, place. The patrol and the attachment memories belong to the receiver;
-the ground memories belong to the sources. `feeding-arrangement.js` assembles
-the corresponding displayed contributions and integrates their sum. It is
-checked against both the independently maintained `feeding-model.js` and the
-library's actual `Phi` / `PhiK` steps. The six source-output loads agree at five
-points in the 60-unit episode. The generic explorer has no feeding constants.
-The mouth contains an opening interaction and a digestion interaction per
-casing, as in the feeding note. The names identify the affected casing. This
-factorization does not assert a separate anatomical tool for each casing.
-The demonstration is the patrol receiver. The main `feeding.html` has since
-gained a food-learning receiver in another run and links back to this example.
-Its live animation has not yet been connected to this observer; that adapter
-must expose its meal and learned spatial memories as well as the mechanics.
+red, place. The receiver owns its eye, wheels and search. Each casing owns its ground damper memory. The
+spatial coupling owns the stroke and latch of each contact. It connects the
+same seven receiver inputs and seven outputs to any number of six-output
+casings. Enter Receiver, then Mouth, to see its one opener and one digestor.
+When a second casing comes within reach during a grip, the first contact
+remains engaged until release. An exact tie with a free grip waits for a
+difference in the contact scores.
+
+`feeding-arrangement.js` assembles the displayed contributions and integrates
+their sum for the patrol reference. Its six source-output loads agree with
+the library composition at five points in the 60-unit patrol episode.
+For the learning cart, the observer reads its live stores and motor rates.
+The learning regression compares the displayed field, mouth flows and memory
+loads with `food-learning.js` through a meal and a mid-grip casing addition.
+The generic explorer has no feeding constants.
+Spatial coupling shows the sums of the individual red signals, contact loads,
+food within grip, opening rates, and food taken. Each Contact computes its own
+contributions. When casings compete, each latch reads its own offer, the grip
+and battery, the comparison of contact scores, and the other latches. The
+opening and eating contributions have separate inputs. Food memory and
+search likewise shows one rate map for each of the nine stores. Select a
+map or follow its output port to inspect its immediate inputs. Click an input
+in the sidebar to follow it to its source. These wires
+describe dependencies for all configurations, including during a pause when
+an individual input happens to have no effect.
+
+The outer Illustrated view shares its scene, plots, playback, and editing
+controls with `feeding.html` through `feeding-view.js`. Its clock steps the
+food-learning receiver. The explorer observes that outing on each display
+update and on every edit or pause. Enter Receiver → Food memory and search
+to inspect the meal, destination, search clock, spatial stores and their
+motors. Enter Receiver → Mouth to read the held casing and the opening and
+eating rates at the same instant. The patrol adapter remains available for
+the earlier model and its independent field checks.
 
 Run `node --test viewer/explorer.test.js viewer/explorer-layout.test.js`, `node viewer/feeding-model.test.js`,
 and `.venv/bin/python -m pytest tests/test_explore.py -q`. The browser regression

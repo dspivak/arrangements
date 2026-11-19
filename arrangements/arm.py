@@ -19,12 +19,15 @@ as plain jax/numpy (P43 (a), cb545383). Here each piece is a box:
 
 from __future__ import annotations
 
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence, Union
+
+from jax import Array
+from jax.typing import ArrayLike
 
 import jax
 import jax.numpy as jnp
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .coalgebra import CotCoalg, configuration, damped
 from .network import fan_box, map_box
 from .rod import spring_box
@@ -32,9 +35,9 @@ from .rvect import euclidean
 from .wiring import compose_seq, tensor_arrangements
 
 
-def joints_box(q0, *, dt: float = None, beta: float = None, n_out: int = 1) -> Arrangement:
+def joints_box(q0: Numbers, *, dt: Optional[float] = None, beta: Optional[float] = None, n_out: int = 1) -> Arrangement:
     """The geared joints ``<0|0> -> <0|n n_out>``: syrup (``dt``) or air keeping ``beta`` of the momentum.
-    The angles are presented ``n_out`` times, once per copy of the arm."""
+    The angles are presented ``n_out`` times, once per copy of the arm. ``q0``: the ``n`` starting angles."""
     q0 = jnp.asarray(q0, dtype=float)
     n = q0.shape[0]
     if dt is not None:
@@ -48,13 +51,14 @@ def joints_box(q0, *, dt: float = None, beta: float = None, n_out: int = 1) -> A
     )
 
 
-def geared_joints(q0, beta: float, n_out: int = 1) -> Arrangement:
+def geared_joints(q0: Numbers, beta: float, n_out: int = 1) -> Arrangement:
     """The geared joints in air with friction, their step held in the state: ``<0|0> -> <0|n n_out>``.
 
     State ``(q, p, lr)``: the angles, the momentum and the step. It presents ``q + lr p``, the angles the
     step moves to, and on the torque ``tau`` there moves to ``(q + lr p, beta p + tau, lr)``: heavy-ball
     momentum keeping ``beta`` of the velocity ``lr p``. ``beta = 0`` is syrup at step ``lr``. ``lr`` never
-    moves; it is set by hand where a run starts (an experimenter's choice, said so where it is used)."""
+    moves; it is set by hand where a run starts (an experimenter's choice, said so where it is used).
+    ``q0``: the ``n`` starting angles."""
     q0 = jnp.asarray(q0, dtype=float)
     n = q0.shape[0]
     P = CotCoalg(
@@ -73,7 +77,8 @@ def geared_joints(q0, beta: float, n_out: int = 1) -> Arrangement:
     )
 
 
-def target_box(t) -> Arrangement:
+def target_box(t: Numbers) -> Arrangement:
+    """A stateless box ``<0|0> -> <0|2>`` presenting the target ``t``, a point in the plane."""
     t = jnp.asarray(t, dtype=float)
     return map_box(lambda v: t, 0, 2, "target")
 
@@ -108,9 +113,11 @@ def _close(joints: Arrangement, copies: Sequence[Arrangement], targets, k: float
     return compose_seq(compose_seq(tips, fan_box(4 * m, pair, "pair")), springs)
 
 
-def two_link_arm(q0, xs: Sequence[float], targets, *, L1: float, L2: float, k: float = 1.0,
-                 dt: float = None, beta: float = None, lr: float = 1.0) -> Arrangement:
-    """The two-link arm: geared joints, two link boxes per copy, a spring per copy. Closed."""
+def two_link_arm(q0: Numbers, xs: Sequence[float], targets: Union[ArrayLike, Sequence[Numbers]], *, L1: float,
+                 L2: float, k: float = 1.0, dt: Optional[float] = None, beta: Optional[float] = None, lr: float = 1.0) -> Arrangement:
+    """The two-link arm: geared joints, two link boxes per copy, a spring per copy. Closed. ``q0``: the two
+    starting angles; ``xs``: each copy's input, its base angle; ``targets``: each copy's target, a point in the
+    plane (shape ``(len(xs), 2)``)."""
     m = len(xs)
     joints = joints_box(q0, dt=dt, beta=beta, n_out=m)
 
@@ -122,10 +129,13 @@ def two_link_arm(q0, xs: Sequence[float], targets, *, L1: float, L2: float, k: f
     return _close(joints, [copy_arm(float(x)) for x in xs], targets, k, 1.0 if dt is not None else lr, 2)
 
 
-def many_link_arm(q0, xs, targets, tip: Callable, *, k: float = 1.0, dt: float = None, beta: float = None,
+def many_link_arm(q0: Numbers, xs: Sequence[float], targets: Union[ArrayLike, Sequence[Numbers]],
+                  tip: Callable[[Array, float], Array], *, k: float = 1.0, dt: Optional[float] = None, beta: Optional[float] = None,
                   lr: float = 1.0, held_step: bool = False) -> Arrangement:
     """The many-link arm: geared joints, the arm's shape ``tip(q, x)`` as one gray box per copy, a spring
-    per copy. Closed. With ``held_step`` the joints are ``geared_joints`` (step in the state)."""
+    per copy. Closed. With ``held_step`` the joints are ``geared_joints`` (step in the state). ``q0``: the
+    ``n`` starting angles; ``xs``: each copy's input; ``targets``: each copy's target in the plane (shape
+    ``(len(xs), 2)``); ``tip(q, x)``: the tip, shape ``(2,)``, at angles ``q`` and input ``x``."""
     q0 = jnp.asarray(q0, dtype=float)
     n, m = q0.shape[0], len(xs)
     joints = geared_joints(q0, beta, n_out=m) if held_step else joints_box(q0, dt=dt, beta=beta, n_out=m)
@@ -133,7 +143,8 @@ def many_link_arm(q0, xs, targets, tip: Callable, *, k: float = 1.0, dt: float =
     return _close(joints, copies, targets, k, 1.0 if dt is not None else lr, n)
 
 
-def many_link_arm_power(q0, xs, targets, tip: Callable, *, k: float = 1.0, beta: float = 0.0) -> Arrangement:
+def many_link_arm_power(q0: Numbers, xs: Numbers, targets: Union[ArrayLike, Sequence[Numbers]],
+                        tip: Callable[[Array, Array], Array], *, k: float = 1.0, beta: float = 0.0) -> Arrangement:
     """``many_link_arm`` with ``held_step``, its ``m`` copies built as tensor powers: the arm-shape box, the
     target box and the spring box each the ``m``-fold tensor power of one, as one box acting copy by copy
     (``jax.vmap``). Equal to ``many_link_arm`` (checked in the test); built so for speed."""

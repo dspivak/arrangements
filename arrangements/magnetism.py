@@ -24,9 +24,13 @@ moment of inertia in the capacitance slot.
 
 from __future__ import annotations
 
-import jax.numpy as jnp
+from typing import Callable, Sequence, Tuple, Union
 
-from .arrangement import Arrangement, exact, zero_form
+import jax.numpy as jnp
+from jax import Array
+from jax.typing import ArrayLike
+
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import CotCoalgK, configuration, phase_on_cotangent
 from .rvect import constant, diagonal
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
@@ -92,7 +96,7 @@ def capacitor_phi(C: float, phi0: float = 0.0, s0: float = 0.0) -> Arrangement:
     )
 
 
-def coils_spring(Lmat, ends) -> Arrangement:
+def coils_spring(Lmat: Union[ArrayLike, Sequence[Sequence[float]]], ends: Sequence[Tuple[int, int]]) -> Arrangement:
     """Coils sharing a field as one stateless part on ``2 * len(ends)`` ports of the node-flux readout.
 
     ``ends`` lists, for each coil, the indices (into the ports it hears, each a (flux, voltage) pair) of its two
@@ -152,9 +156,10 @@ def ground_phi() -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def charge_mass(m: float, x0, p0, dim: int = 2) -> Arrangement:
+def charge_mass(m: float, x0: Numbers, p0: Numbers, dim: int = 2) -> Arrangement:
     """A mass ``m`` in ``R^dim`` presented through ``phase_on_cotangent``: it reads out the position it is headed
-    to and its velocity ``p/m`` (P58 (a)'s readout)."""
+    to and its velocity ``p/m`` (P58 (a)'s readout). ``x0`` and ``p0``: its starting position and momentum, ``dim``
+    numbers each."""
     return Arrangement(
         P=phase_on_cotangent(constant(jnp.eye(dim) / m),
                              init=(jnp.asarray(x0, float), jnp.asarray(p0, float))),
@@ -191,7 +196,7 @@ def magnetic_field_2d(e: float, B: float) -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def select(n_in: int, idx) -> Arrangement:
+def select(n_in: int, idx: Sequence[int]) -> Arrangement:
     """A stateless wiring that hears ``n_in`` values and reads out ``m[idx]`` (copying or dropping); the covectors
     coming back to a copied value add (the transpose of copying, Kirchhoff's current law)."""
     idx = jnp.asarray(idx)
@@ -205,12 +210,13 @@ def select(n_in: int, idx) -> Arrangement:
     )
 
 
-def core_junction(n_in: int, ends, N, ell, R: float) -> Arrangement:
+def core_junction(n_in: int, ends: Sequence[Tuple[int, int]], N: Numbers, ell: Numbers, R: float) -> Arrangement:
     """The core's flux as a stateless junction: it hears ``n_in`` node-flux values (pairs), passes them through, and
     reads out besides them the core flux ``Phi`` that minimizes the windings' and the core's energy,
     ``sum_k (lam_k - N_k Phi)^2 / 2 ell_k + R Phi^2 / 2`` with ``lam_k = phi_a - phi_b`` for ``ends[k] = (a, b)``:
     ``Phi = sum_k (N_k lam_k / ell_k) / (R + sum_k N_k^2 / ell_k)``. At that ``Phi`` the magnetomotive forces
-    coming back to it sum to 0, so it passes nothing back (P58 N1's capacitor-less junction)."""
+    coming back to it sum to 0, so it passes nothing back (P58 N1's capacitor-less junction). ``N`` and ``ell``: each
+    winding's turns and length, one number per entry of ``ends``."""
     N, ell = jnp.asarray(N, float), jnp.asarray(ell, float)
 
     def out_f(q, m):
@@ -289,7 +295,7 @@ def tank(C: float, s0: float, tau: float, label: str = "tank") -> Arrangement:
                        out_f=lambda q, m: q, in_f=lambda q, m, n: _z, omega=zero_form, label=label)
 
 
-def cost_part(n_ports: int, k, label: str) -> Arrangement:
+def cost_part(n_ports: int, k: Callable[[Array], Array], label: str) -> Arrangement:
     """A stateless part hearing ``n_ports`` values with the exact cost ``k(m)``: what comes back is ``-dk``, and nothing else
     is written (§5.9 item 90). Claude Opus 5.5, session 5c9967d2, 2026-11-05."""
     return Arrangement(P=trivial_parameter(), in_dim_M=0, out_dim_M=n_ports, in_dim_N=0, out_dim_N=0,
@@ -362,7 +368,7 @@ def floating_coupler(kappa: float) -> Arrangement:
     return cost_part(3, lambda m: kappa * (m[0] - m[1] - m[2]) ** 2 / 2.0, f"lead(kappa={kappa:g})")
 
 
-def wire(boxes, top: Arrangement) -> Arrangement:
+def wire(boxes: Sequence[Arrangement], top: Arrangement) -> Arrangement:
     """``boxes`` side by side, then ``top`` over them: ``compose_seq(tensor(boxes), top)``. Claude Opus 5.5, session 5c9967d2,
     2026-11-05."""
     inner = boxes[0] if len(boxes) == 1 else tensor_arrangements(boxes)

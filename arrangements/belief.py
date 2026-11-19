@@ -43,12 +43,12 @@ response after the load-induced inclination, ``l |-> l + tau (xi - <softmax(l), 
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable, Sequence
 
 import jax
 import jax.numpy as jnp
 
-from .arrangement import Arrangement, exact
+from .arrangement import Arrangement, Numbers, exact
 from .coalgebra import CotCoalg, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
@@ -246,8 +246,10 @@ def bell_nll(grid: Array) -> Callable[[Array], Array]:
 # ---------------------------------------------------------------------------
 
 
-def run(arr: Arrangement, observations, state=None):
-    """Step ``Phi(arr)`` once per observation; the arrangement is closed on the right."""
+def run(arr: Arrangement, observations: Sequence[Numbers], state: Any = None) -> Any:
+    """Step ``Phi(arr)`` once per observation; the arrangement is closed on the right.
+    Each observation is a number or a vector; ``state`` (``None``: ``Phi(arr)``'s initial state) and the returned
+    state are the composite's state, a pytree of arrays, hence ``Any``."""
     O = Phi(arr)
     s = O.state if state is None else state
     for x in observations:
@@ -258,6 +260,6 @@ def run(arr: Arrangement, observations, state=None):
     return s
 
 
-def log_heights(state) -> Array:
-    """The belief box's state out of a composite's state pair."""
+def log_heights(state: Any) -> Array:
+    """The belief box's state out of a composite's state pair (``state``: a pytree of arrays, hence ``Any``)."""
     return state[0] if isinstance(state, tuple) else state

@@ -31,9 +31,10 @@ from typing import Callable, Dict, List, Sequence, Tuple
 
 import jax.numpy as jnp
 from jax import Array
+from jax.typing import ArrayLike
 
 from .addressed_one import AddrOp, OpData
-from .arrangement import Arrangement, exact
+from .arrangement import Arrangement, Numbers, exact
 from .coalgebra import CotCoalg, configuration
 from .rvect import trivial
 
@@ -53,7 +54,7 @@ def value(g: Array) -> Array:
     return g[:-1] / g[-1]
 
 
-def at(z, mass=1.0) -> Array:
+def at(z: Numbers, mass: ArrayLike = 1.0) -> Array:
     """The position message of mass ``mass`` at ``z``."""
     z = jnp.asarray(z, dtype=float)
     return jnp.concatenate([mass * z, jnp.asarray([mass], dtype=float)])

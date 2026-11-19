@@ -19,6 +19,7 @@ from arrangements.explore import inspect, scene, write_html
 from arrangements.functors import Phi
 from arrangements.interpretation import trivial_omega
 from arrangements.feeding import feeding, pack_state, unpack_state
+from arrangements.feeding import add_casing, couple, receiver, source
 
 jax.config.update('jax_enable_x64', True)
 EMPTY=jnp.zeros(0)
@@ -61,7 +62,12 @@ def test_tensor_scene_keeps_product_coordinates_and_boundary_directions():
     arr=parallel_arrangements(primitive(2.),primitive(3.))
     sc=scene(inspect(arr,inputs=[1.,2.],loads=[3.,4.]))
     assert all(n['side'] in ('in','out') for n in sc['nodes'] if n['kind']=='boundary')
-    assert any(n['kind']=='operation' and n['label']=='Read product coordinates' for n in sc['nodes'])
+    # Each coordinate goes directly to its own factor and carries its own load.
+    at = lambda source, target: next(w for w in sc['wires'] if (w['source'],w['target'])==(source,target))
+    assert at('root/ni/0','root/a/ni/0')['value'] == 1.
+    assert at('root/ni/1','root/b/ni/0')['value'] == 2.
+    assert at('root/a/no/0','root/no/0')['load'] == 3.
+    assert at('root/b/no/0','root/no/1')['load'] == 4.
     viewer=Path(__file__).resolve().parents[1]/'viewer'
     script="""const E=require('./explorer-core.js');require('./explorer-layout.js');
     const sc=JSON.parse(process.argv[1]),m=new E.Model(sc);
@@ -94,7 +100,7 @@ def test_feeding_browser_field_and_port_loads_match_library_phi():
         new=unpack_state(step(state),3)
         np.testing.assert_allclose(new,jnp.array(sample['s'])+tau*jnp.array(sample['rate']),atol=1e-12)
         trace=inspect(arr,state)
-        np.testing.assert_allclose(trace['children'][1]['m_load'],np.array(sample['loads']).reshape(-1),atol=1e-10)
+        np.testing.assert_allclose(trace['children'][1]['m_load'][7:],np.array(sample['loads']).reshape(-1),atol=1e-10)
 
 def test_feeding_four_rounds_agree_with_browser_rk4():
     from arrangements.pcK import PhiK
@@ -113,7 +119,7 @@ def test_multiround_inspection_reads_without_advancing():
     arr=feeding(stages=4,h=.002)
     observed=inspect(arr)
     np.testing.assert_allclose(observed['configuration'],arr.P.reads[0](arr.P.init))
-    assert observed['children'][1]['label']=='receiver'
+    assert observed['children'][1]['label']=='spatial coupling'
 
 
 def test_two_round_inspection_uses_actual_carrier():
@@ -143,7 +149,79 @@ def test_smooth_plot_observation_and_export():
 def test_feeding_zero_and_three_casings_use_same_composition_api():
     for places,foods in [((),()),((0.,1.,2.),(3.,4.,5.))]:
         arr=feeding(places,foods)
-        flat=jnp.array([3.,-1.,-.4,0.,0.,0.,0.,6.,0.,8.]+[x for f in foods for x in [f,0.,-.4,0.,-.4,0.,0.]])
+        flat=jnp.array([3.,-1.,-.4,0.,0.,0.,0.,6.,0.,8.]+[x for f in foods for x in [f,0.,-.4,0.,-.4,0.,0.,0.]])
         np.testing.assert_allclose(unpack_state(pack_state(flat,len(foods)),len(foods)),flat)
         r=inspect(arr,pack_state(flat,len(foods)))
-        assert len(r['children'][1]['m_load'])==6*len(foods)
+        assert len(r['children'][1]['m_load'])==7+6*len(foods)
+
+
+def test_a_single_receiver_releases_its_first_casing_before_feeding_from_the_next():
+    params = {'kexp': 0., 'ktau': 0.}
+    step = dict(parameters=params, stages=4, h=.002)
+    body = receiver(**step)
+    apple = source(0., 10., **step)
+    for count in (0, 1, 2, 4):
+        world = couple(body, [apple]*count, **step)
+        assert world.construction[1].construction[1] is body
+        assert body.in_dim_N == body.out_dim_N == 7
+
+    from arrangements.pcK import PhiK
+    def advance(world, state, steps):
+        dynamics = PhiK(world)
+        def tick(_, state):
+            return dynamics.with_state(state).run_one((EMPTY,trivial_omega(0)),
+                                                     lambda _: (jnp.zeros(2),EMPTY))[1]
+        return jax.lax.fori_loop(0,steps,tick,state)
+
+    empty_world = couple(body,[],**step)
+    first, initial = add_casing(body,[],empty_world.P.init,apple,**step)
+    assert initial[0][0] is empty_world.P.init[0][0]
+    held = advance(first,initial,500)
+    assert held[1][1] > .99
+    # Carry the actual body and the first contact into the enlarged world.
+    (same_body,old_apple),_ = held
+    both,inserted = add_casing(body,[apple],held,apple,**step)
+    assert inserted[0][0] is same_body
+    during = advance(both,inserted,500)
+    flat = unpack_state(during,2)
+    # The casing's state nests by its parts now; its food is the first number of it.
+    from jax.flatten_util import ravel_pytree
+    assert flat[10] < ravel_pytree(old_apple)[0][0] and flat[18] == 10. and flat[19] == 0. and flat[25] == 0.
+    after = unpack_state(advance(both,during,3000),2)
+    assert after[10] < .1 and after[18] < .1
+
+
+def test_separate_coordinate_maps_keep_inactive_inputs_and_individual_loads():
+    a = Arrangement(configuration(euclidean(1), jnp.array([2.])), 1, 2, 1, 3,
+                    lambda q,m: jnp.array([m[0]*m[1], q[0], 7.]),
+                    lambda q,m,n: n - m[1],
+                    lambda q,m,n: (n, jnp.array([q[0], 0.]), jnp.zeros(1)))
+    trace = inspect(a, values=[0.,3.], inputs=[5.], loads=[2.,3.,4.], incoming=lambda z: z)
+    sc = scene(trace)
+    def reads(id):
+        return {w['label'] for w in sc['wires'] if w['target']=='root/map/'+id and w['argument']}
+    assert reads('no/0') == {'Internal output 1','Internal output 2'}
+    assert reads('no/1') == {'Configuration'}
+    assert reads('no/2') == set()
+    assert reads('mi/0') == {'External input','Internal output 2'}
+    assert reads('mo/0') == {'Configuration'}
+    assert reads('q/0') == {'External input'}
+    assert all(n.get('possibleInputs') is not True for n in sc['nodes'])
+    for node,load in [('root/state',trace['inclination'][0]),('root/mo/0',trace['m_load'][0]),
+                      ('root/mo/1',trace['m_load'][1]),('root/ni/0',trace['n_in_load'][0])]:
+        assert sum(w['load'] for w in sc['wires'] if w['source']==node) == load
+
+
+def test_unresolved_coordinate_rules_are_labeled_and_smooth_transfers_keep_plot_loads():
+    a = Arrangement(trivial_parameter(), 0, 2, 0, 1,
+                    lambda q,m: jax.lax.cond(m[0]>0, lambda x:x[:1], lambda x:x[1:], m),
+                    lambda q,m,n: EMPTY, zero_form)
+    sc = scene(inspect(a, values=[0.,2.]))
+    result = next(n for n in sc['nodes'] if n['id']=='root/map/no/0')
+    assert result['possibleInputs'] and result['result']==2.
+    from arrangements import smooth
+    arr = smooth.include(primitive(2.))
+    sc = scene(inspect(arr, inputs=(jnp.array([4.]),)))
+    assert [(w['label'],w['value']) for w in sc['wires'] if w['target']=='root/map/no/0'] == [('Configuration',2.)]
+    plot = next(n for n in sc['nodes'] if n['id']=='root/loads')
+    assert dict((x['label'],x['value']) for x in plot['observations'])['Configuration inclination']==[2.]

@@ -49,12 +49,14 @@ For agents: the file's earlier head, with the predictions fixed before the code,
 weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; the model's choices in ``notes/P29-TOWN-PREDICTIONS-2026-09-28.md``.
 """
 from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .coalgebra import configuration
 from .rvect import euclidean
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
@@ -77,7 +79,9 @@ class Settings:
     clean0: float = 0.0
 
 
-def own_cost(label, initial, inputs, cost, mobility, publish=None, push=None):
+def own_cost(label: str, initial: Numbers, inputs: int, cost: Callable[[Array, Array], Array], mobility: float,
+             publish: Optional[Callable[[Array], Array]] = None,
+             push: Optional[Callable[[Array, Array], Array]] = None) -> Arrangement:
     """Conditional cost differentiated only on the box's configuration.
 
     Zero input covector is the declared one-way boundary. The smooth input map
@@ -87,7 +91,9 @@ def own_cost(label, initial, inputs, cost, mobility, publish=None, push=None):
     return node(label, initial, inputs, lambda q, e: -gradient(q, e), mobility, publish, push)
 
 
-def node(label, initial, inputs, force, mobility, publish=None, push=None):
+def node(label: str, initial: Numbers, inputs: int, force: Callable[[Array, Array], Array], mobility: float,
+         publish: Optional[Callable[[Array], Array]] = None,
+         push: Optional[Callable[[Array, Array], Array]] = None) -> Arrangement:
     """A system: `inputs` values in, `publish(q)` out (its configuration by default).
 
     `push(q, e)` is its one-form on its inputs, the push it returns up each input wire;
@@ -123,8 +129,10 @@ class Town:
         return np.asarray(trajectory)[..., self.slots[name]]
 
 
-def build(stage, settings=Settings(), *, connect_report=True, informed=False, clean=False,
-          power_to_town=False, diligence=False, extra=(), exact_plant=False, fit_coughing=False):
+def build(stage: int, settings: Settings = Settings(), *, connect_report: bool = True, informed: bool = False,
+          clean: bool = False, power_to_town: bool = False, diligence: bool = False,
+          extra: Sequence[Tuple[Arrangement, Union[str, Callable[[Array], Array]]]] = (),
+          exact_plant: bool = False, fit_coughing: bool = False) -> Town:
     """Stages 1=no return, 2=law, 3=historical insurance, 4=her account.
 
     Informed control starts the liability estimator at the true coefficient.
@@ -298,8 +306,9 @@ def build(stage, settings=Settings(), *, connect_report=True, informed=False, cl
     return Town(compose_seq(inner, outer), slots, c, stage, clean)
 
 
-def eve_town(stage=1, settings=Settings(), **options):
+def eve_town(stage: int = 1, settings: Settings = Settings(), **options: Any) -> Town:
     """Eve's town from the book's §1.6.1: the two-dial plant and townspeople who draw its power.
+    ``options`` are the keyword options of ``build`` (``Any``: they differ in type, flags and ``extra``).
 
     Stage 1 is her first model, whose plant has no liability port; stages 2-4 add the court,
     the insurer and her account, as the book's later subsections do.
@@ -307,7 +316,7 @@ def eve_town(stage=1, settings=Settings(), **options):
     return build(stage, settings, clean=True, power_to_town=True, **options)
 
 
-def account_boxes(settings=Settings()):
+def account_boxes(settings: Settings = Settings()) -> List[Arrangement]:
     """The four systems of the book's ``eqn.account_systems`` and ``eqn.town_account``, each a box with the
     ports the book draws: plant (premium in; power, smoke out), townspeople (power, smoke in; coughing out),
     estimator (coughing, smoke in; estimate out), insurer (estimate in; premium out)."""
@@ -324,7 +333,7 @@ def account_boxes(settings=Settings()):
     return [plant, townspeople, estimator, insurer]
 
 
-def account_town(settings=Settings()):
+def account_town(settings: Settings = Settings()) -> Town:
     """The town of the book's ``eqn.town_account``, exactly as drawn: the four boxes of `account_boxes` and
     the wires between them, the smoke copied at its dot, nothing else in the composite. A `Town`, so `run`,
     `summary` and `smoke` take it; slots 'output', 'cleanliness', 'coughing', 'estimate', 'premium'."""
@@ -342,7 +351,7 @@ def account_town(settings=Settings()):
     return Town(compose_seq(tensor_arrangements(boxes), wiring), slots, settings, 4, True)
 
 
-def run(town, duration=30.0):
+def run(town: Town, duration: float = 30.0) -> np.ndarray:
     """Run the actual composed forcing and product integrator, including records."""
     arr = town.arr
     n = round(duration/town.settings.dt)
@@ -359,7 +368,7 @@ def run(town, duration=30.0):
     return np.asarray(scan(arr.P.init))
 
 
-def smoke(town, trajectory):
+def smoke(town: Town, trajectory: np.ndarray) -> np.ndarray:
     """Smoke reaching the residents: output, or (1-c)*output with the second dial."""
     output = town.value(trajectory, 'output')[..., 0]
     if town.clean:
@@ -367,7 +376,7 @@ def smoke(town, trajectory):
     return output
 
 
-def summary(town, trajectory):
+def summary(town: Town, trajectory: np.ndarray) -> Dict[str, Optional[float]]:
     c = town.settings
     output = town.value(trajectory, 'output')[:, 0]
     s = smoke(town, trajectory)

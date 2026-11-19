@@ -41,9 +41,11 @@ from __future__ import annotations
 
 import math
 from fractions import Fraction
-from typing import Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+import numpy as np
 from . import runner as R
+from .arrangement import Numbers
 
 DT, K_STEPS = 0.5, 40
 
@@ -93,7 +95,9 @@ def recip_cost_net(v: float) -> R.Net:
 # ---------------------------------------------------------------------------
 
 
-def tank_pair(v1=3, v2=1, kappa=Fraction(1, 20), x0=1):
+def tank_pair(v1: Union[int, float, Fraction] = 3, v2: Union[int, float, Fraction] = 1,
+              kappa: Union[int, float, Fraction] = Fraction(1, 20),
+              x0: Union[int, float, Fraction] = 1) -> Tuple[R.Net, R.Net, List[int], List[int]]:
     """Net A: tank 1 and the pipe's cost ``(kappa/2)(v1 - x)^2``, ``x`` an inbox hearing tank 2; net B: tank
     2 bare. Returns ``(A, B, a_to_b, b_to_a)``: B hears nothing, A's inbox hears B's output 0."""
     A = R.Net()
@@ -135,9 +139,11 @@ def _guess_wires(n: R.Net, theta: float, dt: float, K: int):
     return n.mul(top, n.recip(lam))
 
 
-def figurine_net(lams: Sequence[float], prior: Sequence[float], dt: float = DT, K: int = K_STEPS):
+def figurine_net(lams: Sequence[float], prior: Sequence[float], dt: float = DT,
+                 K: int = K_STEPS) -> Tuple[R.Net, Dict[str, Any]]:
     """The driver figurine with a market over the rates ``lams`` (prior ``prior``). Returns the net and the
-    wires of interest: the market's slots, the guesses, the mixture guess and the two inboxes."""
+    wires of interest: the market's slots, the guesses, the mixture guess and the two inboxes (a dict
+    whose values are a wire, a list of wires or a list of lists of wires, hence ``Any``)."""
     n = R.Net()
     q = n.market([math.log(p) for p in prior])
     x, f = n.inbox(0.0), n.inbox(0.0)
@@ -157,7 +163,7 @@ def figurine_net(lams: Sequence[float], prior: Sequence[float], dt: float = DT, 
     return n, dict(q=q, g=gs, G=G, x=x, f=f)
 
 
-def world_net(outcomes: Sequence[float], flags: Sequence[float] = None) -> R.Net:
+def world_net(outcomes: Sequence[float], flags: Optional[Sequence[float]] = None) -> R.Net:
     """Two drums, the outcomes and the flags (all 1 unless given), both presented."""
     n = R.Net()
     xs = n.drum([float(v) for v in outcomes])
@@ -167,7 +173,8 @@ def world_net(outcomes: Sequence[float], flags: Sequence[float] = None) -> R.Net
     return n
 
 
-def direct_bayes(lams: Sequence[float], prior: Sequence[float], outcomes: Sequence[float]):
+def direct_bayes(lams: Sequence[float], prior: Sequence[float],
+                 outcomes: Sequence[float]) -> Tuple[List[List[float]], List[float], List[float]]:
     """P36's direct Bayes: the belief after each outcome, ``q p / <q, p>`` with
     ``p_i = exp(-(x - g_i)^2 / 2)``, and the mixture guess before each."""
     g = [driver_guess(l) for l in lams]
@@ -187,7 +194,9 @@ PRIOR = (0.2, 0.2, 0.2, 0.2, 0.2)
 OUTCOMES = (6.0, 5.5, 6.5, 6.0, 5.8, 6.2)
 
 
-def figurine_and_world(lams=LAMS, prior=PRIOR, outcomes=OUTCOMES):
+def figurine_and_world(lams: Sequence[float] = LAMS, prior: Sequence[float] = PRIOR,
+                       outcomes: Sequence[float] = OUTCOMES
+                       ) -> Tuple[R.Net, Dict[str, Any], R.Net, List[int], List[int]]:
     """The figurine net, the world net, and the coupling ``(a_to_b, b_to_a)``: the world's two outputs to
     the figurine's two ports."""
     fig, wires = figurine_net(lams, prior)
@@ -239,7 +248,8 @@ SCENE_ARMS = {
 }
 
 
-def scene_by_hand(a, b, d0, T=T_INNER, d=D_PREF):
+def scene_by_hand(a: float, b: float, d0: float, T: int = T_INNER,
+                  d: float = D_PREF) -> Tuple[float, float]:
     """The scene's recurrence in plain arithmetic: ``(D, s_T)``."""
     s, c = 0.0, d0
     for _ in range(T):
@@ -247,8 +257,10 @@ def scene_by_hand(a, b, d0, T=T_INNER, d=D_PREF):
     return c - s, s
 
 
-def scene_wires(n: R.Net, a, b, d0, T=T_INNER, d=D_PREF):
-    """The scene unrolled in the net from the wires ``a``, ``b`` (parameters) and ``d0``: ``(D, s_T)`` wires."""
+def scene_wires(n: R.Net, a: int, b: int, d0: int, T: int = T_INNER,
+                d: float = D_PREF) -> Tuple[int, int]:
+    """The scene unrolled in the net from the wires ``a``, ``b`` (parameters) and ``d0``: ``(D, s_T)`` wires.
+    A wire is an ``int``, a node's index in ``n``."""
     neg, dc = n.const(-1.0), n.const(d)
     s, c = n.const(0.0), d0
     for _ in range(T):
@@ -258,12 +270,14 @@ def scene_wires(n: R.Net, a, b, d0, T=T_INNER, d=D_PREF):
     return n.add(c, n.mul(neg, s)), s
 
 
-def scene_family(A=A_VALUES, B=B_VALUES, a0=A0, b0=B0):
+def scene_family(A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES, a0: float = A0,
+                 b0: float = B0) -> List[Tuple[str, float, float]]:
     """``(who, a, b)`` for the six one-part-altered scenes: the snake's three, then the cat's three."""
     return [("snake", a, b0) for a in A] + [("cat", a0, b) for b in B]
 
 
-def scene_world_net(d0s=D0S, a_true=A_TRUE, b_true=B_TRUE, b2=B2) -> R.Net:
+def scene_world_net(d0s: Sequence[float] = D0S, a_true: float = A_TRUE, b_true: float = B_TRUE,
+                    b2: float = B2) -> R.Net:
     """The recording: drums of ``d_0``, ``D*``, ``s*``, ``D_2*`` and the flag, presented in that order."""
     n = R.Net()
     truths = [scene_by_hand(a_true, b_true, d0) for d0 in d0s]
@@ -273,10 +287,13 @@ def scene_world_net(d0s=D0S, a_true=A_TRUE, b_true=B_TRUE, b2=B2) -> R.Net:
     return n
 
 
-def scene_market_net(arm: SceneArm, A=A_VALUES, B=B_VALUES, a0=A0, b0=B0, b2=B2, sigma=SIGMA_B, eta=ETA,
-                     T=T_INNER, prior=None):
+def scene_market_net(arm: SceneArm, A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES,
+                     a0: float = A0, b0: float = B0, b2: float = B2, sigma: float = SIGMA_B,
+                     eta: float = ETA, T: int = T_INNER,
+                     prior: Optional[Sequence[float]] = None) -> Tuple[R.Net, Dict[str, Any]]:
     """The figurine world as one net with five ports (``d_0``, ``D*``, ``s*``, ``D_2*``, flag). Returns the net
-    and the wires of interest."""
+    and the wires of interest (a dict whose values are a wire, a list of wires or a list of pairs of wires,
+    hence ``Any``)."""
     n = R.Net()
     d0, Dst, sst, D2st, flag = (n.inbox(0.0) for _ in range(5))
     neg, c_half = n.const(-1.0), n.const(0.5 / sigma ** 2)
@@ -337,8 +354,10 @@ def scene_market_net(arm: SceneArm, A=A_VALUES, B=B_VALUES, a0=A0, b0=B0, b2=B2,
     return n, wires
 
 
-def scene_closed_form(arm: SceneArm, A=A_VALUES, B=B_VALUES, a0=A0, b0=B0, a_true=A_TRUE, b_true=B_TRUE,
-                      b2=B2, d0s=D0S, sigma=SIGMA_B, eta=ETA, T=T_INNER):
+def scene_closed_form(arm: SceneArm, A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES,
+                      a0: float = A0, b0: float = B0, a_true: float = A_TRUE, b_true: float = B_TRUE,
+                      b2: float = B2, d0s: Sequence[float] = D0S, sigma: float = SIGMA_B,
+                      eta: float = ETA, T: int = T_INNER) -> Dict[str, list]:
     """The by-hand model: the flat trust after each round, and the base log-parameters after each round under
     the push arm (the pushes by ``jax.grad`` of the same recurrence; routed by the trust after ``r - 2`` payments).
     Returns ``dict(trust=[q_0, ..., q_R], theta=[th_0, ..., th_R])`` (theta only with a push arm)."""
@@ -393,7 +412,8 @@ def scene_closed_form(arm: SceneArm, A=A_VALUES, B=B_VALUES, a0=A0, b0=B0, a_tru
     return out
 
 
-def nested_market(gammas, prior_outer=(0.5, 0.5), nA=3, nB=3):
+def nested_market(gammas: Sequence[Numbers], prior_outer: Sequence[float] = (0.5, 0.5), nA: int = 3,
+                  nB: int = 3) -> List[np.ndarray]:
     """The prediction market dynamic operad's nested form in the library: an outer belief over the two families
     and an inner belief in each (three belief integrators, tensored), paid by one likelihood box whose cost is
     ``-sum_j mu_j log sum_v sg(nu_jv) gamma_jv - sum_j sum_v nu_jv log gamma_jv``, the inner beliefs read one-way
@@ -444,8 +464,11 @@ def nested_market(gammas, prior_outer=(0.5, 0.5), nA=3, nB=3):
     return out
 
 
-def nested_market_composed(arm: SceneArm, prior_outer=(0.5, 0.5), A=A_VALUES, B=B_VALUES, a0=A0, b0=B0,
-                           a_true=A_TRUE, b_true=B_TRUE, b2=B2, d0s=D0S, sigma=SIGMA_B, T=T_INNER):
+def nested_market_composed(arm: SceneArm, prior_outer: Sequence[float] = (0.5, 0.5),
+                           A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES,
+                           a0: float = A0, b0: float = B0, a_true: float = A_TRUE,
+                           b_true: float = B_TRUE, b2: float = B2, d0s: Sequence[float] = D0S,
+                           sigma: float = SIGMA_B, T: int = T_INNER) -> List[np.ndarray]:
     """``nested_market`` with its likelihoods made by boxes (plan P43 (b) job 7, Claude Opus 5.5, de71554a):
     a box stepping through the rounds' starting distances ``d_0`` (the environment's schedule); the world, a
     gray box running the true scene from ``d_0`` (and the second scene of the comparison); a likelihood box per
@@ -529,8 +552,10 @@ def nested_market_composed(arm: SceneArm, prior_outer=(0.5, 0.5), A=A_VALUES, B=
     return out
 
 
-def scene_likelihoods(arm: SceneArm, A=A_VALUES, B=B_VALUES, a0=A0, b0=B0, a_true=A_TRUE, b_true=B_TRUE, b2=B2,
-                      d0s=D0S, sigma=SIGMA_B, T=T_INNER):
+def scene_likelihoods(arm: SceneArm, A: Sequence[float] = A_VALUES, B: Sequence[float] = B_VALUES,
+                      a0: float = A0, b0: float = B0, a_true: float = A_TRUE, b_true: float = B_TRUE,
+                      b2: float = B2, d0s: Sequence[float] = D0S, sigma: float = SIGMA_B,
+                      T: int = T_INNER) -> List[np.ndarray]:
     """The six scenes' likelihoods of the recording, round by round (what pays the market)."""
     import numpy as np
     fam = scene_family(A, B, a0, b0)
@@ -560,7 +585,9 @@ def scene_likelihoods(arm: SceneArm, A=A_VALUES, B=B_VALUES, a0=A0, b0=B0, a_tru
 # value that must be presented or stored.
 
 
-def tank_pair_same_step(v1=3, v2=1, kappa=Fraction(1, 20)):
+def tank_pair_same_step(v1: Union[int, float, Fraction] = 3, v2: Union[int, float, Fraction] = 1,
+                        kappa: Union[int, float, Fraction] = Fraction(1, 20)
+                        ) -> Tuple[R.Net, R.Net, List[int], List[int]]:
     """Net A: tank 1 with the pipe's cost ``(kappa/2)(v1 - x)^2`` written as the polynomial
     ``(kappa/2) v1^2 - kappa v1 x + (kappa/2) x^2`` in the port's value ``x``; net B: tank 2 bare."""
     A = R.Net()
@@ -577,7 +604,8 @@ def tank_pair_same_step(v1=3, v2=1, kappa=Fraction(1, 20)):
     return A, B, [], [0]
 
 
-def figurine_net_same_step(lams: Sequence[float], prior: Sequence[float], dt: float = DT, K: int = K_STEPS):
+def figurine_net_same_step(lams: Sequence[float], prior: Sequence[float], dt: float = DT,
+                           K: int = K_STEPS) -> Tuple[R.Net, Dict[str, Any]]:
     """The driver figurine with a market over the rates, its likelihood ``sum_i q_i (x - g_i)^2 / 2`` as the
     polynomial ``(½ sum q_i g_i^2) - (sum q_i g_i) x + (½ sum q_i) x^2`` in the outcome heard at its one port."""
     n = R.Net()

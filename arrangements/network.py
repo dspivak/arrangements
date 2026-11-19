@@ -26,7 +26,7 @@ kept, and the test checks the drawn arrangement equal to it at its settings.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable, Sequence
+from typing import Any, Callable, Sequence
 
 import jax.numpy as jnp
 from jax import Array
@@ -247,6 +247,7 @@ def drawn_network(
     return replace(net, label=f"drawn_network(h={h}, m={m}, n={n})")
 
 
-def parameters(arr: Arrangement, state, m: int, size: int) -> Array:
-    """The parameters held in the drawn network's state (its parameter boxes' positions)."""
+def parameters(arr: Arrangement, state: Any, m: int, size: int) -> Array:
+    """The parameters held in the drawn network's state (its parameter boxes' positions).
+    ``state`` is a state of the arrangement's integrator, a pytree of arrays (hence ``Any``)."""
     return arr.P.position(state)[m:m + size]

@@ -29,13 +29,13 @@ Book plan P84 (g), Claude Opus 5.5, session 4eacd80b; *proposed*. Tests: ``tests
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable, Optional
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import CotCoalg, configuration, phase
 from .functors import Phi
 from .interpretation import trivial_omega
@@ -45,8 +45,9 @@ from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 Model = Callable[[Array, float, Array], Array]   # f(theta, tau, mu) -> X, with f(theta, 0, mu) = mu
 
 
-def free_mass(m: float, q0, p0) -> Arrangement:
-    """A physical system ``<0|0> -> <0|dim>`` with no cost of its own: a mass that reads out its look-ahead."""
+def free_mass(m: float, q0: Numbers, p0: Numbers) -> Arrangement:
+    """A physical system ``<0|0> -> <0|dim>`` with no cost of its own: a mass that reads out its look-ahead.
+    ``q0``, ``p0``: the starting position and momentum, a number or a vector of length ``dim``."""
     q0, p0 = jnp.atleast_1d(jnp.asarray(q0, float)), jnp.atleast_1d(jnp.asarray(p0, float))
     d = q0.shape[0]
     return Arrangement(
@@ -57,9 +58,11 @@ def free_mass(m: float, q0, p0) -> Arrangement:
     )
 
 
-def predictor(f: Model, o: Callable[[Array], Array], G: Array, eta: float, mu0, theta0, dy: int) -> Arrangement:
+def predictor(f: Model, o: Callable[[Array], Array], G: Numbers, eta: float, mu0: Numbers, theta0: Numbers,
+              dy: int) -> Arrangement:
     """The modeling predictor (book ``def.model_predictor``), ``<0|0> -> <dy|dy>``: it hears a value ``y`` in
-    ``Y`` and sends out its prediction ``o(xhat)``."""
+    ``Y`` and sends out its prediction ``o(xhat)``. ``mu0``: the starting state in ``X``, ``theta0`` the starting
+    parameter in ``Theta`` (each a number or a vector); ``G``: an ``X x X`` matrix (a number for ``X = R``)."""
     mu0, theta0 = jnp.atleast_1d(jnp.asarray(mu0, float)), jnp.atleast_1d(jnp.asarray(theta0, float))
     G = jnp.atleast_2d(jnp.asarray(G, float))
 
@@ -90,7 +93,7 @@ def predictor(f: Model, o: Callable[[Array], Array], G: Array, eta: float, mu0, 
     )
 
 
-def sensor(g: Callable[[Array], Array], k: float, dx: int, dy: int, y0=None) -> Arrangement:
+def sensor(g: Callable[[Array], Array], k: float, dx: int, dy: int, y0: Optional[Numbers] = None) -> Arrangement:
     """The book's sensor ``<0|0> -> <dy|dx>``: the follower of Ch 4 ``ex.follower``, a report ``y`` that follows a
     leader ``z``, reading out ``y``.
 
@@ -146,7 +149,7 @@ def active(sys: Arrangement, pred: Arrangement, g: Callable[[Array], Array]) -> 
 _IN = (jnp.zeros(0), trivial_omega(0))
 
 
-def run(arr: Arrangement, tau: float, steps: int, s=None):
+def run(arr: Arrangement, tau: float, steps: int, s: Any = None) -> Any:
     """Iterate ``Phi(arr)`` with every step held for duration ``tau``, nothing pushing on the transferred-out
     prediction; return the final state."""
     O = Phi(arr)

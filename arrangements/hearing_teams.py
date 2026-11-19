@@ -30,13 +30,15 @@ the environment's schedule through a port the team has (STATUS.md §2, "Not evid
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Callable, List, Sequence, Tuple
+
+from jax import Array
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import CotCoalg
 from .functors import closed_step
 from .wiring import compose_seq, tensor_arrangements
@@ -52,13 +54,13 @@ def _euclidean(init, rates, label):
                     timed_step=lambda s, xi, tau: s + tau * rates * xi)
 
 
-def member(K: float, eta: float, init, label: str = "member", obs_dim: int = 1) -> Arrangement:
+def member(K: float, eta: float, init: Numbers, label: str = "member", obs_dim: int = 1) -> Arrangement:
     """A member ``(1, t) -> (R, t)``: configuration ``(x, a, b)``, sends ``(x, a x + b)``, residual ``sqrt(K)(c - x)``.
 
     It hears an observation of ``obs_dim`` coordinates and records the last, ``c``. With ``obs_dim = 1`` the
     observation is the series itself, so the record is the last observation; with ``obs_dim = 2`` the world sends
     ``(y_t, x_{t+1})``, the outcome and the next context, and the member records the context a step before the
-    outcome it is used to predict arrives.
+    outcome it is used to predict arrives. ``init``: the starting ``(x, a, b)``.
     """
     def cost(q, m_out, n_in):
         return 0.5 * K * (n_in[obs_dim - 1] - q[0]) ** 2
@@ -71,7 +73,7 @@ def member(K: float, eta: float, init, label: str = "member", obs_dim: int = 1) 
         omega=exact(lambda q, m, n: -cost(q, m, n)), label=label)
 
 
-def team_shares(q, addresses, voice: bool):
+def team_shares(q: Array, addresses: Array, voice: bool) -> Array:
     """The trust-levels (and the voice's share, last) at configuration ``q`` and the members' addresses."""
     n = addresses.shape[0]
     s = q[:n] * addresses + q[n:2 * n]
@@ -81,7 +83,7 @@ def team_shares(q, addresses, voice: bool):
     return jax.nn.softmax(s)
 
 
-def team_out(q, m_out, n: int, voice: bool):
+def team_out(q: Array, m_out: Array, n: int, voice: bool) -> Array:
     """The out-transfer's value action: ``(abar, prediction)`` from the members' ``(address, value)`` pairs."""
     a, w = m_out[0::2], m_out[1::2]
     g = team_shares(q, a, voice)
@@ -92,10 +94,11 @@ def team_out(q, m_out, n: int, voice: bool):
     return jnp.array([abar, pred])
 
 
-def team(n: int, eta: float, init, voice: bool = False, residual: bool = True, label: str = "team",
+def team(n: int, eta: float, init: Numbers, voice: bool = False, residual: bool = True, label: str = "team",
          obs_dim: int = 1) -> Arrangement:
     """A hearing team of ``n`` members; with ``residual``, its residual is ``y - prediction``, ``y`` the first
-    coordinate of what comes in. It delivers what comes in, all ``obs_dim`` coordinates, to each member."""
+    coordinate of what comes in. It delivers what comes in, all ``obs_dim`` coordinates, to each member. ``init``: the
+    starting configuration, ``2n`` numbers, ``2n + 4`` with a voice (``team_init``)."""
     def cost(q, m_out, n_in):
         return 0.5 * (n_in[0] - team_out(q, m_out, n, voice)[1]) ** 2
 
@@ -107,12 +110,12 @@ def team(n: int, eta: float, init, voice: bool = False, residual: bool = True, l
         omega=exact(lambda q, m, nn: -cost(q, m, nn)) if residual else zero_form, label=label)
 
 
-def accountable_member(K: float, eta: float, init, label: str = "member", obs_dim: int = 1) -> Arrangement:
+def accountable_member(K: float, eta: float, init: Numbers, label: str = "member", obs_dim: int = 1) -> Arrangement:
     """A member whose input carries an address: ``(R, t) -> (R, t)``. It hears ``(s, y[, c])``: ``s`` the share in
     which the whole hears it, ``y`` the outcome, ``c`` the context it records (``y`` itself when ``obs_dim = 1``).
     Its residual is ``(sqrt(K)(c - x), sqrt(s)(y - a x - b))``: graded on its own word, weighted by how much it is
     heard (Jacobs, Jordan, Nowlan, Hinton 1991's competitive error, as a residual affine in the values at each
-    configuration and address)."""
+    configuration and address). ``init``: the starting ``(x, a, b)``."""
     def cost(q, m_out, n_in):
         s, y, c = n_in[0], n_in[1], n_in[obs_dim]
         return 0.5 * K * (c - q[0]) ** 2 + 0.5 * s * (y - q[1] * q[0] - q[2]) ** 2
@@ -125,11 +128,11 @@ def accountable_member(K: float, eta: float, init, label: str = "member", obs_di
         omega=exact(lambda q, m, n: -cost(q, m, n)), label=label)
 
 
-def accountable_team(n: int, eta: float, init, label: str = "team", obs_dim: int = 1) -> Arrangement:
+def accountable_team(n: int, eta: float, init: Numbers, label: str = "team", obs_dim: int = 1) -> Arrangement:
     """A hearing team with no residual of its own whose in-transfer tells each member its share: what comes in is
     ``(s, y[, c])``, and member ``k`` is delivered ``(s g_k(a), y[, c])``, ``g`` the trust-levels at the members'
     addresses ``a``. Its out-transfer is ``team_out`` (no voice). Nested, a member's address in is the product of the
-    trust-levels on its path, its share in the composite."""
+    trust-levels on its path, its share in the composite. ``init``: the starting configuration, ``2n`` numbers."""
     d = 1 + obs_dim
 
     def in_f(q, m_out, n_in):
@@ -144,14 +147,15 @@ def accountable_team(n: int, eta: float, init, label: str = "team", obs_dim: int
         in_f=in_f, omega=zero_form, label=label)
 
 
-def expert_team(n: int, K: float, eta: float, init, label: str = "team", obs_dim: int = 1) -> Arrangement:
+def expert_team(n: int, K: float, eta: float, init: Numbers, label: str = "team", obs_dim: int = 1) -> Arrangement:
     """An expert team of ``n >= 0`` members, interface ``(R, t) -> (R, t)`` like each member's (book plan P104,
     *proposed*). Configuration ``(x, a_0, b_0, C_1..C_n, D_1..D_n, C_0, D_0)``: its record ``x``, its own guess
     ``a_0 x + b_0``, the scores' coefficients. Trust-levels ``g = softmax(C_k a_k + D_k, C_0 x + D_0)`` over the
     members' addresses ``a_k`` and its own record; it sends ``(x, sum_k g_k w_k + g_0 (a_0 x + b_0))``. It hears
     ``(s, y[, c])`` and delivers ``(s g_k, y[, c])`` to member ``k``. Residual ``(sqrt(K)(c - x), sqrt(s g_0)(y -
     a_0 x - b_0))``: its record, and its own guess weighted by the share in which the whole hears that guess. With
-    ``n = 0``, ``g_0 = 1``: a predictor that records the context and guesses a line of it."""
+    ``n = 0``, ``g_0 = 1``: a predictor that records the context and guesses a line of it. ``init``: the starting
+    configuration, ``2n + 5`` numbers (``expert_init``)."""
     d = 1 + obs_dim
 
     def shares(q, m_out):
@@ -179,13 +183,13 @@ def expert_team(n: int, K: float, eta: float, init, label: str = "team", obs_dim
         out_f=out_f, in_f=in_f, omega=exact(lambda q, m, nn: -cost(q, m, nn)), label=label)
 
 
-def expert_init(n: int, rng, scale: float = 0.1):
+def expert_init(n: int, rng: np.random.Generator, scale: float = 0.1) -> List[float]:
     """Record 0, a small random own guess, small random score slopes, zero intercepts."""
     return [0.0, rng.normal(0, scale), rng.normal(0, scale)] + list(rng.normal(0, scale, n)) + [0.0] * n + \
         [rng.normal(0, scale), 0.0]
 
 
-def team_init(n: int, rng, voice: bool = False, scale: float = 0.1):
+def team_init(n: int, rng: np.random.Generator, voice: bool = False, scale: float = 0.1) -> List[float]:
     """Small random score slopes, zero intercepts; with a voice, its score and its line too."""
     C = rng.normal(0, scale, n + (1 if voice else 0))
     D = np.zeros(n + (1 if voice else 0))
@@ -195,7 +199,7 @@ def team_init(n: int, rng, voice: bool = False, scale: float = 0.1):
     return q
 
 
-def member_init(rng, scale: float = 0.1):
+def member_init(rng: np.random.Generator, scale: float = 0.1) -> List[float]:
     return [0.0, rng.normal(0, scale), rng.normal(0, scale)]
 
 
@@ -204,7 +208,7 @@ def fill(members: Sequence[Arrangement], parent: Arrangement) -> Arrangement:
     return compose_seq(tensor_arrangements(list(members)), parent)
 
 
-def world(series, inner: Arrangement) -> Arrangement:
+def world(series: Numbers, inner: Arrangement) -> Arrangement:
     """The outside of ``inner``: a clock delivering ``series[floor t]`` (a number, or a row of ``inner``'s input
     dimension) to its input; it reads nothing back."""
     series = jnp.asarray(series, float).reshape(len(series), -1)
@@ -221,7 +225,7 @@ def world(series, inner: Arrangement) -> Arrangement:
         omega=lambda q, m, n: (jnp.zeros(1), jnp.zeros_like(m), EMPTY), label="world")
 
 
-def run(whole: Arrangement, series, duration: float = 1.0):
+def run(whole: Arrangement, series: Numbers, duration: float = 1.0) -> Tuple[Arrangement, np.ndarray, np.ndarray]:
     """Close ``whole`` by the world on ``series`` and run one step per observation, at the given duration.
 
     Returns the positions before each step (``(T, Q_dim)``, the world's clock last) and the prediction ``whole``
@@ -240,7 +244,7 @@ def run(whole: Arrangement, series, duration: float = 1.0):
     return system, np.asarray(qs), np.asarray(preds)
 
 
-def ar_series(f, T: int, sig: float, seed: int, y0: float = 0.0):
+def ar_series(f: Callable[[float], float], T: int, sig: float, seed: int, y0: float = 0.0) -> np.ndarray:
     """``y_t = f(y_{t-1}) + sig eps_t``, the world's arriving observations."""
     rng = np.random.default_rng(seed)
     y = np.zeros(T)

@@ -28,9 +28,13 @@ dynamics functor ``Phi`` for arrangements whose parameter is a ``CotCoalgK``.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Tuple
 
-from .polynomial import DirichletProduct, PolyMap
+from jax import Array
+
+from .arrangement import Arrangement
+from .coalgebra import CotCoalgK
+from .polynomial import DirichletProduct, Poly, PolyMap
 
 
 @dataclass(frozen=True)
@@ -175,7 +179,7 @@ class PCMorphismK:
         )
 
 
-def PhiK(arr) -> PCMorphismK:
+def PhiK(arr: Arrangement) -> PCMorphismK:
     """The K-stage dynamics of an arrangement whose parameter is a ``CotCoalgK``
     (the K-fold analog of ``functors.Phi`` / ``pc2.Phi2``).
 
@@ -196,7 +200,12 @@ def PhiK(arr) -> PCMorphismK:
     return rounds(P, interpretation(arr), phi_box_poly(arr.out_dim_M, arr.in_dim_M), phi_box_poly(arr.out_dim_N, arr.in_dim_N))
 
 
-def rounds(P, interp, src_p, tgt_p) -> PCMorphismK:
+def rounds(
+    P: CotCoalgK,
+    interp: Callable[[Array], Tuple[Callable, Callable]],
+    src_p: Poly,
+    tgt_p: Poly,
+) -> PCMorphismK:
     """The K rounds of a K-stage parameter ``P`` around an interpretation ``interp : q |-> (position_action,
     direction_action)``: the half of ``PhiK`` that steps the integrator. It never looks inside a position or a direction; it
     hands the parameter covector ``xi_Q``, an array on ``P``'s configuration, to ``P``'s advances. So it is shared by the array

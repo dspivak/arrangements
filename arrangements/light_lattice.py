@@ -30,13 +30,13 @@ Written by Claude Fable 5.1, session ec5ece87, 2026-09-29.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import phase
 from .hopfield import _tensor_balanced
 from .rvect import diagonal
@@ -139,10 +139,11 @@ def light_lattice(N: int = 8, kappa: float = 1.0, m: float = 1.0) -> Arrangement
 # ---------------------------------------------------------------------------
 
 
-def pack_state(arr: Arrangement, A, xi):
+def pack_state(arr: Arrangement, A: Numbers, xi: Numbers) -> Any:
     """The composite's state with edge values ``A`` and momenta ``xi`` (flat, edge order).
     The state's leaves in tree order are ``(q_e, xi_e)`` per edge, then the faces' and the
-    wire's empty states, so the flat leaf vector interleaves ``A`` and ``xi``."""
+    wire's empty states, so the flat leaf vector interleaves ``A`` and ``xi``. The returned state has the
+    structure of ``arr.P.init``, a pytree of arrays, hence ``Any``."""
     flat = jnp.stack([jnp.asarray(A, float), jnp.asarray(xi, float)], axis=1).reshape(-1)
     leaves, treedef = jax.tree_util.tree_flatten(arr.P.init)
     pieces, i = [], 0
@@ -155,8 +156,8 @@ def pack_state(arr: Arrangement, A, xi):
     return jax.tree_util.tree_unflatten(treedef, pieces)
 
 
-def unpack_state(state) -> Tuple[Array, Array]:
-    """Inverse of ``pack_state``: ``(A, xi)`` flat in edge order."""
+def unpack_state(state: Any) -> Tuple[Array, Array]:
+    """Inverse of ``pack_state``: ``(A, xi)`` flat in edge order (``state``: a pytree of arrays, hence ``Any``)."""
     flat = jnp.concatenate([jnp.ravel(x) for x in jax.tree_util.tree_leaves(state)])
     pairs = flat.reshape(-1, 2)
     return pairs[:, 0], pairs[:, 1]

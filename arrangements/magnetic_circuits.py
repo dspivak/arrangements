@@ -20,6 +20,8 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
+from typing import Sequence
+
 from .coalgebra import CotCoalgK
 from .magnets import FIELDS, MAGNETIC, g, nothing, placed
 from .smooth import R, SmoothArrangement, compose_seq, include, tensor, zero_form
@@ -27,7 +29,8 @@ from .stored_flux import tank
 from .wiring import trivial_parameter
 
 
-def winding(L, h, tau=0.05, K=16, phi0=0.0, current0=0.0, turns=1.0):
+def winding(L: float, h: float, tau: float = 0.05, K: int = 16, phi0: float = 0.0, current0: float = 0.0,
+            turns: float = 1.0) -> SmoothArrangement:
     """One winding, with fields and one voltage input; state (total flux, current).
 
     Configuration (trial flux, trial current, 0). The auxiliary coordinate's
@@ -82,7 +85,7 @@ def winding(L, h, tau=0.05, K=16, phi0=0.0, current0=0.0, turns=1.0):
         label=f"fieldWinding(L={L:g},h={h:g},N={turns:g})")
 
 
-def circuit_wire():
+def circuit_wire() -> SmoothArrangement:
     """Connect a capacitor and winding; expose only the body's field ports."""
     return SmoothArrangement(
         P=trivial_parameter(), M_in=FIELDS + (R(1),), M_out=(R(1),) + FIELDS,
@@ -90,8 +93,8 @@ def circuit_wire():
         in_f=lambda q, m, n: n + (m[0],), omega=zero_form, label="circuit")
 
 
-def circuit(L=1.0, C=1.0, h=0.5, charge0=0.0, tau=0.05, K=16,
-            phi0=0.0, current0=0.0, turns=1.0):
+def circuit(L: float = 1.0, C: float = 1.0, h: float = 0.5, charge0: float = 0.0, tau: float = 0.05, K: int = 16,
+            phi0: float = 0.0, current0: float = 0.0, turns: float = 1.0) -> SmoothArrangement:
     """A capacitor wired to a winding; a body on magnets.FIELDS."""
     if C <= 0:
         raise ValueError("capacitance must be positive")
@@ -100,7 +103,7 @@ def circuit(L=1.0, C=1.0, h=0.5, charge0=0.0, tau=0.05, K=16,
     return compose_seq(tensor([cap, coil]), circuit_wire())
 
 
-def fixed_circuits(bodies, places):
+def fixed_circuits(bodies: Sequence[SmoothArrangement], places: Sequence[Sequence[float]]) -> SmoothArrangement:
     """Existing field routing, with zero fields arriving from outside."""
     composite = compose_seq(tensor(list(bodies)), placed(places))
     cap = SmoothArrangement(

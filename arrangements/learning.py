@@ -31,12 +31,13 @@ environment streams data ``(x, lambda)`` and seeds the output covector
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Callable, List, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
+from jax.typing import ArrayLike
 
 from .arrangement import Arrangement, exact, zero_form
 from .coalgebra import CotCoalg
@@ -128,8 +129,8 @@ def loss_box(loss: Callable[[Array, Array], Array], n: int) -> Arrangement:
 
 
 def training_arrangement(
-    arr: Arrangement, init_q, data: Sequence[Tuple[Array, Array]],
-    loss: Callable[[Array, Array], Array] = None,
+    arr: Arrangement, init_q: Union[ArrayLike, Sequence[float]], data: Sequence[Tuple[Array, Array]],
+    loss: Optional[Callable[[Array, Array], Array]] = None,
 ) -> Arrangement:
     """The closed arrangement that trains ``arr`` on a list of examples (book sec.neural_network).
 
@@ -168,9 +169,9 @@ def train(
     *,
     forcing: Callable[[Array, Array], Array] = squared_error_forcing,
     loss: Callable[[Array, Array], Array] = squared_error,
-    steps: int = None,
+    steps: Optional[int] = None,
     path: bool = False,
-):
+) -> Union[Tuple[Array, List[float]], Tuple[Array, List[float], Any]]:
     """Run gradient descent as ``Phi`` of the closed training arrangement (``training_arrangement``).
 
     The datum and the label are boxes stepping through ``data`` (cycling), the loss is a box with
@@ -213,7 +214,7 @@ def train_by_port(
     *,
     forcing: Callable[[Array, Array], Array] = squared_error_forcing,
     loss: Callable[[Array, Array], Array] = squared_error,
-    steps: int = None,
+    steps: Optional[int] = None,
 ) -> Tuple[Array, List[float]]:
     """The run ``train`` replaced: the learner alone, stepped by ``Phi(arr)``, the loss in code.
 

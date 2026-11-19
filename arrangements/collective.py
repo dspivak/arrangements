@@ -22,19 +22,21 @@ with a sampler through ``rand.seed`` before running). The response is diagonal,
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, NamedTuple, Sequence
+from typing import Any, Callable, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact
+from .arrangement import Numbers
 from .attention import (
-    AttentionArrangement, input_dim, make_input, message, msg_dim, signal,
+    AttentionArrangement, Cost, input_dim, make_input, message, msg_dim, signal,
     spatial_arrangement, spatial_config, spatial_kappa, spatial_split, weight,
 )
-from .coalgebra import configuration
-from .rvect import constant, trivial
+from .coalgebra import CotCoalg, configuration
+from .rand import Sampler
+from .rvect import ReactiveVectorSpace, constant, trivial
 from .wiring import compose_seq, tensor_arrangements
 
 DH, DP = 1, 1                                   # the default H = R; P = R always
@@ -61,7 +63,8 @@ class Part(NamedTuple):
     label: str
 
 
-def part(send: Callable, cost: Callable, P, label: str, dim_H: int = DH) -> Part:
+def part(send: Callable[[Array], Array], cost: Callable[[Array, Array], Union[float, Array]],
+         P: CotCoalg, label: str, dim_H: int = DH) -> Part:
     """A part ``I -> B``: parameter ``P``, sending ``send(q) in M``, receiving ``e in E``
     through the unique map to the unit's input, and carrying its own cost ``cost(q, e)``
     as the exact forcing ``-dk`` (the idiom of ``tests/test_member.py``)."""
@@ -76,7 +79,7 @@ def part(send: Callable, cost: Callable, P, label: str, dim_H: int = DH) -> Part
     return Part(arr, P.Q_dim, label)
 
 
-def frozen_part(h, w: float, label: str, dim_H: int = DH) -> Part:
+def frozen_part(h: Numbers, w: float, label: str, dim_H: int = DH) -> Part:
     """A part with no configuration and no cost, always sending ``(h, w)``."""
     h = jnp.broadcast_to(jnp.asarray(h, float), (dim_H,))
     return part(lambda q: message(h, w), lambda q, e: 0.0, configuration(trivial()), label, dim_H)
@@ -132,9 +135,10 @@ class Collective:
         return sum(p.q_dim for p in self.parts)
 
 
-def collective(parts: Sequence[Part], *, tau: float, cost: Callable, positions,
-               integrator: Callable, mobility, value_mobility: float,
-               values=None, dim_H: int = DH, label: str = "") -> Collective:
+def collective(parts: Sequence[Part], *, tau: float, cost: Cost, positions: Numbers,
+               integrator: Callable[[ReactiveVectorSpace, Array], CotCoalg], mobility: Numbers,
+               value_mobility: float, values: Optional[Numbers] = None, dim_H: int = DH,
+               label: str = "") -> Collective:
     """The composite ``compose_seq(tensor(parts), parent.arr())``.
 
     ``cost`` is the parent's, a function of ``(q_parent, m_out, n_in)``: build it with
@@ -161,12 +165,13 @@ def collective(parts: Sequence[Part], *, tau: float, cost: Callable, positions,
 # ---------------------------------------------------------------------------
 
 
-def position(C: Collective, state) -> Array:
-    """The flat composite configuration ``q`` a state presents."""
+def position(C: Collective, state: Any) -> Array:
+    """The flat composite configuration ``q`` a state presents (``state`` is the composite's
+    state, a pytree of arrays, hence ``Any``)."""
     return C.arr.P.position(state)
 
 
-def split(C: Collective, q):
+def split(C: Collective, q: Numbers) -> Tuple[List[Array], Array, Array]:
     """``q |-> (the parts' configurations, placements (n,), value maps (n,))``."""
     q = jnp.asarray(q, float)
     qs, i = [], 0
@@ -177,19 +182,19 @@ def split(C: Collective, q):
     return qs, jnp.ravel(pos), V if C.dim_H > 1 else jnp.ravel(V)
 
 
-def emitted(C: Collective, q) -> Array:
+def emitted(C: Collective, q: Numbers) -> Array:
     """The parts' messages at ``q``, in order."""
     qs, _, _ = split(C, q)
     return jnp.concatenate([p.arr.out_f(qp, EMPTY) for p, qp in zip(C.parts, qs)])
 
 
-def sent_onward(C: Collective, q) -> Array:
+def sent_onward(C: Collective, q: Numbers) -> Array:
     """``m~``, the message the collective sends onward at ``q``."""
     q = jnp.asarray(q, float)
     return C.parent.sigma(q[C.parts_dim:], emitted(C, q))
 
 
-def kappas(C: Collective, q) -> Array:
+def kappas(C: Collective, q: Numbers) -> Array:
     """``kappa_j = exp(-p_j^2 / 2 tau)``: how far the parent's kernel reaches each part."""
     _, pos, _ = split(C, q)
     return jnp.array([spatial_kappa(pos[j:j + 1], jnp.zeros(DP), C.tau) for j in range(C.n)])
@@ -200,8 +205,8 @@ def kappas(C: Collective, q) -> Array:
 # ---------------------------------------------------------------------------
 
 
-def step_fn(C: Collective, e_ext=None) -> Callable:
-    """One step of ``Phi(C.arr)`` on the constant exterior input ``e_ext`` with zero
+def step_fn(C: Collective, e_ext: Optional[Array] = None) -> Callable[[Any], Any]:
+    """One step (state to state; a state is a pytree of arrays, hence ``Any``) of ``Phi(C.arr)`` on the constant exterior input ``e_ext`` with zero
     exterior covector, specialized to the configuration component of the forcing (the
     form ``tests/test_rendezvous.run_closed`` uses and checks against ``Phi``)."""
     P, omega = C.arr.P, C.arr.omega
@@ -214,16 +219,19 @@ def step_fn(C: Collective, e_ext=None) -> Callable:
     return step
 
 
-def run(C: Collective, steps: int, state=None, e_ext=None):
-    """The state after ``steps`` steps from ``state`` (the initial state if omitted)."""
+def run(C: Collective, steps: int, state: Any = None, e_ext: Optional[Array] = None) -> Any:
+    """The state after ``steps`` steps from ``state`` (the initial state if omitted); a state is
+    a pytree of arrays, hence ``Any``."""
     f = step_fn(C, e_ext)
     s0 = C.arr.P.init if state is None else state
     return jax.lax.fori_loop(0, steps, lambda _i, s: f(s), s0)
 
 
-def trace(C: Collective, steps: int, observe: Callable, state=None, e_ext=None):
+def trace(C: Collective, steps: int, observe: Callable[[Any], Any], state: Any = None,
+          e_ext: Optional[Array] = None) -> Tuple[Any, Any]:
     """``(final state, observe(s_t) for t = 1..steps)``, by ``lax.scan``; ``observe``
-    reads a state, so a momentum is as visible as a position."""
+    reads a state, so a momentum is as visible as a position. States and what ``observe``
+    returns are pytrees, hence ``Any``."""
     f = step_fn(C, e_ext)
     s0 = C.arr.P.init if state is None else state
 
@@ -234,7 +242,7 @@ def trace(C: Collective, steps: int, observe: Callable, state=None, e_ext=None):
     return jax.lax.scan(body, s0, None, length=steps)
 
 
-def with_sampler(C: Collective, sampler) -> Collective:
+def with_sampler(C: Collective, sampler: Sampler) -> Collective:
     """A collective with a stochastic parent paired with ``sampler`` (``rand.seed``); its
     state is ``(composite state, sampler state)``, and ``run`` and ``trace`` apply as before."""
     from dataclasses import replace
@@ -242,8 +250,8 @@ def with_sampler(C: Collective, sampler) -> Collective:
     return replace(C, arr=seed(C.arr, sampler))
 
 
-def parent_state(C: Collective, state):
-    """The parent's own state inside a composite state: the composite's parameter is
+def parent_state(C: Collective, state: Any) -> Any:
+    """The parent's own state inside a composite state (both pytrees of arrays, hence ``Any``): the composite's parameter is
     ``tensor(parts) (x) parent``, so it is the second factor. For the phase coalgebra it is
     ``(q, xi)``, positions and momenta."""
     return state[1]

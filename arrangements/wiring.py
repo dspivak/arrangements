@@ -26,14 +26,14 @@ Provides:
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import List, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import Array
 
 from .arrangement import Arrangement, exact, zero_form
-from .coalgebra import CotCoalg, configuration
+from .coalgebra import CotCoalg, ParameterRule, configuration
 from .rvect import diagonal, trivial
 
 
@@ -274,7 +274,7 @@ def compose_chain(parts: Sequence[Arrangement]) -> Arrangement:
 # ---------------------------------------------------------------------------
 
 
-def held_end(parameter, kappa: float = 0.0) -> Arrangement:
+def held_end(parameter: ParameterRule, kappa: float = 0.0) -> Arrangement:
     """A held end ``<R^0|R^0> -> <R|R>``: a particle at ``0`` with response ``0``, so it does not move.
 
     Its integrator is ``parameter`` (the chain's own kind: ``configuration``, ``phase``, ``leapfrog``)
@@ -303,7 +303,7 @@ def cap() -> Arrangement:
     )
 
 
-def held_chain(parts: Sequence[Arrangement], kappa: float, parameter=configuration) -> Arrangement:
+def held_chain(parts: Sequence[Arrangement], kappa: float, parameter: ParameterRule = configuration) -> Arrangement:
     """The closed chain ``cap . chain_wire(K+2)(held_left, Part_1, ..., Part_K, held_right)``.
 
     The left end is a held particle at ``0`` with no spring of its own (the first part's spring
@@ -436,8 +436,8 @@ def graph_wire(
 
 
 def harmonic_vertex(
-    d_in: int, d_out: int, m: float, kappas: Sequence[float], vdim: int = 1, onsite=None,
-    parameter=configuration,
+    d_in: int, d_out: int, m: float, kappas: Sequence[float], vdim: int = 1,
+    onsite: Optional[Callable[[Array], Array]] = None, parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """The harmonic particle ``Part_v : <1/1> -> <R^{vdim*in(v)}|R^{vdim*out(v)}>`` at a vertex.
 
@@ -481,8 +481,8 @@ def compose_graph(
     m: float,
     kappa: float,
     vdim: int = 1,
-    onsite=None,
-    parameter=configuration,
+    onsite: Optional[Callable[[Array], Array]] = None,
+    parameter: ParameterRule = configuration,
 ) -> Arrangement:
     """``wire_G = R^{varphi_G}((Part_v)_v)`` (CDLM eqn.graph_wire), by genuine composition.
 

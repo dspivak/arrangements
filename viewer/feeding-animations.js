@@ -16,7 +16,7 @@
     svg('text',{y:6,'text-anchor':'middle','font-size':14},g,v.toFixed(2));
   }
   function casing({svg,group:g,node,scene}){
-    const k=node.index||0,start=Feeding.NR+Feeding.NC*k,[food,opening,height]=scene.state.slice(start,start+3),red=scene.casings[k].red;
+    const {food,opening,height,red}=scene.casings[node.index??0];
     const dy=-Math.max(-.1,height+.4)*28,gap=Math.min(1,Math.max(0,opening))*22;
     const color=red>.5?'#c65346':'#8293a1';
     svg('path',{d:`M ${-gap} ${dy-20} L -30 ${dy-20} L -30 ${dy+18} Q 0 ${dy+35} 30 ${dy+18} L 30 ${dy-20} L ${gap} ${dy-20}`,fill:'#fff',stroke:color,'stroke-width':3},g);
@@ -51,7 +51,10 @@
       svg('text',{y:44,'text-anchor':'middle','font-size':13},g,'position '+position.toFixed(2));
     },tip:({svg,group:g,node})=>{const v=Array.isArray(node.value)?node.value[0]:node.value;line(svg,g,-35,30,35,30,'#c4b398',4);svg('circle',{cx:0,cy:12-(v+.4)*80,r:12,fill:'#6687a7'},g);},
     food:({svg,group:g,node})=>{svg('circle',{r:7+20*Math.sqrt(Math.max(0,node.value)/10),fill:'#d67c63'},g);},
-    mouth:({svg,group:g,scene})=>{svg('path',{d:'M -35 -8 Q 0 35 35 -8',fill:'none',stroke:'#ae6e6e','stroke-width':5},g);svg('circle',{cy:0,r:5+Math.min(12,scene.casings.reduce((a,c)=>a+c.eat,0)*2),fill:'#c76a4e'},g);},
+    mouth:({svg,group:g,scene})=>{svg('path',{d:'M -35 -8 Q 0 35 35 -8',fill:'none',stroke:'#ae6e6e','stroke-width':5},g);const k=scene.casings.findIndex(c=>c.selected>0),c=scene.casings[k];
+      svg('circle',{cy:0,r:5+Math.min(12,(c?.eat??0)*2),fill:'#c76a4e'},g);
+      svg('text',{y:36,'text-anchor':'middle','font-size':12},g,c?'Casing '+(k+1):'Grip free');
+      if(c)svg('text',{y:51,'text-anchor':'middle','font-size':10},g,'Open '+c.pry.toFixed(2)+' · Eat '+c.eat.toFixed(2));},
     red:({svg,group:g,node,scene})=>svg('circle',{r:18,fill:scene.casings[node.index].red>.5?'#c65346':'#a1abb4'},g)};
   root.FeedingAnimations=renderers;
 })(globalThis);

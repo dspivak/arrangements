@@ -39,20 +39,22 @@ clamped wage, and by ``0`` when the paymaster is gone altogether.
 
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import List, Sequence, Tuple, Union
 
 import jax.numpy as jnp
 from jax import Array
+from jax.typing import ArrayLike
 
+from .arrangement import Arrangement, Numbers
 from .attention import make_input, message, split_inputs
-from .cascade import DH2, leaf, market, source, unit
+from .cascade import DH2, Unit, leaf, market, source, unit
 from .coalgebra import configuration
 from .collective import Collective, Part, collective, part, split
 from .rvect import euclidean
 from .wiring import compose_seq
 
 
-def intake(r, A: float, K_s: float):
+def intake(r: ArrayLike, A: float, K_s: float) -> Array:
     """``I(r) = A r / (K_s + r)``: what a part can do with the supply ``r`` that arrives."""
     return A * r / (K_s + r)
 
@@ -67,13 +69,15 @@ def supplier(a0: float, *, alpha: float, b: float, beta: float, sigma: float, A:
         label=label, dim_H=DH2)
 
 
-def suppliers(n: int, a0, **kw) -> List[Part]:
-    """``n`` suppliers ``w0..w{n-1}``; ``a0`` is one number or one per part."""
+def suppliers(n: int, a0: Union[float, Sequence[float]], **kw: float) -> List[Part]:
+    """``n`` suppliers ``w0..w{n-1}``; ``a0`` is one number or one per part; ``kw`` are
+    ``supplier``'s keyword arguments (all numbers) other than ``label``."""
     a0 = [float(a0)] * n if isinstance(a0, (int, float)) else list(a0)
     return [supplier(a0[i], label=f"w{i}", **kw) for i in range(n)]
 
 
-def bare(parts: Sequence[Part], *, positions, mobilities, tau: float, s: float, d: float,
+def bare(parts: Sequence[Part], *, positions: Sequence[float], mobilities: Sequence[float],
+         tau: float, s: float, d: float,
          label: str = "mutual") -> Collective:
     """The collective alone: ``parts`` at ``positions``, and the elsewhere, a frozen source
     offering ``s`` at distance ``d``. Run it with ``collective.run`` on the exterior input
@@ -86,8 +90,9 @@ def bare(parts: Sequence[Part], *, positions, mobilities, tau: float, s: float, 
                       mobility=mob, value_mobility=0.0, dim_H=DH2, label=label)
 
 
-def funded(parts: Sequence[Part], *, positions, mobilities, tau: float, s: float, d: float,
-           fund: dict, r_market: float, label: str = "mutual"):
+def funded(parts: Sequence[Part], *, positions: Sequence[float], mobilities: Sequence[float],
+           tau: float, s: float, d: float, fund: dict, r_market: float,
+           label: str = "mutual") -> Tuple[Unit, Arrangement]:
     """The same collective wrapped in the cascade's fund layer and closed by its market.
     Returns ``(unit, arrangement)``; read it with ``cascade.read`` on the unit.
 
@@ -106,19 +111,19 @@ def funded(parts: Sequence[Part], *, positions, mobilities, tau: float, s: float
 # ---------------------------------------------------------------------------
 
 
-def amplitudes(C: Collective, q) -> Array:
+def amplitudes(C: Collective, q: Numbers) -> Array:
     """The parts' amplitudes, the source excluded (it has no configuration)."""
     qs, _, _ = split(C, q)
     return jnp.array([qp[0] for qp in qs[:-1]])
 
 
-def placements(C: Collective, q) -> Array:
+def placements(C: Collective, q: Numbers) -> Array:
     """The parts' placements, the source's (fixed at ``d``) excluded."""
     _, pos, _ = split(C, q)
     return pos[:-1]
 
 
-def arriving(C: Collective, q, e_ext) -> Array:
+def arriving(C: Collective, q: Numbers, e_ext: Array) -> Array:
     """What arrives on the supply channel at each part, from the library's own ``rho``:
     ``r_i = kappa_i0 g + kappa_{i,src} s + sigma sum_{j != i} kappa_ij a_j``."""
     from .collective import emitted

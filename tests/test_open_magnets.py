@@ -4,7 +4,7 @@ All dynamics run through smooth.PhiK. Same physical limits as magnets.py;
 externally imposed positions supply/remove mechanical work.
 """
 import pytest
-from magnetic_checks import checked_jit, outside_smoothing_discs
+from tests.magnetic_checks import checked_jit, outside_smoothing_discs
 
 pytestmark = pytest.mark.usefixtures("outside_smoothing_discs")
 import jax

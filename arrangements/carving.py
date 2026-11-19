@@ -29,14 +29,14 @@ the tests check it, at the runs' settings.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, Numbers, exact, zero_form
 from .coalgebra import configuration
 from .functors import Phi
 from .interpretation import trivial_omega
@@ -136,7 +136,7 @@ def reader(slow_parts: Sequence[Arrangement], couplings: Sequence[Arrangement], 
     return replace(wired, label=f"reader({', '.join(p.label for p in slow_parts)})")
 
 
-def note_step(arr: Arrangement, check_notes: Sequence[float] = (0.6, 0.0)):
+def note_step(arr: Arrangement, check_notes: Sequence[float] = (0.6, 0.0)) -> Callable[[Any, float], Any]:
     """One ``Phi`` step of a reader ``<0|0> -> <1|0>`` on a note, compiled, checked against ``Phi``.
 
     The reader presents nothing, so the covector triple's ``Q`` part is its forcing's at the note:
@@ -164,7 +164,7 @@ def note_step(arr: Arrangement, check_notes: Sequence[float] = (0.6, 0.0)):
     return step
 
 
-def start_at(arr: Arrangement, position) -> object:
+def start_at(arr: Arrangement, position: Numbers) -> object:
     """The reader's state whose position is ``(q, *slow)`` (its couplings and wires hold nothing)."""
     leaves, treedef = jax.tree_util.tree_flatten(arr.P.init)
     pos = jnp.asarray(np.asarray(position, dtype=float))
@@ -177,7 +177,8 @@ def start_at(arr: Arrangement, position) -> object:
     return jax.tree_util.tree_unflatten(treedef, out)
 
 
-def play(arr: Arrangement, step, notes, record: bool = False, start=None):
+def play(arr: Arrangement, step: Callable[[Any, float], Any], notes: Numbers, record: bool = False,
+         start: Optional[Numbers] = None) -> np.ndarray:
     """Run the reader on the environment's schedule of notes, from its initial state or from the
     position ``start``. Returns the final position ``(q, *slow)``, or every step's when ``record``."""
     notes = jnp.asarray(np.asarray(notes, dtype=float))

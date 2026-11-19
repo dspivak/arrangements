@@ -113,7 +113,8 @@ def gaussian_T(r: int) -> Callable[[Array], Array]:
     return lambda y: jnp.concatenate([y, -0.5 * jnp.ravel(jnp.outer(y, y))])
 
 
-def gaussian_term(r: int, mu, Pi, y) -> Term:
+def gaussian_term(r: int, mu: Callable[[Array, Array, Array], Array], Pi: Callable[[Array], Array],
+                  y: Callable[[Array, Array, Array], Array]) -> Term:
     """A Gaussian term from a prediction ``mu(q, m, e)``, a precision function ``Pi(q) -> PD_r`` and an observation
     ``y(q, m, e)``: ``theta = (Pi mu, vec Pi)``."""
 

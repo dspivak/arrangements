@@ -27,13 +27,16 @@ and as the composite of the units' quick arrangements filled once (``Para`` comp
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Sequence
+from typing import Any, Callable, Optional, Sequence, Tuple, Union
+
+from jax import Array
+from jax.typing import ArrayLike
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .arrangement import Arrangement, zero_form
+from .arrangement import Arrangement, Numbers, zero_form
 from .coalgebra import CotCoalg, configuration
 from .functors import Phi
 from .interpretation import trivial_omega
@@ -171,8 +174,8 @@ def chair_integrator(w_start: float, eta: float = 1.0) -> CotCoalg:
     return configuration(euclidean(1, eta), init=jnp.array([w_start]))
 
 
-def room_flat(eps: float, q: Sequence[float], w: Sequence[float], a=1.0, c=3.0, ell=1.0, b=2.6,
-              w0=(-2.5, 2.5)) -> Arrangement:
+def room_flat(eps: float, q: Sequence[float], w: Sequence[float], a: float = 1.0, c: float = 3.0, ell: float = 1.0,
+              b: float = 2.6, w0: Tuple[float, float] = (-2.5, 2.5)) -> Arrangement:
     """``I -> <1|0>``: people ``q``, chairs ``w`` (each on the clock ``eps``), all four tensored, then wired.
     State position: ``(q1, q2, w1, w2)``."""
     parts = tensor_arrangements([
@@ -186,7 +189,7 @@ def room_flat(eps: float, q: Sequence[float], w: Sequence[float], a=1.0, c=3.0, 
     return replace(compose_seq(wired, couplings), label=f"room_flat(eps={eps:g})")
 
 
-def unit_quick(q0: float, w0: float, a=1.0, b=2.6) -> Arrangement:
+def unit_quick(q0: float, w0: float, a: float = 1.0, b: float = 2.6) -> Arrangement:
     """One person-and-chair unit's quick arrangement ``<0|1> -> <0|2>``: the chair's box left open; the person (its
     quick matter), seated by ``seat``, the chair's box tidied by ``tidy``; the person read out twice."""
     inner = tensor_arrangements([identity(1), person(q0, 1)])          # wires: w, p
@@ -195,23 +198,27 @@ def unit_quick(q0: float, w0: float, a=1.0, b=2.6) -> Arrangement:
                    label="unit_quick")
 
 
-def room_quick(c=3.0, ell=1.0) -> Arrangement:
+def room_quick(c: float = 3.0, ell: float = 1.0) -> Arrangement:
     """The room's own wiring ``<0|4> -> <1|0>`` on ``(p1, p1, p2, p2)``: talk and the routine."""
     return replace(compose_seq(route(4, [0, 2, 1, 3]), tensor_arrangements([talk(c, ell), routine()])),
                    label="room_quick")
 
 
-def room_para(eps: float, q, w, a=1.0, c=3.0, ell=1.0, b=2.6, w0=(-2.5, 2.5)) -> Arrangement:
+def room_para(eps: float, q: Sequence[float], w: Sequence[float], a: float = 1.0, c: float = 3.0, ell: float = 1.0,
+              b: float = 2.6, w0: Tuple[float, float] = (-2.5, 2.5)) -> Arrangement:
     """``Para`` composition, then one fill: the units' quick arrangements composed into the room with both chair
-    boxes open, ``<0|2> -> <1|0>``, then filled by both chairs on the clock ``eps``."""
+    boxes open, ``<0|2> -> <1|0>``, then filled by both chairs on the clock ``eps``. ``q``, ``w``: the two people's
+    and the two chairs' starting positions."""
     quick = compose_seq(tensor_arrangements([unit_quick(q[0], w0[0], a, b), unit_quick(q[1], w0[1], a, b)]),
                         room_quick(c, ell))
     chairs = [matter(slowed(chair_integrator(w[i]), eps), 1, "chair") for i in range(2)]
     return replace(fill(quick, chairs), label=f"room_para(eps={eps:g})")
 
 
-def room_unitwise(eps: float, q, w, a=1.0, c=3.0, ell=1.0, b=2.6, w0=(-2.5, 2.5)) -> Arrangement:
-    """Each unit filled by its own chair first, then the two filled units composed into the room."""
+def room_unitwise(eps: float, q: Sequence[float], w: Sequence[float], a: float = 1.0, c: float = 3.0,
+                  ell: float = 1.0, b: float = 2.6, w0: Tuple[float, float] = (-2.5, 2.5)) -> Arrangement:
+    """Each unit filled by its own chair first, then the two filled units composed into the room. ``q``, ``w`` as in
+    ``room_para``."""
     units = [fill(unit_quick(q[i], w0[i], a, b), [matter(slowed(chair_integrator(w[i]), eps), 1, "chair")])
              for i in range(2)]
     return replace(compose_seq(tensor_arrangements(units), room_quick(c, ell)), label=f"room_unitwise(eps={eps:g})")
@@ -222,7 +229,8 @@ def room_unitwise(eps: float, q, w, a=1.0, c=3.0, ell=1.0, b=2.6, w0=(-2.5, 2.5)
 # ---------------------------------------------------------------------------
 
 
-def routine_step(arr: Arrangement, duration: float, check_inputs: Sequence[float] = (1.0, 0.0)):
+def routine_step(arr: Arrangement, duration: float, check_inputs: Sequence[float] = (1.0, 0.0)
+                 ) -> Callable[[Any, ArrayLike], Any]:
     """One ``Phi`` step of a room ``I -> <1|0>`` held for ``duration``, the routine ``u`` on its port; compiled, and
     checked against ``Phi(arr).run_one`` at the same duration on the inputs ``check_inputs``."""
     if arr.in_dim_M or arr.out_dim_M or arr.out_dim_N or arr.in_dim_N != 1:
@@ -246,7 +254,7 @@ def routine_step(arr: Arrangement, duration: float, check_inputs: Sequence[float
     return step
 
 
-def set_position(arr: Arrangement, position) -> object:
+def set_position(arr: Arrangement, position: Numbers) -> object:
     """The state whose position (leaves in order) is ``position``."""
     leaves, treedef = jax.tree_util.tree_flatten(arr.P.init)
     pos = jnp.asarray(np.asarray(position, dtype=float))
@@ -259,7 +267,8 @@ def set_position(arr: Arrangement, position) -> object:
     return jax.tree_util.tree_unflatten(treedef, out)
 
 
-def run(arr: Arrangement, step, inputs, start=None, record: bool = False):
+def run(arr: Arrangement, step: Callable[[Any, Array], Any], inputs: Numbers, start: Optional[Numbers] = None,
+        record: bool = False) -> np.ndarray:
     """Run on the schedule ``inputs`` (one routine value per step) from ``start`` (a position) or the initial state;
     returns the final position, or every step's."""
     inputs = jnp.asarray(np.asarray(inputs, dtype=float))
@@ -273,7 +282,8 @@ def run(arr: Arrangement, step, inputs, start=None, record: bool = False):
     return np.asarray(path) if record else np.asarray(arr.P.position(s))
 
 
-def run_batch(arr: Arrangement, step, inputs, starts):
+def run_batch(arr: Arrangement, step: Callable[[Any, Array], Any], inputs: Numbers,
+              starts: Union[ArrayLike, Sequence[Sequence[float]]]) -> np.ndarray:
     """Final positions from each start position in ``starts`` (an array, one row per start), on one schedule."""
     inputs = jnp.asarray(np.asarray(inputs, dtype=float))
     leaves, treedef = jax.tree_util.tree_flatten(arr.P.init)
@@ -297,7 +307,8 @@ def run_batch(arr: Arrangement, step, inputs, starts):
     return np.asarray(go(jnp.asarray(np.asarray(starts, dtype=float))))
 
 
-def open_step(arr: Arrangement, duration: float, check_at=None):
+def open_step(arr: Arrangement, duration: float, check_at: Optional[Sequence[float]] = None
+              ) -> Callable[[Any, ArrayLike], Any]:
     """One step of an arrangement ``<0|k> -> I`` whose open boxes read out ``m`` (a held value per box):
     ``(s, m) |-> u(s, omega(q, m, ())|_Q)``, compiled; at ``check_at`` it is checked against the closed arrangement
     with each open box filled by the stateless system reading out that value (``constant``), stepped by ``Phi``."""
@@ -322,7 +333,8 @@ def open_step(arr: Arrangement, duration: float, check_at=None):
     return step
 
 
-def person_open(q0: float, a=1.0, c=3.0, ell=1.0, b=2.6, w0=2.5) -> Arrangement:
+def person_open(q0: float, a: float = 1.0, c: float = 3.0, ell: float = 1.0, b: float = 2.6, w0: float = 2.5
+                ) -> Arrangement:
     """Person 2's unit with the talk coupling, its partner and its chair left open: ``<0|2> -> I`` on
     ``(partner, chair)``. Its matter is person 2 alone; a certificate for it assumes where the partner and the chair
     are (the routine is off)."""
