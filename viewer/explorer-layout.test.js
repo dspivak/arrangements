@@ -1,6 +1,21 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const E=require('./explorer-core.js'),G=require('./explorer-layout.js'),A=require('./feeding-arrangement.js');
 const close=(a,b)=>assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<1e-6,JSON.stringify([a,b]));
+test('the two directions separate along the route and meet at each port and fork',()=>{
+  const model=new E.Model(A.adapter().snapshot());
+  model.enter('receiver');
+  const {edges,forks}=G.layout(model.project());
+  assert.ok(edges.length&&forks.length);
+  for(const wire of [...edges,...forks]){
+    assert.notEqual(wire.tracks.value,wire.tracks.load);
+    for(const track of Object.values(wire.tracks)){
+      const points=track.match(/-?[\d.]+/g).map(Number);
+      for(const [actual,expected] of [[points.slice(0,2),wire.start],[points.slice(-2),wire.end]]){
+        assert.ok(Math.hypot(actual[0]-expected.x,actual[1]-expected.y)<.001);
+      }
+    }
+  }
+});
 function check(project,options){
   const g=G.layout(project,options);
   for(const w of g.edges){

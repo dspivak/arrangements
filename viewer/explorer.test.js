@@ -1,6 +1,16 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const E=require('./explorer-core.js'),A=require('./feeding-arrangement.js'),F=require('./feeding-model.js');
 const scene=()=>A.evaluate(F.START,F.PLACES,F.DEFAULTS);
+test('fork load adds signed branch contributions independently of display scale',()=>{
+  const branches=[{id:'a',load:[2,-1],loadScale:3},{id:'b',load:[-2,4],loadScale:8}];
+  const trunk=E.forkWire(branches);
+  assert.deepEqual(trunk.load,[0,3]);assert.equal(trunk.loadScale,8);
+  assert.deepEqual(trunk.branches,branches);
+  assert.equal(E.forkWire([{load:1},{load:-1}]).load,0);
+  assert.equal(E.forkWire([{load:1},{load:null}]).load,null);
+  assert.equal(E.forkWire([{load:[1,2]},{load:[2]}]).load,null);
+  assert.notEqual(E.format(1e-12),E.format(0));
+});
 const close=(a,b,tol=1e-10)=>{assert.equal(a.length,b.length);a.forEach((v,i)=>assert.ok(Math.abs(v-b[i])<tol,`${i}: ${v} vs ${b[i]}`));};
 test('feeding field agrees with independent existing model at all sampled states',()=>{
   let seed=125,rand=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/2**32;};

@@ -132,6 +132,21 @@
       return {nodes:nodes.concat([...boundary.values()]),wires,bundles:[...bundles.values()]};
     }
   }
+  function sumLoads(branches) {
+    const first=branches[0].load;
+    if(branches.length===1)return first;
+    function add(a,b){
+      if(typeof a==='number'&&typeof b==='number')return a+b;
+      if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length)return null;
+      const sum=a.map((v,i)=>add(v,b[i]));
+      return sum.includes(null)?null:sum;
+    }
+    return branches.slice(1).reduce((total,branch)=>add(total,branch.load),first);
+  }
+  function forkWire(branches){
+    return {...branches[0],branches,load:sumLoads(branches),
+      loadScale:Math.max(...branches.map(w=>w.loadScale??1))};
+  }
   function aggregate(wires) {
     const groups=new Map();
     for(const w of wires){
@@ -139,23 +154,21 @@
       if(!groups.has(key))groups.set(key,{...w,branches:[]});
       groups.get(key).branches.push(w);
     }
-    const shape=x=>Array.isArray(x)?'['+x.map(shape).join(',')+']':typeof x;
-    const add=(a,b)=>Array.isArray(a)&&Array.isArray(b)?a.map((v,i)=>add(v,b[i])):a+b;
-    return [...groups.values()].map(w=>({...w,load:w.branches.length===1?w.load:w.branches.some(b=>b.load==null||!numbers(b.load).length||shape(b.load)!==shape(w.load))?null:w.branches.map(b=>b.load).reduce(add)}));
+    return [...groups.values()].map(w=>({...w,load:sumLoads(w.branches)}));
   }
   function intensity(value,scale=1) {const v=magnitude(value);return v==null?null:Math.min(1,v/scale);}
   function color(value,scale=1,kind='value') {
     const u=intensity(value,scale);if(u===null)return '#89929f';
-    const a=kind==='value'?[129,190,224]:[240,203,143], b=kind==='value'?[0,91,142]:[177,42,60];
+    const a=kind==='value'?[76,145,183]:[201,127,47], b=kind==='value'?[0,80,132]:[163,46,41];
     return `rgb(${a.map((x,i)=>Math.round(x+(b[i]-x)*u)).join(',')})`;
   }
   function format(value) {
     if(value==null)return 'unavailable';
     if(Array.isArray(value))return '['+value.map(format).join(', ')+']';
     if(typeof value==='object')return '{'+Object.entries(value).map(([k,v])=>k+': '+format(v)).join(', ')+'}';
-    if(typeof value==='number')return Math.abs(value)<1e-9?'0.000':Math.abs(value)>=1e4||Math.abs(value)<.001?value.toExponential(2):value.toFixed(3);
+    if(typeof value==='number')return value===0?'0.000':Math.abs(value)>=1e4||Math.abs(value)<.001?value.toExponential(2):value.toFixed(3);
     return String(value);
   }
-  const api={Model,validate,magnitude,intensity,color,format,aggregate,signalKey};
+  const api={Model,validate,magnitude,intensity,color,format,aggregate,forkWire,signalKey};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementExplorer=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

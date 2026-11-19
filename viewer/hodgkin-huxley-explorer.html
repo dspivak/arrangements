@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hodgkin–Huxley with ATP · Arrangement explorer</title>
+  <link rel="stylesheet" href="explorer.css">
+  <style>
+    .hh-panel{margin:0 0 14px;max-width:100%;padding:14px 18px;background:white;border:1px solid #d1dedf;border-radius:10px;color:#193844}
+    .hh-title,.hh-timeline,.hh-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px}
+    .hh-title{justify-content:space-between;margin-bottom:7px}.hh-title h2{font:600 22px Georgia,serif;margin:0}
+    .hh-panel output,.hh-panel input{font-variant-numeric:tabular-nums}
+    .hh-numbers{font:500 14px ui-monospace,monospace;min-width:24ch;text-align:right}
+    .hh-pop{width:100%;display:grid;grid-template-columns:11rem minmax(0,1fr) 7rem;column-gap:12px;align-items:center;text-align:left;background:none;border:0;border-bottom:1px solid #e6ebeb;border-radius:0;margin:0;padding:4px 0;cursor:pointer;color:inherit}
+    .hh-pop:hover{background:#f5f9f9}.hh-pop strong{font-size:15px}.hh-pop small{display:block;color:#52696c}
+    .hh-pop svg{width:100%;height:36px;display:block}.hh-pop output{text-align:right;min-width:8ch;font-family:ui-monospace,monospace}
+    .hh-caption{margin:5px 0 12px;font-size:12px;color:#53696d}.hh-timeline{border-top:1px solid #e3ebec;padding-top:10px;font-size:14px}.hh-timeline input[type=number]{width:9ch;padding:5px}
+    .hh-timeline input[type=range]{width:clamp(6rem,15vw,14rem);vertical-align:middle;accent-color:#15647a}
+    #seek-status{font-size:12px;color:#52696c}.hh-timeline button{padding:5px 11px}
+    @media(max-width:650px){.hh-panel{padding:10px}.hh-pop{grid-template-columns:minmax(0,1fr) 7rem}.hh-pop svg{grid-column:1/-1;grid-row:2;height:auto}.hh-title{align-items:baseline}.hh-numbers{text-align:left}.hh-pop output{grid-row:1;grid-column:2}}
+  </style>
+</head>
+<body>
+  <section id="membrane" class="hh-panel" aria-label="Live channel populations">
+    <div class="hh-title"><h2>Membrane channels</h2></div>
+    <button class="hh-pop" type="button" id="show-sodium" aria-label="Open sodium channel arrangement">
+      <span><strong>Sodium channels</strong><small>Activation and availability · m³h</small></span>
+      <svg id="sodium-pores" viewBox="0 0 600 40" role="img"></svg><output id="sodium-open"></output>
+    </button>
+    <button class="hh-pop" type="button" id="show-potassium" aria-label="Open potassium channel arrangement">
+      <span><strong>Potassium channels</strong><small>Delayed activation · n⁴</small></span>
+      <svg id="potassium-pores" viewBox="0 0 600 40" role="img"></svg><output id="potassium-open"></output>
+    </button>
+    <p class="hh-caption">Colored pores are open. Each row shows the modeled fraction open, rounded to 24 pores.</p>
+  </section>
+    <form class="hh-timeline" id="seek-form">
+      <label>Inspect time (ms) <input type="number" id="inspect-ms" min="0" step="any" value="0" required></label><button type="submit">Go</button>
+      <label>History <input id="frame" type="range" min="0" max="0" step="1" value="0"></label>
+      <output class="hh-numbers" id="readings"></output>
+      <output id="seek-status" aria-live="polite"></output>
+    </form>
+  <main id="explorer"></main>
+  <script src="explorer-core.js"></script>
+  <script src="explorer-layout.js"></script>
+  <script src="explorer.js"></script>
+  <script src="hh-atp-dynamics.js"></script>
+  <script src="hh-atp-channels.js"></script>
+  <script>
+  'use strict';
+  const dynamics = MembraneDynamics;
+  const slider = document.getElementById('frame');
+  const readings = document.getElementById('readings');
+  const stores = [
+    {id:'capacitor', parent:'reserves', label:'Membrane capacitor', signal:'Membrane voltage', state:'Inside charge', unit:'nC', sf:1e9, qf:1e3, qu:'mV', lf:1e6, lu:'µA', qs:100, ls:10, description:'Stores charge on the inside face. The readout is voltage V = charge/C. The returning current adds charge.'},
+    {id:'sodium', parent:'reserves', label:'Sodium pool', signal:'Na chemical potential', state:'Intracellular Na', unit:'nmol', sf:1e9, qf:1e-3, qu:'kJ/mol', lf:1e12, lu:'pmol/s', qs:10, ls:30, description:'Stores the intracellular amount of sodium. Its chemical potential readout is RT log(inside concentration / bath concentration).'},
+    {id:'potassium', parent:'reserves', label:'Potassium pool', signal:'K chemical potential', state:'Intracellular K', unit:'nmol', sf:1e9, qf:1e-3, qu:'kJ/mol', lf:1e12, lu:'pmol/s', qs:10, ls:30, description:'Stores the intracellular amount of potassium. Its chemical potential readout is RT log(inside concentration / bath concentration).'},
+    {id:'atp', parent:'reserves', label:'ATP / ADP pool', signal:'ATP hydrolysis energy', state:'ATP amount', unit:'nmol', sf:1e9, qf:1e-3, qu:'kJ/mol', lf:1e12, lu:'pmol/s', qs:50, ls:10, description:'ATP and ADP share a fixed 5 nmol pool. The readout H = H₀ + RT log(ATP/ADP) gives the free energy available per mole at fixed phosphate activity.'},
+    ...['m','h','n'].map((x,i)=>({id:'store-'+x, parent:'gate-'+x, label:x+' fraction store', signal:x+' fraction', state:'Gate fraction '+x, unit:'fraction', sf:1, qf:1, qu:'fraction', lf:1, lu:'J/s', qs:1, ls:1000, description:'Stores the permissive fraction '+x+'. The gate response divides its inclination by γ = 1 J.'}))
+  ];
+  const signalUnits = {
+    force:{qf:.001,qu:'kJ/mol',lf:1e12,lu:'pmol/s',qs:15,ls:30},
+    voltage:{qf:1000,qu:'mV',lf:1e6,lu:'µA',qs:100,ls:10}
+  };
+  const storeEquations=[
+    ['dz/dt = Iapp − F jNa − F jK − IL − F jp','µA'],
+    ['dNNa/dt = −jNa − 3 jp','pmol/s'],
+    ['dNK/dt = −jK + 2 jp','pmol/s'],
+    ['da/dt = r − jp','pmol/s'],
+    ...['m','h','n'].map(x=>['d'+x+'/dt = α'+x+'(V)(1 − '+x+') − β'+x+'(V)'+x,'/s'])
+  ];
+  function snapshot(f){
+    const nodes=[], wires=[];
+    function node(id,parent,label,kind,description,extra={}){
+      nodes.push({id,parent,label,kind,description,renderer:id,...extra});
+    }
+    function wire(source,target,label,value,load,spec){
+      wires.push({id:source+'--'+target+'--'+label,source,target,sourcePort:label,
+        label,value:value*spec.qf,load:load*spec.lf,valueScale:spec.qs,loadScale:spec.ls,
+        valueUnit:spec.qu,loadUnit:spec.lu,
+        description:'Value in '+spec.qu+'. Returning load in '+spec.lu+'.'});
+    }
+    node('patch',null,'Hodgkin–Huxley with ATP','box','The same fourteen-part IMC membrane as the PDF. Open the ATP-driven pump to see how one turnover reaches charge, sodium, potassium, and ATP. Each gate evolves under its own rate law in the library composition.');
+    node('reserves','patch','Charge and chemical stores','box','Four stores read out voltage, two chemical potentials and the available free energy of ATP hydrolysis.');
+    node('na-channel','patch','Sodium channel','box','Sodium activation m and availability h set the conductance. The pore carries a current proportional to m³h(V − Eₙₐ).');
+    node('k-channel','patch','Potassium channel','box','Potassium activation n sets the conductance. Its fourth power multiplies V − Eₖ.');
+    node('pump','patch','ATP-driven pump','box','Forward cycles export 3 Na, import 2 K, hydrolyze 1 ATP, and carry one positive charge outward. Open the affinity map or the turnover law to inspect their wires.');
+    node('leak','patch','Leak','box','A fixed-reversal reservoir exchanges charge with the capacitor.');
+    node('electrode','patch','Electrode','boundary','Supplies a constant inward current of 10 µA.',{side:'out'});
+    node('metabolism','patch','Metabolism','boundary','The regeneration rate is set to zero for this run.',{side:'out'});
+    for(const [i,x] of ['m','h','n'].entries()){
+      node('gate-'+x,i===2?'k-channel':'na-channel','Gate '+x,'box',
+        ['Sodium activation.','Sodium availability.','Potassium activation.'][i]+' Its local ODE is d'+x+'/dt = α(V)(1 − '+x+') − β(V)'+x+'. Open the kinetics field to inspect the rate.');
+      node('kinetics-'+x,'gate-'+x,x+' kinetics','field','γ[α(V)(1 − '+x+') − β(V)'+x+'] d'+x+'. Voltage controls the rate and receives zero pushback from this law.');
+    }
+    for(const [i,s] of stores.entries()){
+      const [equation,unit]=storeEquations[i],rate=f.total[i]*s.lf;
+      const local=s.description+' Local ODE: '+equation+'. Current rate: '+rate.toFixed(3)+' '+unit+'.';
+      node(s.id,s.parent,s.label,'box',local);
+      node(s.id+'-state',s.id,s.state,'state',local+' State in '+s.unit+', configuration in '+s.qu+', total inclination in '+s.lu+'.',
+        {value:f.state[i]*s.sf,configuration:f.q[i]*s.qf,inclination:f.total[i]*s.lf});
+    }
+    function storeWire(i,target,j){
+      const s=stores[i],load=dynamics.jacobian[j][i]*f.loads[j];
+      wire(s.id+'-state',target,s.signal,f.q[i],load,s);
+    }
+    function process(group,map,field,mapLabel,fieldLabel,signal,j,indices,spec,mapDescription,law){
+      node(map,group,mapLabel,'operation',mapDescription);
+      node(field,group,fieldLabel,'field',law);
+      for(const i of indices)storeWire(i,map,j);
+      wire(map,field,signal,f.values[j],f.loads[j],spec);
+    }
+    process('na-channel','na-drive','na-pore','Na driving force','Sodium pore','Na driving force',0,[0,1],signalUnits.force,
+      'Dₙₐ = FV + μₙₐ. The two inputs receive the same molar flow, scaled by F on the voltage wire.',
+      'jₙₐ = ḡₙₐ m³h Dₙₐ/F². The field returns −jₙₐ on the driving force and zero on the two gate inputs.');
+    process('k-channel','k-drive','k-pore','K driving force','Potassium pore','K driving force',3,[0,2],signalUnits.force,
+      'Dₖ = FV + μₖ. The voltage wire carries current back and the chemical-potential wire carries molar flow back.',
+      'jₖ = ḡₖ n⁴ Dₖ/F². The field returns −jₖ on the driving force and zero on its gate input.');
+    process('leak','leak-drive','leak-law','Leak voltage drop','Leak conductance','Leak voltage drop',5,[0],signalUnits.voltage,
+      'Read V − Eₗ at fixed leak reversal potential.','The field returns −gₗ(V − Eₗ) on voltage.');
+    process('pump','pump-drive','pump-law','Pump affinity','Turnover law','Pump affinity',6,[0,1,2,3],signalUnits.force,
+      'The forward free energy is H + FV + 3μₙₐ − 2μₖ. The transpose returns −Fj to charge, −3j to sodium, +2j to potassium and −j to ATP.',
+      'The proposed forward rate is j = jₘₐₓ tanh(affinity / 2RT). The returning load on this wire is −j. Zero affinity stalls the pump.');
+    storeWire(4,'na-pore',1);storeWire(5,'na-pore',2);storeWire(6,'k-pore',4);
+    for(const [i,x] of ['m','h','n'].entries()){
+      storeWire(0,'kinetics-'+x,7+2*i);
+      storeWire(4+i,'kinetics-'+x,8+2*i);
+    }
+    for(const [j,i,target] of [[0,0,'electrode'],[1,3,'metabolism']]){
+      const s=stores[i];
+      wire(s.id+'-state',target,s.signal,f.q[i],dynamics.outside[j],s);
+    }
+    return {version:1,title:'Hodgkin–Huxley with ATP',root:'patch',time:f.ms,configuration:f.q,nodes,wires};
+  }
+  const timeInput=document.getElementById('inspect-ms'), seekStatus=document.getElementById('seek-status');
+  const checkpointCount=128;
+  let tick=0, furthest=0, remainder=0, state=dynamics.initial.slice(), checkpointInterval=1000;
+  let checkpoints=new Map([[0,state.slice()]]), seekFrame=0, seeking=false;
+  function advanceTo(target){
+    while(tick<target){
+      state=dynamics.step(state);
+      tick++;
+      if(tick%checkpointInterval===0){
+        checkpoints.set(tick,state.slice());
+        if(checkpoints.size>checkpointCount){
+          checkpointInterval*=2;
+          for(const key of checkpoints.keys())if(key%checkpointInterval!==0)checkpoints.delete(key);
+        }
+      }
+    }
+    furthest=Math.max(furthest,tick);
+  }
+  function cancelSeek(){
+    if(seekFrame)cancelAnimationFrame(seekFrame);
+    seekFrame=0;seeking=false;seekStatus.textContent='';
+  }
+  function seek(target){
+    cancelSeek();explorer.setRunning(false);remainder=0;
+    let best=tick<=target?tick:0;
+    for(const key of checkpoints.keys())if(key>best&&key<=target)best=key;
+    if(best!==tick){tick=best;state=checkpoints.get(best).slice();}
+    seeking=true;
+    function chunk(){
+      const stop=performance.now()+12;
+      while(tick<target&&performance.now()<stop)advanceTo(Math.min(tick+512,target));
+      if(tick<target){
+        seekStatus.textContent='Advancing to '+(target*dynamics.dtMs).toLocaleString()+' ms…';
+        seekFrame=requestAnimationFrame(chunk);
+      }else cancelSeek();
+      explorer.refresh();
+    }
+    chunk();
+  }
+  const adapter={
+    snapshot(){
+      const f={...dynamics.observe(state),state,ms:tick*dynamics.dtMs};
+      slider.max=furthest;slider.value=tick;
+      if(document.activeElement!==timeInput&&!seeking)timeInput.value=f.ms.toFixed(2);
+      readings.textContent=f.ms.toFixed(2)+' ms · '+(1000*f.q[0]).toFixed(1)+' mV · '+((dynamics.initial[3]-state[3])*1e12).toFixed(3)+' pmol ATP spent';
+      for(const name of ['sodium','potassium']){
+        MembraneChannels.population(document.getElementById(name+'-pores'),name,f.q);
+        document.getElementById(name+'-open').textContent=(100*MembraneChannels.fraction(name,f.q)).toFixed(2)+'% open';
+      }
+      return snapshot(f);
+    },
+    step(seconds){
+      if(seconds<=0)return;
+      if(seeking)cancelSeek();
+      // The library step is 0.01 ms. At 1×, one real second presents 2.5 model ms.
+      remainder+=seconds*2.5/dynamics.dtMs;
+      const count=Math.floor(remainder+1e-10);remainder-=count;
+      advanceTo(tick+count);
+    },
+    reset(){cancelSeek();state=dynamics.initial.slice();tick=0;furthest=0;remainder=0;checkpointInterval=1000;checkpoints=new Map([[0,state.slice()]]);timeInput.value='0';}
+  };
+  const explorer=new ArrangementExplorer.View(document.getElementById('explorer'),adapter,{
+    storageKey:'hh-atp-membrane-v1',renderers:MembraneChannels.renderers,
+    rootAnimation:document.getElementById('membrane'),
+    description:'Each gate, channel, store and pump runs as a library arrangement. The page advances their composition in 0.01 ms steps. Playback is slowed to show the gates.'
+  });
+  explorer.el.querySelector('.ex-controls').after(document.getElementById('seek-form'));
+  function showChannel(id){
+    explorer.enter(id);
+    explorer.crumbs.scrollIntoView({block:'start',behavior:'smooth'});
+  }
+  document.getElementById('show-sodium').onclick=()=>showChannel('na-channel');
+  document.getElementById('show-potassium').onclick=()=>showChannel('k-channel');
+  document.getElementById('seek-form').onsubmit=event=>{
+    event.preventDefault();
+    const ms=timeInput.valueAsNumber;
+    if(Number.isFinite(ms)&&ms>=0)seek(Math.round(ms/dynamics.dtMs));
+  };
+  slider.oninput=()=>seek(Number(slider.value));
+  </script>
+</body>
+</html>

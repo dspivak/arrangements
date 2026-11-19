@@ -37,6 +37,10 @@
       const styleLabel=html('label',{},controls,'View '),style=html('select',{'aria-label':'Drawing style'},styleLabel);
       html('option',{value:'illustrated'},style,'Illustrated');html('option',{value:'wiring'},style,'Wiring');
       style.onchange=()=>{this.style=style.value;this.render();};
+      const flowLabel=html('label',{},controls,'Wires '),flow=html('select',{'aria-label':'Wire display'},flowLabel);
+      for(const [value,label] of [['both','Values and loads'],['load','Loads only'],['value','Values only']])html('option',{value},flow,label);
+      this.el.dataset.flow=flow.value;
+      flow.onchange=()=>{this.el.dataset.flow=flow.value;};
       const zoomLabel=html('label',{},controls,'Zoom '),zoom=html('select',{'aria-label':'Diagram size'},zoomLabel);
       this.zoomSelect=zoom;this.zoomLevels=[.25,.5,.75,1,1.25,1.5,2,3,4];
       html('option',{value:'fit'},zoom,'Fit');for(const value of this.zoomLevels)html('option',{value},zoom,value*100+'%');
@@ -44,6 +48,11 @@
       this.button(controls,'−',()=>this.zoomBy(-1),'ex-zoom-button').setAttribute('aria-label','Zoom out');
       this.button(controls,'+',()=>this.zoomBy(1),'ex-zoom-button').setAttribute('aria-label','Zoom in');
       this.crumbs=html('nav',{class:'ex-breadcrumbs','aria-label':'Inside arrangement'},this.el);
+      this.scopeAnimation=html('section',{class:'ex-scope-animation','aria-label':'Current arrangement animation'},this.el);
+      this.scopeFigure=html('figure',{},this.scopeAnimation);
+      this.scopeCaption=html('figcaption',{},this.scopeFigure);
+      this.scopePicture=svg('svg',{viewBox:'-80 -55 160 110',role:'img'},this.scopeFigure);
+      if(options.rootAnimation)this.scopeAnimation.append(options.rootAnimation);
       const toolbar=html('div',{class:'ex-toolbar'},this.el);
       this.selectButton=this.button(toolbar,'Select parts',()=>{this.selectMode=!this.selectMode;this.selectButton.setAttribute('aria-pressed',String(this.selectMode));this.render();});
       this.selectButton.setAttribute('aria-pressed','false');
@@ -63,7 +72,7 @@
       this.canvas.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();this.pinchZoom(e);}},{passive:false});
       this.sidebar=html('aside',{class:'ex-sidebar','aria-label':'Selected part or wire'},workspace);
       const legend=html('div',{class:'ex-legend'},this.el);
-      for(const [label,kind] of [['Values forward','value'],['Loads back','load']]) {
+      for(const [label,kind] of [['Values →','value'],['← Loads','load']]) {
         const span=html('span',{},legend,label+' · low');html('i',{class:'ex-ramp '+kind},span);span.append('high');
       }
       html('span',{},legend,'Color = magnitude · signed numbers on selection');
@@ -172,27 +181,52 @@
       else E.aggregate(project.wires).forEach((w,i)=>Object.assign(this.geometry.edges[i],w));
       return this.geometry;
     }
-    drawWire(parent,w,d,start,end,trunk=false){
+    drawWire(parent,w,d,tracks,start,end,trunk=false){
       const branches=w.branches||[w],selected=this.focusSignal?E.signalKey(w)===this.focusSignal:branches.some(b=>b.id===this.focusWire);
       const g=svg('g',{role:'button',tabindex:0,'data-wire':w.id,'data-trunk':String(trunk),
         'aria-label':w.label+'; inspect value and returning load',opacity:this.focusWire&&!selected?.16:1},parent);
-      svg('title',{},g,w.label+' · value '+E.format(w.value)+' · load '+E.format(w.load));
-      // Both colors follow the same complete path and meet the same port.
-      // A thin return stroke leaves the blue value stroke visible on either side.
-      svg('path',{d,fill:'none',stroke:'white','stroke-width':9,'stroke-linejoin':'round'},g);
-      for(const [kind,weight] of [['value',selected?7:5],['load',selected?3:2]]){
+      const reading=w.label+' · value '+E.format(w.value)+' · returning load '+E.format(w.load);
+      svg('title',{},g,reading);g.setAttribute('aria-label',reading);
+      svg('path',{d,fill:'none',stroke:'white','stroke-width':12,'stroke-linejoin':'round'},g);
+      for(const kind of ['value','load']){
         const color=E.color(w[kind],w[kind+'Scale'],kind);
-        svg('path',{d,fill:'none',stroke:color,'stroke-width':weight,'data-kind':kind,'stroke-linecap':'round'},g);
-        if(E.magnitude(w[kind])>1e-10)svg('path',{d,fill:'none',stroke:color,'stroke-width':kind==='value'?7:4,
-          'stroke-linecap':'round','stroke-dasharray':'1 59',class:'ex-pulse'+(kind==='load'?' ex-back':''),
-          'stroke-dashoffset':-(this.model.scene.time||0)*20*(kind==='load'?-1:1),
-          style:`animation-duration:${3/this.speed}s;animation-delay:-${((this.model.scene.time||0)%3)/this.speed}s`},g);
-        if(!trunk){const sign=kind==='value'?1:-1,x=kind==='value'?end.x-9:start.x+9,y=kind==='value'?end.y:start.y;
-          svg('path',{d:`M ${x-sign*4} ${y-4} L ${x+sign*3} ${y} L ${x-sign*4} ${y+4}`,fill:'none',stroke:color,'stroke-width':2},g);}
+        const magnitude=E.magnitude(w[kind]),forward=kind==='value',sign=forward?1:-1;
+        const lane=svg('g',{'data-flow-track':kind,'data-level':magnitude==null?'unknown':magnitude===0?'zero':'nonzero'},g);
+        svg('path',{d:tracks[kind],fill:'none',stroke:color,'stroke-width':selected?3.5:2.5,
+          'data-kind':kind,'stroke-linejoin':'round','stroke-linecap':'round',
+          'stroke-dasharray':magnitude==null?'2 5':magnitude===0?'4 3':'none'},lane);
+        if(magnitude>0)svg('path',{d:tracks[kind],fill:'none',stroke:forward?'#084675':'#963816',
+          'stroke-width':selected?5.5:4.5,'stroke-linecap':'round','stroke-dasharray':'4 56',
+          class:'ex-pulse'+(forward?'':' ex-back'),'stroke-dashoffset':-sign*((this.model.scene.time||0)%3)*20},lane);
+        const x=forward?end.x-10:start.x+10,y=(forward?end.y:start.y)-sign*E.geometry.trackOffset;
+        svg('path',{d:`M ${x-sign*4} ${y-3.5} L ${x+sign*2} ${y} L ${x-sign*4} ${y+3.5}`,
+          fill:'none',stroke:magnitude==null?color:forward?'#084675':'#963816','stroke-width':2.6,'stroke-linejoin':'round','data-direction':forward?'forward':'backward'},lane);
       }
       svg('path',{d,fill:'none',stroke:'transparent','stroke-width':12},g);
-      const select=()=>{this.focusWire=branches[0].id;this.focusSignal=null;this.focusNode=null;this.render();};
+      const select=()=>{this.focusWire=branches[0].id;this.focusSignal=trunk?E.signalKey(w):null;this.focusNode=null;this.render();};
       g.onclick=select;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select();}};
+    }
+    rendererFor(node){return this.renderers[node.renderer]||this.renderers[node.kind];}
+    drawAnimation(group,node,width,height){
+      try{
+        const cleanup=this.rendererFor(node)({group,node,scene:this.model.scene,svg,width,height});
+        if(typeof cleanup==='function')this.cleanups.push(cleanup);
+      }catch(error){this.setRunning(false);this.say('Animation: '+error.message,true);}
+    }
+    renderScopeAnimation(){
+      const node=this.model.nodes.get(this.model.scope),illustrated=this.style==='illustrated';
+      const rootAnimation=this.options.rootAnimation;
+      const showRoot=illustrated&&node.id===this.model.scene.root&&!!rootAnimation;
+      const showFigure=illustrated&&!showRoot&&!!this.rendererFor(node);
+      this.scopeAnimation.hidden=!showRoot&&!showFigure;
+      this.scopeFigure.hidden=!showFigure;
+      if(rootAnimation)rootAnimation.hidden=!showRoot;
+      this.scopePicture.replaceChildren();
+      if(showFigure){
+        this.scopeCaption.textContent=node.label;
+        this.scopePicture.setAttribute('aria-label',node.label+' animation');
+        this.drawAnimation(svg('g',{},this.scopePicture),node,160,110);
+      }
     }
     render(){
       for(const cleanup of this.cleanups)cleanup();this.cleanups=[];
@@ -204,6 +238,7 @@
       this.groupButton.disabled=this.selection.size<2;this.ungroupButton.disabled=!this.model.nodes.get(this.model.scope)?.userGroup;this.undoButton.disabled=!this.model.history.length;
       this.crumbs.replaceChildren();
       this.model.ancestors(this.model.scope).forEach((n,i)=>{if(i)html('span',{},this.crumbs,'/');this.button(this.crumbs,n.label,()=>this.enter(n.id));});
+      this.renderScopeAnimation();
       this.canvas.replaceChildren();this.canvas.setAttribute('viewBox',`0 0 ${width} ${height}`);
       this.canvas.style.width=this.drag?.active?width*this.drag.scale+'px':this.zoom==='fit'?'100%':width*Number(this.zoom)+'px';
       this.canvas.style.minWidth=this.drag?.active||this.zoom!=='fit'?'0':'';
@@ -211,11 +246,10 @@
       const wireLayer=svg('g',{},this.canvas);
       // The current scope is an opened arrangement. Its ports lie on its boundary.
       svg('rect',{x:50,y:25,width:width-100,height:height-50,rx:6,fill:'none',stroke:'#d9e1e8','stroke-dasharray':'5 5'},wireLayer);
-      for(const w of edges)this.drawWire(wireLayer,w,w.path,w.start,w.end);
+      for(const w of edges)this.drawWire(wireLayer,w,w.path,w.tracks,w.start,w.end);
       for(const fork of forks){
-        const wires=fork.wires.flatMap(w=>w.branches).map(w=>({...w,target:'shared-readout',targetPort:undefined}));
-        const w=E.aggregate(wires)[0],d=`M ${fork.start.x} ${fork.start.y} L ${fork.end.x} ${fork.end.y}`;
-        this.drawWire(wireLayer,w,d,fork.start,fork.end,true);
+        const w=E.forkWire(fork.wires.flatMap(w=>w.branches)),d=`M ${fork.start.x} ${fork.start.y} L ${fork.end.x} ${fork.end.y}`;
+        this.drawWire(wireLayer,w,d,fork.tracks,fork.start,fork.end,true);
         svg('circle',{cx:fork.end.x,cy:fork.end.y,r:3.8,fill:'#425f73',class:'ex-fork','data-fork':fork.port.key},wireLayer);
       }
       for(const node of project.nodes){
@@ -232,10 +266,9 @@
           else if(node.kind==='operation'||node.kind==='field')svg('circle',{r:p.radius,fill:selected?'#e0effa':node.kind==='field'?'#f8e8dc':'#eef1f4',stroke:selected?'#1474ab':'#c4cdd5','stroke-width':selected?3:1,class:'ex-focus-ring'},g);
           else if(selected)svg('ellipse',{rx:85,ry:54,fill:'#e0effa',stroke:'#1474ab','stroke-dasharray':'4 4',class:'ex-focus-ring'},g);
           // State has no rectangular frame and no fictitious input port.
-          const renderer=this.style==='illustrated'&&(this.renderers[node.renderer]||this.renderers[node.kind]);
-          if(renderer){
-            try{const animation=svg('g',{transform:node.kind==='state'?`translate(0,${-p.h/2+40}) scale(.7)`:'scale(.62)'},g);const cleanup=renderer({group:animation,node,scene:this.model.scene,svg,width:p.w,height:p.h});if(typeof cleanup==='function')this.cleanups.push(cleanup);}
-            catch(error){this.setRunning(false);this.say('Animation: '+error.message,true);}
+          if(this.style==='illustrated'&&this.rendererFor(node)){
+            const animation=svg('g',{transform:node.kind==='state'?`translate(0,${-p.h/2+40}) scale(.7)`:'scale(.62)'},g);
+            this.drawAnimation(animation,node,p.w,p.h);
           }else if(node.kind==='state'){
             const v=E.magnitude(node.value)||0;
             svg('line',{x1:-58,x2:58,y1:0,y2:0,stroke:'#c1d5e4','stroke-width':4},g);
@@ -289,8 +322,13 @@
         html('p',{},this.sidebar,'Open a box to replace this view with its contents. Use the path above to come back out.');
         html('h3',{},this.sidebar,'At this level');
         for(const node of this.model.children())this.button(this.sidebar,node.label,()=>this.choose(node,{shiftKey:false}));
-        html('p',{},this.sidebar,'Blue travels with the value; amber/red travels back with the load. A zero load has no moving marks. Each wire has its own fixed scale.');
+        html('p',{},this.sidebar,'Blue arrows carry values forward. Amber arrows carry loads back. A dashed track shows zero. A dotted gray track has no numeric observation.');
         if(this.options.description)html('p',{},this.sidebar,this.options.description);
+      }
+      if(this.focusSignal&&wires.length>1){
+        const total=E.forkWire(wires);
+        html('h3',{},this.sidebar,'Total returning load');
+        html('output',{},this.sidebar,E.format(total.load)+(total.loadUnit?' '+total.loadUnit:''));
       }
       for(const wire of E.aggregate(wires)){
         const row=html('div',{class:'ex-wire-detail'},this.sidebar);html('strong',{},row,wire.label);

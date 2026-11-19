@@ -19,6 +19,34 @@
     const u=1-t;return point(u*u*u*s.a.x+3*u*u*t*s.c.x+3*u*t*t*s.d.x+t*t*t*s.b.x,
       u*u*u*s.a.y+3*u*u*t*s.c.y+3*u*t*t*s.d.y+t*t*t*s.b.y);
   }
+  // The two tracks meet at the port or fork. Between the ends they sit on
+  // opposite sides of the route, including on vertical and returning bends.
+  const trackOffset=4;
+  function wireTracks(segments){
+    const points=[segments[0].a];
+    const distance=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+    for(const segment of segments){
+      const {a,b,c,d}=segment;
+      if(c){
+        const count=Math.max(1,Math.ceil((distance(a,c)+distance(c,d)+distance(d,b))/8));
+        for(let i=1;i<count;i++)points.push(sample(segment,i/count));
+      }else if(distance(a,b)>12){
+        for(const t of [6/distance(a,b),1-6/distance(a,b)])points.push(sample(segment,t));
+      }
+      if(!same(points.at(-1),b))points.push(b);
+    }
+    const value=[],load=[];
+    for(let i=0;i<points.length;i++){
+      const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)];
+      const length=distance(prev,next);
+      const offset=i>0&&i<points.length-1&&length ? trackOffset/length : 0;
+      const dx=(next.y-prev.y)*offset,dy=-(next.x-prev.x)*offset;
+      const move=i?'L':'M';
+      value.push(move+round(p.x+dx)+' '+round(p.y+dy));
+      load.push(move+round(p.x-dx)+' '+round(p.y-dy));
+    }
+    return {value:value.join(' '),load:load.join(' ')};
+  }
   const inside=(p,r,pad=0)=>p.x>r.x-r.w/2-pad+.01&&p.x<r.x+r.w/2+pad-.01&&p.y>r.y-r.h/2-pad+.01&&p.y<r.y+r.h/2+pad-.01;
   function clear(segments,rects,width,height){
     return segments.every(s=>Array.from({length:41},(_,i)=>sample(s,i/40)).every(p=>
@@ -173,14 +201,17 @@
     // obscure its name. Vary corridor lanes to separate unrelated feedback wires.
     const rects=inner.map(n=>{const p=positions.get(n.id);return {...p,y:p.y-12,h:p.h+24};}),forks=[];
     for(const p of positions.values())for(const port of p.outputs)if(port.wires.length>1){
-      port.fork=point(port.x+19,port.y);forks.push({port,start:point(port.x,port.y),end:port.fork,wires:port.wires});
+      port.fork=point(port.x+19,port.y);
+      const start=point(port.x,port.y),end=port.fork;
+      forks.push({port,start,end,wires:port.wires,tracks:wireTracks([line(start,end)])});
     }
     for(const w of edges){const a=positions.get(w.source),b=positions.get(w.target),out=a.outputs.find(p=>p.key===w.outKey),input=b.inputs.find(p=>p.key===w.inKey);
       w.start=out.fork||point(out.x,out.y);w.end=point(input.x,input.y);
       w.segments=route(w.start,w.end,a,b,rects,width,height,(edges.indexOf(w)%4)*7);w.path=path(w.segments);
+      w.tracks=wireTracks(w.segments);
     }
     return {positions,width,height,edges,forks};
   }
-  E.layout=layout;E.wheelZoom=wheelZoom;E.geometry={sample,path,inside};
+  E.layout=layout;E.wheelZoom=wheelZoom;E.geometry={sample,path,inside,trackOffset};
   if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom};
 })(globalThis);

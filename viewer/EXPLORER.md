@@ -20,12 +20,16 @@ with gesture distance, with small deltas combined into one render per frame;
 it does not jump a preset on every trackpad event. Scroll zoom keeps the point under the
 pointer fixed as far as the page's scroll bounds permit. Fork dots mark shared
 readouts, with returning loads summed on the trunk.
-Forward and backward strokes follow the same complete path to the same port.
-Blue marks travel forward; amber/red marks travel backward. A zero load has no
-moving marks. Color indicates magnitude relative to the fixed scale supplied
-for that wire. Signs and exact numbers appear on selection. An array uses its
-Euclidean norm for color, with all entries retained in the inspector. Unknown
-loads remain gray and say unavailable; they are never silently zero.
+Each wire has two tracks that meet at its ports. Blue arrows point from source
+to target. Amber arrows point back toward the source. During playback, marks
+travel along each nonzero track in its arrow's direction. The arrows stay
+visible when paused and with reduced motion. Zero is dashed and missing numeric
+observations are dotted gray. Use **Wires → Loads only** to follow returning
+loads in a crowded diagram. Selecting a branch shows its signed reading.
+Selecting a fork shows its total and the contributions from its branches.
+Color uses magnitude relative to the wire's scale (the largest branch scale
+on a shared trunk). Arrays use their Euclidean norm for color and keep all
+components in the inspector.
 
 ## Connecting a runnable example
 
@@ -126,6 +130,12 @@ renderer is recreated on each observation. It may return a cleanup function,
 called before the next rendering and when the view is destroyed.
 Keep a default icon within about 130 by 100 local units; the host scales and
 places this group within the part, reserving its port labels and readout marks.
+In Illustrated view, opening a box also draws its own renderer at the top,
+above its contents, from the same snapshot. Breadcrumbs restore the enclosing
+box's animation. A scope with no renderer shows its diagram on its own. A page
+that already draws a whole-model animation can pass its DOM element as the
+`rootAnimation` option. The explorer displays that element at the root in
+Illustrated view. Keep shared controls outside this element.
 An animation does not need to implement port positioning or wire geometry.
 For persistent canvas animation, keep the canvas in the host and call
 `view.enter(id)` on its hit targets, drawing from the same adapter snapshot.
