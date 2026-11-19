@@ -55,7 +55,8 @@ def _propagate(graph, constants, inputs):
                     for var in eq.invars:
                         factor = constant(var)
                         if factor is not None:
-                            value = np.where(np.asarray(factor) == 0, 0, value)
+                            # object dtype: with more than 63 inputs a mask is a Python int past C long
+                            value = np.where(np.asarray(factor) == 0, 0, np.asarray(value, dtype=object))
             elif op == 'slice':
                 steps = p['strides'] or (1,) * a.ndim
                 value = a[tuple(map(slice, p['start_indices'], p['limit_indices'], steps))]
