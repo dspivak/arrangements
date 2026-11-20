@@ -39,21 +39,39 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from arrangements.arrangement import Arrangement, zero_form
 from arrangements.attention import (
-    attention_arrangement, identity_transfer, input_dim, msg_dim, transfer, zero_transfer,
+    attention_arrangement, identity_transfer, input_dim, make_input, message, msg_dim, transfer, zero_transfer,
 )
 from arrangements.coalgebra import configuration
 from arrangements.functors import closed_step
 from arrangements.rvect import euclidean
 from arrangements.wiring import compose_seq, tensor_arrangements
 
-from tests.test_trust_in_time import EMPTY, member, world
+from tests.test_trust_in_time import EMPTY, clock, today
 
 jax.config.update("jax_enable_x64", True)
 
 DAYS = 20000
 MU = 0.01
 VARS = np.array([0.25, 1.0, 1.0, 4.0])
+
+
+def member(reports, label):
+    """A clock part reading out the day's weighted message."""
+    return Arrangement(
+        P=clock(label), in_dim_M=0, out_dim_M=0, in_dim_N=input_dim(1, 1), out_dim_N=msg_dim(1),
+        out_f=lambda q, m_out: message(today(reports, q), 1.0),
+        in_f=lambda q, m_out, n_in: EMPTY, omega=zero_form, label=label)
+
+
+def world(truth, team):
+    """Deliver the day's truth as a weighted message to the team."""
+    return Arrangement(
+        P=clock("world"), in_dim_M=team.in_dim_N, out_dim_M=team.out_dim_N, in_dim_N=0, out_dim_N=0,
+        out_f=lambda q, m_out: EMPTY,
+        in_f=lambda q, m_out, n_in: make_input(message(today(truth, q), 1.0), 0.0),
+        omega=zero_form, label="world")
 
 
 def days(shared=0.0, n=DAYS, seed=0):

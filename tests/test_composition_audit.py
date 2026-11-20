@@ -525,7 +525,7 @@ def pendulum_read(kappa, dt, kappa_r, x_R):
     """``reader . link^2 . pivot``: ``pendulum.pendulum`` with the reader in ``drop``'s place."""
     a = pend.pivot()
     for p in pend.positions(tp.ANGLES, tp.L):
-        a = compose_seq(a, pend.link(tp.M, kappa, tp.L, p, tp.G, dt))
+        a = compose_seq(a, pend.link(tp.M, kappa, tp.L, p, tp.G, 1.0))
     return compose_seq(a, position_reader(kappa_r, x_R))
 
 
@@ -546,7 +546,7 @@ def test_18_1_the_pendulum_read_by_a_spring_is_still_nested_and_still_set_by_the
     over 1 s. Could fail if the reader's spring did not add to the composite's cost, or set the step."""
     kappa, dt, N = 1e4, 1e-3, 500
     A = pendulum_read(kappa, dt, KAPPA_R, X_R)
-    s = tp._runner(A)(A.P.init, N)
+    s = tp._runner(A, dt)(A.P.init, N)
     q = jnp.stack(pend.positions(tp.ANGLES, tp.L)); p = jnp.zeros_like(q)
     cost = lambda Q: (pend.bar_cost(kappa, tp.L, jnp.zeros(2), Q[0]) + pend.bar_cost(kappa, tp.L, Q[0], Q[1])
                       + tp.M * tp.G * jnp.sum(Q[:, 1]) + 0.5 * KAPPA_R * jnp.sum((Q[1] - X_R) ** 2))
@@ -558,7 +558,7 @@ def test_18_1_the_pendulum_read_by_a_spring_is_still_nested_and_still_set_by_the
     # the bar still sets the step
     kappa = 2e7
     A = pendulum_read(kappa, 1e-4, KAPPA_R, X_R)
-    run, E0, s = tp._runner(A), _spring_energy(A.P.init, kappa), A.P.init
+    run, E0, s = tp._runner(A, 1e-4), _spring_energy(A.P.init, kappa), A.P.init
     for _ in range(20):
         s = run(s, 500)
         assert abs(_spring_energy(s, kappa) - E0) < 1e-3 * abs(E0)
@@ -586,7 +586,7 @@ def test_18_1_the_pendulum_read_by_a_spring_is_still_nested_and_still_set_by_the
 
     dt = 2e-5
     A = pendulum_read(kappa, dt, KAPPA_R, X_R)
-    run, every = tp._runner(A), int(round(1e-3 / dt))
+    run, every = tp._runner(A, dt), int(round(1e-3 / dt))
     rigid, h = rigid_with_spring(1e-5), 1e-5
     s, y, worst = A.P.init, jnp.array(tp.ANGLES + [0.0, 0.0]), 0.0
     for _ in range(1000):
