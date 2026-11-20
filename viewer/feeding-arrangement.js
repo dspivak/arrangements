@@ -50,9 +50,10 @@
       split(part,[[coordinate,name,[rate,other],undefined,forms[0]],['battery','Battery payment',[name,rate],undefined,forms[1]]]);
     }
     // The lever's motors, the note's sec.gates: a torque τ = c u − P at the rate u pushes the coordinate and pays τ u.
+    // The first mark's formula is written in the letters at its terminals (u and P), not in τ, which it gives.
     const lever=(cost,rateLabel,otherLabel,coordinate,q,load,c)=>{
-      const form=(letters,terms,where=[])=>({letters,constants:{[c]:cost},where,terms});
-      return [form({[rateLabel]:'u',[otherLabel]:load,[coordinate]:q},[{c:'τ',h:q}],[['τ',c+'*u - '+load]]),
+      const form=(letters,terms)=>({letters,constants:{[c]:cost},terms});
+      return [form({[rateLabel]:'u',[otherLabel]:load,[coordinate]:q},[{c:c+'*u - '+load,h:q}]),
         form({[rateLabel]:'u','Battery':'b'},[{c:'-τ*u',h:'b'}])];
     };
     const gripForms=lever(P.cgrip,'Chosen grip rate','Other grip load','Grip','ℓ','P_ℓ','c_grip');
@@ -67,39 +68,27 @@
       {letters:{'Opening rate':'pry','Battery':'b'},constants:{c_tear:P.ctear},terms:[{c:'-c_tear*pry',h:'b'}]}]]);
     split('digestor',[['battery','Energy from food',['sum-eaten'],undefined,
       {letters:{'Food taken':'eat','Battery':'b'},constants:{α:P.alpha},terms:[{c:'α*eat',h:'b'}]}]]);
-    // The dragger's spring is the cost κ_w δ_w²/2 of δ_w = y - z_w; its load on the wheel is P_w = κ_w δ_w, and the
-    // cart receives -P_w, carried on the wheel's mark.
-    split('axle',[['wheel','Wheel spring load',['cart','wheel'],'Other wheel load',
-        {letters:{'Cart position':'y','Wheel position':'z_w'},constants:{κ_w:P.kappac},where:[['δ_w','y - z_w']],terms:[{c:'κ_w*δ_w',h:'z_w'}]}],
-      ['cart','Cart spring load',['Wheel spring load'],undefined,
-        {letters:{'Wheel spring load':'P_w','Cart position':'y'},terms:[{c:'-P_w',h:'y'}]}]]);
-    const drive=['battery','look','sum-red',...(learning?['memory-drive']:['cart','patrol-point'])];
-    // The drive: a torque τ_drive on the wheel, paid by the battery at the wheel's rate (τ_drive + P_w)/β_w.
-    // Written for the learning explorer, whose torque reads the search pull; the patrol one reads other wires.
-    const driveForm=learning&&{
-      field:{letters:{'Battery':'b','Look distance':'r','Red at gaze':'seen','Search pull':'pull','Wheel position':'z_w'},
-        constants:{b_0:P.b0,k_τ:P.ktau},where:[['live','θ(b/b_0)'],['free','θ(1 - 2*seen)'],['τ_drive','live*(k_τ*seen*r + free*pull)']],
-        terms:[{c:'τ_drive',h:'z_w'}]},
-      pay:{letters:{'Drive torque':'τ_drive','Other wheel load':'P_w','Battery':'b'},constants:{β_w:P.betac},
-        where:[['wheel_rate','(τ_drive + P_w)/β_w']],terms:[{c:'-τ_drive*wheel_rate',h:'b'}]}};
-    split('drive',[['wheel','Drive torque',drive,undefined,driveForm&&driveForm.field],
-      ['battery','Battery payment',['Drive torque','axle/field'],undefined,driveForm&&driveForm.pay]]);
-    function oscillator(part,coordinate,inputs,forms=[]){
-      split(part,[[coordinate,'Motor inclination',inputs,undefined,forms[0]],['battery','Battery payment',inputs,undefined,forms[1]]]);
+    // The dragger's spring and each casing's air spring are not split into pushes: each is one spring mark
+    // (evaluate, springMark), the cost of a difference, with equal and opposite loads on its two wires.
+    // The drive, the note's motor (eqn.motor, eqn.cart) sent the torque τ_drive and the axle's load P_w on the
+    // wheel: τ_drive dz_w − τ_drive (τ_drive + P_w)/β_w db, the wheel's rate being (τ_drive + P_w)/β_w. The torque
+    // arrives on a wire from its static map (Drive torque), so each mark hears only what its formula names.
+    split('drive',[['wheel','Motor inclination',['drive-torque'],undefined,
+        {letters:{'Drive torque':'τ_drive','Wheel position':'z_w'},terms:[{c:'τ_drive',h:'z_w'}]}],
+      ['battery','Battery payment',['drive-torque','wheel-load'],undefined,
+        {letters:{'Drive torque':'τ_drive','Other wheel load':'P_w','Battery':'b'},constants:{β_w:P.betac},
+          terms:[{c:'-τ_drive*(τ_drive + P_w)/β_w',h:'b'}]}]]);
+    // A motor at a chosen rate u (the note's sec.general, after eqn.motor, with no other load on its store):
+    // c u dq − c u² db. Each mark is wired to the rate, which it reads, and to the one wire it pushes; what the
+    // rate itself reads enters the rate's static map, outside the motor.
+    function atRate(part,store,storeLabel,q,rate,rateLabel,c,cost){
+      const form=(letters,terms)=>({letters:{[rateLabel]:'u',...letters},constants:{[c]:cost},terms});
+      split(part,[[store,'Motor inclination',[rate],undefined,form({[storeLabel]:q},[{c:c+'*u',h:q}])],
+        ['battery','Battery payment',[rate],undefined,form({'Battery':'b'},[{c:'-'+c+'*u**2',h:'b'}])]]);
     }
-    // The eye, the note's sec.gates: a sweep on (r, ψ) sent the gate live(b) free and the extra rate
-    // λ_look live(b) climb. Each motor's field is c_see u dq − c_see u² db at its rate u.
-    const eye={constants:{c_see:P.csee,A:P.A,ν:P.omega,γ:P.gam,λ_look:P.lam,b_0:P.b0},
-      where:[['live','θ(b/b_0)'],['free','θ(1 - 2*seen)']]};
-    const eyeLetters={'Battery':'b','Look distance':'r','Scan':'ψ','Red at gaze':'seen'};
-    const eyeRates={look:['look_r','live*(free*(ν*ψ + γ*(A**2 - r**2 - ψ**2)*r) + λ_look*climb)','r',{'Change with gaze':'climb'}],
-      scan:['look_ψ','live*free*(-ν*r + γ*(A**2 - r**2 - ψ**2)*ψ)','ψ',{}]};
-    for(const x of ['look','scan']){
-      const [rate,law,letter,more]=eyeRates[x];
-      const form=terms=>({...eye,letters:{...eyeLetters,...more},where:[...eye.where,[rate,law]],terms});
-      oscillator(x+'-motor',x,['battery','look','scan','sum-red',...(x==='look'?['sum-climb']:[])],
-        [form([{c:'c_see*'+rate,h:letter}]),form([{c:'-c_see*'+rate+'**2',h:'b'}])]);
-    }
+    // The eye, the note's sec.gates: the sweep's two motors, each at its rate (Look rate, Scan rate).
+    atRate('look-motor','look','Look distance','r','look-rate','Look rate','c_see',P.csee);
+    atRate('scan-motor','scan','Scan','ψ','scan-rate','Scan rate','c_see',P.csee);
     if(learning){
       // A memory motor at its rate u costs the battery c_mem |u|²: c_mem u dq − c_mem u² db. A store of several
       // numbers has lists on its wires: its motor is that many side by side, and the battery pays their sum.
@@ -110,21 +99,16 @@
           ['battery','Battery payment',[id+'-rate'],undefined,form({'Battery':'b'},[{c:end===start+1?'-c_mem*u**2':'-c_mem*Σ(u**2)',h:'b'}])]]);
       }
     }else{
-      for(const [motor,coordinate] of [['patrol-motor','patrol-point'],['patrol-scan-motor','patrol-scan']])
-        oscillator(motor,coordinate,['battery','patrol-point','patrol-scan','sum-red']);
+      atRate('patrol-motor','patrol-point','Patrol point','η','patrol-rate','Patrol point rate','c_pat',P.cpat);
+      atRate('patrol-scan-motor','patrol-scan','Patrol scan','ζ','patrol-scan-rate','Patrol scan rate','c_pat',P.cpat);
     }
     for(let k=0;k<places.length;k++){
       const c='casing-'+k+'/', contact='attachment-'+k+'/', springs=contact+'springs';
       const height=c+'height', place=c+'place', latch=c+'latch', memory=c+'attachment-memory';
       const hx='Height '+(k+1),air='Air memory '+(k+1),gm='Ground memory '+(k+1);
-      // Gravity pushes the height by -m g; the air spring is the cost κ (x - z)²/2, its load -κ(x - z) on the height
-      // carried by the first mark and its reaction on the air memory z by the second.
+      // Gravity pushes the height by -m g. The air spring, the cost κ (x - z)²/2, is one spring mark (evaluate).
       split(c+'gravity',[[height,'Weight',[],undefined,
         {letters:{[hx]:'x'},constants:{m:P.m,g:P.g},terms:[{c:'-m*g',h:'x'}]}]]);
-      split(c+'spring',[[height,'Load on casing',[height,c+'memory'],undefined,
-          {letters:{[hx]:'x',[air]:'z'},constants:{κ:P.kappa},terms:[{c:'-κ*(x - z)',h:'x'}]}],
-        [c+'memory','Load on air memory',['Load on casing'],undefined,
-          {letters:{'Load on casing':'F',[air]:'z'},terms:[{c:'-F',h:'z'}]}]]);
       // The ground: a stiff floor under x_g (switched on by θ over the width ε) and a damper whose stroke is the ground
       // memory z_g; v is the height above the floor and δ the damper's stretch. Marks: the load on the height, then on z_g.
       const ground={constants:{k_g:P.kg,k_d:P.kd,k_r:P.kr,ε:P.eps,ε_d:P.epsd,x_g:P.xg},
@@ -156,7 +140,7 @@
       // The latch motor at the rate u_n applies the torque τ = C_c u_n - P_n (P_n the spring's load on the latch) and pays τ u_n.
       split(contact+'latch-drive',[[latch,'Latch torque',[contact+'latch-rate',springs+'/field'],undefined,
           {letters:{['Latch rate '+(k+1)]:'u_n','Other latch load':'P_n',['Latch '+(k+1)]:'n'},constants:{C_c:P.latchCost},
-            where:[['τ','C_c*u_n - P_n']],terms:[{c:'τ',h:'n'}]}],
+            terms:[{c:'C_c*u_n - P_n',h:'n'}]}],
         ['in-battery','Battery payment',['Latch torque',contact+'latch-rate'],undefined,
           {letters:{'Latch torque':'τ',['Latch rate '+(k+1)]:'u_n','Battery':'b'},terms:[{c:'-τ*u_n',h:'b'}]}]]);
     }
@@ -223,20 +207,61 @@
     }
     node('grip','lever','Grip','state',{value:s[1]});node('tip','lever','Tip height','state',{value:s[2],renderer:'tip'});
     node('cart','wheels','Cart','state',{value:[s[3],s[4]],configuration:s[3],renderer:'cart'});
-    node('dragger','wheels','Dragger','box',{renderer:'spring',stretch:s[3]-s[5]});
-    node('wheel','dragger','Wheel','state',{value:s[5],renderer:'wheel'});
-    node('axle','dragger','Axle spring','effort',{renderer:'spring',stretch:s[3]-s[5]});
+    // The note's dragger is drawn as what it is made of, with no box around it: the store it holds (the wheel)
+    // and the spring between that store and the position it reads (David, 2026-11-20: "it shoudlbe explicit").
+    node('wheel','wheels','Wheel','state',{value:s[5],renderer:'wheel'});
+    // A spring (the note's sec.general): minus d of half a stiffness times the squared difference of two
+    // readings. One mark with no box, drawn by the explorer as a bend joining its two wires with a red resistor
+    // on it (glyph 'spring'); its loads on the two wires are equal and opposite. `pull` is its load on the second.
+    const springMark=(id,parent,label,stiffness,k,[firstLabel,x],[secondLabel,y],pull)=>node(id,parent,label,'field',{glyph:'spring',stiffness,
+      dependencyView:true,result:pull,resultLabel:'Load on '+secondLabel.toLowerCase()+'; its negative on '+firstLabel.toLowerCase(),
+      form:{letters:{[firstLabel]:x,[secondLabel]:y},constants:{[stiffness]:k},terms:[{c:'-1',h:`${stiffness}/2*(${x} - ${y})**2`}]}});
+    springMark('axle','wheels','Axle spring','κ_w',P.kappac,['Cart position','y'],['Wheel position','z_w'],P.kappac*(s[3]-s[5]));
+    // The load the axle's spring puts on the wheel, which the drive motor is sent (the note's eqn.cart: "The
+    // circle computes P_w"), a static map of the cart's and the wheel's positions.
+    node('wheel-load','wheels','Other wheel load','operation',{law:{letters:{'Cart position':'y','Wheel position':'z_w'},
+      constants:{κ_w:P.kappac},where:[['P_w','κ_w*(y - z_w)']]}});
     node('drive','wheels','Drive motor','effort');
     node('look','eye','Look distance','state',{value:s[6],renderer:'look'});node('scan','eye','Scan','state',{value:s[7]});
 
     node('look-motor','eye','Look motor','effort');node('scan-motor','eye','Scan motor','effort');
+    // The eye is the note's sweep on (r, ψ) (sec.gates). Its two rates are static maps, each with its law
+    // written once (explorer-forms.js, lawCheck); a motor reads its own rate and nothing else. A law here is
+    // gated by live (the battery holds some) and free (nothing red is seen).
+    const gates=[['live','θ(b/b_0)'],['free','θ(1 - 2*seen)']];
+    const gatedLaw=(letters,constants,name,law)=>({letters:{'Battery':'b','Red at gaze':'seen',...letters},
+      constants:{b_0:P.b0,...constants},where:[...gates,[name,law]]});
+    // The drive's torque (the note's eqn.cart: "a circle reading b, y, r, the search destination d, and the
+    // redness at the gaze"), a static map outside the motor, which is sent the torque it gives.
+    node('drive-torque','wheels','Drive torque','operation',{law:learning
+      ?gatedLaw({'Look distance':'r','Search pull':'pull'},{k_τ:P.ktau},'τ_drive','live*(k_τ*seen*r + free*pull)')
+      :gatedLaw({'Look distance':'r','Patrol point':'η','Cart position':'y'},{k_τ:P.ktau,k_exp:P.kexp},
+        'τ_drive','live*(k_τ*seen*r + free*k_exp*(η - y))')});
+    const eyeLetters={'Look distance':'r','Scan':'ψ'},eyeConstants={A:P.A,ν:P.omega,γ:P.gam};
+    node('look-rate','eye','Look rate','operation',{law:gatedLaw({...eyeLetters,'Change with gaze':'climb'},{...eyeConstants,λ_look:P.lam},
+      'look_r','live*(free*(ν*ψ + γ*(A**2 - r**2 - ψ**2)*r) + λ_look*climb)')});
+    node('scan-rate','eye','Scan rate','operation',{law:gatedLaw(eyeLetters,eyeConstants,
+      'look_ψ','live*free*(-ν*r + γ*(A**2 - r**2 - ψ**2)*ψ)')});
+    if(!learning){
+      const letters={'Patrol point':'η','Patrol scan':'ζ'},constants={B:P.B,ν_p:P.nup,γ_p:P.gamp};
+      node('patrol-rate','patrol','Patrol point rate','operation',{law:gatedLaw(letters,constants,
+        'patrol_η','live*free*(ν_p*ζ + γ_p*(B**2 - η**2 - ζ**2)*η)')});
+      node('patrol-scan-rate','patrol','Patrol scan rate','operation',{law:gatedLaw(letters,constants,
+        'patrol_ζ','live*free*(-ν_p*η + γ_p*(B**2 - η**2 - ζ**2)*ζ)')});
+    }
     node('gripper','lever','Grip motor','effort');node('lift','lever','Lift motor','effort');
     node('grip-rate','lever','Grip rate','operation');node('lift-rate','lever','Lift rate','operation');
     const scales=[10,2,.4,8,1,8,6,6,8,8];
     scales.length=receiverSize;
+    // A spatial store holds one number for each centre on the line, so its wires carry a list: a hose in the
+    // explorer, whose wires are named by their centres (explorer-core.js, `coordinate`).
+    const atCentres=learning?Learning.centres.map(c=>'at '+String(c).replace('-','−')):[];
     function wire(source,target,label,value,load,extra={}){
       if(efforts.has(source))source+='/field';if(efforts.has(target))target+='/field';
-      if(trace)wires.push({id:source+'>'+target+':'+label,source,target,label,value,load,valueScale:1,loadScale:1,...extra});
+      // Such a list stands in for a function on the displayed line [−9, 9] (the note's sec.food_expectation:
+      // U(x) = Σ w_i φ_i(x) for the usual yield, one number per centre for the rest); the hose's mouth says so.
+      const coordinates=Array.isArray(value)&&value.length===atCentres.length?{coordinates:atCentres,standsFor:'ℝ^[−9, 9]'}:{};
+      if(trace)wires.push({id:source+'>'+target+':'+label,source,target,label,value,load,valueScale:1,loadScale:1,...coordinates,...extra});
     }
     function term(target,i,load=0){
       qload[i]+=load;
@@ -254,8 +279,7 @@
       node(id+'/food',id,'Food','state',{value:f,renderer:'food'});node(id+'/opening',id,'Opening','state',{value:a});
       node(id+'/body',id,'Casing body','box',{renderer:'casing',index:k});
       node(id+'/height',id+'/body','Height','state',{value:[x,mu],configuration:x,renderer:'tip'});
-      node(id+'/air',id+'/body','Air dragger','box',{renderer:'spring',stretch:x-z});
-      node(id+'/memory',id+'/air','Air memory','state',{value:z});node(id+'/spring',id+'/air','Spring','effort',{renderer:'spring',stretch:x-z});
+      node(id+'/memory',id+'/body','Air memory','state',{value:z});springMark(id+'/spring',id+'/body','Air spring','κ',P.kappa,['Height '+(k+1),'x'],['Air memory '+(k+1),'z'],P.kappa*(x-z));
       node(id+'/ground',id+'/body','Ground','effort');node(id+'/gravity',id+'/body','Gravity','effort');
       node(id+'/ground-memory',id+'/body','Ground memory','state',{value:zg});
       node(id+'/red',id,'Red','operation',{renderer:'red',index:k});node(id+'/access',id,'Access','operation');node(id+'/place',id,'Place','operation',{value:place});
@@ -384,7 +408,7 @@
       readings.set('eaten',['sum-eaten','Food taken',eatAll]);
       term('memory-drive',3);
       wire('destination','memory-drive','Destination',learning.target,0);
-      wire('memory-drive','drive','Search pull',learning.pull,0);
+      wire('memory-drive','drive-torque','Search pull',learning.pull,0);
       for (const {id,label,start,end} of Learning.stores) {
         const scalar=end===start+1, speed=learning.rate.slice(start,end);
         const load=speed.map(v=>P.memoryCost*v);
@@ -410,18 +434,24 @@
     } else {
       const ringp=P.B*P.B-eta*eta-zeta*zeta;
       const patE=live*free*(P.nup*zeta+P.gamp*ringp*eta),patZ=live*free*(-P.nup*eta+P.gamp*ringp*zeta);
-      for(const [id,i,speed] of [['patrol-motor',8,patE],['patrol-scan-motor',9,patZ]]){
-        term(id,8,i===8?P.cpat*speed:0);term(id,9,i===9?P.cpat*speed:0);
-        term(id,0,-P.cpat*speed*speed);wire('sum-red',id,'Red at gaze',seen,0);
+      for(const [x,i,speed] of [['patrol',8,patE],['patrol-scan',9,patZ]]){
+        const map=x+'-rate',motor=x+'-motor';
+        term(map,0);term(map,8);term(map,9);wire('sum-red',map,'Red at gaze',seen,0);
+        wire(map,motor,labels[i]+' rate',speed,0);
+        term(motor,i,P.cpat*speed);term(motor,0,-P.cpat*speed*speed);
         rate[i]=speed;
       }
       loss+=P.cpat*(patE*patE+patZ*patZ);
     }
 
-    for(const id of ['look-motor','scan-motor']){
-      term(id,6,id==='look-motor'?P.csee*lookR:0);term(id,7,id==='scan-motor'?P.csee*lookS:0);
-      term(id,0,-P.csee*(id==='look-motor'?lookR**2:lookS**2));
-      wire('sum-red',id,'Red at gaze',seen,0);if(id==='look-motor')wire('sum-climb',id,'Change with gaze',climb,0,{valueScale:3});
+    // The five readings (four for the scan) enter the rate's static map; the motor hears the rate alone,
+    // pushes its own store and charges the battery.
+    for(const [x,i,speed] of [['look',6,lookR],['scan',7,lookS]]){
+      const map=x+'-rate',motor=x+'-motor';
+      term(map,0);term(map,6);term(map,7);wire('sum-red',map,'Red at gaze',seen,0);
+      if(x==='look')wire('sum-climb',map,'Change with gaze',climb,0,{valueScale:3});
+      wire(map,motor,x==='look'?'Look rate':'Scan rate',speed,0);
+      term(motor,i,P.csee*speed);term(motor,0,-P.csee*speed**2);
     }
     for(const i of [0,1])term('grip-rate',i);
     for(const i of [0,1,2])term('lift-rate',i);
@@ -434,9 +464,12 @@
     // They are dependencies, not a force returning through a coefficient wire.
     wire('sum-grip-load','gripper','Other grip load',Pl,0);wire('sum-tip-load','lift','Other tip load',Ph,0);
     const spring=P.kappac*(y-zw),wheel=(spring+torque)/P.betac;
-    term('axle',3,-spring);term('axle',5,spring);term('drive',5,torque);term('drive',0,-torque*wheel);term('drive',6);
-    if(!learning){term('drive',8);term('drive',3);}
-    wire('sum-red','drive','Red at gaze',seen,0);wire('axle','drive','Other wheel load',spring,0);
+    term('axle',3,-spring);term('axle',5,spring);term('drive',5,torque);term('drive',0,-torque*wheel);
+    // What the torque law reads enters its static map; the drive hears the torque and the axle's load on the wheel.
+    term('drive-torque',0);term('drive-torque',6);
+    if(!learning){term('drive-torque',8);term('drive-torque',3);}
+    wire('sum-red','drive-torque','Red at gaze',seen,0);wire('drive-torque','drive','Drive torque',torque,0);
+    term('wheel-load',3);term('wheel-load',5);wire('wheel-load','drive','Other wheel load',spring,0);
     rate[0]=qload[0];rate[1]=qload[1]/P.cgrip;rate[2]=qload[2]/P.clift;rate[3]=my/P.M;rate[4]=qload[3];rate[5]=qload[5]/P.betac;
     // The existing page permits zero eye cost: the continuous limit has the
     // chosen rates and zero inclination/payment; do not divide zero by zero.

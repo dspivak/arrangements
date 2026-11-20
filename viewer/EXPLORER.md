@@ -29,7 +29,9 @@ loads in a crowded diagram. Selecting a branch shows its signed reading.
 Selecting a fork shows its total and the contributions from its branches.
 Color uses magnitude relative to the wire's scale (the largest branch scale
 on a shared trunk). Arrays use their Euclidean norm for color and keep all
-components in the inspector.
+components in the inspector. A wire that carries a list of numbers is a hose,
+several wires bundled: click its mouth, the oval with a number beside it, to
+unwrap that end into one port per number, and again to wrap them.
 
 ## Connecting a runnable example
 
@@ -93,9 +95,10 @@ Port identity defaults to the original source node and wire label, preserved
 through projection. Equal numbers from different readouts remain different
 ports. Use optional wire `sourcePort` for a stable output-port name independent
 of its display label, and `targetPort` for an explicit input-port name. Otherwise
-each distinct incoming readout gets its own port. An array-valued readout is one
-port; split its coordinates into separately identified wires when appropriate
-to the actual interface. Port identity must not depend on the current value.
+each distinct incoming readout gets its own port. One port carries one number: a
+readout of n numbers is n ports. A wire whose `value` is a list of n numbers is
+those n wires bundled, a hose (see "Hoses" below); its optional `coordinates`
+names them. Port identity must not depend on the current value.
 `kind` is `box`, `state`, `operation` (static map), `field` (inclination field),
 or `boundary`. An internal integrator is drawn as state, without a box or a
 fictitious input port. A state-to-coupling observation carries its configuration
@@ -139,6 +142,67 @@ the wire's `load`. A disagreement is drawn red and named in the sidebar, so a wr
 formula is never trusted. Every entering wire that carries a load needs a letter, and a
 lettered wire carries one number. `node --test viewer/explorer-forms.test.js` checks every
 written form through a feeding meal and lists the marks that have none.
+
+**A mark is wired to what its formula names.** A coefficient that reads several wires is
+not written on the field's mark under one name: it is a static map of its own, outside the
+field, and the mark hears the one wire that carries its value. So a motor at a rate has the
+form `c u dq − c u² db` and hears `u`; what the rate reads enters the rate's map.
+
+An `operation` node may carry `law`, the static map's formula, with a form's `letters`,
+`constants` and `where`; the map's value is the last abbreviation:
+
+```js
+law: {
+  letters:   {'Battery': 'b', 'Red at gaze': 'seen', 'Look distance': 'r', 'Search pull': 'pull'},
+  constants: {b_0: 1, k_τ: 0.16},
+  where:     [['live', 'θ(b/b_0)'], ['free', 'θ(1 - 2*seen)'], ['τ_drive', 'live*(k_τ*seen*r + free*pull)']],
+}
+```
+
+The view writes each letter after its terminal's name and the law in the sidebar, and
+compares it at every snapshot with the value on the wire leaving the map
+(`ArrangementForms.lawCheck`); the same test file checks every law through the meal.
+While the map's circle is the one chosen (clicked), its law is also written on a card
+under the circle.
+
+**A spring is drawn as a spring.** A `field` node with `glyph: 'spring'` is the field
+minus d of half a stiffness times the squared difference of its two entering wires. It
+has no circle and no box: the two wires are joined by a bend (the cap of string
+diagrams), the bend's upright stretch drawn as a red resistor, with `stiffness` (a
+letter, such as `'κ_w'`) written over the top and its `form`, the cost, under it. The
+two loads are equal and opposite, on the wires. A value another part needs from it (the
+load it puts on one end) is a static map of its own, with a `law`.
+
+## Hoses
+
+**One port per number; wires that are bundled are drawn as a hose.** A wire whose
+`value` is a list of n numbers (n > 1) is n wires, one per number, bundled. It is
+drawn as a hose: a ribbed tube around the value track and the load track, which are
+colored by the size of the whole list. The hose's **mouth**, an oval with the number
+n beside it, is the icon that wraps and unwraps it. Each end of a hose is in one of
+two states, and clicking the mouth changes that end to the other:
+
+- **wrapped**: the part has one hose port there, drawn as the mouth;
+- **unwrapped**: the part has n ports there, one per number, each named by the
+  wire's label and its `coordinates` entry (or its number in the list). Their
+  strands, each a wire with its own value and its own returning load, run to the
+  mouth, which stands a little way off the part; the hose goes on from the mouth,
+  and a shared readout forks just past it.
+
+A list of at most four numbers is unwrapped until the viewer wraps it; a longer one
+is wrapped until the viewer unwraps it (the view's `hoseAbove` option, 4 by
+default). A hose stays wrapped where it crosses the boundary of the opened box and
+at a spring's terminal. The choice is saved with the positions, level by level, and
+like them it changes the drawing only: the hose's value is the list of its strands'
+values and its load the list of their loads (`ArrangementExplorer.dimension`,
+`coordinate`, `strand` in `explorer-core.js`; `hoseEnd` in `explorer-layout.js`).
+One port per number is the rule and a hose the exception: a hose is for a list
+that is one thing held as several numbers, such as a function on a line held as
+its coefficients. The wire's optional `standsFor` says what that thing is
+(feeding's stores of 19 numbers give `'ℝ^[−9, 9]'`, the functions on the displayed
+line), and the mouth writes it after the count, the part after `^` raised.
+A model whose part reads out several numbers either gives each its own wire or
+sends the list on one wire; the explorer never joins separate wires into a hose.
 
 Optional node fields include `description`, `renderer`, and layout hints
 `column` and `row`. Hints are ignored when regrouping would cause overlap.

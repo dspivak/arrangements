@@ -32,6 +32,9 @@ explorer = new ArrangementExplorer.View(document.getElementById('explorer'), ada
   playback: feeding,
   description: 'The receiver uses the same gripper, opener and digestor for every casing.'
 });
+// feeding-explorer.html?scope=wheels opens the page at that level (a part's id), scrolled to the diagram.
+const opened = new URLSearchParams(location.search).get('scope');
+if (opened) { explorer.enter(opened); explorer.crumbs.scrollIntoView({block: 'start'}); }
 document.getElementById('add-casing').addEventListener('submit', event => {
   event.preventDefault();
   feeding.addCasing(10, document.getElementById('place').valueAsNumber);

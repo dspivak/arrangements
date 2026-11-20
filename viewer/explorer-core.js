@@ -7,6 +7,17 @@
   // Signal identity survives projection and changes of value. Two equal numbers
   // from different readouts must never accidentally become the same port.
   const signalKey = w => w.signal ?? JSON.stringify([w.source,w.sourcePort ?? w.label]);
+  // One port per number. A wire that carries a list of n numbers is n wires bundled, a hose: `dimension` is
+  // its n (1 for a number, and for a value that is not a list of numbers), `coordinate` the name of its i-th
+  // wire (the wire's own `coordinates`, else its number in the list), and `strand` that wire alone, with its
+  // own value and its own returning load. Wrapping and unwrapping change the drawing only: the hose's value
+  // is the list of its strands' values and its load the list of their loads, the product R^n of n copies of
+  // R and its projections, with nothing added or dropped.
+  const list=x=>Array.isArray(x)&&x.length>1&&x.every(v=>typeof v==='number');
+  const dimension = w => list(w.value)?w.value.length:w.value==null&&list(w.load)?w.load.length:1;
+  const coordinate = (w,i) => w.coordinates?.[i] ?? String(i+1);
+  const strand = (w,i) => ({...w,label:w.label+' '+coordinate(w,i),strandOf:w,index:i,
+    value:Array.isArray(w.value)?w.value[i]:w.value,load:Array.isArray(w.load)?w.load[i]:w.load});
   function validate(scene) {
     if (scene.version !== 1 || !Array.isArray(scene.nodes) || !Array.isArray(scene.wires)) throw Error('Expected an explorer version-1 scene');
     const nodes = new Map();
@@ -169,6 +180,6 @@
     if(typeof value==='number')return value===0?'0.000':Math.abs(value)>=1e4||Math.abs(value)<.001?value.toExponential(2):value.toFixed(3);
     return String(value);
   }
-  const api={Model,validate,magnitude,intensity,color,format,aggregate,forkWire,signalKey};
+  const api={Model,validate,magnitude,intensity,color,format,aggregate,forkWire,signalKey,dimension,coordinate,strand};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementExplorer=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const E=require('./explorer-core.js'),G=require('./explorer-layout.js'),A=require('./feeding-arrangement.js');
-const close=(a,b)=>assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<1e-6,JSON.stringify([a,b]));
+const close=(a,b)=>assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<1e-6,JSON.stringify([[a.x,a.y],[b.x,b.y]]));
 test('the two directions separate along the route and meet at each port and fork',()=>{
   const model=new E.Model(A.adapter().snapshot());
   model.enter('receiver');
@@ -20,7 +20,8 @@ function check(project,options){
   const g=G.layout(project,options);
   for(const w of g.edges){
     const source=g.positions.get(w.source),target=g.positions.get(w.target);
-    const out=source.outputs.find(p=>p.key===w.outKey),input=target.inputs.find(p=>p.key===w.inKey);
+    // A wire ends at a port, or, where a hose is unwrapped, at the hose's mouth (G.endAt).
+    const out=G.endAt(source,'outputs',w.outKey),input=G.endAt(target,'inputs',w.inKey);
     close(w.segments[0].a,out.fork||out);close(w.segments.at(-1).b,input);
     assert.ok(out.x>=source.x&&input.x<=target.x,'outputs right, inputs left');
     const first=w.segments[0],last=w.segments.at(-1);
@@ -71,7 +72,7 @@ test('the food-learning receiver has the same ports with zero, one and four casi
 test('every feeding level has connected horizontal endpoints and clears unrelated parts',()=>{
   const m=new E.Model(A.adapter().snapshot());let levels=0;
   for(const n of m.scene.nodes)if(m.children(n.id).length){m.enter(n.id);check(m.project());levels++;}
-  assert.ok(levels>40);
+  assert.ok(levels>=38);   // 38 since a spring is one mark and a dragger is drawn as its store and its spring, with no box
 });
 test('nested grouping preserves distinct crossing ports and routes them',()=>{
   const m=new E.Model(A.adapter().snapshot());m.enter('receiver');const group=m.group(['eye','wheels'],'Guidance');
@@ -144,4 +145,86 @@ test('an operation with many true inputs uses compact marks and individually spa
   }
   assert.equal(sizes[0].radius,sizes[2].radius);
   assert.ok(sizes[2].w < 150 && sizes[2].h > sizes[0].h);
+});
+
+// Hoses: a wire that carries a list of n numbers is n wires bundled, and wrapping is the product's
+// isomorphism between n wires and one hose, on values and on returning loads.
+// A store of n numbers read by a field, which loads it, and by a static map, which does not.
+function hoseScene(n,coordinates){
+  const value=Array.from({length:n},(_,i)=>i+1),load=value.map(v=>-v/10);
+  return {version:1,root:'r',nodes:[{id:'r',kind:'box',label:'R'},{id:'s',parent:'r',kind:'state',label:'Store',value},
+    {id:'f',parent:'r',kind:'field',label:'Field'},{id:'g',parent:'r',kind:'operation',label:'Map'}],
+    wires:[{id:'s>f',source:'s',target:'f',label:'Position',value,load,...(coordinates?{coordinates}:{})},
+      {id:'s>g',source:'s',target:'g',label:'Position',value,load:value.map(v=>v/100),...(coordinates?{coordinates}:{})}]};
+}
+test('a wire has one strand per number, and its strands give back its value and its load',()=>{
+  assert.equal(E.dimension({value:3,load:1}),1);
+  assert.equal(E.dimension({value:[1,2,3],load:null}),3);
+  assert.equal(E.dimension({value:null,load:[0,0]}),2);
+  for(const value of [[5],'open',null,[[1,2],[3,4]],{a:1}])assert.equal(E.dimension({value,load:0}),1);
+  const scene=hoseScene(3,['x','y','z']),[loaded,read]=scene.wires;
+  // Unwrapping then wrapping is the identity: the list of the strands' values is the hose's value, and so for loads.
+  for(const w of scene.wires){
+    const strands=w.value.map((_,i)=>E.strand(w,i));
+    assert.deepEqual(strands.map(s=>s.value),w.value);assert.deepEqual(strands.map(s=>s.load),w.load);
+    assert.deepEqual(strands.map(s=>s.label),['Position x','Position y','Position z']);
+    assert.ok(strands.every(s=>E.dimension(s)===1));
+  }
+  assert.equal(E.strand({label:'Yield',value:[4,5],load:[0,0]},1).label,'Yield 2');
+  // On a readout shared by two branches the loads add strand by strand: the trunk's strand is the sum of the
+  // branches' strands, the same number either way round.
+  const trunk=E.forkWire([loaded,read]);
+  for(let i=0;i<3;i++)assert.ok(Math.abs(E.strand(trunk,i).load-(E.strand(loaded,i).load+E.strand(read,i).load))<1e-12);
+});
+test('a long list is one hose port at each end until an end is unwrapped into one port per number',()=>{
+  const project=new E.Model(hoseScene(6)).project(),wrapped=check(project);
+  const store=wrapped.positions.get('s'),field=wrapped.positions.get('f');
+  assert.equal(store.outputs.length,1);assert.equal(store.outputs[0].hose,6);assert.equal(store.groups.length,0);
+  assert.equal(field.inputs.length,1);assert.equal(field.inputs[0].hose,6);
+  assert.equal(store.outputs[0].end,G.hoseEnd('s','outputs',store.outputs[0].key));
+  // Unwrap the store's end: six ports, their strands meeting at the hose's mouth, where the readout forks.
+  const open=check(project,{toggled:[store.outputs[0].end]}),s=open.positions.get('s'),[group]=s.groups;
+  assert.equal(s.outputs.length,6);assert.ok(s.outputs.every((port,i)=>port.group===group&&port.index===i&&!port.hose));
+  assert.deepEqual(s.outputs.map(port=>port.label),[1,2,3,4,5,6].map(i=>'Position '+i));
+  assert.equal(group.dimension,6);assert.ok(group.x>s.outputs[0].x+30,'the mouth stands off the part');
+  assert.ok(group.y>s.outputs[0].y&&group.y<s.outputs[5].y);
+  for(const port of s.outputs){close(port.strand.a,port);close(port.strand.b,group);assert.notEqual(port.tracks.value,port.tracks.load);}
+  assert.ok(group.fork&&group.wires.length===2);
+  for(const w of open.edges)close(w.start,group.fork);
+  // The other end of the same hose is still wrapped: wires and hose meet at the mouth, on the way.
+  assert.equal(open.positions.get('f').inputs.length,1);assert.equal(open.positions.get('f').inputs[0].hose,6);
+  assert.ok(open.width>wrapped.width,'the column makes room for the fan');
+  // Unwrap the field's end as well: the hose now runs from mouth to mouth.
+  const both=check(project,{toggled:[store.outputs[0].end,field.inputs[0].end]}),f=both.positions.get('f'),[entering]=f.groups;
+  assert.equal(f.inputs.length,6);assert.ok(entering.x<f.inputs[0].x-30);
+  for(const port of f.inputs){close(port.strand.a,entering);close(port.strand.b,port);}
+  close(both.edges.find(w=>w.target==='f').end,entering);
+  assert.equal(both.positions.get('g').inputs.length,1,'the map, not toggled, keeps its hose port');
+});
+test('a short list is one port per number until the viewer wraps it; the limit is an option',()=>{
+  const project=new E.Model(hoseScene(3,['x','y','z'])).project(),open=check(project),s=open.positions.get('s');
+  assert.deepEqual(s.outputs.map(port=>port.label),['Position x','Position y','Position z']);
+  assert.equal(open.positions.get('f').inputs.length,3);
+  const wrapped=check(project,{toggled:[s.groups[0].end]});
+  assert.equal(wrapped.positions.get('s').outputs.length,1);assert.equal(wrapped.positions.get('s').outputs[0].hose,3);
+  assert.equal(check(project,{hoseAbove:2}).positions.get('s').outputs.length,1);
+  assert.equal(check(new E.Model(hoseScene(6)).project(),{hoseAbove:6}).positions.get('s').outputs.length,6);
+});
+test('a hose stays wrapped where it crosses a boundary, and every hose end of the food memory unwraps and routes',()=>{
+  const L=require('./food-learning.js'),places=[0,1];
+  const model=new E.Model(A.observeLearning(L.start(places,places.map(()=>10)),places,L.DEFAULTS));
+  model.enter('yield-motor');
+  const inside=check(model.project()),crossing=[...inside.positions.values()].filter(p=>p.kind==='boundary').flatMap(p=>[...p.inputs,...p.outputs]).filter(port=>port.hose);
+  assert.ok(crossing.length>=2);assert.ok(crossing.every(port=>port.hose===19&&port.end===undefined));
+  model.enter('memory');
+  const project=model.project(),wrapped=check(project);let ends=0;
+  for(const id of ['yield','yield-rate','yield-motor','return','return-rate']){
+    const p=wrapped.positions.get(id);
+    for(const port of [...p.inputs,...p.outputs].filter(port=>port.end)){
+      const open=check(project,{toggled:[port.end]}),group=open.positions.get(id).groups.find(g=>g.end===port.end);
+      assert.equal(group.ports.length,19);assert.equal(port.wires[0].standsFor,'ℝ^[−9, 9]','the hose says what its list stands in for');assert.equal(group.ports[0].label,port.label+' at −9');assert.equal(group.ports[18].label,port.label+' at 9');
+      ends++;
+    }
+  }
+  assert.ok(ends>=10);
 });

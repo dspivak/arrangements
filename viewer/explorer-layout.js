@@ -123,14 +123,40 @@
     }
     return [line(a,start),...middle,line(end,b)];
   }
+  // The rows of a spring's terminals, and how far down its bend each wire has turned where it meets the resistor.
+  const SPRING_ROWS=46,SPRING_TURN=9;
+  // Hoses. A wire of dimension n > 1 (explorer-core.js, `dimension`) is n wires bundled. At each of its two
+  // ends it is either wrapped, one hose port on the part, or unwrapped, n ports on the part, one per number,
+  // whose strands run to the hose's mouth a little way off. A list of at most `options.hoseAbove` numbers
+  // (4 by default) is unwrapped until the viewer wraps it, a longer one wrapped until the viewer unwraps
+  // it; `options.toggled` lists the ends the viewer has changed, each by its `hoseEnd` key. A boundary port
+  // and a spring's terminal stay wrapped. Unwrapped, the part has a `group` for the end: its n ports, and
+  // the mouth's place (x, y), where the hose begins or ends.
+  const hoseEnd=(node,side,key)=>JSON.stringify([node,side,key]);
+  const endAt=(p,side,key)=>p.groups.find(g=>g.side===side&&g.key===key)||p[side].find(v=>v.key===key);
   function layout(project,options={}){
     const edges=E.aggregate(project.wires).map(w=>({...w,signal:E.signalKey(w)}));
+    const toggled=new Set(options.toggled||[]),hoseAbove=options.hoseAbove??4;
     const positions=new Map(),inner=project.nodes.filter(n=>n.kind!=='boundary'),boundaries=project.nodes.filter(n=>n.kind==='boundary');
-    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,inputs:[],outputs:[],x:0,y:0,w:0,h:0});
+    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,glyph:n.glyph,inputs:[],outputs:[],groups:[],x:0,y:0,w:0,h:0});
     for(const w of edges){
       const a=positions.get(w.source),b=positions.get(w.target);w.outKey=w.signal;w.inKey=w.targetPort??w.signal;
+      w.dimension=E.dimension(w);
       for(const [p,side,key] of [[a,'outputs',w.outKey],[b,'inputs',w.inKey]]){
+        const end=hoseEnd(p.id,side,key),fixed=p.kind==='boundary'||p.glyph==='spring';
+        if(w.dimension>1&&!fixed&&(w.dimension>hoseAbove)===toggled.has(end)){
+          let group=p.groups.find(g=>g.side===side&&g.key===key);
+          if(!group){
+            group={key,side,end,label:w.label,dimension:w.dimension,wires:[],ports:[]};p.groups.push(group);
+            for(let i=0;i<w.dimension;i++){
+              const port={key:key+'#'+i,label:w.label+' '+E.coordinate(w,i),wires:group.wires,group,index:i};
+              group.ports.push(port);p[side].push(port);
+            }
+          }
+          group.wires.push(w);continue;
+        }
         let port=p[side].find(v=>v.key===key);if(!port){port={key,label:w.label,wires:[]};p[side].push(port);}port.wires.push(w);
+        if(w.dimension>1){port.hose=w.dimension;if(!fixed)port.end=end;}
       }
     }
     const authored=inner.some(n=>n.column!=null)&&!inner.some(n=>n.userGroup);
@@ -158,23 +184,34 @@
         // rows. Adding an argument extends only that list of terminals.
         p.radius=n.renderer?34:15;
         // A terminal of a field with a written 1-form carries, after its name, the letter the formula uses.
-        const lettered=port=>{const letter=n.form?.letters?.[port.label];return port.label.length+(letter?letter.replace('_','').length+2:0);};
+        // (A strand's letter is its hose's, with the strand's number under it.)
+        const lettered=port=>{const letter=(n.form||n.law)?.letters?.[port.group?port.group.label:port.label];
+          return port.label.length+(letter?letter.replace('_','').length+(port.group?4:2):0);};
         const labelWidth=ports=>ports.reduce((width,port)=>
           Math.max(width,lettered(port)*6.7+18),0);
         const left=labelWidth(p.inputs),right=labelWidth(p.outputs);
         p.w=Math.max(left+2*p.radius+right,(n.label??n.id).length*7.8+8);
         p.glyphX=(left-right)/2;
         p.h=Math.max(2*p.radius+10,count*20+12);
+        // A spring is a bend joining its wires, with a resistor on the bend's upright stretch: its terminals
+        // stand further apart, so that the resistor between them can be seen.
+        if(n.glyph==='spring')p.h=(count-1)*SPRING_ROWS+40;
       }
       if(n.kind==='state')p.h=Math.max(132,100+count*24);
+      // How far from the part an unwrapped hose's mouth stands: further for a taller fan of strands.
+      const pitch=n.kind==='state'?24:p.radius?20:22;
+      for(const group of p.groups)group.reach=Math.min(90,40+(group.dimension-1)*pitch/6);
     }
+    const reach=(n,side)=>Math.max(0,...positions.get(n.id).groups.filter(g=>g.side===side).map(g=>g.reach));
     const columns=[...new Set(inner.map(n=>column.get(n.id)))].sort((a,b)=>a-b),groups=columns.map(c=>inner.filter(n=>column.get(n.id)===c).sort((a,b)=>(a.row??0)-(b.row??0)));
     const heights=groups.map(ns=>ns.reduce((s,n)=>s+positions.get(n.id).h+68,0)-68);
     const incoming=boundaries.filter(n=>n.side==='in'||(!n.side&&positions.get(n.id).outputs.length>0)),outgoing=boundaries.filter(n=>!incoming.includes(n));
     let height=Math.max(270,Math.max(0,...heights)+152,Math.max(incoming.length,outgoing.length)*26+140);
     let x=160;
     for(const ns of groups){const width=Math.max(...ns.map(n=>positions.get(n.id).w));let y=(height-heights[groups.indexOf(ns)])/2;
-      for(const n of ns){const p=positions.get(n.id);p.x=x+width/2;p.y=y+p.h/2;y+=p.h+68;}x+=width+148;
+      // A column leaves room on each side for the fans of its parts' unwrapped hoses.
+      x+=Math.max(...ns.map(n=>reach(n,'inputs')));
+      for(const n of ns){const p=positions.get(n.id);p.x=x+width/2;p.y=y+p.h/2;y+=p.h+68;}x+=width+148+Math.max(...ns.map(n=>reach(n,'outputs')));
     }
     let width=Math.max(420,x-148+160);
     for(const n of inner){const p=positions.get(n.id);p.orderY=p.y;
@@ -192,7 +229,9 @@
       for(const [ports,side] of [[p.inputs,'in'],[p.outputs,'out']]){
         ports.sort((a,b)=>{
           const ordinate=port=>port.wires.reduce((s,w)=>{const p=positions.get(side==='in'?w.source:w.target);return s+(p.orderY??p.y);},0)/port.wires.length;
-          return ordinate(a)-ordinate(b)||a.label.localeCompare(b.label);
+          // The strands of one unwrapped hose share their wires, so they stand together, in the list's order.
+          const name=port=>port.group?port.group.label:port.label;
+          return ordinate(a)-ordinate(b)||name(a).localeCompare(name(b))||(a.index??-1)-(b.index??-1);
         });
         ports.forEach((port,i)=>{
           let dy=(i-(ports.length-1)/2)*22,dx=p.w/2;
@@ -203,9 +242,25 @@
             const angle=ports.length===1?0:((i/(ports.length-1))-.5)*1.9;
             port.glyphX=p.glyphX+(side==='in'?-1:1)*p.radius*Math.cos(angle);
             port.glyphY=p.radius*Math.sin(angle);
+            // A spring's wire runs level to the bend and turns into its upright stretch, where it ends.
+            if(p.glyph==='spring'){
+              dy=(i-(ports.length-1)/2)*SPRING_ROWS;
+              port.glyphX=p.glyphX;port.glyphY=dy+Math.sign((ports.length-1)/2-i)*SPRING_TURN;
+            }
           }
           port.side=side;port.x=p.x+(side==='in'?-dx:dx);port.y=p.y+dy;
         });
+      }
+      // An unwrapped hose's mouth stands level with the middle of its ports; each strand leaves its port
+      // level and enters the mouth level.
+      for(const group of p.groups){
+        const out=group.side==='outputs',d=out?group.reach:-group.reach;
+        group.x=group.ports[0].x+d;group.y=group.ports.reduce((sum,port)=>sum+port.y,0)/group.ports.length;
+        for(const port of group.ports){
+          const at=point(port.x,port.y),mouth=point(group.x,group.y);
+          const bend=curve(at,point(at.x+d/2,at.y),point(mouth.x-d/2,mouth.y),mouth);
+          port.strand=out?bend:curve(bend.b,bend.d,bend.c,bend.a);port.tracks=wireTracks([port.strand]);
+        }
       }
     }
     for(const p of positions.values())anchors(p);
@@ -213,7 +268,7 @@
     for(const ns of [incoming,outgoing]){
       const desired=n=>{const p=positions.get(n.id),ps=[...p.inputs,...p.outputs];
         const isInput=incoming.includes(n);
-        const ys=ps.flatMap(port=>port.wires.map(w=>{const other=positions.get(isInput?w.target:w.source);return (isInput?other.inputs.find(v=>v.key===w.inKey):other.outputs.find(v=>v.key===w.outKey)).y;}));
+        const ys=ps.flatMap(port=>port.wires.map(w=>{const other=positions.get(isInput?w.target:w.source);return (isInput?endAt(other,'inputs',w.inKey):endAt(other,'outputs',w.outKey)).y;}));
         return ys.length?ys.reduce((a,b)=>a+b)/ys.length:p.y;};
       const ordered=ns.map(n=>({n,y:desired(n)})).sort((a,b)=>a.y-b.y);let last=56;
       for(const o of ordered){const p=positions.get(o.n.id);p.y=Math.max(o.y,last+26);last=p.y;}
@@ -222,18 +277,19 @@
     // Include the title above each part in the obstacle, so a routed wire cannot
     // obscure its name. Vary corridor lanes to separate unrelated feedback wires.
     const rects=inner.map(n=>{const p=positions.get(n.id);return {...p,y:p.y-12,h:p.h+24};}),forks=[];
-    for(const p of positions.values())for(const port of p.outputs)if(port.wires.length>1){
+    // A shared readout forks just past its port; an unwrapped hose forks just past its mouth.
+    for(const p of positions.values())for(const port of [...p.outputs.filter(port=>!port.group),...p.groups.filter(g=>g.side==='outputs')])if(port.wires.length>1){
       port.fork=point(port.x+19,port.y);
       const start=point(port.x,port.y),end=port.fork;
       forks.push({port,start,end,wires:port.wires,tracks:wireTracks([line(start,end)])});
     }
-    for(const w of edges){const a=positions.get(w.source),b=positions.get(w.target),out=a.outputs.find(p=>p.key===w.outKey),input=b.inputs.find(p=>p.key===w.inKey);
+    for(const w of edges){const a=positions.get(w.source),b=positions.get(w.target),out=endAt(a,'outputs',w.outKey),input=endAt(b,'inputs',w.inKey);
       w.start=out.fork||point(out.x,out.y);w.end=point(input.x,input.y);
       w.segments=route(w.start,w.end,a,b,rects,width,height,(edges.indexOf(w)%4)*7);w.path=path(w.segments);
       w.tracks=wireTracks(w.segments);
     }
     return {positions,width,height,edges,forks};
   }
-  E.layout=layout;E.wheelZoom=wheelZoom;E.geometry={sample,path,inside,trackOffset,wireTracks};
-  if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom};
+  E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks};
+  if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom,hoseEnd,endAt};
 })(globalThis);

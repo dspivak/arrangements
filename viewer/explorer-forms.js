@@ -125,6 +125,19 @@
       return {ok:rows.every(r=>r.ok),rows};
     }catch(error){return {ok:false,rows:[],error:error.message};}
   }
+  /* A static map's law: {letters, constants, where}, the same fields as a form's, the map's value being the
+   * last abbreviation. readings: the map's entering wires, [{label, value}]; want: the value the model put
+   * on the wire that leaves it. Returns {ok, got, want, error}, so a law is no more trusted than a form. */
+  function lawCheck(law,readings,want){
+    try{
+      const values={};
+      for(const r of readings){const letter=law.letters?.[r.label];if(letter!==undefined)values[letter]=r.value;}
+      for(const letter of Object.values(law.letters||{}))if(!(letter in values))throw Error('No wire for the letter '+letter);
+      const got=environment(law,values)[law.where.at(-1)[0]],g=[].concat(got),w=[].concat(want);
+      const ok=g.length===w.length&&g.every((x,i)=>Math.abs(x-w[i])<=1e-9*Math.max(Math.abs(x),Math.abs(w[i]))+1e-12);
+      return {ok,got,want};
+    }catch(error){return {ok:false,error:error.message};}
+  }
 
   // ---- Writing a formula. A run is {text, shift} with shift 1 a superscript, -1 a subscript, and
   // `italic` for a one-letter name. `plain` joins runs into one line of text.
@@ -183,6 +196,6 @@
   }
   // Each abbreviation as name = formula, in order.
   const definitions=form=>(form.where||[]).map(([n,text])=>[...name(n),{text:' = '},...runs(parse(text))]);
-  const api={functions,parse,value,environment,loads,check,runs,term,written,definitions,plain};
+  const api={functions,parse,value,environment,loads,check,lawCheck,runs,term,written,definitions,plain};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementForms=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

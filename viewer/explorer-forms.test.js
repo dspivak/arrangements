@@ -54,7 +54,7 @@ test('every formula on a feeding field mark gives the loads the model returns, t
   // A form is an identity between two functions of the state, so it is checked off the outing too: at each
   // sampled moment, the state itself and four states near it (a fixed pseudo-random sequence). Along the
   // outing alone many loads are 0 (a latch at rest, a motor at rate 0), and a wrong formula passes at 0.
-  let s=L.start(),seed=12345;const written=new Map(),missing=new Set();
+  let s=L.start(),seed=12345;const written=new Map(),missing=new Set(),laws=new Map();
   const random=()=>(seed=(seed*1664525+1013904223)%4294967296)/4294967296;
   const near=state=>state.map(v=>v+.3*(random()-.5)*(.2+Math.abs(v)));
   const finite=x=>Array.isArray(x)?x.every(finite):x===null||typeof x!=='number'||Number.isFinite(x);
@@ -67,6 +67,13 @@ test('every formula on a feeding field mark gives the loads the model returns, t
       const verdict=Forms.check(node.form,sc.wires.filter(w=>w.target===node.id).map(w=>({label:w.label,value:w.value,load:w.load})));
       assert.ok(verdict.ok,`${node.id} (${line(node.form)}) ${where}: ${verdict.error||JSON.stringify(verdict.rows.filter(r=>!r.ok))}`);
       written.set(kind,(written.get(kind)||0)+(verdict.rows.some(r=>[].concat(r.want).some(x=>Math.abs(x)>1e-7))?1:0));
+    }
+    // A static map's law gives the value on the wire leaving it.
+    for(const node of sc.nodes)if(node.law){
+      const leaving=sc.wires.find(w=>w.source===node.id);
+      const verdict=Forms.lawCheck(node.law,sc.wires.filter(w=>w.target===node.id).map(w=>({label:w.label,value:w.value})),leaving.value);
+      assert.ok(verdict.ok,`${node.id} ${where}: ${verdict.error||`its law gives ${verdict.got}, the model ${verdict.want}`}`);
+      laws.set(node.id,(laws.get(node.id)||0)+(Math.abs(leaving.value)>1e-7?1:0));
     }
   }
   // The destination moves only while the search clock is choosing (its angle near a whole turn), which this
@@ -95,9 +102,59 @@ test('every formula on a feeding field mark gives the loads the model returns, t
     s=L.rk4(s,.004,places,p);
   }
   for(const id of ['look-motor/field','look-motor/field-#','scan-motor/field','scan-motor/field-#'])assert.ok(written.has(id),id+' has a formula');
+  for(const id of ['look-rate','scan-rate','drive-torque'])assert.ok(laws.get(id)>=10,id+' has a law, checked at ten values that are not 0 or more');
   console.log(`field marks with a checked formula: ${written.size}; without one yet: ${missing.size}`);
   for(const id of [...missing].sort())console.log('  no formula yet: '+id);
   // Each written form has to have met a load that is not 0 at ten states or more, or it is unproven.
   const thin=[...written].filter(([,count])=>count<10).map(([kind,count])=>`${kind} (${count})`);
   assert.deepEqual(thin,[],'forms checked at fewer than ten nonzero loads');
+});
+
+test('a motor at a rate hears its rate alone: each mark is wired to the rate and to the one wire it pushes',()=>{
+  // The eye in the learning receiver, and the patrol receiver's four motors (which no page shows).
+  const scenes=[A.observeLearning(L.start(),L.PLACES.slice(),L.DEFAULTS)];
+  const patrol=A.adapter();patrol.step(.5);scenes.push(patrol.snapshot());
+  let seen=0;
+  for(const sc of scenes)for(const node of sc.nodes)if(node.kind==='field'&&/^(look|scan|patrol|patrol-scan)-motor\//.test(node.id)){
+    const part=node.id.split('/')[0],rate=part.replace('-motor','-rate'),entering=sc.wires.filter(w=>w.target===node.id);
+    const pushed=part==='look-motor'?'look':part==='scan-motor'?'scan':part==='patrol-motor'?'patrol-point':'patrol-scan';
+    assert.deepEqual(entering.map(w=>w.source).sort(),[rate,node.label==='Battery payment'?'battery':pushed].sort(),node.id);
+    const verdict=Forms.check(node.form,entering.map(w=>({label:w.label,value:w.value,load:w.load})));
+    assert.ok(verdict.ok,`${node.id}: ${verdict.error||JSON.stringify(verdict.rows)}`);
+    seen++;
+  }
+  assert.equal(seen,12);   // two marks for each of look and scan in both receivers, and for the two patrol motors
+  // The drive hears its torque and, for the payment, the axle's load on the wheel; what the torque law reads
+  // enters the torque's static map.
+  for(const sc of scenes){
+    const sources=id=>sc.wires.filter(w=>w.target===id).map(w=>w.source).sort();
+    assert.deepEqual(sources('drive/field'),['drive-torque','wheel']);
+    assert.deepEqual(sources('drive/field-1'),['battery','drive-torque','wheel-load']);
+    // A spring is one mark with no box: its two wires, equal and opposite loads, and its cost as its form.
+    const axle=sc.nodes.find(n=>n.id==='axle'),ends=sc.wires.filter(w=>w.target==='axle');
+    assert.equal(axle.glyph,'spring');assert.deepEqual(ends.map(w=>w.source).sort(),['cart','wheel']);
+    close(ends[0].load+ends[1].load,0);
+    assert.ok(Forms.check(axle.form,ends.map(w=>({label:w.label,value:w.value,load:w.load}))).ok);
+    assert.equal(line(axle.form),'−d(κ_w/2 (y − z_w)²)');
+    for(const id of ['drive/field','drive/field-1']){
+      const node=sc.nodes.find(n=>n.id===id);
+      assert.ok(Forms.check(node.form,sc.wires.filter(w=>w.target===id).map(w=>({label:w.label,value:w.value,load:w.load}))).ok,id);
+    }
+  }
+  // The patrol receiver's laws, like the learning one's, give the values on their wires.
+  let laws=0;
+  for(const node of scenes[1].nodes)if(node.law){
+    const sc=scenes[1],leaving=sc.wires.find(w=>w.source===node.id);
+    const verdict=Forms.lawCheck(node.law,sc.wires.filter(w=>w.target===node.id).map(w=>({label:w.label,value:w.value})),leaving.value);
+    assert.ok(verdict.ok,`${node.id}: ${verdict.error||`its law gives ${verdict.got}, the model ${verdict.want}`}`);
+    laws++;
+  }
+  assert.equal(laws,6);   // look, scan, patrol point, patrol scan, drive torque, the axle's load on the wheel
+  // A law that is mistyped is caught: the look rate with its climb term dropped.
+  const sc=scenes[0],look=sc.nodes.find(n=>n.id==='look-rate'),entering=sc.wires.filter(w=>w.target==='look-rate').map(w=>({label:w.label,value:w.value}));
+  const wrong={...look.law,where:[...look.law.where.slice(0,-1),['look_r','live*free*(ν*ψ + γ*(A**2 - r**2 - ψ**2)*r)']]};
+  const climbing=entering.map(r=>r.label==='Change with gaze'?{...r,value:.5}:r);
+  const at=readings=>Forms.environment(look.law,Object.fromEntries(readings.map(r=>[look.law.letters[r.label],r.value]))).look_r;
+  assert.equal(Forms.lawCheck(look.law,climbing,at(climbing)).ok,true);
+  assert.equal(Forms.lawCheck(wrong,climbing,at(climbing)).ok,false);
 });

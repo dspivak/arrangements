@@ -125,7 +125,7 @@
     ['return', 'Return-rate weights', weights], ['eye-contact', 'Eye contact', contact],
     ['last-empty', 'Last empty', empty], ['time-away', 'Time away', age]
   ].map(([id, label, start], i, all) => ({id, label, start, end: all[i+1]?.[2] ?? NR}));
-  const api={stores,DEFAULTS,NR,NC:base.NC,PLACES,FOODS,start,field,rk4,maps,searchMap,usualMemory,learnedMemory,returnRate,casing:base.casing};
+  const api={stores,centres,DEFAULTS,NR,NC:base.NC,PLACES,FOODS,start,field,rk4,maps,searchMap,usualMemory,learnedMemory,returnRate,casing:base.casing};
   if(typeof module!=='undefined' && module.exports)module.exports=api;
   else root.FoodLearning=api;
 })(this);

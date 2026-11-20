@@ -176,7 +176,7 @@ test('the fingers, battery and spring each show the dependencies of their own lo
   assert.deepEqual(inputs('gripper/field'),['Chosen grip rate','Other grip load']);
   assert.deepEqual(inputs('gripper/field-1'),['Chosen grip rate','Grip torque']);
   assert.deepEqual(inputs('casing-0/gravity/field'),[]);
-  assert.deepEqual(inputs('casing-0/spring/field-1'),['Load on casing']);
+  assert.deepEqual(inputs('casing-0/spring'),['Air memory 1','Height 1']);
   for(const n of sc.nodes.filter(n=>n.kind==='field')){
     assert.equal(n.dependencyView,true,n.id);
     assert.ok(n.result!==undefined,n.id);

@@ -34,9 +34,12 @@
       this.running=false;this.style='illustrated';this.selection=new Set();this.selectMode=false;this.focusWire=null;this.focusNode=null;
       this.last=0;this.accumulator=0;this.speed=1;this.destroyed=false;this.cleanups=[];
       this.placements={};this.zoom='fit';this.drag=null;
+      // The hose ends the viewer has wrapped or unwrapped, at each level (explorer-layout.js, `hoseEnd`).
+      this.hoses={};
       const scene=adapter.snapshot();this.model=new E.Model(scene);
       this.storageKey=options.storageKey;
-      if(this.storageKey)try{const s=JSON.parse(localStorage.getItem(this.storageKey));if(s){this.model.restore(s);if(s.placements&&typeof s.placements==='object')this.placements=s.placements;if(s.zoom==='fit'||Number(s.zoom)>=.25&&Number(s.zoom)<=4)this.zoom=s.zoom;}}catch{}
+      if(this.storageKey)try{const s=JSON.parse(localStorage.getItem(this.storageKey));if(s){this.model.restore(s);if(s.placements&&typeof s.placements==='object')this.placements=s.placements;if(s.zoom==='fit'||Number(s.zoom)>=.25&&Number(s.zoom)<=4)this.zoom=s.zoom;
+        if(s.hoses&&typeof s.hoses==='object')for(const [scope,ends] of Object.entries(s.hoses))if(Array.isArray(ends))this.hoses[scope]=ends.filter(end=>typeof end==='string');}}catch{}
       this.el=html('section',{class:'explorer','data-playing':'false'},container);
       const header=html('header',{class:'ex-header'},this.el),title=html('div',{},header);
       html('div',{class:'ex-kicker'},title,'Arrangement explorer');
@@ -97,7 +100,7 @@
         const span=html('span',{},legend,label+' · low');html('i',{class:'ex-ramp '+kind},span);span.append('high');
       }
       html('span',{},legend,'Color = magnitude · signed numbers on selection');
-      html('p',{class:'ex-help'},this.el,'Click a box to enter; drag to move it. Shift-click parts to group them. Click a port to follow its readout. Zoom with + / − or Ctrl/⌘ + scroll. Auto arrange restores positions at this level. Alt + arrow keys move a focused part.');
+      html('p',{class:'ex-help'},this.el,'Click a box to enter; drag to move it. Shift-click parts to group them. Click a port to follow its readout. A hose is several wires bundled, one per number: click its mouth to unwrap that end into its wires, and again to wrap them. Zoom with + / − or Ctrl/⌘ + scroll. Auto arrange restores positions at this level. Alt + arrow keys move a focused part.');
       this.status=html('div',{class:'ex-status',role:'status','aria-live':'polite'},this.el);
       this.refresh();
       this.tick=now=>{
@@ -120,7 +123,15 @@
     }
     advance(dt){this.adapter.step?.(dt);if(this.adapter.ended?.())this.setRunning(false);}
     act(fn){try{fn();this.persist();this.selection.clear();this.focusWire=null;this.focusSignal=null;this.render();}catch(error){this.say(error.message,true);}}
-    persist(){if(this.storageKey)try{localStorage.setItem(this.storageKey,JSON.stringify({...this.model.save(),placements:this.placements,zoom:this.zoom}));}catch{}}
+    persist(){if(this.storageKey)try{localStorage.setItem(this.storageKey,JSON.stringify({...this.model.save(),placements:this.placements,zoom:this.zoom,hoses:this.hoses}));}catch{}}
+    // Wrap or unwrap one end of a hose at this level. Like moving a part, it changes the drawing only.
+    toggleHose(end){
+      const scope=this.model.scope,ends=new Set(this.hoses[scope]||[]),before=this.hoses[scope];
+      if(ends.has(end))ends.delete(end);else ends.add(end);
+      this.hoses[scope]=[...ends];
+      try{this.layout(this.model.project(),true);}catch(error){this.hoses[scope]=before;if(!before)delete this.hoses[scope];this.say(error.message);return false;}
+      this.persist();this.render();return true;
+    }
     syncZoomControl(){
       const select=this.zoomSelect;let custom=select.querySelector('[data-custom-zoom]');
       if(![...select.options].some(o=>!o.hasAttribute('data-custom-zoom')&&o.value===String(this.zoom))){
@@ -154,7 +165,7 @@
       this.setZoom(value,event);
     }
     beginDrag(node,event){
-      if(node.kind==='boundary'||event.button!==0||event.shiftKey||this.selectMode||event.target.closest('[data-port]'))return;
+      if(node.kind==='boundary'||event.button!==0||event.shiftKey||this.selectMode||event.target.closest('[data-port],[data-hose-end]'))return;
       const p=this.positions.get(node.id);
       this.drag={id:node.id,scope:this.model.scope,pointer:event.pointerId,x:p.x,y:p.y,clientX:event.clientX,clientY:event.clientY,
         scrollX:this.canvasWrap.scrollLeft,scrollY:window.scrollY+this.canvasWrap.scrollTop,scale:this.canvas.getScreenCTM().a,
@@ -201,11 +212,12 @@
       this.focusNode=node.id;this.focusWire=node.wire||null;this.focusSignal=null;this.render();
     }
     layout(project,strict=false){
+      const toggled=this.hoses[this.model.scope],hoseAbove=this.options.hoseAbove;
       const key=JSON.stringify([this.model.scope,project.nodes.map(n=>[n.id,n.kind,n.column,n.row,n.userGroup]),
-        project.wires.map(w=>[w.id,w.source,w.target,w.signal,w.targetPort,w.label]),this.placements[this.model.scope]]);
+        project.wires.map(w=>[w.id,w.source,w.target,w.signal,w.targetPort,w.label,E.dimension(w)]),this.placements[this.model.scope],toggled]);
       if(key!==this.layoutKey){
-        try{this.geometry=E.layout(project,{placements:this.placements[this.model.scope]});}
-        catch(error){if(strict)throw error;delete this.placements[this.model.scope];this.geometry=E.layout(project);this.say('The parts changed; automatic positions restored at this level.');}
+        try{this.geometry=E.layout(project,{placements:this.placements[this.model.scope],toggled,hoseAbove});}
+        catch(error){if(strict)throw error;delete this.placements[this.model.scope];this.geometry=E.layout(project,{toggled,hoseAbove});this.say('The parts changed; automatic positions restored at this level.');}
         this.layoutKey=key;
       }
       else E.aggregate(project.wires).forEach((w,i)=>Object.assign(this.geometry.edges[i],w));
@@ -217,7 +229,9 @@
         'aria-label':w.label+'; inspect value and returning load',opacity:this.focusWire&&!selected?.16:1},parent);
       const reading=w.label+(w.argument===false?' · receives load ':' · value '+E.format(w.value)+' · returning load ')+E.format(w.load);
       svg('title',{},g,reading);g.setAttribute('aria-label',reading);
-      svg('path',{d,fill:'none',stroke:'white','stroke-width':12,'stroke-linejoin':'round'},g);
+      const hose=E.dimension(w)>1;
+      svg('path',{d,fill:'none',stroke:'white','stroke-width':hose?23:12,'stroke-linejoin':'round'},g);
+      if(hose)this.drawHose(g,d);
       for(const kind of w.argument===false?['load']:['value','load']){
         const color=E.color(w[kind],w[kind+'Scale'],kind);
         const magnitude=E.magnitude(w[kind]),forward=kind==='value',sign=forward?1:-1;
@@ -238,10 +252,16 @@
     }
     // The stretch of a wire inside a compact mark, from its labeled terminal to the mark itself:
     // the same value and load tracks as drawWire, so both are seen to reach the map or the field.
-    drawLead(parent,w,tracks){
+    // A strand of an unwrapped hose (explorer-core.js, `strand`) is drawn the same way, and says on hover which
+    // of the hose's wires it is, with its value and load.
+    drawLead(parent,w,tracks,d){
       const selected=this.focusSignal?E.signalKey(w)===this.focusSignal:(w.branches||[w]).some(b=>b.id===this.focusWire);
       const g=svg('g',{'data-lead':w.id,opacity:this.focusWire&&!selected?.16:1},parent);
-      for(const kind of w.argument===false?['load']:['value','load']){
+      // `d` is the stretch's middle line: a hose stays a hose all the way into the mark, so that it is never
+      // seen to turn into one wire, which would read as a projection.
+      if(d&&E.dimension(w)>1)this.drawHose(g,d);
+      if(w.strandOf){g.setAttribute('data-strand',w.index);
+        svg('title',{},g,w.label+(w.argument===false?' · receives load ':' · value '+E.format(w.value)+' · returning load ')+E.format(w.load));}      for(const kind of w.argument===false?['load']:['value','load']){
         const magnitude=E.magnitude(w[kind]),forward=kind==='value',sign=forward?1:-1;
         svg('path',{d:tracks[kind],fill:'none',stroke:E.color(w[kind],w[kind+'Scale'],kind),'stroke-width':selected?3.5:2.5,
           'stroke-linejoin':'round','stroke-linecap':'round',
@@ -249,6 +269,59 @@
         if(magnitude>0)svg('path',{d:tracks[kind],fill:'none',stroke:forward?'#084675':'#963816',
           'stroke-width':selected?5.5:4.5,'stroke-linecap':'round','stroke-dasharray':'4 56',
           class:'ex-pulse'+(forward?'':' ex-back'),'stroke-dashoffset':-sign*((this.model.scene.time||0)%3)*20},g);
+      }
+    }
+    // A hose, the shape around wires that are bundled: a tube around the middle line `d` of a wire that carries
+    // a list of numbers, ribbed so that it reads as a hose and not as one thick wire. The value track and the
+    // load track run inside it, colored by the size of the whole list.
+    drawHose(parent,d){
+      svg('path',{d,fill:'none',stroke:'#7d91a4','stroke-width':17,'stroke-linejoin':'round','data-hose':'tube'},parent);
+      svg('path',{d,fill:'none',stroke:'#eef2f6','stroke-width':14,'stroke-linejoin':'round'},parent);
+      svg('path',{d,fill:'none',stroke:'#c3cfda','stroke-width':14,'stroke-dasharray':'1.4 8.6'},parent);
+    }
+    // The mouth of a hose, the icon that wraps and unwraps it: an oval, the hose's open end seen at a slant,
+    // with the number of wires in the hose beside it. On a part it is a wrapped end, the part's one hose port
+    // for that many numbers; away from the part, where the strands of an unwrapped end meet the hose, it is
+    // the unwrapped one. Clicking it changes that end to the other. `end` is the end's key (none where the
+    // end cannot be unwrapped: a boundary port, a spring's terminal); `outward` is 1 to write the count to
+    // the right of the mouth and -1 to its left, the side away from the part or from the port's name.
+    // `standsFor` is what the model says the list stands in for (a wire's `standsFor`, such as 'ℝ^[−9, 9]' for
+    // a function on a line held as n coefficients): written after the count, the part after ^ raised.
+    // It is written where a hose leaves a part and where it crosses a boundary (there above the port's name,
+    // `rise` higher), not at each terminal it enters, where the names stand close.
+    drawMouth(parent,x,y,count,end,wrapped,label,outward,standsFor,rise=12){
+      const g=svg('g',{class:'ex-hose-end','data-wrapped':String(wrapped),role:end?'button':'img'},parent);
+      const say=label+' · '+count+' wires in a hose'+(standsFor?', standing in for '+standsFor:'')+(end?wrapped?' · click to unwrap them':' · click to wrap them':'');
+      svg('title',{},g,say);g.setAttribute('aria-label',say);
+      svg('circle',{cx:x,cy:y,r:12,fill:'transparent'},g);
+      svg('ellipse',{cx:x,cy:y,rx:4.8,ry:9.6,fill:'white',stroke:'#4f6578','stroke-width':1.8},g);
+      svg('ellipse',{cx:x,cy:y,rx:1.7,ry:5.4,fill:'#4f6578'},g);
+      svg('text',{x:x+outward*8,y:y-rise,'text-anchor':outward>0?'start':'end',class:'ex-port-label ex-hose-count',stroke:'white','stroke-width':3,'paint-order':'stroke'},g,String(count));
+      if(standsFor){
+        const [base,power]=standsFor.split('^'),tag=g.lastChild;
+        svg('tspan',{},tag,' for '+base);
+        if(power){svg('tspan',{dy:-4,'font-size':'82%'},tag,power);svg('tspan',{dy:4},tag,'​');}
+      }
+      if(!end)return;
+      g.setAttribute('data-hose-end',end);g.setAttribute('tabindex',0);
+      const toggle=e=>{e.stopPropagation();this.toggleHose(end);};
+      g.onclick=toggle;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle(e);}};
+    }
+    // A spring, the field minus d of half a stiffness times a squared difference: no mark, only the bend that
+    // joins its two wires, the bend's upright stretch drawn as a resistor in the book's load red (loadcolor,
+    // red!80!black) with the stiffness written over the top. A resistor has this same field.
+    drawSpring(g,node,p,selected){
+      const ys=p.inputs.map(port=>port.glyphY).sort((a,b)=>a-b),top=ys[0],bottom=ys.at(-1),x=p.glyphX;
+      const teeth=6,step=(bottom-top-8)/teeth;
+      let d=`M ${x} ${top} L ${x} ${top+4}`;
+      for(let k=0;k<teeth;k++)d+=` L ${x+(k%2?-7:7)} ${top+4+(k+.5)*step}`;
+      d+=` L ${x} ${bottom-4} L ${x} ${bottom}`;
+      svg('rect',{x:x-13,y:top-2,width:26,height:bottom-top+4,rx:6,fill:selected?'#e0effa':'transparent',
+        stroke:selected?'#1474ab':'none','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
+      svg('path',{d,fill:'none',stroke:'#cc0000','stroke-width':2.4,'stroke-linejoin':'round','stroke-linecap':'round','data-glyph':'spring'},g);
+      if(Forms&&node.stiffness){
+        const rows=p.inputs.map(port=>port.y-p.y),tag=svg('text',{x:x+3,y:Math.min(...rows)-9,'text-anchor':'middle',class:'ex-form ex-stiffness'},g);
+        writeSvg(tag,Forms.runs(Forms.parse(node.stiffness)));
       }
     }
     rendererFor(node){return this.renderers[node.renderer]||this.renderers[node.kind];}
@@ -295,8 +368,16 @@
       for(const fork of forks){
         const w=E.forkWire(fork.wires.flatMap(w=>w.branches)),d=`M ${fork.start.x} ${fork.start.y} L ${fork.end.x} ${fork.end.y}`;
         this.drawWire(wireLayer,w,d,fork.tracks,fork.start,fork.end,true);
-        svg('circle',{cx:fork.end.x,cy:fork.end.y,r:3.8,fill:'#425f73',class:'ex-fork','data-fork':fork.port.key},wireLayer);
+        svg('circle',{cx:fork.end.x,cy:fork.end.y,r:E.dimension(w)>1?6:3.8,fill:'#425f73',class:'ex-fork','data-fork':fork.port.key},wireLayer);
       }
+      // An unwrapped end of a hose: its strands, one wire per number, between the part's ports and the mouth.
+      for(const p of positions.values())for(const group of p.groups){
+        const out=group.side==='outputs';
+        const whole=out&&group.wires.length>1?E.forkWire(group.wires.flatMap(w=>w.branches||[w])):group.wires[0];
+        for(const port of group.ports)this.drawLead(wireLayer,E.strand(whole,port.index),port.tracks);
+        this.drawMouth(wireLayer,group.x,group.y,group.dimension,group.end,false,group.label,out?1:-1,out?whole.standsFor:undefined);
+      }
+      let lawCard=null;
       for(const node of project.nodes){
         const p=positions.get(node.id),selected=this.selection.has(node.id),hasChildren=this.model.children(node.id).length;
         const g=svg('g',{transform:`translate(${p.x},${p.y})`,class:'ex-node',tabindex:0,role:'button','data-node':node.id,
@@ -305,7 +386,10 @@
           svg('circle',{r:4.5,fill:'#fff',stroke:'#76889b','stroke-width':1.5},g);
           const left=p.x<width/2;
           const label=node.label.length>24?node.label.slice(0,22)+'…':node.label;
-          svg('text',{x:left?8:-8,y:-7,'text-anchor':left?'start':'end',class:'ex-port-label',stroke:'white','stroke-width':3,'paint-order':'stroke'},g,label);
+          // A hose stays wrapped where it crosses the boundary of the opened box; its name stands clear of the tube.
+          const crossing=[...p.inputs,...p.outputs].find(port=>port.hose);
+          svg('text',{x:left?8:-8,y:crossing?-13:-7,'text-anchor':left?'start':'end',class:'ex-port-label',stroke:'white','stroke-width':3,'paint-order':'stroke'},g,label);
+          if(crossing)this.drawMouth(g,0,0,crossing.hose,null,true,node.label,(left?1:-1)*(crossing.wires[0].standsFor?1:-1),crossing.wires[0].standsFor,crossing.wires[0].standsFor?27:12);
         }else{
           if(node.kind==='box')svg('rect',{x:-p.w/2,y:-p.h/2,width:p.w,height:p.h,rx:this.style==='wiring'?0:12,fill:selected?'#e0effa':'#f5f9fc',stroke:selected?'#1474ab':'#a9becf','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
           else if(p.radius){
@@ -314,10 +398,16 @@
               const bend=p.glyphX+(left?-1:1)*(p.radius+10);
               // The value and its load run on from the terminal into the mark, on the wire's own two tracks.
               const T={x:px,y:py},B={x:bend,y:py},K={x:bend,y:port.glyphY},G={x:port.glyphX,y:port.glyphY};
-              const segments=left?[{a:T,b:B},{a:B,c:B,d:K,b:G}]:[{a:G,c:K,d:B,b:B},{a:B,b:T}];
-              this.drawLead(g,port.wires.length>1?E.forkWire(port.wires.flatMap(w=>w.branches||[w])):port.wires[0],E.geometry.wireTracks(segments));
+              // A spring's wires are joined by a bend, the cap of string diagrams: each runs level to the
+              // bend's corner and turns there into the upright stretch.
+              const corner={x:port.glyphX,y:py};
+              const segments=node.glyph==='spring'?[{a:T,b:B},{a:B,c:corner,d:corner,b:G}]
+                :left?[{a:T,b:B},{a:B,c:B,d:K,b:G}]:[{a:G,c:K,d:B,b:B},{a:B,b:T}];
+              const whole=port.wires.length>1?E.forkWire(port.wires.flatMap(w=>w.branches||[w])):port.wires[0];
+              this.drawLead(g,port.group?E.strand(whole,port.index):whole,E.geometry.wireTracks(segments),E.geometry.path(segments));
             }
-            svg('circle',{cx:p.glyphX,r:p.radius,fill:selected?'#e0effa':node.kind==='field'?'#f8e8dc':'#eef1f4',
+            if(node.glyph==='spring')this.drawSpring(g,node,p,selected);
+            else svg('circle',{cx:p.glyphX,r:p.radius,fill:selected?'#e0effa':node.kind==='field'?'#f8e8dc':'#eef1f4',
               stroke:selected?'#1474ab':'#91a1af','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
           }
           // A store is one blue box, the book's fill for a part that only stores a state
@@ -328,10 +418,11 @@
             const animation=svg('g',{transform:node.kind==='state'?`translate(0,${-p.h/2+40}) scale(.7)`:p.radius?`translate(${p.glyphX},0) scale(.43)`:'scale(.62)'},g);
             this.drawAnimation(animation,node,p.w,p.h);
           }else if(node.kind==='state'){
-            const v=E.magnitude(node.value)||0;
-            svg('line',{x1:-58,x2:58,y1:0,y2:0,stroke:'#c1d5e4','stroke-width':4},g);
-            svg('circle',{cx:48*Math.tanh(v/5),cy:0,r:9,fill:'#237bab'},g);
-            svg('text',{y:25,'text-anchor':'middle',class:'ex-secondary'},g,E.format(node.value).slice(0,28));
+            // The stored value keeps its place under the store's top, above the readouts, however many there are.
+            const v=E.magnitude(node.value)||0,top=svg('g',{transform:`translate(0,${-p.h/2+66})`},g);
+            svg('line',{x1:-58,x2:58,y1:0,y2:0,stroke:'#c1d5e4','stroke-width':4},top);
+            svg('circle',{cx:48*Math.tanh(v/5),cy:0,r:9,fill:'#237bab'},top);
+            svg('text',{y:25,'text-anchor':'middle',class:'ex-secondary'},top,E.format(node.value).slice(0,28));
           }else if(hasChildren){
             svg('text',{y:4,'text-anchor':'middle',class:'ex-secondary'},g,'Open');
           }else if(node.symbol){
@@ -342,14 +433,23 @@
             if(node.kind==='state')svg('line',{x1:-64,x2:p.w/2,y1:py,y2:py,stroke:'#b9cedd','stroke-width':2},g);
             const mark=svg('g',{'data-port':port.key,'data-side':port.side,role:'button',tabindex:0,'aria-label':port.label+' '+port.side+' port; follow readout'},g);
             svg('circle',{cx:px,cy:py,r:10,fill:'transparent'},mark);
-            svg('circle',{cx:px,cy:py,r:4,fill:'white',stroke:'#386b88','stroke-width':1.6},mark);
+            // One port carries one number. A port that carries a list is a hose port, drawn below as the
+            // hose's mouth; a strand's port is one number of an unwrapped hose.
+            if(!port.hose)svg('circle',{cx:px,cy:py,r:4,fill:'white',stroke:'#386b88','stroke-width':1.6},mark);
             svg('title',{},mark,port.label+' · '+(left?'input':'output'));
-            const text=node.kind==='state'?E.format(port.wires[0].value):port.label;
+            const strand=port.group&&E.strand(port.wires[0],port.index),place=strand&&E.coordinate(port.wires[0],port.index);
+            const text=node.kind==='state'?(port.hose?port.hose+' numbers':strand?place+':  '+E.format(strand.value):E.format(port.wires[0].value))
+              :strand&&!p.radius&&port.label.length>16?'… '+place:port.label;
             // A store's readout is written under its line; above it would sit on the stored value (y=25).
             const tag=svg('text',{x:node.kind==='state'?0:px+(left?9:-9),y:node.kind==='state'?py+15:py-6,'text-anchor':node.kind==='state'?'middle':left?'start':'end',class:'ex-port-label'},mark,!p.radius && text.length>16?text.slice(0,14)+'…':text);
-            // The letter the field's formula uses for this terminal, after its name.
-            const letter=Forms&&node.form?.letters?.[port.label];
+            // The letter the field's formula uses for this terminal, after its name; a strand's is its
+            // hose's letter with the strand's number under it.
+            // A hose terminal's name lies on the hose's tube: a white edge keeps it readable.
+            if(port.hose&&p.radius)for(const [k,v] of [['stroke','white'],['stroke-width',3],['paint-order','stroke']])tag.setAttribute(k,v);
+            const hoseLetter=Forms&&(node.form||node.law)?.letters?.[port.group?port.group.label:port.label];
+            const letter=hoseLetter&&port.group&&!hoseLetter.includes('_')?hoseLetter+'_'+(port.index+1):hoseLetter;
             if(letter){svg('tspan',{},tag,'  ');const span=svg('tspan',{class:'ex-form'},tag);writeSvg(span,Forms.runs(Forms.parse(letter)));}
+            if(port.hose)this.drawMouth(g,px,py,port.hose,port.end,true,port.label,left?-1:1,left?undefined:port.wires[0].standsFor);
             const selectPort=e=>{e.stopPropagation();this.focusSignal=port.wires[0].signal;this.focusWire=port.wires[0].branches[0].id;this.focusNode=null;this.render();};
             mark.onclick=selectPort;mark.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectPort(e);}};
           }
@@ -361,6 +461,11 @@
             const tag=svg('text',{y:p.h/2+15,'text-anchor':'middle',class:'ex-form'+(this.formCheck(node).ok?'':' ex-form-wrong'),stroke:'white','stroke-width':3,'paint-order':'stroke'},g);
             writeSvg(tag,long?[{text:Forms.plain(line).slice(0,42)+'…'}]:line);
           }
+          // A static map's law is written under its circle while the circle is the one chosen: each
+          // abbreviation on its own line, whole, red when it disagrees with the value on the wire leaving it.
+          // It is drawn after every part, on a white card, so that no wire or title crosses it.
+          if(Forms&&node.law&&this.focusNode===node.id)
+            lawCard={x:p.x+(p.glyphX??0),y:p.y+p.h/2+6,lines:Forms.definitions(node.law),wrong:!this.lawCheck(node).ok};
           if(hasChildren)svg('text',{x:p.w/2-9,y:p.h/2-8,'text-anchor':'end',class:'ex-secondary'},g,this.model.children(node.id).length+' inside');
           if(this.selectMode)svg('circle',{cx:-p.w/2+10,cy:-p.h/2+12,r:6,fill:selected?'#13669b':'white',stroke:'#13669b'},g);
         }
@@ -373,12 +478,30 @@
           if(e.key==='Enter'||e.key===' '){e.preventDefault();this.choose(node,e);}
         };
       }
+      if(lawCard){
+        const w=Math.max(...lawCard.lines.map(line=>Forms.plain(line).length))*6.9+24,h=lawCard.lines.length*19+10;
+        const x=Math.min(Math.max(lawCard.x,58+w/2),width-58-w/2),card=svg('g',{class:'ex-law-card','pointer-events':'none'},this.canvas);
+        svg('rect',{x:x-w/2,y:lawCard.y,width:w,height:h,rx:7,fill:'white',stroke:lawCard.wrong?'#b3261e':'#c9a98f','stroke-width':1.2},card);
+        lawCard.lines.forEach((line,k)=>writeSvg(svg('text',{x,y:lawCard.y+19+k*19,'text-anchor':'middle',class:'ex-form'+(lawCard.wrong?' ex-form-wrong':'')},card),line));
+      }
       this.renderDetails();
       if(focused){const el=[...this.canvas.querySelectorAll('[data-node]')].find(el=>el.getAttribute('data-node')===focused);el?.focus({preventScroll:true});}
     }
     // A field's form against the values and loads now on the wires that enter its mark.
     formCheck(node){
       return Forms.check(node.form,this.model.scene.wires.filter(w=>w.target===node.id).map(w=>({label:w.label,value:w.value,load:w.load})));
+    }
+    // A static map's law against the values now on its entering wires and the value on the wire leaving it.
+    lawCheck(node){
+      const all=this.model.scene.wires,leaving=all.find(edge=>edge.source===node.id);
+      return Forms.lawCheck(node.law,all.filter(edge=>edge.target===node.id).map(edge=>({label:edge.label,value:edge.value})),leaving?.value);
+    }
+    // The constants of a form or a law, on one line of the sidebar: name = number.
+    writeConstants(written){
+      const constants=Object.entries(written.constants||{});
+      if(!constants.length)return;
+      const p=html('p',{class:'ex-form'},this.sidebar);
+      constants.forEach(([name,v],k)=>writeHtml(p,[...(k?[{text:',  '}]:[]),...Forms.runs(Forms.parse(name)),{text:' = '+E.format(v)}]));
     }
     renderDetails(){
       this.sidebar.replaceChildren();
@@ -431,14 +554,20 @@
           html('h3',{},this.sidebar,'Inclination field');
           writeHtml(html('output',{class:'ex-form'},this.sidebar),Forms.written(n.form));
           for(const line of Forms.definitions(n.form))writeHtml(html('p',{class:'ex-form'},this.sidebar),line);
-          const constants=Object.entries(n.form.constants||{});
-          if(constants.length){
-            const p=html('p',{class:'ex-form'},this.sidebar);
-            constants.forEach(([name,v],k)=>writeHtml(p,[...(k?[{text:',  '}]:[]),...Forms.runs(Forms.parse(name)),{text:' = '+E.format(v)}]));
-          }
+          this.writeConstants(n.form);
           const verdict=this.formCheck(n);
           html('p',{class:verdict.ok?'ex-form-agrees':'ex-form-wrong'},this.sidebar,verdict.ok?'This formula gives the loads now on its wires.'
             :verdict.error||('This formula disagrees with the model: '+verdict.rows.filter(r=>!r.ok).map(r=>`at ${r.letter} it gives ${E.format(r.got)}, the model ${E.format(r.want)}`).join('; ')+'.'));
+        }
+        // A static map's law, in the letters at its terminals, checked against the value on the wire leaving it.
+        // The heading is the book's term for a part that is stateless and has no inclination field.
+        if(Forms&&n.law){
+          html('h3',{},this.sidebar,'Static arrangement');
+          for(const line of Forms.definitions(n.law))writeHtml(html('p',{class:'ex-form'},this.sidebar),line);
+          this.writeConstants(n.law);
+          const verdict=this.lawCheck(n);
+          html('p',{class:verdict.ok?'ex-form-agrees':'ex-form-wrong'},this.sidebar,verdict.ok?'This formula gives the value now on its wire.'
+            :verdict.error||`This formula gives ${E.format(verdict.got)}, the model ${E.format(verdict.want)}.`);
         }
         if(n.description)html('p',{},this.sidebar,n.description);
         for(const [key,label] of [['value','State'],['configuration','Readout'],['inclination','Total inclination']])if(n[key]!==undefined){html('h3',{},this.sidebar,label);html('output',{},this.sidebar,E.format(n[key]));}
@@ -467,6 +596,7 @@
           const line=html('label',{},row,label+' ');html('output',{},line,E.format(wire[key]));
           html('div',{class:'ex-scale'},row,'High color at |'+key+'| ≥ '+(wire[key+'Scale']??1)+(wire[key+'Unit']?' '+wire[key+'Unit']:''));
         }
+        if(E.dimension(wire)>1)html('p',{},row,'A hose: '+E.dimension(wire)+' wires bundled, one per number'+(wire.standsFor?', standing in for '+wire.standsFor.replace('^','^('  )+(wire.standsFor.includes('^')?')':''):'')+'. Click a mouth of the hose to unwrap that end into its wires.');
         if(wire.description)html('p',{},row,wire.description);
         if(wire.branches.length>1)html('p',{},row,'The '+wire.branches.length+' internal contributions add to this returning load.');
       }
