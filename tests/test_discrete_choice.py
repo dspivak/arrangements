@@ -19,7 +19,7 @@ The derivation was fixed in writing before ``arrangements/choice.py`` existed
   parameters, inverse-Fisher response, affine forcing, ``lambda |-> lambda + t`` with
   ``t_i = (v_i - v_n)/T``, landing on the logit exactly from the uniform belief.
 * a MADE CHOICE is a ``(cot(Q) tri rand)``-coalgebra whose branches are the constant maps onto
-  the vertices, so a sampled collapse is inside ``poly(SmSet)``; ``argmax`` is not.
+  the vertices, so a sampled collapse is inside ``poly(Smooth)``; ``argmax`` is not.
 
 THE FIVE PREDICTIONS, verbatim from notes/DISCRETE-CHOICE.md §3, written before any
 construction code:

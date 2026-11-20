@@ -17,7 +17,7 @@ translation from CDLM is in STATUS.md §1).
 
 In this module, the array core, the smooth sets are Cartesian spaces ``R^d``,
 recorded by their dimensions -- the admissible subcategory of STATUS.md §3.1,
-not the whole of ``SmSet``. An interface side that is a mapping space (a wire
+not the whole of ``Smooth``. An interface side that is a mapping space (a wire
 that carries a function) is in ``smooth.py``, the core beside this one;
 ``smooth.include`` sends an ``Arrangement`` of this module into it, and both are
 stepped by ``pcK.rounds``. A one-form on ``R^a x R^b x R^c`` is represented as a callable

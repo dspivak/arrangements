@@ -1146,7 +1146,7 @@ in is part of the arrangement.**
 
 **A made choice is a sample, and it needs no extension of the framework.** The collapsing chooser is
 a `(cot(Q) tri rand)`-coalgebra whose branches are the constant maps onto the vertices, so it is
-inside `poly(SmSet)`; `key_sampler` gives frequencies within 0.0066 of `p` over 20000 draws
+inside `poly(Smooth)`; `key_sampler` gives frequencies within 0.0066 of `p` over 20000 draws
 (bound 0.0283), `FiniteRV.bind` gives the exact two-step law with no sampler, and that law equals
 the one-step law, so it is **absorbing** — a chooser that stores its choice cannot reconsider, while
 one that records it without feeding it back can. What is outside the smooth setting is `argmax`: its

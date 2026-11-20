@@ -16,7 +16,7 @@ and the jump it makes in the state is outside the smooth setting unless the stat
 distribution." The first half stands. The second does not: `rand`'s whole point is that the
 branching lives in its *positions*, so a map `S -> rand(S)` needs only a smooth weight map
 `S -> Delta_n` and `n` smooth return maps `S -> S`, and for a chooser the return maps are the
-constant maps onto the vertices. A **sampled** collapse is therefore inside `poly(SmSet)` with
+constant maps onto the vertices. A **sampled** collapse is therefore inside `poly(Smooth)` with
 no extension at all. What is outside the smooth setting is the **deterministic** chooser,
 `argmax`, which has no smooth extension across a tie. Determinism is the obstruction, not the
 jump. Prediction 4 is the test of that correction.
@@ -100,7 +100,7 @@ The distribution is not yet a choice. A chooser that collapses is a
 `(cot(Q) tri rand)`-coalgebra, `rand.CotCoalgR` over `FiniteRV`: at state `p` it presents `p`
 and, on a covector, returns the finite random variable with weights `p` and outcomes the `n`
 vertices `e_1, ..., e_n`. Each branch is a *constant* map `Delta_n -> Delta_n`, hence smooth,
-and the branching sits in `rand`'s positions, so nothing leaves `poly(SmSet)`. `rand.seeded`
+and the branching sits in `rand`'s positions, so nothing leaves `poly(Smooth)`. `rand.seeded`
 with a sampler turns it back into an ordinary `CotCoalg`; `FiniteRV.bind` iterates it exactly
 with no sampler at all.
 
@@ -252,7 +252,7 @@ chooser is absorbing, and that is visible without sampling. It tensors with an o
 limit fails instead: the choice's derivative in the utility gap, at gap 1, is 0.196612,
 0.000453958, 0.0 at `T = 1, 0.1, 0.01`, while at a tie it is exactly 0.5 at every `T`. **So the
 stage's own prediction was wrong in one clause and the correction is confirmed: a sampled
-collapse is inside `poly(SmSet)` with no extension; determinism is the obstruction.**
+collapse is inside `poly(Smooth)` with no extension; determinism is the obstruction.**
 
 ### Prediction 5 — choice is selection at a temperature. **Held, one clause half testable.**
 

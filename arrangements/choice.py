@@ -68,7 +68,7 @@ A CHOICE ACTUALLY MADE (``collapsing_chooser``) is a ``(cot(Q) tri rand)``-coalg
 (``rand.CotCoalgR`` over ``FiniteRV``): at state ``p`` it presents ``p`` and, on a
 covector, returns the finite random variable with weights ``p`` and outcomes the
 vertices. Each branch is a CONSTANT map, hence smooth, and the branching sits in
-``rand``'s positions, so nothing leaves ``poly(SmSet)``: a SAMPLED collapse needs no
+``rand``'s positions, so nothing leaves ``poly(Smooth)``: a SAMPLED collapse needs no
 extension of the framework. ``rand.seeded`` turns it into an ordinary ``CotCoalg``
 and ``FiniteRV.bind`` iterates it exactly with no sampler. It is ABSORBING -- at a
 vertex ``e_i`` the weights are ``e_i`` -- so a chooser that stores its choice cannot
@@ -280,7 +280,7 @@ def trajectory(arr: Arrangement, steps: int, s: Optional[Array] = None) -> Array
 def collapsing_chooser(n: int, init: Optional[Array] = None) -> CotCoalgR:
     """The chooser that stores its choice: weights the current distribution, outcomes the
     ``n`` vertices. Each branch is a constant map, so this is a ``(cot(Q) tri rand)``-coalgebra
-    in ``poly(SmSet)`` with no extension. It is absorbing: at ``e_i`` the weights are ``e_i``.
+    in ``poly(Smooth)`` with no extension. It is absorbing: at ``e_i`` the weights are ``e_i``.
     """
     p0 = jnp.full(n, 1.0 / n) if init is None else jnp.asarray(init, dtype=float)
     vertices = jnp.eye(n)

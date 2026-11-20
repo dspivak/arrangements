@@ -31,7 +31,7 @@ from .rvect import SmoothMap
 
 
 # ---------------------------------------------------------------------------
-# cot : SmSet -> poly(SmSet) (sec.poly_smoothset), restricted to R^d.
+# cot : Smooth -> poly(Smooth) (sec.poly_smoothset), restricted to R^d.
 # ---------------------------------------------------------------------------
 
 

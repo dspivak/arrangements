@@ -1,6 +1,6 @@
 """Randomness: random-variable polynomials, samplers, and stochastic integrators (STATUS.md §3.12).
 
-Two random-variable polynomials in ``poly(SmSet)``, each a ``tri``-monad and an
+Two random-variable polynomials in ``poly(Smooth)``, each a ``tri``-monad and an
 ``(x)``-monoid (independent product), neither commutative:
 
 * ``rand = sum_n Delta_n y^{underline n}`` (NOTATION.md "Random-variable polynomial"):
