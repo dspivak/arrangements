@@ -125,6 +125,10 @@
   }
   // The rows of a spring's terminals, and how far down its bend each wire has turned where it meets the resistor.
   const SPRING_ROWS=46,SPRING_TURN=9;
+  // A spring with a third terminal (`third`, the label of the wire that sets its stiffness) has that terminal
+  // on a row of its own between its two ends, where its wire meets the resistor from the side. A spring to an
+  // anchor (`anchor`) has one end; the row below it is the anchor's, which has no port.
+  const springRows=p=>p.inputs.length+(p.anchor?1:0),springPitch=p=>p.third?32:SPRING_ROWS;
   // Hoses. A wire of dimension n > 1 (explorer-core.js, `dimension`) is n wires bundled. At each of its two
   // ends it is either wrapped, one hose port on the part, or unwrapped, n ports on the part, one per number,
   // whose strands run to the hose's mouth a little way off. A list of at most `options.hoseAbove` numbers
@@ -138,7 +142,7 @@
     const edges=E.aggregate(project.wires).map(w=>({...w,signal:E.signalKey(w)}));
     const toggled=new Set(options.toggled||[]),hoseAbove=options.hoseAbove??4;
     const positions=new Map(),inner=project.nodes.filter(n=>n.kind!=='boundary'),boundaries=project.nodes.filter(n=>n.kind==='boundary');
-    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,glyph:n.glyph,inputs:[],outputs:[],groups:[],x:0,y:0,w:0,h:0});
+    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,glyph:n.glyph,third:n.third,anchor:n.anchor,inputs:[],outputs:[],groups:[],x:0,y:0,w:0,h:0});
     for(const w of edges){
       const a=positions.get(w.source),b=positions.get(w.target);w.outKey=w.signal;w.inKey=w.targetPort??w.signal;
       w.dimension=E.dimension(w);
@@ -195,7 +199,7 @@
         p.h=Math.max(2*p.radius+10,count*20+12);
         // A spring is a bend joining its wires, with a resistor on the bend's upright stretch: its terminals
         // stand further apart, so that the resistor between them can be seen.
-        if(n.glyph==='spring')p.h=(count-1)*SPRING_ROWS+40;
+        if(n.glyph==='spring')p.h=(springRows(p)-1)*springPitch(p)+40;
       }
       if(n.kind==='state')p.h=Math.max(132,100+count*24);
       // How far from the part an unwrapped hose's mouth stands: further for a taller fan of strands.
@@ -233,6 +237,11 @@
           const name=port=>port.group?port.group.label:port.label;
           return ordinate(a)-ordinate(b)||name(a).localeCompare(name(b))||(a.index??-1)-(b.index??-1);
         });
+        // A spring's third terminal stands between its two ends, wherever its wire comes from.
+        if(p.glyph==='spring'&&p.third&&side==='in'){
+          const k=ports.findIndex(port=>port.label===p.third);
+          if(k>=0)ports.splice(1,0,...ports.splice(k,1));
+        }
         ports.forEach((port,i)=>{
           let dy=(i-(ports.length-1)/2)*22,dx=p.w/2;
           if(p.kind==='boundary'){dy=0;dx=0;}
@@ -244,8 +253,11 @@
             port.glyphY=p.radius*Math.sin(angle);
             // A spring's wire runs level to the bend and turns into its upright stretch, where it ends.
             if(p.glyph==='spring'){
-              dy=(i-(ports.length-1)/2)*SPRING_ROWS;
-              port.glyphX=p.glyphX;port.glyphY=dy+Math.sign((ports.length-1)/2-i)*SPRING_TURN;
+              const middle=(springRows(p)-1)/2;
+              dy=(i-middle)*springPitch(p);
+              port.glyphX=p.glyphX;port.glyphY=dy+Math.sign(middle-i)*SPRING_TURN;
+              // The third terminal's wire runs level to the resistor and ends at its side.
+              if(port.label===p.third){port.third=true;port.glyphX=p.glyphX-10;port.glyphY=dy;}
             }
           }
           port.side=side;port.x=p.x+(side==='in'?-dx:dx);port.y=p.y+dy;
@@ -290,6 +302,6 @@
     }
     return {positions,width,height,edges,forks};
   }
-  E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks};
+  E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks,springRows:SPRING_ROWS,springTurn:SPRING_TURN};
   if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom,hoseEnd,endAt};
 })(globalThis);

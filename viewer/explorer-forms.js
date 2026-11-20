@@ -138,6 +138,33 @@
       return {ok,got,want};
     }catch(error){return {ok:false,error:error.message};}
   }
+  /* A static map sends the load on the wires that leave it back along the wires that enter it, each through
+   * the transpose of its law's derivative: the load on a letter is the leaving load times the law's derivative
+   * along that letter (composition's pullback, which nobody writes in). readings: the map's entering wires,
+   * [{label, value, load}]; load: the total load on the wires leaving it. Returns {ok, rows, error}, a row per
+   * letter with the model's load (`want`) and the law's (`got`). The derivative is a five-point difference,
+   * since a smooth gate's higher derivatives are large. A map of lists is checked only where every load is 0. */
+  function pullbackCheck(law,readings,load){
+    try{
+      const values={},want={},flat=x=>[].concat(x??0).flat(Infinity),zero=x=>flat(x).every(v=>Math.abs(v)<=1e-12);
+      for(const r of readings){
+        const letter=law.letters?.[r.label];
+        if(letter===undefined){if(!zero(r.load))throw Error(`The wire ${r.label} carries a load and has no letter`);continue;}
+        values[letter]=r.value;want[letter]=letter in want?plus(want[letter],r.load??0):(r.load??0);
+      }
+      const letters=Object.keys(values),name=law.where.at(-1)[0];
+      if(zero(load))return (rows=>({ok:rows.every(r=>r.ok),rows}))(letters.map(letter=>({letter,got:0,want:want[letter],ok:zero(want[letter])})));
+      if(typeof load!=='number'||letters.some(letter=>typeof values[letter]!=='number'))throw Error('A map of lists that carries a load is not checked');
+      const rows=letters.map(letter=>{
+        const at=values[letter],h=2e-5*Math.max(1,Math.abs(at)),f=d=>environment(law,{...values,[letter]:at+d})[name];
+        const got=load*(-f(2*h)+8*f(h)-8*f(-h)+f(-2*h))/(12*h),w=want[letter];
+        // The floor is the differences' round-off, which grows with the load they multiply.
+        return {letter,got,want:w,ok:Math.abs(got-w)<=1e-6*Math.max(Math.abs(got),Math.abs(w))+1e-9*Math.max(1,Math.abs(load))};
+      });
+      const wrong=rows.find(r=>!r.ok);
+      return {ok:!wrong,rows,...(wrong?{error:`Its law sends the load ${wrong.got} back along ${wrong.letter}; that wire carries ${wrong.want}`}:{})};
+    }catch(error){return {ok:false,rows:[],error:error.message};}
+  }
 
   // ---- Writing a formula. A run is {text, shift} with shift 1 a superscript, -1 a subscript, and
   // `italic` for a one-letter name. `plain` joins runs into one line of text.
@@ -196,6 +223,6 @@
   }
   // Each abbreviation as name = formula, in order.
   const definitions=form=>(form.where||[]).map(([n,text])=>[...name(n),{text:' = '},...runs(parse(text))]);
-  const api={functions,parse,value,environment,loads,check,lawCheck,runs,term,written,definitions,plain};
+  const api={functions,parse,value,environment,loads,check,lawCheck,pullbackCheck,runs,term,written,definitions,plain};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementForms=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

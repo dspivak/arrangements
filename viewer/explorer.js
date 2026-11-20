@@ -310,8 +310,13 @@
     // A spring, the field minus d of half a stiffness times a squared difference: no mark, only the bend that
     // joins its two wires, the bend's upright stretch drawn as a resistor in the book's load red (loadcolor,
     // red!80!black) with the stiffness written over the top. A resistor has this same field.
+    // Two more of the kind. A spring to an anchor has one wire: the resistor runs from it down to a hatched bar,
+    // the fixed end, held at 0. A spring with a third terminal has, between its two ends, the wire that sets its
+    // stiffness: it meets the resistor from the side at an arrowhead, as the wiper of a variable resistor does,
+    // and the spring pushes back on it too.
     drawSpring(g,node,p,selected){
-      const ys=p.inputs.map(port=>port.glyphY).sort((a,b)=>a-b),top=ys[0],bottom=ys.at(-1),x=p.glyphX;
+      const ends=p.inputs.filter(port=>!port.third),ys=ends.map(port=>port.glyphY).sort((a,b)=>a-b),x=p.glyphX;
+      const top=ys[0],bottom=node.anchor?top+E.geometry.springRows-2*E.geometry.springTurn:ys.at(-1);
       const teeth=6,step=(bottom-top-8)/teeth;
       let d=`M ${x} ${top} L ${x} ${top+4}`;
       for(let k=0;k<teeth;k++)d+=` L ${x+(k%2?-7:7)} ${top+4+(k+.5)*step}`;
@@ -319,6 +324,16 @@
       svg('rect',{x:x-13,y:top-2,width:26,height:bottom-top+4,rx:6,fill:selected?'#e0effa':'transparent',
         stroke:selected?'#1474ab':'none','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
       svg('path',{d,fill:'none',stroke:'#cc0000','stroke-width':2.4,'stroke-linejoin':'round','stroke-linecap':'round','data-glyph':'spring'},g);
+      if(node.anchor){
+        let bar=`M ${x-11} ${bottom} L ${x+11} ${bottom}`;
+        for(let k=-2;k<=2;k++)bar+=` M ${x+k*5+2} ${bottom} l -4 6`;
+        svg('path',{d:bar,fill:'none',stroke:'#5b6772','stroke-width':1.8,'stroke-linecap':'round','data-glyph':'anchor'},g);
+      }
+      const third=p.inputs.find(port=>port.third);
+      if(third){
+        const y=third.glyphY,tip=x-2;
+        svg('path',{d:`M ${tip-7} ${y-4.5} L ${tip} ${y} L ${tip-7} ${y+4.5} Z`,fill:'#cc0000',stroke:'#cc0000','stroke-width':1,'stroke-linejoin':'round','data-glyph':'third-terminal'},g);
+      }
       if(Forms&&node.stiffness){
         const rows=p.inputs.map(port=>port.y-p.y),tag=svg('text',{x:x+3,y:Math.min(...rows)-9,'text-anchor':'middle',class:'ex-form ex-stiffness'},g);
         writeSvg(tag,Forms.runs(Forms.parse(node.stiffness)));
@@ -401,7 +416,8 @@
               // A spring's wires are joined by a bend, the cap of string diagrams: each runs level to the
               // bend's corner and turns there into the upright stretch.
               const corner={x:port.glyphX,y:py};
-              const segments=node.glyph==='spring'?[{a:T,b:B},{a:B,c:corner,d:corner,b:G}]
+              // A spring's third terminal, the wire that sets its stiffness, runs level to the resistor's side.
+              const segments=port.third?[{a:T,b:G}]:node.glyph==='spring'?[{a:T,b:B},{a:B,c:corner,d:corner,b:G}]
                 :left?[{a:T,b:B},{a:B,c:B,d:K,b:G}]:[{a:G,c:K,d:B,b:B},{a:B,b:T}];
               const whole=port.wires.length>1?E.forkWire(port.wires.flatMap(w=>w.branches||[w])):port.wires[0];
               this.drawLead(g,port.group?E.strand(whole,port.index):whole,E.geometry.wireTracks(segments),E.geometry.path(segments));
@@ -492,9 +508,14 @@
       return Forms.check(node.form,this.model.scene.wires.filter(w=>w.target===node.id).map(w=>({label:w.label,value:w.value,load:w.load})));
     }
     // A static map's law against the values now on its entering wires and the value on the wire leaving it.
+    // And the loads on its entering wires against the load on the wires leaving it, sent back through the law's
+    // derivative (`carries` says whether there is such a load now).
     lawCheck(node){
-      const all=this.model.scene.wires,leaving=all.find(edge=>edge.source===node.id);
-      return Forms.lawCheck(node.law,all.filter(edge=>edge.target===node.id).map(edge=>({label:edge.label,value:edge.value})),leaving?.value);
+      const all=this.model.scene.wires,leaving=all.filter(edge=>edge.source===node.id),entering=all.filter(edge=>edge.target===node.id);
+      const value=Forms.lawCheck(node.law,entering.map(edge=>({label:edge.label,value:edge.value})),leaving[0]?.value);
+      if(!value.ok||!leaving.length)return value;
+      const load=E.forkWire(leaving).load,back=Forms.pullbackCheck(node.law,entering.map(edge=>({label:edge.label,value:edge.value,load:edge.load})),load);
+      return {...value,ok:back.ok,error:back.error,carries:!!E.magnitude(load)};
     }
     // The constants of a form or a law, on one line of the sidebar: name = number.
     writeConstants(written){
@@ -566,8 +587,9 @@
           for(const line of Forms.definitions(n.law))writeHtml(html('p',{class:'ex-form'},this.sidebar),line);
           this.writeConstants(n.law);
           const verdict=this.lawCheck(n);
-          html('p',{class:verdict.ok?'ex-form-agrees':'ex-form-wrong'},this.sidebar,verdict.ok?'This formula gives the value now on its wire.'
-            :verdict.error||`This formula gives ${E.format(verdict.got)}, the model ${E.format(verdict.want)}.`);
+          html('p',{class:verdict.ok?'ex-form-agrees':'ex-form-wrong'},this.sidebar,verdict.ok?'This formula gives the value now on its wire'
+            +(verdict.carries?', and the load on that wire goes back along each entering wire times the formula’s derivative there.':'.')
+            :(verdict.error||`This formula gives ${E.format(verdict.got)}, the model ${E.format(verdict.want)}`)+'.');
         }
         if(n.description)html('p',{},this.sidebar,n.description);
         for(const [key,label] of [['value','State'],['configuration','Readout'],['inclination','Total inclination']])if(n[key]!==undefined){html('h3',{},this.sidebar,label);html('output',{},this.sidebar,E.format(n[key]));}

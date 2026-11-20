@@ -163,7 +163,9 @@ The view writes each letter after its terminal's name and the law in the sidebar
 compares it at every snapshot with the value on the wire leaving the map
 (`ArrangementForms.lawCheck`); the same test file checks every law through the meal.
 While the map's circle is the one chosen (clicked), its law is also written on a card
-under the circle.
+under the circle. A map also sends the load on the wires leaving it back along the wires
+entering it, each times its law's derivative there; the view checks those loads too
+(`ArrangementForms.pullbackCheck`), so a load drawn on a map's input is never trusted either.
 
 **A spring is drawn as a spring.** A `field` node with `glyph: 'spring'` is the field
 minus d of half a stiffness times the squared difference of its two entering wires. It
@@ -172,6 +174,18 @@ diagrams), the bend's upright stretch drawn as a red resistor, with `stiffness` 
 letter, such as `'κ_w'`) written over the top and its `form`, the cost, under it. The
 two loads are equal and opposite, on the wires. A value another part needs from it (the
 load it puts on one end) is a static map of its own, with a `law`.
+
+Two more of the kind. A spring with a **third terminal** (`third`, the label of the wire
+that sets its stiffness) has that wire on a row between its two ends, meeting the resistor
+from the side at an arrowhead; its stiffness is a constant times the value on that wire,
+and it pushes back there by minus half the constant times the squared stretch. A spring to
+an **anchor** (`anchor: true`) has one wire, and its resistor ends at a hatched bar, the end
+held at 0. In feeding, each Contact's springs are drawn so (Feeding, Spatial coupling,
+Contact 1, Contact springs): static maps compute the stretch and the gate's four factors
+and their product, a tip spring and a damper's spring each take the gate on a third
+terminal, and the damper's return spring goes to an anchor. The loads the gripper, the
+lever and the latch motor are told stand in a box of their own, since a motor must be sent
+the load on its store as a value.
 
 ## Hoses
 

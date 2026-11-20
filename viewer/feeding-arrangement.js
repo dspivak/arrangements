@@ -104,7 +104,7 @@
     }
     for(let k=0;k<places.length;k++){
       const c='casing-'+k+'/', contact='attachment-'+k+'/', springs=contact+'springs';
-      const height=c+'height', place=c+'place', latch=c+'latch', memory=c+'attachment-memory';
+      const height=c+'height', latch=c+'latch';
       const hx='Height '+(k+1),air='Air memory '+(k+1),gm='Ground memory '+(k+1);
       // Gravity pushes the height by -m g. The air spring, the cost κ (x - z)²/2, is one spring mark (evaluate).
       split(c+'gravity',[[height,'Weight',[],undefined,
@@ -117,28 +117,10 @@
           {...ground,letters:{[hx]:'x',[gm]:'z_g'},terms:[{c:'-(k_g*(tg*v + dtg*v**2/2) + k_d*(td*δ + dtd*δ**2/2))',h:'x'}]}],
         [c+'ground-memory','Load on ground memory',[height,c+'ground-memory'],undefined,
           {...ground,letters:{[hx]:'x',[gm]:'z_g'},terms:[{c:'k_d*td*δ - k_r*z_g',h:'z_g'}]}]]);
-      const positions=['in-tip',height,'in-cart',place], contactInputs=[...positions,'in-grip',latch,memory];
-      // The contact spring is the cost U = ½ S(n) θ(ℓ) near(x - h) near_h(y - p) (κ_0 (x - h)² + k_d δ²) of the
-      // latch n, the grip ℓ, the tip h, the casing height x, the cart y, the place p and the attachment memory
-      // z_a, with δ = x - h - z_a. Each mark carries minus one partial of U (the memory's also its damper -k_r z_a).
-      const lx={'Tip height':'h',[hx]:'x','Cart position':'y',['Place '+(k+1)]:'p','Grip':'ℓ',['Latch '+(k+1)]:'n',['Attachment memory '+(k+1)]:'z_a'};
-      const cs={constants:{R:P.R,R_h:P.Rh,κ_0:P.kappa0,k_d:P.kd,k_r:P.kr},letters:lx,
-        where:[['S','θ((n - 0.3)/0.2)'],['dS','dθ((n - 0.3)/0.2)/0.2'],['hold','θ(ℓ)'],['dhold','dθ(ℓ)'],
-          ['u','x - h'],['tv','(R**2 - u**2)/(0.75*R**2)'],['nv','θ(tv)'],['dnv','dθ(tv)*(-2*u)/(0.75*R**2)'],
-          ['uh','y - p'],['th','(R_h**2 - uh**2)/(0.75*R_h**2)'],['nh','θ(th)'],['dnh','dθ(th)*(-2*uh)/(0.75*R_h**2)'],
-          ['δ','u - z_a'],['W','κ_0*u**2 + k_d*δ**2'],['G','S*hold*nv*nh']]};
-      const spring=(c,h,letters=lx)=>({...cs,letters,terms:[{c,h}]});
-      split(springs,[
-        ['in-grip','Grip load',contactInputs,'Grip load '+(k+1),spring('-S*dhold*nv*nh*W/2','ℓ')],
-        ['in-tip','Tip load',contactInputs,'Tip load '+(k+1),spring('G*(κ_0*u + k_d*δ) + S*hold*dnv*nh*W/2','h')],
-        [height,'Load on casing',['Tip load'],undefined,{letters:{'Tip load':'F',[hx]:'x'},terms:[{c:'-F',h:'x'}]}],
-        ['in-cart','Cart load',contactInputs,undefined,spring('-S*hold*nv*dnh*W/2','y')],
-        [place,'Load on place',['Cart load'],undefined,{letters:{'Cart load':'F',['Place '+(k+1)]:'p'},terms:[{c:'-F',h:'p'}]}],
-        [memory,'Load on attachment memory',contactInputs,undefined,spring('G*k_d*δ - k_r*z_a','z_a')],
-        [latch,'Spring load on latch',contactInputs,'Other latch load',spring('-dS*hold*nv*nh*W/2','n')]
-      ]);
+      // The contact's springs are not split into pushes: they are drawn as the note's lever has them (sec.gates),
+      // a spring and a damper sent one gate, each a spring mark with a third terminal (evaluate, contactSprings).
       // The latch motor at the rate u_n applies the torque τ = C_c u_n - P_n (P_n the spring's load on the latch) and pays τ u_n.
-      split(contact+'latch-drive',[[latch,'Latch torque',[contact+'latch-rate',springs+'/field'],undefined,
+      split(contact+'latch-drive',[[latch,'Latch torque',[contact+'latch-rate',springs+'/latch-load'],undefined,
           {letters:{['Latch rate '+(k+1)]:'u_n','Other latch load':'P_n',['Latch '+(k+1)]:'n'},constants:{C_c:P.latchCost},
             terms:[{c:'C_c*u_n - P_n',h:'n'}]}],
         ['in-battery','Battery payment',['Latch torque',contact+'latch-rate'],undefined,
@@ -213,9 +195,17 @@
     // A spring (the note's sec.general): minus d of half a stiffness times the squared difference of two
     // readings. One mark with no box, drawn by the explorer as a bend joining its two wires with a red resistor
     // on it (glyph 'spring'); its loads on the two wires are equal and opposite. `pull` is its load on the second.
-    const springMark=(id,parent,label,stiffness,k,[firstLabel,x],[secondLabel,y],pull)=>node(id,parent,label,'field',{glyph:'spring',stiffness,
-      dependencyView:true,result:pull,resultLabel:'Load on '+secondLabel.toLowerCase()+'; its negative on '+firstLabel.toLowerCase(),
-      form:{letters:{[firstLabel]:x,[secondLabel]:y},constants:{[stiffness]:k},terms:[{c:'-1',h:`${stiffness}/2*(${x} - ${y})**2`}]}});
+    // Two more of the same kind. A spring with a third terminal (`third`, the label and letter of a wire): its
+    // stiffness is the constant times the value on that wire, and it pushes back there by minus half the constant
+    // times the squared stretch (the note's eqn.spring, "the energy it takes to change its stiffness"). A spring
+    // to an anchor (`second` null): its second end is held at 0, and `pull` is its load on its one wire.
+    const springMark=(id,parent,label,stiffness,k,[firstLabel,x],second,pull,third,place={})=>{
+      const K=third?stiffness+'*'+third[1]:stiffness,stretch=second?`(${x} - ${second[1]})`:x;
+      return node(id,parent,label,'field',{glyph:'spring',stiffness:K,...(third?{third:third[0]}:{}),...(second?{}:{anchor:true}),...place,
+        dependencyView:true,result:pull,resultLabel:second?'Load on '+second[0].toLowerCase()+'; its negative on '+firstLabel.toLowerCase():'Load on '+firstLabel.toLowerCase(),
+        form:{letters:{[firstLabel]:x,...(second?{[second[0]]:second[1]}:{}),...(third?{[third[0]]:third[1]}:{})},constants:{[stiffness]:k},
+          terms:[{c:'-1',h:`${K}/2*${stretch}**2`}]}});
+    };
     springMark('axle','wheels','Axle spring','κ_w',P.kappac,['Cart position','y'],['Wheel position','z_w'],P.kappac*(s[3]-s[5]));
     // The load the axle's spring puts on the wheel, which the drive motor is sent (the note's eqn.cart: "The
     // circle computes P_w"), a static map of the cart's and the wheel's positions.
@@ -263,10 +253,12 @@
       const coordinates=Array.isArray(value)&&value.length===atCentres.length?{coordinates:atCentres,standsFor:'ℝ^[−9, 9]'}:{};
       if(trace)wires.push({id:source+'>'+target+':'+label,source,target,label,value,load,valueScale:1,loadScale:1,...coordinates,...extra});
     }
-    function term(target,i,load=0){
-      qload[i]+=load;
+    // A store's wire to a part, with the load that part returns on it. `term` also adds that load to the
+    // store's total; `read` draws the wire alone, for a load whose total the model has already counted.
+    function read(target,i,load=0){
       wire(stateIds[i],target,labels[i],s[i],load,{valueScale:scales[i]||1,loadScale:i===0?1:i===1?.1:1,inclination:true});
     }
+    function term(target,i,load=0){qload[i]+=load;read(target,i,load);}
     const [b,l,h,y,my,zw,r,scan,eta,zeta]=s;
     const live=theta(b/P.b0),hold=theta(l),dhold=derivative(l);
     const contact=F.encounter(s,places,P,receiverSize), mouth=F.mouthEfforts(b,l,P);
@@ -296,28 +288,94 @@
       const pl=-.5*selected*dhold*nv*nh*W,py=-.5*selected*hold*nv*dnh*W;
       Pl+=pl;Ph-=px;Py+=py;
       const attBox='attachment-'+k,att=attBox+'/springs';node(attBox,'encounter','Contact '+(k+1),'box',{renderer:'spring',stretch,column:1,row:k});
-      node(att,attBox,'Contact springs','effort',{renderer:'spring',stretch:da});node(id+'/attachment-memory',attBox,'Attachment memory','state',{value:za});
-      wire('in-grip',att,'Grip',l,pl);wire('in-tip',att,'Tip height',h,-px);wire('in-cart',att,'Cart position',y,py);
-      wire(att,'sum-grip-load','Grip load '+(k+1),pl,0);
-      wire(att,'sum-tip-load','Tip load '+(k+1),-px,0);
-      term(att,start+2,px);wire(id+'/place',att,'Place '+(k+1),place,-py,{valueScale:6});
-      term(att,start+6,G*P.kd*da-P.kr*za);
+      node(att,attBox,'Contact springs','box',{renderer:'spring',stretch:da});node(id+'/attachment-memory',attBox,'Attachment memory','state',{value:za});
+      // The model's loads from this contact's springs, minus the partials of U = ½ G (κ_0 u² + k_d δ²) + ½ k_r z_a²
+      // written out (the note's sec.gates, P_x, P_ℓ, P_y, P_z): these are what the stores are charged. The wires
+      // drawn below carry the same loads factored through the springs and the gates' maps, and the tests compare.
+      qload[start+2]+=px;qload[start+6]+=G*P.kd*da-P.kr*za;
       node(id+'/latch',attBox,'Contact latch','state',{value:s[start+7]});
       node(attBox+'/latch-drive',attBox,'Latch motor','effort');
       const latchDot=contact.latchRate[k], springLatch=-.5*contact.engageSlope[k]*hold*nv*nh*W;
       const latchTorque=P.latchCost*latchDot-springLatch;
-      term(att,start+7,springLatch);term(attBox+'/latch-drive',start+7,latchTorque);
+      qload[start+7]+=springLatch;term(attBox+'/latch-drive',start+7,latchTorque);
       latchPay+=latchTorque*latchDot;loss+=P.latchCost*latchDot*latchDot;
       wire('in-battery',attBox+'/latch-drive','Battery',b,-latchTorque*latchDot);
-      wire(att,attBox+'/latch-drive','Other latch load',springLatch,0);
       const share=selected*contact.mouth[k],atMouth=live*hold*share;
       const pry=mouth.opening*share*(1-a),eat=mouth.digestion*share*access*f;
       pryAll+=pry;eatAll+=eat;
 
       // Each stateless operation below has one readout and receives only the
       // arguments used to compute it. Contact-local names survive projection.
-      const op=(key,label,parent=attBox)=>node(attBox+'/'+key,parent,label,'operation');
-      const offer=op('offer','Food within reach'), engaged=op('engaged','Engagement');
+      const op=(key,label,parent=attBox,extra={})=>node(attBox+'/'+key,parent,label,'operation',extra);
+      const named=name=>name+' '+(k+1);
+      const offer=op('offer','Food within reach');
+      // The engagement s = θ((n − 0.3)/0.2) of the latch n (the note's s_k), one of the contact gate's four factors.
+      const engaged=op('engaged','Engagement',attBox,{law:{letters:{[named('Latch')]:'n'},where:[['s','θ((n - 0.3)/0.2)']]}});
+      if(trace){
+        // The contact's springs, as the note's lever has them (sec.gates): "a spring and a damper sent the same
+        // gate G", the spring the stiffness κ_0 G and the damper k_d G, with the damper's return spring. Static
+        // maps compute the stretch u = x − h and the gate's four factors (the engagement s, hold = θ(ℓ), and the
+        // two nearnesses N and H) and their product G; the tip spring joins the casing's height and the tip, the
+        // damper's spring joins the stretch and the stroke z_a, and each has a third terminal, fed G, where it
+        // pushes back by minus half its constant times its squared stretch. That load returns through the maps
+        // to the grip, the latch, the heights and the places, each map sending it on times its law's derivative.
+        const map=(key,label,law,column,row=0,parent=att)=>node(att+'/'+key,parent,label,'operation',{law,column,row});
+        const Rk={R:P.R},stiff={κ_0:P.kappa0,k_d:P.kd};
+        map('stretch','Stretch',{letters:{[named('Height')]:'x','Tip height':'h'},where:[['u','x - h']]},0,0);
+        map('near-tip','Near the tip',{letters:{[named('Stretch')]:'u'},constants:Rk,where:[['N','θ((R**2 - u**2)/(0.75*R**2))']]},1,0);
+        map('over','Cart at casing',{letters:{'Cart position':'y',[named('Place')]:'p'},constants:{R_h:P.Rh},
+          where:[['H','θ((R_h**2 - (y - p)**2)/(0.75*R_h**2))']]},0,1);
+        map('hold','Hold',{letters:{'Grip':'ℓ'},where:[['hold','θ(ℓ)']]},0,2);
+        map('gate','Gate',{letters:{[named('Engagement')]:'s',[named('Hold')]:'hold',[named('Near the tip')]:'N',[named('Cart at casing')]:'H'},
+          where:[['G','s*hold*N*H']]},2,0);
+        const gate=[named('Gate'),'G'],tipSpring=att+'/tip-spring',damperSpring=att+'/damper-spring';
+        springMark(tipSpring,att,'Tip spring','κ_0',P.kappa0,[named('Height'),'x'],['Tip height','h'],P.kappa0*G*stretch,gate,{column:3,row:0});
+        springMark(damperSpring,att,'Damper spring','k_d',P.kd,[named('Stretch'),'u'],[named('Attachment memory'),'z_a'],P.kd*G*da,gate,{column:3,row:1});
+        springMark(att+'/return-spring',att,'Return spring','k_r',P.kr,[named('Attachment memory'),'z_a'],null,-P.kr*za,undefined,{column:3,row:2});
+        // The loads, from the springs back. On the gate's wire: −½ κ_0 u² and −½ k_d δ², in all −W/2.
+        const onGate=-.5*W,onNear=onGate*selected*hold*nh,onOver=onGate*selected*hold*nv;
+        const onStretch=-P.kd*G*da+onNear*dnv;
+        read(tipSpring,start+2,-P.kappa0*G*stretch);wire('in-tip',tipSpring,'Tip height',h,P.kappa0*G*stretch);
+        wire(att+'/gate',tipSpring,gate[0],G,-.5*P.kappa0*stretch*stretch);
+        wire(att+'/stretch',damperSpring,named('Stretch'),stretch,-P.kd*G*da);read(damperSpring,start+6,P.kd*G*da);
+        wire(att+'/gate',damperSpring,gate[0],G,-.5*P.kd*da*da);
+        read(att+'/return-spring',start+6,-P.kr*za);
+        read(att+'/stretch',start+2,onStretch);wire('in-tip',att+'/stretch','Tip height',h,-onStretch);
+        wire(att+'/stretch',att+'/near-tip',named('Stretch'),stretch,onNear*dnv);
+        wire('in-cart',att+'/over','Cart position',y,onOver*dnh);
+        wire(id+'/place',att+'/over',named('Place'),place,-onOver*dnh,{valueScale:6});
+        wire('in-grip',att+'/hold','Grip',l,onGate*selected*nv*nh*dhold);
+        wire(att+'/hold',att+'/gate',named('Hold'),hold,onGate*selected*nv*nh);
+        wire(att+'/near-tip',att+'/gate',named('Near the tip'),nv,onNear);
+        wire(att+'/over',att+'/gate',named('Cart at casing'),nh,onOver);
+        wire(engaged,att+'/gate',named('Engagement'),selected,onGate*hold*nv*nh);
+        // What the motors are told (the note's eqn.motor: a motor "must be sent the true P"): the load these
+        // springs put on the grip, on the tip and on the latch, each as a value, so each a static map. They
+        // read the energy the two springs would hold at G = 1, E = W/2, which is minus the load on the gate's wire.
+        // They stand in a box of their own, so that the springs and their gate are seen without them.
+        const told=node(att+'/told',att,'Loads told to the motors','box',{column:4,row:0,
+          description:'A motor must be sent the load the rest of the arrangement puts on its store. These static arrangements compute the load the contact’s springs put on the grip, on the tip and on the latch, each as a value.'});
+        map('energy','Energy at full gate',{letters:{[named('Stretch')]:'u',[named('Attachment memory')]:'z_a'},constants:stiff,
+          where:[['E','(κ_0*u**2 + k_d*(u - z_a)**2)/2']]},0,0,told);
+        wire(att+'/stretch',att+'/energy',named('Stretch'),stretch,0);read(att+'/energy',start+6);
+        const energy=to=>wire(att+'/energy',to,named('Energy at full gate'),.5*W,0);
+        const nearTo=to=>wire(att+'/near-tip',to,named('Near the tip'),nv,0),overTo=to=>wire(att+'/over',to,named('Cart at casing'),nh,0);
+        const holdTo=to=>wire(att+'/hold',to,named('Hold'),hold,0),sTo=to=>wire(engaged,to,named('Engagement'),selected,0);
+        const gripLoad=map('grip-load','Grip load',{letters:{'Grip':'ℓ',[named('Engagement')]:'s',[named('Near the tip')]:'N',
+          [named('Cart at casing')]:'H',[named('Energy at full gate')]:'E'},where:[['P_ℓ','-s*dθ(ℓ)*N*H*E']]},1,0,told);
+        wire('in-grip',gripLoad,'Grip',l,0);sTo(gripLoad);nearTo(gripLoad);overTo(gripLoad);energy(gripLoad);
+        wire(gripLoad,'sum-grip-load','Grip load '+(k+1),pl,0);
+        const tipLoad=map('tip-load','Tip load',{letters:{[named('Engagement')]:'s',[named('Hold')]:'hold',[named('Cart at casing')]:'H',
+          [named('Stretch')]:'u',[named('Attachment memory')]:'z_a'},constants:{...Rk,...stiff},
+          where:[['t','(R**2 - u**2)/(0.75*R**2)'],['δ','u - z_a'],
+            ['P_h','s*hold*H*(θ(t)*(κ_0*u + k_d*δ) + dθ(t)*(-2*u)/(0.75*R**2)*(κ_0*u**2 + k_d*δ**2)/2)']]},1,1,told);
+        sTo(tipLoad);holdTo(tipLoad);overTo(tipLoad);wire(att+'/stretch',tipLoad,named('Stretch'),stretch,0);read(tipLoad,start+6);
+        wire(tipLoad,'sum-tip-load','Tip load '+(k+1),-px,0);
+        const latchLoad=map('latch-load','Latch load',{letters:{[named('Latch')]:'n',[named('Hold')]:'hold',[named('Near the tip')]:'N',
+          [named('Cart at casing')]:'H',[named('Energy at full gate')]:'E'},where:[['P_n','-dθ((n - 0.3)/0.2)/0.2*hold*N*H*E']]},1,2,told);
+        read(latchLoad,start+7);holdTo(latchLoad);nearTo(latchLoad);overTo(latchLoad);energy(latchLoad);
+        wire(latchLoad,attBox+'/latch-drive','Other latch load',springLatch,0);
+      }
       const gripFood=op('held-food','Food within grip'), reachMouth=op('mouth-reach','Within reach of mouth');
       const at=op('at-mouth','Contact at mouth'), opening=op('opening','Opening contribution');
       const eating=op('eating','Food contribution'), latchRate=op('latch-rate','Latch rate');
@@ -327,7 +385,9 @@
       const offeredTo=target=>wire(offer,target,'Food within reach '+(k+1),contact.available[k],0);
       const engagedTo=target=>wire(engaged,target,'Engagement '+(k+1),selected,0);
       term(offer,start);term(offer,start+2);placeTo(offer);cartTo(offer);tipTo(offer);
-      term(engaged,start+7);
+      // The latch's wire into the engagement carries the load the gate sends back through it, the springs' whole
+      // load on the latch (counted above).
+      read(engaged,start+7,springLatch);
       offeredTo(gripFood);engagedTo(gripFood);
       wire(gripFood,'sum-keep','Food within grip '+(k+1),kept,0);
       term(reachMouth,start+2);placeTo(reachMouth);cartTo(reachMouth);
