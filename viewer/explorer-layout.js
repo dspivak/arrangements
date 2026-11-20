@@ -157,8 +157,10 @@
         // The mark has a fixed size. Its labeled terminals occupy their own
         // rows. Adding an argument extends only that list of terminals.
         p.radius=n.renderer?34:15;
+        // A terminal of a field with a written 1-form carries, after its name, the letter the formula uses.
+        const lettered=port=>{const letter=n.form?.letters?.[port.label];return port.label.length+(letter?letter.replace('_','').length+2:0);};
         const labelWidth=ports=>ports.reduce((width,port)=>
-          Math.max(width,port.label.length*6.7+18),0);
+          Math.max(width,lettered(port)*6.7+18),0);
         const left=labelWidth(p.inputs),right=labelWidth(p.outputs);
         p.w=Math.max(left+2*p.radius+right,(n.label??n.id).length*7.8+8);
         p.glyphX=(left-right)/2;

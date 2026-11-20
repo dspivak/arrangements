@@ -111,6 +111,35 @@ known result can supply `dependencyView: true`, `result`, `resultLabel` and
 appearing in the result's argument list. Use `possibleInputs: true` for a
 conservative list when coordinate dependencies cannot be determined.
 
+## A field's 1-form
+
+A `field` node may carry `form`, its inclination field written once (`explorer-forms.js`,
+loaded before `explorer.js`; a page without it draws as before):
+
+```js
+form: {
+  letters:   {'Battery': 'b', 'Look distance': 'r'},   // label of an entering wire -> its letter
+  constants: {c_see: 0.002},                            // optional numbers, by letter
+  where:     [['live', 'θ(b/b_0)']],                    // optional abbreviations, in order
+  terms:     [{c: 'c_see*look_r', h: 'r'}],             // the form is the sum of c d(h)
+}
+```
+
+The form is the sum of the terms `c d(h)`, the shape of `feeding_parts.pushes`: a push is
+`{c: 'F', h: 'x'}`, a cost `k` is `{c: '-1', h: k}`, a Petri transition is its rate with
+`h` the signed sum of what it gives and takes, and no terms is the zero form. `c`, `h` and
+the abbreviations use the arithmetic Python and JavaScript share (`+ - * / **`, calls),
+with Python's precedences. A name may be any letters, Greek included; an underscore starts
+a subscript. A page adds the functions it needs to `ArrangementForms.functions`.
+
+The view writes each letter after its terminal's name, the form under the mark (cut when
+long, whole in the sidebar with its abbreviations and constants), and at every snapshot
+evaluates the form at the values on the mark's entering wires and compares each load with
+the wire's `load`. A disagreement is drawn red and named in the sidebar, so a written
+formula is never trusted. Every entering wire that carries a load needs a letter, and a
+lettered wire carries one number. `node --test viewer/explorer-forms.test.js` checks every
+written form through a feeding meal and lists the marks that have none.
+
 Optional node fields include `description`, `renderer`, and layout hints
 `column` and `row`. Hints are ignored when regrouping would cause overlap.
 Static maps and fields use compact circles. Their labeled terminals fan into the mark. Additional arguments extend the rows vertically. The shared layout aligns boundary ports,

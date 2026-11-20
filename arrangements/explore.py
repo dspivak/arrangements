@@ -360,7 +360,7 @@ def write_html(frames: Union[Dict[str, Any], Sequence[Dict[str, Any]]], path: Un
         raise ValueError('At least one frame is required')
     viewer = Path(__file__).resolve().parents[1] / 'viewer'
     css = (viewer/'explorer.css').read_text()
-    core = (viewer/'explorer-core.js').read_text() + '\n' + (viewer/'explorer-layout.js').read_text()
+    core = '\n'.join((viewer/name).read_text() for name in ('explorer-core.js', 'explorer-layout.js', 'explorer-forms.js'))
     ui = (viewer/'explorer.js').read_text()
     payload = json.dumps(frames, allow_nan=False).replace('<', '\\u003c')
     html = ('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'

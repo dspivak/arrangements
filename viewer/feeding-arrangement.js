@@ -9,13 +9,17 @@
   'use strict';
   const F=typeof module!=='undefined'&&module.exports?require('./feeding-model.js'):root.Feeding;
   const Learning = typeof module !== 'undefined' && module.exports ? require('./food-learning.js') : root.FoodLearning;
+  const Forms = typeof module !== 'undefined' && module.exports ? require('./explorer-forms.js') : root.ArrangementForms;
   const NR=F.NR,NC=F.NC,theta=F.theta;
+  // The note's smooth step, for the formulas written on the field marks (explorer-forms.js).
+  if(Forms)Forms.functions.θ=theta;
+  if(Forms)Forms.functions.dθ=t=>derivative(t);
   if(NR!==10||NC!==8)throw Error('Feeding explorer expects the patrol model with external contact memory.');
   function derivative(t){if(t<=0||t>=1)return 0;const a=Math.exp(-1/t),b=Math.exp(-1/(1-t));return a*b*(1/t**2+1/(1-t)**2)/(a+b)**2;}
   function near(u,R){const t=(R*R-u*u)/(.75*R*R);return [theta(t),derivative(t)*(-2*u)/(.75*R*R)];}
   // A coefficient may act on a coordinate it never reads (gravity is the
   // simplest example). Preserve that returning load on the coordinate's wire.
-  function separateFields(nodes,wires,places,learning){
+  function separateFields(nodes,wires,places,learning,P){
     const incoming=new Map(), published=new Map(), byId=new Map(nodes.map(n=>[n.id,n]));
     for(const edge of wires){
       if(!incoming.has(edge.target))incoming.set(edge.target,new Map());
@@ -26,10 +30,12 @@
     function split(part,rows){
       const field=part+'/field', ports=incoming.get(field), results=new Map();
       fields.add(field);
-      for(const [index,[on,name,args,output]] of rows.entries()){
+      // A row's fifth entry is the mark's 1-form (explorer-forms.js): the explorer writes it on the mark and
+      // checks it against the loads on the mark's wires, so it is the note's formula, not a second model.
+      for(const [index,[on,name,args,output,form]] of rows.entries()){
         const target=ports.get(on), id=index?field+'-'+index:field;
         const result={id,parent:part,label:name,kind:'field',dependencyView:true,
-          result:target.load,resultLabel:'Contribution to '+target.label.toLowerCase()};
+          result:target.load,resultLabel:'Contribution to '+target.label.toLowerCase(),...(form?{form}:{})};
         if(index)nodes.push(result);else Object.assign(byId.get(field),result,{description:''});
         for(const key of new Set([...args,on])){
           const edge=ports.get(key)||results.get(key);
@@ -40,26 +46,68 @@
         if(output)published.set(field+'|'+output,id);
       }
     }
-    function motor(part,coordinate,rate,other,name){
-      split(part,[[coordinate,name,[rate,other]],['battery','Battery payment',[name,rate]]]);
+    function motor(part,coordinate,rate,other,name,forms=[]){
+      split(part,[[coordinate,name,[rate,other],undefined,forms[0]],['battery','Battery payment',[name,rate],undefined,forms[1]]]);
     }
-    motor('gripper','grip','grip-rate','sum-grip-load','Grip torque');
-    motor('lift','tip','lift-rate','sum-tip-load','Lift torque');
-    split('opener',[['battery','Opening cost',['sum-opened']]]);
-    split('digestor',[['battery','Energy from food',['sum-eaten']]]);
-    split('axle',[['wheel','Wheel spring load',['cart','wheel'],'Other wheel load'],
-      ['cart','Cart spring load',['Wheel spring load']]]);
+    // The lever's motors, the note's sec.gates: a torque τ = c u − P at the rate u pushes the coordinate and pays τ u.
+    const lever=(cost,rateLabel,otherLabel,coordinate,q,load,c)=>{
+      const form=(letters,terms,where=[])=>({letters,constants:{[c]:cost},where,terms});
+      return [form({[rateLabel]:'u',[otherLabel]:load,[coordinate]:q},[{c:'τ',h:q}],[['τ',c+'*u - '+load]]),
+        form({[rateLabel]:'u','Battery':'b'},[{c:'-τ*u',h:'b'}])];
+    };
+    const gripForms=lever(P.cgrip,'Chosen grip rate','Other grip load','Grip','ℓ','P_ℓ','c_grip');
+    const liftForms=lever(P.clift,'Chosen lift rate','Other tip load','Tip height','h','P_h','c_lift');
+    gripForms[1].letters={'Grip torque':'τ','Chosen grip rate':'u','Battery':'b'};
+    liftForms[1].letters={'Lift torque':'τ','Chosen lift rate':'u','Battery':'b'};
+    motor('gripper','grip','grip-rate','sum-grip-load','Grip torque',gripForms);
+    motor('lift','tip','lift-rate','sum-tip-load','Lift torque',liftForms);
+    // The mouth's two organs, each one push on the battery at the total rate its casings realize (pry, eat):
+    // tearing costs c_tear per unit of opening, and digestion gives back the fraction α of the food taken.
+    split('opener',[['battery','Opening cost',['sum-opened'],undefined,
+      {letters:{'Opening rate':'pry','Battery':'b'},constants:{c_tear:P.ctear},terms:[{c:'-c_tear*pry',h:'b'}]}]]);
+    split('digestor',[['battery','Energy from food',['sum-eaten'],undefined,
+      {letters:{'Food taken':'eat','Battery':'b'},constants:{α:P.alpha},terms:[{c:'α*eat',h:'b'}]}]]);
+    // The dragger's spring is the cost κ_w δ_w²/2 of δ_w = y - z_w; its load on the wheel is P_w = κ_w δ_w, and the
+    // cart receives -P_w, carried on the wheel's mark.
+    split('axle',[['wheel','Wheel spring load',['cart','wheel'],'Other wheel load',
+        {letters:{'Cart position':'y','Wheel position':'z_w'},constants:{κ_w:P.kappac},where:[['δ_w','y - z_w']],terms:[{c:'κ_w*δ_w',h:'z_w'}]}],
+      ['cart','Cart spring load',['Wheel spring load'],undefined,
+        {letters:{'Wheel spring load':'P_w','Cart position':'y'},terms:[{c:'-P_w',h:'y'}]}]]);
     const drive=['battery','look','sum-red',...(learning?['memory-drive']:['cart','patrol-point'])];
-    split('drive',[['wheel','Drive torque',drive],['battery','Battery payment',['Drive torque','axle/field']]]);
-    function oscillator(part,coordinate,inputs){
-      split(part,[[coordinate,'Motor inclination',inputs],['battery','Battery payment',inputs]]);
+    // The drive: a torque τ_drive on the wheel, paid by the battery at the wheel's rate (τ_drive + P_w)/β_w.
+    // Written for the learning explorer, whose torque reads the search pull; the patrol one reads other wires.
+    const driveForm=learning&&{
+      field:{letters:{'Battery':'b','Look distance':'r','Red at gaze':'seen','Search pull':'pull','Wheel position':'z_w'},
+        constants:{b_0:P.b0,k_τ:P.ktau},where:[['live','θ(b/b_0)'],['free','θ(1 - 2*seen)'],['τ_drive','live*(k_τ*seen*r + free*pull)']],
+        terms:[{c:'τ_drive',h:'z_w'}]},
+      pay:{letters:{'Drive torque':'τ_drive','Other wheel load':'P_w','Battery':'b'},constants:{β_w:P.betac},
+        where:[['wheel_rate','(τ_drive + P_w)/β_w']],terms:[{c:'-τ_drive*wheel_rate',h:'b'}]}};
+    split('drive',[['wheel','Drive torque',drive,undefined,driveForm&&driveForm.field],
+      ['battery','Battery payment',['Drive torque','axle/field'],undefined,driveForm&&driveForm.pay]]);
+    function oscillator(part,coordinate,inputs,forms=[]){
+      split(part,[[coordinate,'Motor inclination',inputs,undefined,forms[0]],['battery','Battery payment',inputs,undefined,forms[1]]]);
     }
+    // The eye, the note's sec.gates: a sweep on (r, ψ) sent the gate live(b) free and the extra rate
+    // λ_look live(b) climb. Each motor's field is c_see u dq − c_see u² db at its rate u.
+    const eye={constants:{c_see:P.csee,A:P.A,ν:P.omega,γ:P.gam,λ_look:P.lam,b_0:P.b0},
+      where:[['live','θ(b/b_0)'],['free','θ(1 - 2*seen)']]};
+    const eyeLetters={'Battery':'b','Look distance':'r','Scan':'ψ','Red at gaze':'seen'};
+    const eyeRates={look:['look_r','live*(free*(ν*ψ + γ*(A**2 - r**2 - ψ**2)*r) + λ_look*climb)','r',{'Change with gaze':'climb'}],
+      scan:['look_ψ','live*free*(-ν*r + γ*(A**2 - r**2 - ψ**2)*ψ)','ψ',{}]};
     for(const x of ['look','scan']){
-      oscillator(x+'-motor',x,['battery','look','scan','sum-red',...(x==='look'?['sum-climb']:[])]);
+      const [rate,law,letter,more]=eyeRates[x];
+      const form=terms=>({...eye,letters:{...eyeLetters,...more},where:[...eye.where,[rate,law]],terms});
+      oscillator(x+'-motor',x,['battery','look','scan','sum-red',...(x==='look'?['sum-climb']:[])],
+        [form([{c:'c_see*'+rate,h:letter}]),form([{c:'-c_see*'+rate+'**2',h:'b'}])]);
     }
     if(learning){
-      for(const {id} of Learning.stores){
-        split(id+'-motor',[[id,'Memory inclination',[id+'-rate']],['battery','Battery payment',[id+'-rate']]]);
+      // A memory motor at its rate u costs the battery c_mem |u|²: c_mem u dq − c_mem u² db. A store of several
+      // numbers has lists on its wires: its motor is that many side by side, and the battery pays their sum.
+      for(const {id,label,start,end} of Learning.stores){
+        const rateLabel=label+' rate',form=(letters,terms)=>({letters:{[rateLabel]:'u',...letters},
+          constants:{c_mem:P.memoryCost},terms});
+        split(id+'-motor',[[id,'Memory inclination',[id+'-rate'],undefined,form({[label]:'q'},[{c:'c_mem*u',h:'q'}])],
+          ['battery','Battery payment',[id+'-rate'],undefined,form({'Battery':'b'},[{c:end===start+1?'-c_mem*u**2':'-c_mem*Σ(u**2)',h:'b'}])]]);
       }
     }else{
       for(const [motor,coordinate] of [['patrol-motor','patrol-point'],['patrol-scan-motor','patrol-scan']])
@@ -68,22 +116,49 @@
     for(let k=0;k<places.length;k++){
       const c='casing-'+k+'/', contact='attachment-'+k+'/', springs=contact+'springs';
       const height=c+'height', place=c+'place', latch=c+'latch', memory=c+'attachment-memory';
-      split(c+'gravity',[[height,'Weight',[]]]);
-      split(c+'spring',[[height,'Load on casing',[height,c+'memory']],
-        [c+'memory','Load on air memory',['Load on casing']]]);
-      split(c+'ground',[[height,'Ground force',[height,c+'ground-memory']],
-        [c+'ground-memory','Load on ground memory',[height,c+'ground-memory']]]);
+      const hx='Height '+(k+1),air='Air memory '+(k+1),gm='Ground memory '+(k+1);
+      // Gravity pushes the height by -m g; the air spring is the cost κ (x - z)²/2, its load -κ(x - z) on the height
+      // carried by the first mark and its reaction on the air memory z by the second.
+      split(c+'gravity',[[height,'Weight',[],undefined,
+        {letters:{[hx]:'x'},constants:{m:P.m,g:P.g},terms:[{c:'-m*g',h:'x'}]}]]);
+      split(c+'spring',[[height,'Load on casing',[height,c+'memory'],undefined,
+          {letters:{[hx]:'x',[air]:'z'},constants:{κ:P.kappa},terms:[{c:'-κ*(x - z)',h:'x'}]}],
+        [c+'memory','Load on air memory',['Load on casing'],undefined,
+          {letters:{'Load on casing':'F',[air]:'z'},terms:[{c:'-F',h:'z'}]}]]);
+      // The ground: a stiff floor under x_g (switched on by θ over the width ε) and a damper whose stroke is the ground
+      // memory z_g; v is the height above the floor and δ the damper's stretch. Marks: the load on the height, then on z_g.
+      const ground={constants:{k_g:P.kg,k_d:P.kd,k_r:P.kr,ε:P.eps,ε_d:P.epsd,x_g:P.xg},
+        where:[['v','x - x_g'],['δ','v - z_g'],['tg','θ(-v/ε)'],['dtg','-dθ(-v/ε)/ε'],['td','θ(-v/ε_d)'],['dtd','-dθ(-v/ε_d)/ε_d']]};
+      split(c+'ground',[[height,'Ground force',[height,c+'ground-memory'],undefined,
+          {...ground,letters:{[hx]:'x',[gm]:'z_g'},terms:[{c:'-(k_g*(tg*v + dtg*v**2/2) + k_d*(td*δ + dtd*δ**2/2))',h:'x'}]}],
+        [c+'ground-memory','Load on ground memory',[height,c+'ground-memory'],undefined,
+          {...ground,letters:{[hx]:'x',[gm]:'z_g'},terms:[{c:'k_d*td*δ - k_r*z_g',h:'z_g'}]}]]);
       const positions=['in-tip',height,'in-cart',place], contactInputs=[...positions,'in-grip',latch,memory];
+      // The contact spring is the cost U = ½ S(n) θ(ℓ) near(x - h) near_h(y - p) (κ_0 (x - h)² + k_d δ²) of the
+      // latch n, the grip ℓ, the tip h, the casing height x, the cart y, the place p and the attachment memory
+      // z_a, with δ = x - h - z_a. Each mark carries minus one partial of U (the memory's also its damper -k_r z_a).
+      const lx={'Tip height':'h',[hx]:'x','Cart position':'y',['Place '+(k+1)]:'p','Grip':'ℓ',['Latch '+(k+1)]:'n',['Attachment memory '+(k+1)]:'z_a'};
+      const cs={constants:{R:P.R,R_h:P.Rh,κ_0:P.kappa0,k_d:P.kd,k_r:P.kr},letters:lx,
+        where:[['S','θ((n - 0.3)/0.2)'],['dS','dθ((n - 0.3)/0.2)/0.2'],['hold','θ(ℓ)'],['dhold','dθ(ℓ)'],
+          ['u','x - h'],['tv','(R**2 - u**2)/(0.75*R**2)'],['nv','θ(tv)'],['dnv','dθ(tv)*(-2*u)/(0.75*R**2)'],
+          ['uh','y - p'],['th','(R_h**2 - uh**2)/(0.75*R_h**2)'],['nh','θ(th)'],['dnh','dθ(th)*(-2*uh)/(0.75*R_h**2)'],
+          ['δ','u - z_a'],['W','κ_0*u**2 + k_d*δ**2'],['G','S*hold*nv*nh']]};
+      const spring=(c,h,letters=lx)=>({...cs,letters,terms:[{c,h}]});
       split(springs,[
-        ['in-grip','Grip load',contactInputs,'Grip load '+(k+1)],
-        ['in-tip','Tip load',contactInputs,'Tip load '+(k+1)],
-        [height,'Load on casing',['Tip load']],
-        ['in-cart','Cart load',contactInputs],[place,'Load on place',['Cart load']],
-        [memory,'Load on attachment memory',contactInputs],
-        [latch,'Spring load on latch',contactInputs,'Other latch load']
+        ['in-grip','Grip load',contactInputs,'Grip load '+(k+1),spring('-S*dhold*nv*nh*W/2','ℓ')],
+        ['in-tip','Tip load',contactInputs,'Tip load '+(k+1),spring('G*(κ_0*u + k_d*δ) + S*hold*dnv*nh*W/2','h')],
+        [height,'Load on casing',['Tip load'],undefined,{letters:{'Tip load':'F',[hx]:'x'},terms:[{c:'-F',h:'x'}]}],
+        ['in-cart','Cart load',contactInputs,undefined,spring('-S*hold*nv*dnh*W/2','y')],
+        [place,'Load on place',['Cart load'],undefined,{letters:{'Cart load':'F',['Place '+(k+1)]:'p'},terms:[{c:'-F',h:'p'}]}],
+        [memory,'Load on attachment memory',contactInputs,undefined,spring('G*k_d*δ - k_r*z_a','z_a')],
+        [latch,'Spring load on latch',contactInputs,'Other latch load',spring('-dS*hold*nv*nh*W/2','n')]
       ]);
-      split(contact+'latch-drive',[[latch,'Latch torque',[contact+'latch-rate',springs+'/field']],
-        ['in-battery','Battery payment',['Latch torque',contact+'latch-rate']]]);
+      // The latch motor at the rate u_n applies the torque τ = C_c u_n - P_n (P_n the spring's load on the latch) and pays τ u_n.
+      split(contact+'latch-drive',[[latch,'Latch torque',[contact+'latch-rate',springs+'/field'],undefined,
+          {letters:{['Latch rate '+(k+1)]:'u_n','Other latch load':'P_n',['Latch '+(k+1)]:'n'},constants:{C_c:P.latchCost},
+            where:[['τ','C_c*u_n - P_n']],terms:[{c:'τ',h:'n'}]}],
+        ['in-battery','Battery payment',['Latch torque',contact+'latch-rate'],undefined,
+          {letters:{'Latch torque':'τ',['Latch rate '+(k+1)]:'u_n','Battery':'b'},terms:[{c:'-τ*u_n',h:'b'}]}]]);
     }
     const kept=wires.filter(edge=>!fields.has(edge.target));
     for(const edge of [...kept,...branches]){
@@ -371,7 +446,7 @@
     node('battery-output','feeding','Battery out','boundary',{side:'out'});node('grip-output','feeding','Grip out','boundary',{side:'out'});
     wire('battery','battery-output','Battery',b,0,{valueScale:10});wire('grip','grip-output','Grip',l,0,{valueScale:2});
     if(trace)for(const n of nodes)if(n.kind==='state' && n.inclination===undefined){const i=stateIds.indexOf(n.id);n.inclination=qload[i];}
-    const diagramWires=trace?separateFields(nodes,wires,places,learning):wires;
+    const diagramWires=trace?separateFields(nodes,wires,places,learning,P):wires;
     return {rate,qload,energy,loss,seen,torque,live,hold,casings:data,version:1,title:'Feeding',root:'feeding',time,nodes,wires:diagramWires,state:s.slice(),places:places.slice()};
   }
   function rk4(s,h,places,P){

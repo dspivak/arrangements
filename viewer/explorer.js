@@ -11,6 +11,23 @@
     for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);
     if(text!=null)e.textContent=text;if(parent)parent.appendChild(e);return e;
   }
+  // A field mark's 1-form (explorer-forms.js). A page that does not load that script draws as before.
+  const Forms=root.ArrangementForms;
+  // Formula runs as SVG tspans or as HTML: a one-letter name slanted, a subscript or superscript small and shifted.
+  function writeSvg(parent,runs){
+    let shift=0;
+    for(const r of runs){
+      const s=r.shift||0,span=svg('tspan',{},parent,r.text);
+      if(s!==shift)span.setAttribute('dy',(shift-s)*4);
+      if(s)span.setAttribute('font-size','72%');
+      if(r.italic)span.setAttribute('font-style','italic');
+      shift=s;
+    }
+    if(shift)svg('tspan',{dy:shift*4},parent,'​');
+  }
+  function writeHtml(parent,runs){
+    for(const r of runs)html(r.shift===1?'sup':r.shift===-1?'sub':r.italic?'i':'span',{},parent,r.text);
+  }
   class View {
     constructor(container,adapter,options={}) {
       this.adapter=adapter;this.options=options;this.renderers=options.renderers||{};
@@ -329,11 +346,21 @@
             svg('title',{},mark,port.label+' · '+(left?'input':'output'));
             const text=node.kind==='state'?E.format(port.wires[0].value):port.label;
             // A store's readout is written under its line; above it would sit on the stored value (y=25).
-            svg('text',{x:node.kind==='state'?0:px+(left?9:-9),y:node.kind==='state'?py+15:py-6,'text-anchor':node.kind==='state'?'middle':left?'start':'end',class:'ex-port-label'},mark,!p.radius && text.length>16?text.slice(0,14)+'…':text);
+            const tag=svg('text',{x:node.kind==='state'?0:px+(left?9:-9),y:node.kind==='state'?py+15:py-6,'text-anchor':node.kind==='state'?'middle':left?'start':'end',class:'ex-port-label'},mark,!p.radius && text.length>16?text.slice(0,14)+'…':text);
+            // The letter the field's formula uses for this terminal, after its name.
+            const letter=Forms&&node.form?.letters?.[port.label];
+            if(letter){svg('tspan',{},tag,'  ');const span=svg('tspan',{class:'ex-form'},tag);writeSvg(span,Forms.runs(Forms.parse(letter)));}
             const selectPort=e=>{e.stopPropagation();this.focusSignal=port.wires[0].signal;this.focusWire=port.wires[0].branches[0].id;this.focusNode=null;this.render();};
             mark.onclick=selectPort;mark.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectPort(e);}};
           }
           svg('text',{y:-p.h/2-12,'text-anchor':'middle',class:'ex-part-label'},g,node.label);
+          // A field's 1-form under its mark, red when it disagrees with the loads on the mark's wires. A form
+          // too long for the canvas is cut here and whole in the sidebar: a long one is a field not yet factored.
+          if(Forms&&node.form){
+            const line=Forms.written(node.form),long=Forms.plain(line).length>44;
+            const tag=svg('text',{y:p.h/2+15,'text-anchor':'middle',class:'ex-form'+(this.formCheck(node).ok?'':' ex-form-wrong'),stroke:'white','stroke-width':3,'paint-order':'stroke'},g);
+            writeSvg(tag,long?[{text:Forms.plain(line).slice(0,42)+'…'}]:line);
+          }
           if(hasChildren)svg('text',{x:p.w/2-9,y:p.h/2-8,'text-anchor':'end',class:'ex-secondary'},g,this.model.children(node.id).length+' inside');
           if(this.selectMode)svg('circle',{cx:-p.w/2+10,cy:-p.h/2+12,r:6,fill:selected?'#13669b':'white',stroke:'#13669b'},g);
         }
@@ -348,6 +375,10 @@
       }
       this.renderDetails();
       if(focused){const el=[...this.canvas.querySelectorAll('[data-node]')].find(el=>el.getAttribute('data-node')===focused);el?.focus({preventScroll:true});}
+    }
+    // A field's form against the values and loads now on the wires that enter its mark.
+    formCheck(node){
+      return Forms.check(node.form,this.model.scene.wires.filter(w=>w.target===node.id).map(w=>({label:w.label,value:w.value,load:w.load})));
     }
     renderDetails(){
       this.sidebar.replaceChildren();
@@ -395,6 +426,19 @@
       if(n){
         for(const reading of n.observations||[]){
           html('h3',{},this.sidebar,reading.label);html('output',{},this.sidebar,E.format(reading.value));
+        }
+        if(Forms&&n.form){
+          html('h3',{},this.sidebar,'Inclination field');
+          writeHtml(html('output',{class:'ex-form'},this.sidebar),Forms.written(n.form));
+          for(const line of Forms.definitions(n.form))writeHtml(html('p',{class:'ex-form'},this.sidebar),line);
+          const constants=Object.entries(n.form.constants||{});
+          if(constants.length){
+            const p=html('p',{class:'ex-form'},this.sidebar);
+            constants.forEach(([name,v],k)=>writeHtml(p,[...(k?[{text:',  '}]:[]),...Forms.runs(Forms.parse(name)),{text:' = '+E.format(v)}]));
+          }
+          const verdict=this.formCheck(n);
+          html('p',{class:verdict.ok?'ex-form-agrees':'ex-form-wrong'},this.sidebar,verdict.ok?'This formula gives the loads now on its wires.'
+            :verdict.error||('This formula disagrees with the model: '+verdict.rows.filter(r=>!r.ok).map(r=>`at ${r.letter} it gives ${E.format(r.got)}, the model ${E.format(r.want)}`).join('; ')+'.'));
         }
         if(n.description)html('p',{},this.sidebar,n.description);
         for(const [key,label] of [['value','State'],['configuration','Readout'],['inclination','Total inclination']])if(n[key]!==undefined){html('h3',{},this.sidebar,label);html('output',{},this.sidebar,E.format(n[key]));}
