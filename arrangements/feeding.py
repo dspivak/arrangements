@@ -9,11 +9,14 @@ The browser's factored field is checked against this composite, including its
 six source-output loads. A zero eye capacity is a browser limiting convention,
 not a rod-segment integrator, so the library requires positive capacities.
 
-The casings (``source``) and the receiver's body and motors (``_body``) are composed by
+``feeding`` is built from three constructors, ``seeker`` (the note's receiver; ``receiver``
+is the same function), ``source`` and ``spatial_coupling``, each composed by
 ``compose_seq`` and ``tensor_arrangements`` from the note's general parts, in
-``feeding_composed.py`` and ``feeding_parts.py`` (book P109 (e), 2026-11-19). The spatial
-coupling and the mouth's two organs are still single boxes with their fields typed out.
-``source_by_hand`` and ``_body_by_hand`` are the earlier single boxes, kept as checks.
+``feeding_composed.py`` and ``feeding_parts.py`` (book P109 (e), 2026-11-19, the casings and
+the body; P109 (h), 2026-11-21, the mouth's organs and the spatial coupling). The one field
+still typed out as a whole is inside a circle: the memory's rates, ``_food_memory``.
+``source_by_hand``, ``_body_by_hand``, ``receiver_by_hand`` and ``_encounter_by_hand`` are
+the earlier single boxes, kept as checks; regrouping changed no equation.
 """
 from __future__ import annotations
 import functools
@@ -251,8 +254,24 @@ def _mouth_organ(name, width, capacity, battery_per_unit, flow_index, battery_sc
                        lambda q,m,n:n, exchange, label=name)
 
 
-def receiver(*, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
-    """One receiver. The interface, organs and stores are independent of its partners."""
+def seeker(*, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
+    """One seeker: the receiver ``R`` of the note. Its interface, organs and stores are
+    independent of its partners.
+
+    Composed by the library (``feeding_composed.seeker``): the body and its motors beside
+    the opener and the digestor, each organ a ``push`` that settles its realized rate at the
+    battery.
+    """
+    from .feeding_composed import seeker as composed
+    return composed(parameters=parameters, stages=stages, h=h, learning=learning, memory=memory, cart=cart)
+
+
+receiver = seeker
+
+
+def receiver_by_hand(*, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
+    """The same receiver with each mouth organ one box, its field typed out. Kept only as a
+    check on ``seeker`` (``tests/test_feeding_composed.py``); the model does not use it."""
     p = {**DEFAULTS, **(parameters or {})}
     body = _body(parameters=p, stages=stages, h=h, learning=learning, memory=memory, cart=cart)
     opener = _mouth_organ('opener', 5, p['lpry'], -p['ctear'], 5, p['b0'])
@@ -260,8 +279,20 @@ def receiver(*, parameters=None, stages=1, h=1., learning=False, memory=None, ca
     return compose_seq(compose_seq(body, opener), digestor)
 
 
-def _encounter(count, p, stages, h):
-    """Spatial coupling outside the body. Each contact owns its stroke and latch."""
+def spatial_coupling(count, *, parameters=None, stages=1, h=1.):
+    """The spatial coupling ``W_n`` of one seeker and ``count`` sources (note ``eqn.feed``).
+
+    Composed by the library (``feeding_composed.spatial_coupling``): per casing a contact
+    and a latch, two pushes for the casing side of opening and eating, and one static map.
+    """
+    from .feeding_composed import spatial_coupling as composed
+    return composed(count, parameters=parameters, stages=stages, h=h)
+
+
+def _encounter_by_hand(count, p, stages, h):
+    """The same spatial coupling as one box, its field typed out. Kept only as a check on
+    ``spatial_coupling`` (``tests/test_feeding_composed.py``); the model does not use it.
+    Each contact owns its stroke and latch."""
     def respond(s,xi):
         return jnp.concatenate([xi[:count]/p['bd'],xi[count:]/p['latchCost']])
     strokes = _parameter([0.]*(2*count), list(range(2*count)), respond,
@@ -332,13 +363,24 @@ def _encounter(count, p, stages, h):
                        label='spatial coupling')
 
 
-def couple(body, casings, *, parameters=None, stages=1, h=1.):
-    """Put this receiver instance in an environment containing the given casing instances."""
+def couple(body, casings, *, parameters=None, stages=1, h=1., by_hand=False):
+    """Put this receiver instance in an environment containing the given casing instances:
+    ``W_n . (body (x) casing_1 (x) ... (x) casing_n)``. ``by_hand`` takes the typed-out
+    coupling in place of the composed one, as a check."""
     p = {**DEFAULTS, **(parameters or {})}
     casings = list(casings)
     sources = tensor_arrangements(casings) if casings else Arrangement(
         trivial_parameter(),0,0,0,0,lambda q,m:m,lambda q,m,n:n,zero_form,label='no casings')
-    return compose_seq(parallel_arrangements(body,sources), _encounter(len(casings),p,stages,h))
+    coupling = (_encounter_by_hand(len(casings),p,stages,h) if by_hand
+                else spatial_coupling(len(casings),parameters=p,stages=stages,h=h))
+    return compose_seq(parallel_arrangements(body,sources), coupling)
+
+
+def _contacts(strokes, latches):
+    """The spatial coupling's state, which nests by its parts, from the contacts' strokes
+    and latches."""
+    as_coupling = _unravel_coupling(len(strokes))
+    return as_coupling(jnp.concatenate([jnp.asarray(strokes, dtype=float), jnp.asarray(latches, dtype=float)]))
 
 
 def add_casing(body, casings, state, new_casing, *, parameters=None, stages=1, h=1.):
@@ -346,15 +388,18 @@ def add_casing(body, casings, state, new_casing, *, parameters=None, stages=1, h
     casings = tuple(casings)
     count = len(casings)
     (body_state, sources), contacts = state
+    contacts = ravel_pytree(contacts)[0]
     if contacts.shape != (2*count,):
         raise ValueError("expected a stroke and latch for each existing casing")
     expanded = couple(body, (*casings,new_casing), parameters=parameters, stages=stages, h=h)
     sources = (sources,new_casing.P.init) if count else new_casing.P.init
-    contacts = jnp.concatenate([jnp.append(contacts[:count],0.),jnp.append(contacts[count:],0.)])
+    contacts = _contacts(jnp.append(contacts[:count],0.), jnp.append(contacts[count:],0.))
     return expanded, ((body_state,sources),contacts)
 
 def feeding(places=(4.,-8.,8.), foods=(.05,10.,10.), *, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
-    """Put a fixed receiver and the casing sources side by side in a spatial coupling."""
+    """Put a fixed receiver and the casing sources side by side in a spatial coupling:
+    ``spatial_coupling(n) . (seeker (x) source_1 (x) ... (x) source_n)``, the three
+    constructors each composed by the library from the note's parts."""
     if len(places)!=len(foods):raise ValueError('One food per casing')
     p={**DEFAULTS,**(parameters or {})}
     for key in ['m','M','beta','betac','cgrip','clift','csee','cpat','bd','b0','f0','fr','R','Rh','w','eps','epsd','latchCost','latchRate']:
@@ -376,6 +421,13 @@ def _unravel(learning):
     return (ravel_pytree(receiver(learning=learning).P.init)[1], ravel_pytree(source(0.).P.init)[1])
 
 
+@functools.lru_cache(maxsize=None)
+def _unravel_coupling(count):
+    """How ``count`` strokes then ``count`` latches nest into the spatial coupling's state:
+    read off the composite's own starting state."""
+    return ravel_pytree(spatial_coupling(count).P.init)[1]
+
+
 def pack_state(flat, count):
     """The browser state in the library tensor's actual nesting.
 
@@ -388,10 +440,11 @@ def pack_state(flat, count):
     as_body,as_source=_unravel(nr!=_PATROL_STATE)
     sources=jnp.zeros(0) if not count else as_source(flat[nr:nr+6])
     for k in range(1,count):sources=(sources,as_source(flat[nr+8*k:nr+6+8*k]))
-    return (as_body(flat[:nr]),sources),jnp.concatenate([flat[nr+6::8],flat[nr+7::8]])
+    return (as_body(flat[:nr]),sources),_contacts(flat[nr+6::8],flat[nr+7::8])
 
 def unpack_state(state, count):
     (body,sources),strokes=state
+    strokes=ravel_pytree(strokes)[0]
     receiver_state=ravel_pytree(body)[0]
     parts=ravel_pytree(sources)[0].reshape((count,6)) if count else []
     full=[jnp.concatenate([part,strokes[k:k+1],strokes[count+k:count+k+1]]) for k,part in enumerate(parts)]

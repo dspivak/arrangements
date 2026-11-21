@@ -215,6 +215,32 @@ terminal, and the damper's return spring goes to an anchor. The loads the grippe
 lever and the latch motor are told stand in a box of their own, since a motor must be sent
 the load on its store as a value.
 
+**A motor is drawn as a motor.** A `box` node with `glyph: 'motor'` is a motor, a stateless
+part that pushes a load on a store and charges the battery the work of that push: two
+pushes that share a rate. It has no box. It is one mark, a picture of a motor standing
+upright, its finned body on the fill of a field's mark and outlined in the load red of the
+spring's resistor, with its name over it. The picture says what runs it and what it runs.
+The node names two of its wires: `turns`, the label of its store's wire, and `powered`,
+the battery's. The first has the top row and ends at the pulley on the motor's shaft; the
+second has the bottom row and ends at the plug of the motor's cord; the wires it only
+hears stand between and end at the side of its body (`MOTOR` in `explorer-layout.js`). Clicked, it opens into its two pushes, whose count
+is written under the circle. In feeding every motor is drawn so: the gripper, the lift,
+the look and the scan, the drive, the nine memory motors and each Contact's latch motor
+(`motorPart` in `feeding-arrangement.js`).
+
+**A load-free input port carries a black wall.** An input port is load-free when no mark
+its wire enters, however deep inside the part, can push it: each such mark has a written
+form that reads the wire and never pushes it (`carriesLoad` in `explorer-core.js`, from
+`pushes`). There the port's ring is replaced by the book's mark, a short thick black bar
+across the wire (Ch 3: "We draw a black wall at each input port where an arrangement is
+load-free"), and the wire has no amber track, at every level. So a closed motor shows a
+wall at the rate or the torque it is sent and at the other load on its store, and no wall
+at its store and the battery, which it pushes; opened, its two pushes show the same walls
+at their own terminals, and the opened box's boundary shows none. A static map has no
+wall: it sends a load back through its law's derivative. `node --test
+viewer/explorer.test.js` checks, for every feeding motor, that the walled terminals are
+exactly the ones it only hears.
+
 ## Hoses
 
 **One port per number; wires that are bundled are drawn as a hose.** A wire whose

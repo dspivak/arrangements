@@ -265,9 +265,10 @@
     }
     // The tracks a wire draws: no blue one where its value means nothing, and no amber one where the field it
     // enters reads it and never pushes it, so that its load is zero at every state (explorer-core.js, `pushes`).
+    // That holds at every level: a wire into a box is judged by the marks it enters inside the box (`carriesLoad`).
     kinds(w){
       const kinds=w.argument===false?['load']:['value','load'];
-      return kinds.filter(k=>k!=='load'||E.pushes(this.model.nodes.get(w.target),w.label));
+      return kinds.filter(k=>k!=='load'||E.carriesLoad(this.model.nodes,w));
     }
     // One track: a line in the track's one color, and packets on it, evenly spaced, whose speed codes the size and
     // whose direction of travel shows a load's sign (explorer-core.js, `packets`, `packetVelocity`). A zero load has no packets, and a
@@ -377,6 +378,38 @@
         writeSvg(tag,Forms.runs(Forms.parse(node.stiffness)));
       }
     }
+    // A motor, a part that pushes a load on a store and charges the battery the work of that push (two pushes that
+    // share a rate): one mark, a picture of a motor (David, 2026-11-21, of a circle with the letter M: "looks good. i
+    // picture of a motor might be better."), standing upright so that what runs it and what it runs are told apart
+    // (of the picture lying on its side, every wire entering one end: "it's unlcear here which is meant to be
+    // running it (battery) and which is being run by it (grip). the motor could be written at a 90° angle so that
+    // it was clearer what's the cord and what's the torque"). Its finned body is on the fill of a field's mark,
+    // outlined in the load red of the spring's resistor. Its shaft goes up to a pulley, where the wire of the store
+    // it turns ends; its cord leaves its bottom for a plug, where the battery's wire ends; the wires it only hears
+    // (the rate or the torque it is sent, the other load on its store) end at the body's side, behind the black
+    // wall of a load-free port (`drawWall`). The places are explorer-layout.js's `MOTOR`. Clicked, it opens into
+    // its pushes, whose count is under it.
+    drawMotor(g,node,p,selected,inside){
+      const x=p.glyphX,M=E.geometry.motor,red=selected?'#1474ab':'#cc0000',cord='#3d4650';
+      // the cord and its plug, then the shaft and its pulley, then the body over their ends
+      svg('path',{d:`M ${x} ${M.bottom} L ${x} ${M.cordY-4} Q ${x} ${M.cordY} ${x-4} ${M.cordY} L ${x+M.plugX+5} ${M.cordY}`,fill:'none',stroke:cord,'stroke-width':1.8,'stroke-linecap':'round','data-glyph':'cord'},g);
+      svg('rect',{x:x+M.plugX,y:M.cordY-3.4,width:5.5,height:6.8,rx:1.4,fill:cord},g);
+      svg('rect',{x:x-2.6,y:M.hubY,width:5.2,height:M.top-M.hubY+2,fill:red},g);
+      svg('circle',{cx:x,cy:M.hubY,r:M.hub,fill:'#f8e8dc',stroke:red,'stroke-width':1.8,'data-glyph':'pulley'},g);
+      svg('rect',{x:x-M.half,y:M.top,width:2*M.half,height:M.bottom-M.top,rx:5,fill:selected?'#e0effa':'#f8e8dc',stroke:red,'stroke-width':selected?3:2.2,class:'ex-focus-ring','data-glyph':'motor'},g);
+      // the body's cooling fins, and the band of its end bell at the shaft's end
+      for(const dx of [-5,0,5])svg('path',{d:`M ${x+dx} ${M.top+8} L ${x+dx} ${M.bottom-4.5}`,fill:'none',stroke:red,'stroke-width':1.5,'stroke-linecap':'round'},g);
+      svg('path',{d:`M ${x-M.half+1.5} ${M.top+4} L ${x+M.half-1.5} ${M.top+4}`,fill:'none',stroke:red,'stroke-width':1.5},g);
+      // under the battery's wire, which may come up to the plug from the row below it
+      if(inside)svg('text',{x,y:M.cordY+24,'text-anchor':'middle',class:'ex-secondary'},g,inside+' inside');
+    }
+    // The book's mark for a load-free input port (Ch 3: "We draw a black wall at each input port where an arrangement
+    // is load-free"): a short thick black bar across the wire at the port, in place of the port's ring. At a hose
+    // port it stands just before the hose's mouth and spans the tube.
+    drawWall(parent,x,y,hose){
+      const at=hose?x-9:x,half=hose?12:7.5;
+      svg('path',{d:`M ${at} ${y-half} L ${at} ${y+half}`,fill:'none',stroke:'#111','stroke-width':3.4,'data-wall':'load-free'},parent);
+    }
     rendererFor(node){return this.renderers[node.renderer]||this.renderers[node.kind];}
     drawAnimation(group,node,width,height){
       try{
@@ -444,7 +477,7 @@
           svg('text',{x:left?8:-8,y:crossing?-13:-7,'text-anchor':left?'start':'end',class:'ex-port-label',stroke:'white','stroke-width':3,'paint-order':'stroke'},g,label);
           if(crossing)this.drawMouth(g,0,0,crossing.hose,null,true,node.label,(left?1:-1)*(crossing.wires[0].standsFor?1:-1),crossing.wires[0].standsFor,crossing.wires[0].standsFor?27:12);
         }else{
-          if(node.kind==='box')svg('rect',{x:-p.w/2,y:-p.h/2,width:p.w,height:p.h,rx:this.style==='wiring'?0:12,fill:selected?'#e0effa':'#f5f9fc',stroke:selected?'#1474ab':'#a9becf','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
+          if(node.kind==='box'&&!p.radius)svg('rect',{x:-p.w/2,y:-p.h/2,width:p.w,height:p.h,rx:this.style==='wiring'?0:12,fill:selected?'#e0effa':'#f5f9fc',stroke:selected?'#1474ab':'#a9becf','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
           else if(p.radius){
             for(const port of [...p.inputs,...p.outputs]){
               const left=port.side==='in',px=port.x-p.x,py=port.y-p.y;
@@ -461,6 +494,7 @@
               this.drawLead(g,port.group?E.strand(whole,port.index):whole,E.geometry.wireTracks(segments),E.geometry.path(segments));
             }
             if(node.glyph==='spring')this.drawSpring(g,node,p,selected);
+            else if(node.glyph==='motor')this.drawMotor(g,node,p,selected,hasChildren);
             else svg('circle',{cx:p.glyphX,r:p.radius,fill:selected?'#e0effa':node.kind==='field'?'#f8e8dc':'#eef1f4',
               stroke:selected?'#1474ab':'#91a1af','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
           }
@@ -477,7 +511,7 @@
             svg('line',{x1:-58,x2:58,y1:0,y2:0,stroke:'#c1d5e4','stroke-width':4},top);
             svg('circle',{cx:48*Math.tanh(v/5),cy:0,r:9,fill:'#237bab'},top);
             svg('text',{y:25,'text-anchor':'middle',class:'ex-secondary'},top,E.format(node.value).slice(0,28));
-          }else if(hasChildren){
+          }else if(hasChildren&&node.glyph!=='motor'){
             svg('text',{y:4,'text-anchor':'middle',class:'ex-secondary'},g,'Open');
           }else if(node.symbol){
             svg('text',{x:p.glyphX??0,y:4,'text-anchor':'middle',class:'ex-secondary'},g,node.symbol);
@@ -489,8 +523,11 @@
             svg('circle',{cx:px,cy:py,r:10,fill:'transparent'},mark);
             // One port carries one number. A port that carries a list is a hose port, drawn below as the
             // hose's mouth; a strand's port is one number of an unwrapped hose.
-            if(!port.hose)svg('circle',{cx:px,cy:py,r:4,fill:'white',stroke:'#386b88','stroke-width':1.6},mark);
-            svg('title',{},mark,port.label+' · '+(left?'input':'output'));
+            // An input port no mark inside can push is load-free: the book's black wall stands there, in place of the ring.
+            const walled=left&&node.kind!=='state'&&!E.carriesLoad(this.model.nodes,{branches:port.wires.flatMap(w=>w.branches||[w])});
+            if(walled)this.drawWall(mark,px,py,port.hose);
+            else if(!port.hose)svg('circle',{cx:px,cy:py,r:4,fill:'white',stroke:'#386b88','stroke-width':1.6},mark);
+            svg('title',{},mark,port.label+' · '+(left?'input':'output')+(walled?' · load-free: read here, never pushed':''));
             const strand=port.group&&E.strand(port.wires[0],port.index),place=strand&&E.coordinate(port.wires[0],port.index);
             const text=node.kind==='state'?(port.hose?port.hose+' numbers':strand?place+':  '+E.format(strand.value):E.format(port.wires[0].value))
               :strand&&!p.radius&&port.label.length>16?'… '+place:port.label;
@@ -520,7 +557,7 @@
           // It is drawn after every part, on a white card, so that no wire or title crosses it.
           if(Forms&&node.law&&this.focusNode===node.id)
             lawCard={x:p.x+(p.glyphX??0),y:p.y+p.h/2+6,lines:Forms.definitions(node.law),wrong:!this.lawCheck(node).ok};
-          if(hasChildren)svg('text',{x:p.w/2-9,y:p.h/2-8,'text-anchor':'end',class:'ex-secondary'},g,this.model.children(node.id).length+' inside');
+          if(hasChildren&&node.glyph!=='motor')svg('text',{x:p.w/2-9,y:p.h/2-8,'text-anchor':'end',class:'ex-secondary'},g,this.model.children(node.id).length+' inside');
           if(this.selectMode)svg('circle',{cx:-p.w/2+10,cy:-p.h/2+12,r:6,fill:selected?'#13669b':'white',stroke:'#13669b'},g);
         }
         g.onpointerdown=e=>this.beginDrag(node,e);g.onclick=e=>this.choose(node,e);

@@ -22,14 +22,20 @@ Everything else is composed from these by the library's own ``compose_seq`` and
 * ``spring``    -- note ``eqn.spring``, two pushes;
 * ``dragger``   -- note ``eqn.dragger``, a memory and a spring;
 * ``damper``    -- note ``eqn.damper``, a dragger and a return spring;
+* ``contact``   -- a spring and a damper on one stretch, each behind a gate wire: the
+  note's ground and its lever's attachment (``sec.source``, ``sec.gates``);
 * ``motor``     -- note ``eqn.motor``, two pushes; ``motor_at_rate`` is it sent the push that
   moves its store at a chosen rate;
+* ``latch``     -- note ``eqn.contact_latch``, a store and its motor;
 * ``sweep``     -- the note's sweep, two motors;
 * ``send`` and ``discard`` -- a part with a constant sent in on some input wires, or with
-  some outputs unread (the first paragraph of the note's ``sec.general``).
+  some outputs unread (the first paragraph of the note's ``sec.general``);
+* ``identity``  -- the identity on an interface, beside the parts of an arrangement whose
+  domain is not the unit.
 
-Built 2026-11-19 for the book's P109 (e) (Claude Fable 5.2, 6a32afbb). Nothing here is used
-by ``feeding.py`` yet: its casing and receiver are still single boxes with typed-out fields.
+Built 2026-11-19 for the book's P109 (e) (Claude Fable 5.2, 6a32afbb); ``contact``,
+``latch`` and ``identity`` 2026-11-21 for P109 (h) (86739fa7). ``feeding.py`` is built from
+these through ``feeding_composed.py``.
 """
 from __future__ import annotations
 
@@ -40,6 +46,7 @@ from jax import Array
 
 from .arrangement import Arrangement, zero_form
 from .coalgebra import CotCoalg, CotCoalgK
+from .feeding import theta
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 EMPTY = jnp.zeros(0)
@@ -139,6 +146,14 @@ def transfer(label: str, inner_in: int, inner_out: int, outer_in: int, outer_out
                        lambda q, m: publish(m), lambda q, m, n: route(m, n), zero_form, label)
 
 
+def identity(inputs: int, outputs: int, label: str = "identity") -> Arrangement:
+    """The identity on the interface ``<inputs|outputs>``: every value and every load passes
+    through unchanged. It stands beside the parts that fill an arrangement whose domain is
+    not the unit, such as the feeding note's spatial coupling."""
+    return Arrangement(trivial_parameter(), inputs, outputs, inputs, outputs,
+                       lambda q, m: m, lambda q, m, n: n, zero_form, label)
+
+
 def fill(parts: Sequence[Arrangement], wiring: Arrangement) -> Arrangement:
     """The parts side by side, their interfaces filled into ``wiring``: ``wiring . (part_1 (x) ...)``."""
     return compose_seq(tensor_arrangements(list(parts)), wiring)
@@ -230,17 +245,84 @@ def dragger(beta: float, memory: float = 0.0, label: str = "dragger", *,
 
 
 def damper(beta: float, kappa_return: float, stroke: float = 0.0, label: str = "damper", *,
-           stages: int = 1, h: float = 1.0) -> Arrangement:
+           read: bool = False, stages: int = 1, h: float = 1.0) -> Arrangement:
     """The damper ``1 -> <2|0>`` (note ``eqn.damper``): a dragger whose memory, its stroke
     ``z``, a spring sent the constant stiffness ``kappa_return`` pulls back to ``0``.
 
     Inputs a stiffness ``k`` (``0`` out of contact) and a gap ``u``. The field is
     ``-d(k (u - z)^2 / 2 + kappa_return z^2 / 2)`` and the stroke moves at
-    ``(k (u - z) - kappa_return z) / beta``.
+    ``(k (u - z) - kappa_return z) / beta``. With ``read`` it is ``1 -> <2|1>``, the same
+    damper sending its stroke out.
     """
     back = send(spring("return spring"), {0: kappa_return})
-    wiring = transfer(label, 3, 1, 2, 0, lambda m, n: jnp.stack([n[0], n[1], m[0]]))
+    wiring = transfer(label, 3, 1, 2, int(read), lambda m, n: jnp.stack([n[0], n[1], m[0]]),
+                      (lambda m: m) if read else (lambda m: EMPTY))
     return fill([dragger(beta, stroke, stages=stages, h=h), back], wiring)
+
+
+def contact_cost(k_spring: float, k_damper: float) -> Callable[[Array, Array, Array, Array], Array]:
+    """The cost of a contact's gated spring and damper, its return spring left out:
+    ``(g_s, g_d, u, z) |-> k_spring g_s u^2 / 2 + k_damper g_d (u - z)^2 / 2``.
+
+    ``contact`` is composed from ``push`` and does not use this; it is here for the circle
+    that tells a motor the load a contact puts on its store (a motor must be sent the true
+    other load, note ``eqn.motor``), and ``tests/test_feeding_parts.py`` checks it against
+    the composed field.
+    """
+    return lambda g_s, g_d, u, z: 0.5 * k_spring * g_s * u ** 2 + 0.5 * k_damper * g_d * (u - z) ** 2
+
+
+def contact(k_spring: float, k_damper: float, beta: float, kappa_return: float, stroke: float = 0.0,
+            label: str = "contact", *, stages: int = 1, h: float = 1.0) -> Arrangement:
+    """The contact ``1 -> <3|1>``: a spring and a damper on one stretch, each behind a gate wire.
+
+    Inputs: the spring's gate ``g_s``, the damper's gate ``g_d`` and the stretch ``u``; the
+    spring is sent the stiffness ``k_spring g_s`` and the damper ``k_damper g_d``. Output:
+    the damper's stroke ``z``, its integrand. The field is
+    ``-d(k_spring g_s u^2 / 2 + k_damper g_d (u - z)^2 / 2 + kappa_return z^2 / 2)``, so a
+    gate gets back the energy it takes to stiffen its part, ``-k_spring u^2 / 2`` and
+    ``-k_damper (u - z)^2 / 2``.
+
+    The feeding note's two contacts are this one (``feeding_composed``): the ground, its
+    gates ``theta(-v / eps)`` and ``theta(-v / eps_d)`` of its own stretch ``v``, the stroke
+    unread; and the lever's attachment, both gates the one ``G_k``.
+    """
+    def route(m: Array, n: Array) -> Array:
+        g_s, g_d, u = n
+        return jnp.stack([k_spring * g_s, u, k_damper * g_d, u])
+
+    return fill([spring(f"{label} spring"),
+                 damper(beta, kappa_return, stroke, f"{label} damper", read=True, stages=stages, h=h)],
+                transfer(label, 4, 1, 3, 1, route, lambda m: m))
+
+
+def engagement(latch: Array) -> Array:
+    """How far a latch is engaged, ``s = theta((v - .3) / .2)`` (note ``sec.gates``)."""
+    return theta((latch - .3) / .2)
+
+
+def latch(capacity: float, rate: float, wake: float, initial: float = 0.0, label: str = "latch", *,
+          stages: int = 1, h: float = 1.0) -> Arrangement:
+    """The latch ``1 -> <5|1>`` (note ``eqn.contact_latch``): a store ``v`` and its motor.
+
+    Inputs: the battery ``b``; whether the latch is free to engage, ``U``; the targets
+    ``D`` to acquire and ``T`` to retain; and the load ``P`` the rest of the arrangement
+    puts on the store. Output: ``v``. With ``s = engagement(v)``, the motor of the given
+    capacity drives the store at the rate
+    ``rate * theta(b / wake) * (U ((1 - s) D + s T) - v)``: toward ``U D`` while the latch
+    is not engaged and toward ``U T`` once it is, so what it takes to engage and what it
+    takes to stay engaged differ. The battery pays ``capacity u^2 - P u`` at the rate ``u``.
+    """
+    def route(m: Array, n: Array) -> Array:
+        v = m[0]
+        b, free, acquire, retain, other = n
+        s = engagement(v)
+        u = rate * theta(b / wake) * (free * ((1 - s) * acquire + s * retain) - v)
+        return jnp.stack([b, v, u, other])
+
+    return fill([rod_segment(capacity, initial, f"{label} store", stages=stages, h=h),
+                 motor_at_rate(capacity, f"{label} motor")],
+                transfer(label, 4, 1, 5, 1, route, lambda m: m))
 
 
 def motor(capacity: float, label: str = "motor", width: int = 1) -> Arrangement:

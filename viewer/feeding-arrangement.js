@@ -143,6 +143,16 @@
         if(trace){nodes.push({id,parent,label,kind:'box',...extra});nodes.push({id:id+'/field',parent:id,label:'Inclination field',kind:'field',description:'The stateless part’s own inclination field; no integrator.'});}
       }else if(trace)nodes.push({id,parent,label,kind,...extra});return id;
     };
+    // A motor (the note's sec.general: "A stateless part that pushes a load τ on a store q and pays the battery for
+    // it"). Every motor is drawn with the one mark, the explorer's glyph 'motor', and opens into its two pushes.
+    // `told` says what it is sent: a rate, a rate and the other load on its store, or a torque and that load.
+    const sent={rate:'the rate at which to drive its store',
+      'rate and load':'the rate at which to drive its store, and the load the rest of the arrangement puts on that store',
+      'torque and load':'the torque to push with, and the load the rest of the arrangement puts on its store'};
+    // `turns` is the label of its store's wire, which ends at the pulley on its shaft; the battery's ends at its plug.
+    const motorPart=(id,parent,label,turns,told='rate')=>node(id,parent,label,'effort',{glyph:'motor',turns,powered:'Battery',
+      description:'A motor: a stateless part that pushes a load on a store and pays the battery for it. It is sent '+sent[told]
+        +'. It reads what it is sent and never pushes it: each such terminal is load-free, and carries a black wall.'});
     node('feeding',null,'Feeding');node('receiver','feeding','Receiver','box',{renderer:'receiver',column:2,row:Math.max(0,(places.length-1)/2)});
     node('battery','receiver','Battery','state',{value:s[0],renderer:'battery',column:0,row:1});
     node('wheels','receiver','Wheels','box',{renderer:'wheels',column:1,row:2});
@@ -174,7 +184,7 @@
         const value = end === start+1 ? s[start] : s.slice(start,end);
         node(id,'memory',label,'state',{value});
         node(id+'-rate','memory',label+' rate','operation');
-        node(id+'-motor','memory',label+' motor','effort');
+        motorPart(id+'-motor','memory',label+' motor',label);
       }
       // A vector store has one vector readout. Its scalar coordinates occupy
       // their usual places in the integrator, before the casings.
@@ -183,8 +193,8 @@
       node('patrol','receiver','Patrol','box',{column:1,row:1});
       node('patrol-point','patrol','Patrol point','state',{value:s[8]});
       node('patrol-scan','patrol','Patrol scan','state',{value:s[9]});
-      node('patrol-motor','patrol','Patrol motor','effort');
-      node('patrol-scan-motor','patrol','Patrol scan motor','effort');
+      motorPart('patrol-motor','patrol','Patrol motor','Patrol point');
+      motorPart('patrol-scan-motor','patrol','Patrol scan motor','Patrol scan');
       stateIds.push('patrol-point','patrol-scan');labels.push('Patrol point','Patrol scan');
     }
     node('grip','lever','Grip','state',{value:s[1]});node('tip','lever','Tip height','state',{value:s[2],renderer:'tip'});
@@ -211,10 +221,10 @@
     // circle computes P_w"), a static map of the cart's and the wheel's positions.
     node('wheel-load','wheels','Other wheel load','operation',{law:{letters:{'Cart position':'y','Wheel position':'z_w'},
       constants:{κ_w:P.kappac},where:[['P_w','κ_w*(y - z_w)']]}});
-    node('drive','wheels','Drive motor','effort');
+    motorPart('drive','wheels','Drive motor','Wheel position','torque and load');
     node('look','eye','Look distance','state',{value:s[6],renderer:'look'});node('scan','eye','Scan','state',{value:s[7]});
 
-    node('look-motor','eye','Look motor','effort');node('scan-motor','eye','Scan motor','effort');
+    motorPart('look-motor','eye','Look motor','Look distance');motorPart('scan-motor','eye','Scan motor','Scan');
     // The eye is the note's sweep on (r, ψ) (sec.gates). Its two rates are static maps, each with its law
     // written once (explorer-forms.js, lawCheck); a motor reads its own rate and nothing else. A law here is
     // gated by live (the battery holds some) and free (nothing red is seen).
@@ -239,7 +249,7 @@
       node('patrol-scan-rate','patrol','Patrol scan rate','operation',{law:gatedLaw(letters,constants,
         'patrol_ζ','live*free*(-ν_p*η + γ_p*(B**2 - η**2 - ζ**2)*ζ)')});
     }
-    node('gripper','lever','Grip motor','effort');node('lift','lever','Lift motor','effort');
+    motorPart('gripper','lever','Grip motor','Grip','rate and load');motorPart('lift','lever','Lift motor','Tip height','rate and load');
     node('grip-rate','lever','Grip rate','operation');node('lift-rate','lever','Lift rate','operation');
     const scales=[10,2,.4,8,1,8,6,6,8,8];
     scales.length=receiverSize;
@@ -294,7 +304,7 @@
       // drawn below carry the same loads factored through the springs and the gates' maps, and the tests compare.
       qload[start+2]+=px;qload[start+6]+=G*P.kd*da-P.kr*za;
       node(id+'/latch',attBox,'Contact latch','state',{value:s[start+7]});
-      node(attBox+'/latch-drive',attBox,'Latch motor','effort');
+      motorPart(attBox+'/latch-drive',attBox,'Latch motor','Latch '+(k+1),'rate and load');
       const latchDot=contact.latchRate[k], springLatch=-.5*contact.engageSlope[k]*hold*nv*nh*W;
       const latchTorque=P.latchCost*latchDot-springLatch;
       qload[start+7]+=springLatch;term(attBox+'/latch-drive',start+7,latchTorque);

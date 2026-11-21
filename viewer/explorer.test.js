@@ -131,6 +131,53 @@ test('a field that reads a wire and never pushes it sends no load on it, at any 
   assert.ok(read.has('Meal rate into pay-mem')||[...read].some(x=>x.startsWith('Meal rate')),[...read].join('; '));
   console.log('wires read and never pushed:',read.size);
 });
+test('a wire into a box carries a load back exactly when some mark it enters inside can push it',()=>{
+  // A box of two marks: `pay` reads the rate u and pushes the battery b; `drive` reads u and pushes the store q.
+  const mark=(id,pushed,letter)=>({id,parent:'m',kind:'field',form:{letters:{'Rate':'u',[pushed]:letter},terms:[{c:'u',h:letter}]}});
+  const sc={version:1,root:'r',nodes:[{id:'r',kind:'box'},{id:'m',parent:'r',kind:'box',glyph:'motor'},
+    mark('m/drive','Store','q'),mark('m/pay','Battery','b'),{id:'plain',parent:'m',kind:'field'},
+    ...['rate','store','battery','other'].map(id=>({id,parent:'r',kind:'boundary',side:'in'}))],
+    wires:[['rate','m/drive','Rate'],['rate','m/pay','Rate'],['store','m/drive','Store'],['battery','m/pay','Battery'],
+      ['other','plain','Other']].map(([source,target,label])=>({id:source+'>'+target,source,target,label,value:1,load:0}))};
+  const m=new E.Model(sc),wires=m.project().wires,by=label=>wires.filter(w=>w.label===label);
+  for(const w of wires){assert.equal(w.target,'m');assert.equal(w.deepTarget,sc.wires.find(x=>x.id===w.id).target);}
+  // one wire at a time, then the two branches of the rate joined: read by both marks, pushed by neither
+  for(const w of by('Rate'))assert.equal(E.carriesLoad(m.nodes,w),false);
+  assert.equal(E.carriesLoad(m.nodes,E.aggregate(by('Rate'))[0]),false);
+  assert.equal(E.carriesLoad(m.nodes,by('Store')[0]),true);assert.equal(E.carriesLoad(m.nodes,by('Battery')[0]),true);
+  // a mark with no written form may push; and a wire joined with one that is pushed carries a load
+  assert.equal(E.carriesLoad(m.nodes,by('Other')[0]),true);
+  assert.equal(E.carriesLoad(m.nodes,E.forkWire([...by('Rate'),...by('Store')])),true);
+  // inside the box the same wires are judged by the same marks
+  m.enter('m');for(const w of m.project().wires)assert.equal(E.carriesLoad(m.nodes,w),w.label!=='Rate',w.id);
+});
+test('every feeding motor has the one mark, and is load-free exactly at the wires it only hears',()=>{
+  const L=require('./food-learning.js'),places=[0,5];
+  const heard={gripper:['Chosen grip rate','Other grip load'],lift:['Chosen lift rate','Other tip load'],
+    drive:['Drive torque','Other wheel load'],'look-motor':['Look rate'],'scan-motor':['Scan rate'],
+    'patrol-motor':['Patrol point rate'],'patrol-scan-motor':['Patrol scan rate']};
+  for(const {label,id} of L.stores)heard[id+'-motor']=[label+' rate'];
+  places.forEach((_,k)=>{heard['attachment-'+k+'/latch-drive']=['Latch rate '+(k+1),'Other latch load'];});
+  const scenes=[[A.observeLearning(L.start(places,[10,8]),places,L.DEFAULTS),5+L.stores.length+places.length],
+    [A.adapter({places,foods:[10,8]}).snapshot(),7+places.length]];
+  for(const [sc,count] of scenes){
+    const m=new E.Model(sc),motors=sc.nodes.filter(n=>n.glyph==='motor');
+    assert.equal(motors.length,count);
+    // every part named a motor is one, and every one opens into its two pushes
+    for(const n of sc.nodes)if(n.kind==='box'&&/ motor$/.test(n.label))assert.equal(n.glyph,'motor',n.id);
+    for(const n of motors){
+      assert.deepEqual(m.children(n.id).map(c=>c.kind),['field','field'],n.id);
+      m.enter(n.parent);
+      const entering=m.project().wires.filter(w=>w.target===n.id),labels=[...new Set(entering.map(w=>w.label))];
+      const free=labels.filter(label=>!E.carriesLoad(m.nodes,E.forkWire(entering.filter(w=>w.label===label))));
+      assert.deepEqual(free.sort(),heard[n.id].slice().sort(),n.id);
+      // what is left is the store it pushes and the battery it charges
+      assert.equal(labels.length-free.length,2,n.id);assert.ok(labels.includes('Battery'),n.id);
+      // and the node names them: the wire that powers it and the wire it turns, the two it pushes
+      assert.equal(n.powered,'Battery',n.id);assert.ok(labels.includes(n.turns)&&!free.includes(n.turns)&&n.turns!==n.powered,n.id);
+    }
+  }
+});
 test('a value\'s shade is its place in its wire\'s range, light low and dark high',()=>{
   const S=E.packets.shade,shade=(v,lo,hi)=>E.valueShade((v-lo)/(hi-lo));
   assert.equal(E.valueShade(0),S.light);assert.equal(E.valueShade(1),S.dark);

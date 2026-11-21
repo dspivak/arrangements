@@ -96,6 +96,35 @@ test('every feeding level has connected horizontal endpoints and clears unrelate
   for(const n of m.scene.nodes)if(m.children(n.id).length){m.enter(n.id);check(m.project());levels++;}
   assert.ok(levels>=38);   // 38 since a spring is one mark and a dragger is drawn as its store and its spring, with no box
 });
+test('a motor is one compact mark: the wire it turns ends at its pulley, the battery\'s at its plug, the rest at its side',()=>{
+  const L=require('./food-learning.js'),places=[0,5];
+  const m=new E.Model(A.observeLearning(L.start(places,[10,8]),places,L.DEFAULTS));
+  const parents=new Set(m.scene.nodes.filter(n=>n.glyph==='motor').map(n=>n.parent));let seen=0;
+  assert.deepEqual([...parents].sort(),['attachment-0','attachment-1','eye','lever','memory','wheels']);
+  for(const parent of parents){
+    m.enter(parent);const project=m.project(),g=check(project);
+    for(const n of project.nodes.filter(n=>n.glyph==='motor')){
+      const p=g.positions.get(n.id);seen++;
+      assert.equal(p.radius,19);assert.equal(p.outputs.length,0,'a motor has input ports only');
+      assert.ok(p.inputs.length>=3,n.id);
+      // top to bottom: what it turns (one wire, or the strands of one hose), what it only hears, what powers it
+      const M=E.geometry.motor,roles=p.inputs.map(port=>port.motor),name=port=>port.group?port.group.label:port.label;
+      assert.deepEqual(roles,[...roles].sort((a,b)=>['turns','heard','powered'].indexOf(a)-['turns','heard','powered'].indexOf(b)),n.id);
+      assert.ok(roles.includes('turns')&&roles.includes('heard'),n.id);assert.equal(roles.filter(r=>r==='powered').length,1,n.id);
+      for(const port of p.inputs){
+        assert.equal(port.motor,name(port)===n.turns?'turns':name(port)===n.powered?'powered':'heard',n.id);
+        const at=[port.glyphX-p.glyphX,port.glyphY];
+        if(port.motor==='turns')assert.deepEqual(at,[-M.hub,M.hubY]);
+        else if(port.motor==='powered')assert.deepEqual(at,[M.plugX,M.cordY]);
+        else{assert.equal(at[0],-M.half);assert.ok(at[1]>M.top&&at[1]<M.bottom,'a heard wire ends on the body\'s side');}
+        assert.ok(port.x<p.x+port.glyphX-10,'the terminal stands left of the picture');
+      }
+      // the pulley above the body, the plug below it, and under them the count of its parts, inside the part's rectangle
+      assert.ok(M.hubY<M.top&&M.cordY>M.bottom&&p.h/2>=M.cordY+27);
+    }
+  }
+  assert.equal(seen,5+L.stores.length+places.length);
+});
 test('nested grouping preserves distinct crossing ports and routes them',()=>{
   const m=new E.Model(A.adapter().snapshot());m.enter('receiver');const group=m.group(['eye','wheels'],'Guidance');
   check(m.project());m.enter(group);check(m.project());m.enter('receiver');const outer=m.group([group,'lever'],'Movement');

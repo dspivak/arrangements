@@ -218,6 +218,14 @@
   }
   // The rows of a spring's terminals, and how far down its bend each wire has turned where it meets the resistor.
   const SPRING_ROWS=46,SPRING_TURN=9;
+  // A motor's mark (explorer.js, `drawMotor`): a motor standing upright, in local units about the mark's centre.
+  // Its body runs from `top` to `bottom`, `half` wide each way; its shaft goes up to a pulley of radius `hub` at
+  // `hubY`; its cord leaves the bottom and ends in a plug whose face is at `plugX`, `cordY`. A motor node names
+  // the wire it turns (`turns`, its store) and the wire that powers it (`powered`, the battery): the first has
+  // the top row and ends at the pulley, the second the bottom row and ends at the plug, and the wires it only
+  // hears stand between and end at the body's side. `MOTOR_RADIUS` sets the mark's width and where its wires bend.
+  const MOTOR_RADIUS=19,MOTOR={half:11,top:-9,bottom:16,hubY:-19,hub:4.5,cordY:23,plugX:-15,height:102};
+  const motorRole=(p,port)=>{const name=port.group?port.group.label:port.label;return name===p.turns?0:name===p.powered?2:1;};
   // A spring with a third terminal (`third`, the label of the wire that sets its stiffness) has that terminal
   // on a row of its own between its two ends, where its wire meets the resistor from the side. A spring to an
   // anchor (`anchor`) has one end; the row below it is the anchor's, which has no port.
@@ -235,7 +243,7 @@
     const edges=E.aggregate(project.wires).map(w=>({...w,signal:E.signalKey(w)}));
     const toggled=new Set(options.toggled||[]),hoseAbove=options.hoseAbove??4;
     const positions=new Map(),inner=project.nodes.filter(n=>n.kind!=='boundary'),boundaries=project.nodes.filter(n=>n.kind==='boundary');
-    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,glyph:n.glyph,third:n.third,anchor:n.anchor,inputs:[],outputs:[],groups:[],x:0,y:0,w:0,h:0});
+    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,glyph:n.glyph,third:n.third,anchor:n.anchor,turns:n.turns,powered:n.powered,inputs:[],outputs:[],groups:[],x:0,y:0,w:0,h:0});
     for(const w of edges){
       const a=positions.get(w.source),b=positions.get(w.target);w.outKey=w.signal;w.inKey=w.targetPort??w.signal;
       w.dimension=E.dimension(w);
@@ -271,15 +279,17 @@
     }
     for(const n of inner){const p=positions.get(n.id),count=Math.max(p.inputs.length,p.outputs.length);
       p.column=column.get(n.id);p.w=n.kind==='state'?156:260;p.h=Math.max(132,(count+1)*22);
-      if(n.kind==='box'){
+      // A motor (`glyph: 'motor'`) is a box drawn as one compact mark, with its terminals fanned in like a field's.
+      const compact=n.kind==='operation'||n.kind==='field'||n.glyph==='motor';
+      if(n.kind==='box'&&!compact){
         const labelWidth=ports=>ports.reduce((w,port)=>Math.max(w,Math.min(16,port.label.length)*6.7+16),0);
         p.w=Math.max((n.label??n.id).length*8+16,labelWidth(p.inputs)+labelWidth(p.outputs)+(n.renderer?90:48),90);
         p.h=Math.max(n.renderer?102:54,count*22+26);
       }
-      if(n.kind==='operation'||n.kind==='field'){
+      if(compact){
         // The mark has a fixed size. Its labeled terminals occupy their own
         // rows. Adding an argument extends only that list of terminals.
-        p.radius=n.renderer?34:15;
+        p.radius=n.glyph==='motor'?MOTOR_RADIUS:n.renderer?34:15;
         // A terminal of a field with a written 1-form carries, after its name, the letter the formula uses.
         // (A strand's letter is its hose's, with the strand's number under it.)
         const lettered=port=>{const letter=(n.form||n.law)?.letters?.[port.group?port.group.label:port.label];
@@ -293,6 +303,8 @@
         // A spring is a bend joining its wires, with a resistor on the bend's upright stretch: its terminals
         // stand further apart, so that the resistor between them can be seen.
         if(n.glyph==='spring')p.h=(springRows(p)-1)*springPitch(p)+40;
+        // A motor's mark holds its pulley, body, cord and, under them, the count of the parts it opens into.
+        if(n.glyph==='motor')p.h=Math.max(p.h,MOTOR.height);
       }
       if(n.kind==='state')p.h=Math.max(132,100+count*24);
       // How far from the part an unwrapped hose's mouth stands: further for a taller fan of strands.
@@ -353,6 +365,9 @@
           const k=ports.findIndex(port=>port.label===p.third);
           if(k>=0)ports.splice(1,0,...ports.splice(k,1));
         }
+        // A motor's wires stand in the order of its picture: what it turns on top, what powers it at the bottom.
+        if(p.glyph==='motor'&&side==='in')ports.splice(0,ports.length,...ports.slice().sort((a,b)=>motorRole(p,a)-motorRole(p,b)));
+        const heard=p.glyph==='motor'&&side==='in'?ports.filter(port=>motorRole(p,port)===1):[];
         ports.forEach((port,i)=>{
           let dy=(i-(ports.length-1)/2)*22,dx=p.w/2;
           if(p.kind==='boundary'){dy=0;dx=0;}
@@ -369,6 +384,14 @@
               port.glyphX=p.glyphX;port.glyphY=dy+Math.sign(middle-i)*SPRING_TURN;
               // The third terminal's wire runs level to the resistor and ends at its side.
               if(port.label===p.third){port.third=true;port.glyphX=p.glyphX-10;port.glyphY=dy;}
+            }
+            // A motor's wires end at its pulley, at its plug, or at the side of its body.
+            if(p.glyph==='motor'&&side==='in'){
+              const role=motorRole(p,port),j=heard.indexOf(port);
+              port.motor=['turns','heard','powered'][role];
+              if(role===0){port.glyphX=p.glyphX-MOTOR.hub;port.glyphY=MOTOR.hubY;}
+              else if(role===2){port.glyphX=p.glyphX+MOTOR.plugX;port.glyphY=MOTOR.cordY;}
+              else{port.glyphX=p.glyphX-MOTOR.half;port.glyphY=heard.length===1?3:-5+16*j/(heard.length-1);}
             }
           }
           port.side=side;port.x=p.x+(side==='in'?-dx:dx);port.y=p.y+dy;
@@ -415,6 +438,6 @@
     return {result:{positions,width,height,edges,forks},short};
     }
   }
-  E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks,springRows:SPRING_ROWS,springTurn:SPRING_TURN};
+  E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks,springRows:SPRING_ROWS,springTurn:SPRING_TURN,motor:MOTOR};
   if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom,hoseEnd,endAt};
 })(globalThis);

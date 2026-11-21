@@ -131,7 +131,8 @@
         if(source&&!target&&source===w.source&&this.nodes.get(source).kind==='boundary')continue;
         if(!source&&target&&target===w.target&&this.nodes.get(target).kind==='boundary')continue;
         if(!source)source=port(w,'in');if(!target)target=port(w,'out');
-        wires.push({...w,signal:signalKey(w),source,target});
+        // `deepTarget` keeps the wire's actual endpoint, the mark it enters inside the part drawn (`carriesLoad`).
+        wires.push({...w,signal:signalKey(w),source,target,deepTarget:w.target});
       }
       // Display bundles retain every individual wire and its own scale and load.
       const bundles=new Map();
@@ -214,6 +215,15 @@
     while(todo.length){const n=todo.pop();if(seen.has(n))continue;seen.add(n);if(where.has(n))todo.push(...names(where.get(n)));}
     return seen.has(letter);
   }
+  // Whether a wire as drawn at some level can carry a load back: whether any of the marks it actually enters, however
+  // deep inside the part drawn, can push it. `w` is a wire of `project()`, or several of them joined by `aggregate`
+  // or `forkWire` (its `branches`); `nodes` is the model's map of nodes. Where it cannot, the part is load-free at
+  // that input port, and the view draws no amber track there and the book's mark for it (Ch 3: "We draw a black
+  // wall at each input port where an arrangement is load-free"; Ch 4 def.walled). So a motor is load-free at the
+  // rate it is sent, since each of its two pushes only reads it.
+  function carriesLoad(nodes,w) {
+    return (w.branches||[w]).some(b=>pushes(nodes.get(b.deepTarget??b.target),b.label));
+  }
   // A value's beads, all one shade at a time, light where the value is lowest of what its wire has carried and
   // dark where it is highest (David, 2026-11-21, 66ce7547: "different colored beads, light blue vs dark vlue for
   // different values", and "yes all beads share one shade"). The place u = (v − low)/(high − low) in the wire's
@@ -233,6 +243,6 @@
     if(typeof value==='number')return value===0?'0.000':Math.abs(value)>=1e4||Math.abs(value)<.001?value.toExponential(2):value.toFixed(3);
     return String(value);
   }
-  const api={Model,validate,magnitude,intensity,packets,packetSpeed,packetVelocity,valueShade,pushes,format,aggregate,forkWire,signalKey,dimension,coordinate,strand};
+  const api={Model,validate,magnitude,intensity,packets,packetSpeed,packetVelocity,valueShade,pushes,carriesLoad,format,aggregate,forkWire,signalKey,dimension,coordinate,strand};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementExplorer=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -171,8 +171,10 @@ def _inspect(arr, q, state, m, incoming, n, xi):
         ra = _inspect(a, qa, sa, m, incoming, rb['m_in'], rb['m_load'])
     elif operation == 'tensor':
         mi, mo, ni, no = a.in_dim_M, a.out_dim_M, a.in_dim_N, a.out_dim_N
-        ia = lambda z: incoming(jnp.concatenate([z, in_m[mi:]]))[:mi]
-        ib = lambda z: incoming(jnp.concatenate([in_m[:mi], z]))[mi:]
+        # A factor with no M inputs receives the one-form on R^0; the whole incoming form, which
+        # can be a deep composite's, is not evaluated to slice nothing out of it.
+        ia = trivial_omega(0) if mi == 0 else lambda z: incoming(jnp.concatenate([z, in_m[mi:]]))[:mi]
+        ib = trivial_omega(0) if b.in_dim_M == 0 else lambda z: incoming(jnp.concatenate([in_m[:mi], z]))[mi:]
         ra = _inspect(a, qa, sa, m[:mo], ia, n[:ni], xi[:no])
         rb = _inspect(b, qb, sb, m[mo:], ib, n[ni:], xi[no:])
     else:

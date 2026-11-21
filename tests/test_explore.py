@@ -177,7 +177,8 @@ def test_a_single_receiver_releases_its_first_casing_before_feeding_from_the_nex
     first, initial = add_casing(body,[],empty_world.P.init,apple,**step)
     assert initial[0][0] is empty_world.P.init[0][0]
     held = advance(first,initial,500)
-    assert held[1][1] > .99
+    # The spatial coupling's state nests by its parts now; the latch is the last number of the flat state.
+    assert unpack_state(held,1)[-1] > .99
     # Carry the actual body and the first contact into the enlarged world.
     (same_body,old_apple),_ = held
     both,inserted = add_casing(body,[apple],held,apple,**step)

@@ -124,6 +124,74 @@ def test_damper_field_and_return():
     np.testing.assert_allclose(s, [0.3 - 0.01 * kr * 0.3 / beta])
 
 
+def test_contact_field_and_gates():
+    """A spring and a damper on one stretch, each behind a gate wire: the field is minus the
+    differential of ``contact_cost`` plus the return spring's, and each gate gets back the
+    energy it takes to stiffen its part."""
+    ks, kd, beta, kr = 100.0, 4000.0, 40.0, 10.0
+    part = fp.contact(ks, kd, beta, kr)
+    assert (part.in_dim_N, part.out_dim_N, part.P.Q_dim) == (3, 1, 1)
+    cost = fp.contact_cost(ks, kd)
+    whole = lambda z, gs, gd, u: cost(gs, gd, u, z) + 0.5 * kr * z * z
+    for gs, gd, u, z in RNG.normal(size=(8, 4)) * np.array([1.0, 1.0, 0.3, 0.05]):
+        xi_z, xi_n = field(part, [z], [gs, gd, u])
+        d = u - z
+        np.testing.assert_allclose(xi_z, [kd * gd * d - kr * z], atol=1e-10)
+        np.testing.assert_allclose(xi_n, [-0.5 * ks * u * u, -0.5 * kd * d * d, -ks * gs * u - kd * gd * d],
+                                   atol=1e-10)
+        grads = jax.grad(whole, argnums=(0, 1, 2, 3))(z, gs, gd, u)
+        np.testing.assert_allclose(np.concatenate([xi_z, xi_n]), -np.asarray(grads), atol=1e-10)
+        np.testing.assert_allclose(part.out_f(jnp.array([z]), EMPTY), [z])       # it sends its stroke out
+    # Both gates shut: nothing acts on the stretch, and the stroke returns at kr / beta.
+    xi_z, xi_n = field(part, [0.3], [0.0, 0.0, 5.0])
+    np.testing.assert_allclose(xi_n[2], 0.0)
+    np.testing.assert_allclose(xi_z, [-kr * 0.3])
+    # The spring's gate alone: no damper, the stroke still returns.
+    xi_z, xi_n = field(part, [0.3], [1.0, 0.0, 0.2])
+    np.testing.assert_allclose(xi_n[2], -ks * 0.2)
+    np.testing.assert_allclose(xi_z, [-kr * 0.3])
+
+
+def test_latch_law_and_payment():
+    """The latch's store moves at the rate of the note's ``eqn.contact_latch``, whatever load
+    is on it, when its motor is told that load; the battery pays ``C u^2 - P u``."""
+    C, rate, wake = 1e-4, 40.0, 1.0
+    theta = fp.theta
+
+    def law(v, b, free, acquire, retain):
+        s = theta((v - .3) / .2)
+        return rate * theta(b / wake) * (free * ((1 - s) * acquire + s * retain) - v)
+
+    part = fp.latch(C, rate, wake)
+    assert (part.in_dim_N, part.out_dim_N, part.P.Q_dim) == (5, 1, 1)
+    for v, b, free, acquire, retain, P in RNG.uniform(size=(8, 6)) * np.array([1.2, 2.0, 1.0, 1.0, 1.0, 0.02]):
+        u = law(v, b, free, acquire, retain)
+        xi_v, xi_n = field(part, [v], [b, free, acquire, retain, P])
+        np.testing.assert_allclose(xi_v, [C * u - P], atol=1e-12)
+        np.testing.assert_allclose(xi_n, [-(C * u - P) * u, 0.0, 0.0, 0.0, 0.0], atol=1e-10)
+        # A load P comes back along its output; told P, the store moves at the law's rate.
+        tau = 1e-3
+        s = ravel_pytree(open_step(fp.latch(C, rate, wake, initial=v), [b, free, acquire, retain, P], [P],
+                                   duration=tau)(fp.latch(C, rate, wake, initial=v).P.init))[0]
+        np.testing.assert_allclose(s, [v + tau * u], atol=1e-9)
+    # What it takes to engage and what it takes to stay engaged differ: with nothing to
+    # acquire and something to retain, a latch at 0 stays at 0 and a latch at 1 stays at 1.
+    np.testing.assert_allclose(law(0.0, 5.0, 1.0, 0.0, 1.0), 0.0)
+    np.testing.assert_allclose(law(1.0, 5.0, 1.0, 0.0, 1.0), 0.0)
+    # Not free (another latch is engaged): it relaxes toward 0 from anywhere.
+    assert law(1.0, 5.0, 0.0, 1.0, 1.0) < 0 and law(0.2, 5.0, 0.0, 1.0, 1.0) < 0
+    # A flat battery: it does not move.
+    np.testing.assert_allclose(law(0.7, 0.0, 1.0, 1.0, 1.0), 0.0)
+
+
+def test_identity_passes_values_and_loads():
+    part = fp.identity(2, 3)
+    m, n = jnp.array([1.0, 2.0, 3.0]), jnp.array([4.0, 5.0])
+    np.testing.assert_allclose(part.out_f(EMPTY, m), m)
+    np.testing.assert_allclose(part.in_f(EMPTY, m, n), n)
+    assert all(not np.any(x) for x in part.omega(EMPTY, m, n))
+
+
 def test_motor_field():
     C = 0.02
     for b, q, t, P in RNG.normal(size=(5, 4)):
