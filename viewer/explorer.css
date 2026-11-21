@@ -6,13 +6,20 @@
 .ex-controls,.ex-toolbar,.ex-breadcrumbs,.ex-legend{display:flex;flex-wrap:wrap;gap:9px;align-items:center}.ex-controls{border-bottom:1px solid var(--ex-line);padding-bottom:16px;margin-bottom:14px}.ex-controls .ex-time{margin-right:auto;font-variant-numeric:tabular-nums;min-width:8em}.ex-toolbar{padding:12px 0}.ex-breadcrumbs{gap:5px;min-height:42px}.ex-breadcrumbs span{color:var(--ex-muted)}.ex-breadcrumbs button{border:0;background:transparent;padding:6px 10px}.ex-breadcrumbs button:last-child{font-weight:650;background:#e1ebf4}
 .ex-workspace{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}.ex-canvas-wrap{background:var(--ex-panel);border:1px solid var(--ex-line);border-radius:12px;overflow:auto;position:relative;min-width:0}.ex-canvas{display:block;width:100%;min-width:650px;min-height:0;touch-action:pan-y}.ex-canvas text{font-family:system-ui,sans-serif;fill:var(--ex-ink);font-variant-numeric:tabular-nums}.ex-canvas .ex-node{cursor:pointer}.ex-canvas .ex-node:focus{outline:none}.ex-canvas .ex-node:focus .ex-focus-ring{stroke:#198bcd;stroke-width:3}.ex-canvas .ex-part-label{font-size:16px;font-weight:600}.ex-canvas .ex-secondary{font-size:13px;fill:var(--ex-muted)}
 .ex-sidebar{background:var(--ex-panel);border:1px solid var(--ex-line);border-radius:12px;padding:18px;max-height:740px;overflow:auto}.ex-sidebar h2{font-size:18px;margin:0 0 10px}.ex-sidebar p{margin:8px 0;color:var(--ex-muted)}.ex-sidebar h3{font-size:14px;margin:14px 0 4px}.ex-sidebar output,.ex-number{font:14px/1.5 ui-monospace,monospace;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.ex-wire-detail{border-top:1px solid var(--ex-line);padding:9px 0}.ex-wire-detail strong{display:block;font-size:14px}.ex-wire-detail label{display:block;color:var(--ex-muted);font-size:13px}.ex-wire-detail output{color:var(--ex-ink)}.ex-scale{font-size:12px;color:var(--ex-muted)}
-.ex-legend{margin:16px 0 8px;font-size:14px;color:var(--ex-muted);gap:20px}.ex-ramp{display:inline-block;width:80px;height:7px;border-radius:6px;margin:0 6px;vertical-align:middle;background:linear-gradient(90deg,#81bee0,#005b8e)}.ex-ramp.load{background:linear-gradient(90deg,#f0cb8f,#b12a3c)}.ex-help{font-size:14px;color:var(--ex-muted);margin:0}.ex-status{min-height:24px;color:var(--ex-blue);font-size:14px}.ex-error{color:#a3223b}.ex-group-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}.ex-link{color:var(--ex-blue)}
+.ex-legend{margin:16px 0 8px;font-size:14px;color:var(--ex-muted);gap:20px}.ex-help{font-size:14px;color:var(--ex-muted);margin:0}.ex-status{min-height:24px;color:var(--ex-blue);font-size:14px}.ex-error{color:#a3223b}.ex-group-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}.ex-link{color:var(--ex-blue)}
 .ex-scope-animation[hidden],.ex-scope-animation [hidden]{display:none}
 .ex-scope-animation figure{margin:8px 0;background:var(--ex-panel);border:1px solid var(--ex-line);border-radius:12px;padding:10px 16px}
 .ex-scope-animation figcaption{font-weight:600}.ex-scope-animation figure svg{display:block;width:100%;height:clamp(115px,16vh,170px)}
 .explorer[data-flow=load] [data-flow-track=value],.explorer[data-flow=value] [data-flow-track=load]{display:none}
-.ex-ramp.value{background:linear-gradient(90deg,#4c91b7,#005084)}.ex-ramp.load{background:linear-gradient(90deg,#c97f2f,#a32e29)}
-@media(prefers-reduced-motion:reduce){.ex-pulse{display:none}}
+/* Legend swatches for packet speed (explorer-core.js, `packets`): packets 20px apart on the track's one color,
+   moving slowly or fast; loads move right to left, as they do on a wire. */
+.ex-packets{display:inline-block;width:80px;height:7px;margin:0 6px;vertical-align:middle;border-radius:4px;--track:#c97f2f;--ink:#963816;
+  background:repeating-linear-gradient(90deg,var(--ink) 0 4px,transparent 4px 20px) 0 0/20px 100%,linear-gradient(var(--track),var(--track)) center/100% 3px no-repeat;
+  animation:ex-packets-back 1.25s linear infinite}
+.ex-packets.value{--track:#4c91b7;--ink:#084675;animation-name:ex-packets-forward}.ex-packets.fast{animation-duration:.12s}
+@keyframes ex-packets-forward{from{background-position:0 0,center}to{background-position:20px 0,center}}
+@keyframes ex-packets-back{from{background-position:20px 0,center}to{background-position:0 0,center}}
+@media(prefers-reduced-motion:reduce){.ex-packets{animation:none}}
 @media(max-width:900px){.explorer{padding:14px}.ex-workspace{grid-template-columns:1fr}.ex-sidebar{max-height:350px}.ex-header{align-items:start}.ex-group-tools{margin-left:0}.ex-canvas{min-width:600px}.explorer h1{font-size:27px}}
 
 .ex-canvas .ex-port-label{font-size:11px;fill:#405b70;pointer-events:none}.ex-canvas .ex-fork{pointer-events:none}

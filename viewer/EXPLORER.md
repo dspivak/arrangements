@@ -21,15 +21,43 @@ it does not jump a preset on every trackpad event. Scroll zoom keeps the point u
 pointer fixed as far as the page's scroll bounds permit. Fork dots mark shared
 readouts, with returning loads summed on the trunk.
 Each wire can display two tracks that meet at its ports. A coordinate that only receives a load shows its amber track. Blue arrows point from source
-to target. Amber arrows point back toward the source. During playback, marks
-travel along each nonzero track in its arrow's direction. The arrows stay
-visible when paused and with reduced motion. Zero is dashed and missing numeric
-observations are dotted gray. Use **Wires → Loads only** to follow returning
-loads in a crowded diagram. Selecting a branch shows its signed reading.
-Selecting a fork shows its total and the contributions from its branches.
-Color uses magnitude relative to the wire's scale (the largest branch scale
-on a shared trunk). Arrays use their Euclidean norm for color and keep all
-components in the inspector. A wire that carries a list of numbers is a hose,
+to target. Amber arrows point back toward the source, or away from it when the load
+is negative (below). Each track has one color,
+blue or amber, and carries packets that travel in its arrow's direction during
+playback. **A load's size is the packet rate**: packets are always 60 pixels
+apart, so the larger the load, the faster they move and the more pass a point per
+second. Against the wire's scale s (the largest branch scale on a shared trunk),
+each tenfold step in a load doubles its packets' speed, from the slowest at
+x ≤ s/1000 to the fastest at x ≥ 100 s: over a feeding run the nonzero loads span
+ten decades, and a speed proportional to the load would leave most of them still,
+while at 1.5 per decade the meal's load on the battery (about 12) moved hardly
+faster than the wheels' drain (about 0.7). **A load's sign is the packets' direction
+of travel**: a load on a wire that carries one number is one real number, and a
+positive one, which inclines the source's value up, travels back toward the source,
+while a negative one travels away from it, and the load's arrowhead turns round
+with it. So the meal's load feeds into the battery while the grip's and the wheels'
+drains run out of it, and the map from a load to its packets' velocity is odd,
+v(−x) = −v(x). A hose's load, a list of numbers, has no one sign: its packets
+travel back and show the size of the list, and each strand of an unwrapped hose
+shows its own sign. Each track keeps how far its packets have gone, so they
+speed up, slow down and turn round in place. Speed and direction are seen only during playback: paused, or with
+reduced motion, the packets hold still and a load is read by selecting its
+wire. A
+load lives in a cotangent space, whose zero is canonical, so a zero load has no
+packets on its plain amber track. A wire into a field mark whose written form
+reads it and never pushes it (its letter occurs in no h of Σ c dh) has a load
+that is zero at every state, and draws no amber track, as a wire whose value
+means nothing draws no blue one (`pushes` in `explorer-core.js`). A value's size depends on where a chart puts zero, so
+value packets move at one steady speed, and their shade shows the value: all the
+beads on a wire share one shade, light at the lowest value the wire has carried
+since the start and dark at the highest. That place in the range is unchanged by
+a change of units or of zero, which is what a value allows. A hose's value, a
+list, takes the middle shade. `packets.valuePackets = 'size'` in
+`explorer-core.js` codes values' speed like loads. Missing numeric observations are
+dotted gray. Use **Wires → Loads only** to follow returning loads in a crowded
+diagram. Selecting a branch shows its signed reading. Selecting a fork shows its
+total and the contributions from its branches. Arrays use their Euclidean norm
+for the rate and keep all components in the inspector. A wire that carries a list of numbers is a hose,
 several wires bundled: click its mouth, the oval with a number beside it, to
 unwrap that end into one port per number, and again to wrap them.
 
@@ -222,7 +250,16 @@ Optional node fields include `description`, `renderer`, and layout hints
 `column` and `row`. Hints are ignored when regrouping would cause overlap.
 Static maps and fields use compact circles. Their labeled terminals fan into the mark. Additional arguments extend the rows vertically. The shared layout aligns boundary ports,
 uses horizontal endpoint tangents, and routes around other parts and their
-titles. Unboxed states have visible readout marks; wires meet those marks.
+titles. **Two wires meet only where they cross, at a point**, never along a
+stretch: each wire is a rounded polyline, and wires that share a channel are
+spread into lanes 12 px apart, ordered by which way each turns at its two ends
+so that they cross as little as possible; a long stretch at a port keeps only
+16 px there, so branches of one fork and wires entering ports in a row part
+soon after. Where a channel has too little room, the gaps between rows and
+columns, and the margins, grow and the parts are placed again. Before this,
+58% of the feeding explorer's wire length lay within 10 px of another wire
+running the same way; now about 4% does, mostly at rounded corners.
+Unboxed states have visible readout marks; wires meet those marks.
 An adapter can append application data to a node or snapshot; feeding supplies
 its state and individual spring stretches this way. Grouping is a view operation:
 it leaves model state, values, loads and dynamics untouched. It neither deletes

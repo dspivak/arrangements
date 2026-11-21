@@ -16,6 +16,28 @@ test('the two directions separate along the route and meet at each port and fork
     }
   }
 });
+test('two wires meet only where they cross, at a point, never along a stretch',()=>{
+  // David, 2026-11-21: the Mouth's incoming wires were "blocked by other wires … crossings should raise codimension".
+  // A wire runs on top of another where it lies within 10 px of it, nearly parallel, away from its two ends; before
+  // the separating pass that was 61% of the receiver's wire length and 29% of the mouth's.
+  const L=require('./food-learning.js');
+  const m=new E.Model(A.observeLearning(L.start(),L.PLACES.slice(),L.DEFAULTS,0));
+  for(const scope of ['receiver','mouth','eye','lever']){
+    m.enter(scope);const {edges}=G.layout(m.project());
+    const samples=edges.map(w=>w.segments.flatMap(s=>Array.from({length:40},(_,i)=>{
+      const a=G.sample(s,i/40),b=G.sample(s,(i+.5)/40),d=Math.hypot(b.x-a.x,b.y-a.y)||1;
+      return {x:a.x,y:a.y,tx:(b.x-a.x)/d,ty:(b.y-a.y)/d,len:2*d};})));
+    let total=0,over=0;
+    samples.forEach((pts,i)=>{const w=edges[i];for(const q of pts){total+=q.len;
+      if(Math.hypot(q.x-w.start.x,q.y-w.start.y)<=20||Math.hypot(q.x-w.end.x,q.y-w.end.y)<=20)continue;
+      if(samples.some((o,j)=>j!==i&&o.some(r=>Math.hypot(r.x-q.x,r.y-q.y)<10&&Math.abs(r.tx*q.tx+r.ty*q.ty)>.9)))over+=q.len;}});
+    assert.ok(over/total<.04,scope+': '+(100*over/total).toFixed(1)+'% of wire length runs on another wire');
+    // and a wire moved off another never doubles back on itself: a forward wire never runs leftward
+    for(const w of edges)if(w.end.x>w.start.x){const pts=w.segments.flatMap(s=>Array.from({length:12},(_,i)=>G.sample(s,i/12)));
+      let back=0;for(let i=0;i+1<pts.length;i++)back+=Math.max(0,pts[i].x-pts[i+1].x-.5);
+      assert.ok(back<4,scope+': '+w.label+' runs back '+back.toFixed(0)+' px');}
+  }
+});
 function check(project,options){
   const g=G.layout(project,options);
   for(const w of g.edges){

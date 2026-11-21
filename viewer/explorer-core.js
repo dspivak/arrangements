@@ -168,10 +168,63 @@
     return [...groups.values()].map(w=>({...w,argument:w.branches.some(b=>b.argument!==false),load:sumLoads(w.branches)}));
   }
   function intensity(value,scale=1) {const v=magnitude(value);return v==null?null:Math.min(1,v/scale);}
-  function color(value,scale=1,kind='value') {
-    const u=intensity(value,scale);if(u===null)return '#89929f';
-    const a=kind==='value'?[76,145,183]:[201,127,47], b=kind==='value'?[0,80,132]:[163,46,41];
-    return `rgb(${a.map((x,i)=>Math.round(x+(b[i]-x)*u)).join(',')})`;
+  // A track's packets. Each track has one color, blue for values and amber for loads. Packets are always `spacing`
+  // pixels apart; a load's size x, against the wire's scale s, sets their speed, so the number passing a point per
+  // unit of time is speed/spacing (David, 2026-11-20, 66ce7547: "keep spacing the same and increase speed rather than
+  // vice versa, at least on loads"). Over a feeding run the nonzero loads span ten decades (median 0.01 s, 99% under
+  // 3.1 s; a contact spring held off its rest, as in a test state, near 700 s), so each tenfold step in x multiplies the speed by one factor: `slowest` at x ≤ `bottom`·s,
+  // `fastest` at x ≥ `top`·s, in pixels per unit of model time. The factor is about 2 (David, 2026-11-20, 66ce7547,
+  // yes to doubling, "i'd like the meal's battery laod ot stand out"): the meal pushes the battery with a load near
+  // 12 while the wheels drain it with about 0.7, and at 1.5 per decade the two moved 66 and 40. `fastest` is kept low enough that a packet moves well
+  // under half the spacing in a frame at the page's top playback speed, so motion never reads backward. Speed is seen
+  // only in motion: paused, a load's size is read on selection. A load lives in a cotangent space, whose zero is
+  // canonical, so no packets means no load. A value's size depends on where a chart puts zero, so by default its
+  // packets move at one speed and show only direction; `valuePackets: 'size'` codes values like loads.
+  const packets={spacing:60,dash:4,slowest:7,fastest:220,bottom:1e-3,top:1e2,steady:20,valuePackets:'steady',
+    color:{value:'#4c91b7',load:'#c97f2f'},ink:{value:'#084675',load:'#963816'},shade:{light:'#bfe1f6',dark:'#062b5c'}};
+  function packetSpeed(value,scale=1,kind='load') {
+    if(kind==='value'&&packets.valuePackets==='steady')return magnitude(value)==null?null:packets.steady;
+    const x=magnitude(value);if(!x)return null;
+    const u=Math.min(1,Math.max(0,Math.log(x/(scale*packets.bottom))/Math.log(packets.top/packets.bottom)));
+    return packets.slowest*Math.pow(packets.fastest/packets.slowest,u);
+  }
+  // The packets' velocity along the wire, positive from source to target. A value's packets go forward. A load on a
+  // wire carrying one number shows its sign by the direction of travel (David, 2026-11-21, 66ce7547: "it should be
+  // about direction of travel, i.e. velocity"): a positive load, one that pushes the source's value up, travels back
+  // to the source, as the meal's load feeds the battery; a negative one travels away from it, as the wheels' drain
+  // does. So the map from a load to its velocity is odd, v(-x) = -v(x), where the speed alone saw only |x|. A hose's
+  // load, a list of numbers, has no one sign, so its packets travel back, the load track's direction, and show only
+  // the size of the list; each strand of an unwrapped hose is one number and shows its own sign.
+  function packetVelocity(value,scale=1,kind='load') {
+    const speed=packetSpeed(value,scale,kind);if(!speed)return null;
+    if(kind==='value')return speed;
+    return typeof value==='number'&&value<0?speed:-speed;
+  }
+  // Whether the field mark `node` can send a load back on the wire `label`. Its form is Σ c dh (explorer-forms.js),
+  // so the load on a wire is the form's component along that wire's coordinate, and that is zero at every state when
+  // the wire's letter occurs in no h, nor in an abbreviation an h uses: the field reads the wire (in some c) and
+  // never pushes it. Such a wire's amber track is not drawn, as a wire whose value means nothing has no blue one
+  // (David, 2026-11-21, 66ce7547: "we completely remove blue wires when they're meaningless; maybe the same for
+  // amber?"). A node without a written form, or a wire without a letter, may push it.
+  function pushes(node,label) {
+    const form=node?.form,letter=form?.letters?.[label];if(!form||!letter||!Array.isArray(form.terms))return true;
+    const names=text=>new Set(String(text).match(/[\p{L}_][\p{L}\p{N}_]*/gu)||[]);
+    const where=new Map((form.where||[]).map(([n,e])=>[n,e]));
+    const seen=new Set(),todo=form.terms.flatMap(t=>[...names(t.h)]);
+    while(todo.length){const n=todo.pop();if(seen.has(n))continue;seen.add(n);if(where.has(n))todo.push(...names(where.get(n)));}
+    return seen.has(letter);
+  }
+  // A value's beads, all one shade at a time, light where the value is lowest of what its wire has carried and
+  // dark where it is highest (David, 2026-11-21, 66ce7547: "different colored beads, light blue vs dark vlue for
+  // different values", and "yes all beads share one shade"). The place u = (v − low)/(high − low) in the wire's
+  // range is unchanged by a change of units or of zero, v ↦ av + b with a > 0, which is what a value, unlike a
+  // load, allows: its size depends on where a chart puts zero, its order and its proportions of difference do not.
+  // A wire that has carried one value so far, or a value that is not a number (a hose's list), takes the middle.
+  function valueShade(u) {
+    const t=u==null||!Number.isFinite(u)?.5:Math.min(1,Math.max(0,u)),{light,dark}=packets.shade;
+    const hex=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16));
+    const a=hex(light),b=hex(dark);
+    return '#'+a.map((x,i)=>Math.round(x+(b[i]-x)*t).toString(16).padStart(2,'0')).join('');
   }
   function format(value) {
     if(value==null)return 'unavailable';
@@ -180,6 +233,6 @@
     if(typeof value==='number')return value===0?'0.000':Math.abs(value)>=1e4||Math.abs(value)<.001?value.toExponential(2):value.toFixed(3);
     return String(value);
   }
-  const api={Model,validate,magnitude,intensity,color,format,aggregate,forkWire,signalKey,dimension,coordinate,strand};
+  const api={Model,validate,magnitude,intensity,packets,packetSpeed,packetVelocity,valueShade,pushes,format,aggregate,forkWire,signalKey,dimension,coordinate,strand};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementExplorer=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -96,10 +96,12 @@
       this.canvas.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();this.pinchZoom(e);}},{passive:false});
       this.sidebar=html('aside',{class:'ex-sidebar','aria-label':'Selected part or wire'},workspace);
       const legend=html('div',{class:'ex-legend'},this.el);
-      for(const [label,kind] of [['Values →','value'],['← Loads','load']]) {
-        const span=html('span',{},legend,label+' · low');html('i',{class:'ex-ramp '+kind},span);span.append('high');
-      }
-      html('span',{},legend,'Color = magnitude · signed numbers on selection');
+      const valueSpan=html('span',{},legend,'Values → ');html('i',{class:'ex-packets value'},valueSpan);
+      valueSpan.append(' bead shade: light = lowest so far, dark = highest');
+      if(E.packets.valuePackets!=='steady'){valueSpan.append(' small ');html('i',{class:'ex-packets value fast'},valueSpan);valueSpan.append(' large');}
+      const loadSpan=html('span',{},legend,'Loads · small ');html('i',{class:'ex-packets load slow'},loadSpan);
+      loadSpan.append(' large ');html('i',{class:'ex-packets load fast'},loadSpan);
+      html('span',{},legend,'Faster = larger load · toward the source = positive, raising it · away = negative, lowering it');
       html('p',{class:'ex-help'},this.el,'Click a box to enter; drag to move it. Shift-click parts to group them. Click a port to follow its readout. A hose is several wires bundled, one per number: click its mouth to unwrap that end into its wires, and again to wrap them. Zoom with + / − or Ctrl/⌘ + scroll. Auto arrange restores positions at this level. Alt + arrow keys move a focused part.');
       this.status=html('div',{class:'ex-status',role:'status','aria-live':'polite'},this.el);
       this.refresh();
@@ -232,19 +234,16 @@
       const hose=E.dimension(w)>1;
       svg('path',{d,fill:'none',stroke:'white','stroke-width':hose?23:12,'stroke-linejoin':'round'},g);
       if(hose)this.drawHose(g,d);
-      for(const kind of w.argument===false?['load']:['value','load']){
-        const color=E.color(w[kind],w[kind+'Scale'],kind);
-        const magnitude=E.magnitude(w[kind]),forward=kind==='value',sign=forward?1:-1;
-        const lane=svg('g',{'data-flow-track':kind,'data-level':magnitude==null?'unknown':magnitude===0?'zero':'nonzero'},g);
-        svg('path',{d:tracks[kind],fill:'none',stroke:color,'stroke-width':selected?3.5:2.5,
-          'data-kind':kind,'stroke-linejoin':'round','stroke-linecap':'round',
-          'stroke-dasharray':magnitude==null?'2 5':magnitude===0?'4 3':'none'},lane);
-        if(magnitude>0)svg('path',{d:tracks[kind],fill:'none',stroke:forward?'#084675':'#963816',
-          'stroke-width':selected?5.5:4.5,'stroke-linecap':'round','stroke-dasharray':'4 56',
-          class:'ex-pulse'+(forward?'':' ex-back'),'stroke-dashoffset':-sign*((this.model.scene.time||0)%3)*20},lane);
-        const x=forward?end.x-10:start.x+10,y=(forward?end.y:start.y)-sign*E.geometry.trackOffset;
+      for(const kind of this.kinds(w)){
+        // The arrowhead points the way the packets travel: a value forward, a load back to its source when it is
+        // positive (or zero, or a hose's), forward when it is negative (explorer-core.js, `packetVelocity`).
+        const magnitude=E.magnitude(w[kind]),lane=kind==='value'?1:-1;
+        const velocity=E.packetVelocity(w[kind],w[kind+'Scale'],kind),sign=velocity?Math.sign(velocity):lane,forward=sign>0;
+        const g2=svg('g',{'data-flow-track':kind,'data-level':magnitude==null?'unknown':magnitude===0?'zero':'nonzero'},g);
+        this.drawTrack(g2,w,kind,tracks[kind],selected);
+        const x=forward?end.x-10:start.x+10,y=(forward?end.y:start.y)-lane*E.geometry.trackOffset;
         svg('path',{d:`M ${x-sign*4} ${y-3.5} L ${x+sign*2} ${y} L ${x-sign*4} ${y+3.5}`,
-          fill:'none',stroke:magnitude==null?color:forward?'#084675':'#963816','stroke-width':2.6,'stroke-linejoin':'round','data-direction':forward?'forward':'backward'},lane);
+          fill:'none',stroke:magnitude==null?'#89929f':E.packets.ink[kind],'stroke-width':2.6,'stroke-linejoin':'round','data-direction':forward?'forward':'backward'},g2);
       }
       svg('path',{d,fill:'none',stroke:'transparent','stroke-width':12},g);
       const select=()=>{this.focusWire=branches[0].id;this.focusSignal=trunk?E.signalKey(w):null;this.focusNode=null;this.render();};
@@ -261,15 +260,54 @@
       // seen to turn into one wire, which would read as a projection.
       if(d&&E.dimension(w)>1)this.drawHose(g,d);
       if(w.strandOf){g.setAttribute('data-strand',w.index);
-        svg('title',{},g,w.label+(w.argument===false?' · receives load ':' · value '+E.format(w.value)+' · returning load ')+E.format(w.load));}      for(const kind of w.argument===false?['load']:['value','load']){
-        const magnitude=E.magnitude(w[kind]),forward=kind==='value',sign=forward?1:-1;
-        svg('path',{d:tracks[kind],fill:'none',stroke:E.color(w[kind],w[kind+'Scale'],kind),'stroke-width':selected?3.5:2.5,
-          'stroke-linejoin':'round','stroke-linecap':'round',
-          'stroke-dasharray':magnitude==null?'2 5':magnitude===0?'4 3':'none'},g);
-        if(magnitude>0)svg('path',{d:tracks[kind],fill:'none',stroke:forward?'#084675':'#963816',
-          'stroke-width':selected?5.5:4.5,'stroke-linecap':'round','stroke-dasharray':'4 56',
-          class:'ex-pulse'+(forward?'':' ex-back'),'stroke-dashoffset':-sign*((this.model.scene.time||0)%3)*20},g);
+        svg('title',{},g,w.label+(w.argument===false?' · receives load ':' · value '+E.format(w.value)+' · returning load ')+E.format(w.load));}
+      for(const kind of this.kinds(w))this.drawTrack(g,w,kind,tracks[kind],selected);
+    }
+    // The tracks a wire draws: no blue one where its value means nothing, and no amber one where the field it
+    // enters reads it and never pushes it, so that its load is zero at every state (explorer-core.js, `pushes`).
+    kinds(w){
+      const kinds=w.argument===false?['load']:['value','load'];
+      return kinds.filter(k=>k!=='load'||E.pushes(this.model.nodes.get(w.target),w.label));
+    }
+    // One track: a line in the track's one color, and packets on it, evenly spaced, whose speed codes the size and
+    // whose direction of travel shows a load's sign (explorer-core.js, `packets`, `packetVelocity`). A zero load has no packets, and a
+    // missing observation dotted gray. Each track keeps how far its packets have travelled, signed, advanced by their
+    // velocity over the model time since its last drawing, so a packet speeds up, slows down or turns round in place
+    // when the load changes, and never jumps; a track not drawn for over a unit of time (another level was open)
+    // resumes where it was. Start over starts the distance again. With reduced motion the packets hold still.
+    drawTrack(parent,w,kind,path,selected){
+      const magnitude=E.magnitude(w[kind]);
+      svg('path',{d:path,fill:'none',stroke:magnitude==null?'#89929f':E.packets.color[kind],'stroke-width':selected?3.5:2.5,
+        'data-kind':kind,'stroke-linejoin':'round','stroke-linecap':'round',
+        'stroke-dasharray':magnitude==null?'2 5':'none'},parent);
+      const velocity=E.packetVelocity(w[kind],w[kind+'Scale'],kind);if(!velocity)return;
+      const still=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const time=this.model.scene.time||0,key=(w.id||w.label)+'|'+kind;
+      this.travel??=new Map();
+      const last=this.travel.get(key),dt=last?time-last.time:0;
+      // A packet never moves as far as half the spacing between two drawings: further, and the eye pairs it with
+      // the packet behind and sees it run backward, which now reads as the opposite sign. The HH+ATP page's sodium
+      // and potassium loads, 270 times their scale at a spike, reach 37 pixels a frame at its 4× playback.
+      const reach=.45*E.packets.spacing,step=Math.max(-reach,Math.min(reach,velocity*dt));
+      const distance=!last||dt<0?0:last.distance+(dt<=1?step:0);
+      this.travel.set(key,{time,distance});
+      const spacing=E.packets.spacing,dashes=E.packets.dash+' '+(spacing-E.packets.dash),offset=still?0:-(distance%spacing);
+      // A value's beads take its shade in the range its wire has carried since the start (explorer-core.js,
+      // `valueShade`), and a white rim, so that a bead of the track's own blue still shows on it.
+      let ink=E.packets.ink[kind];
+      if(kind==='value'){
+        this.ranges??=new Map();const v=w.value,seen=this.ranges.get(key);
+        const range=typeof v!=='number'?null:!seen||dt<0?{low:v,high:v}:{low:Math.min(seen.low,v),high:Math.max(seen.high,v)};
+        if(range)this.ranges.set(key,range);
+        const u=range&&range.high>range.low?(v-range.low)/(range.high-range.low):null;
+        ink=E.valueShade(u);
+        svg('path',{d:path,fill:'none',stroke:'white','stroke-width':selected?8:7,'stroke-linecap':'round',
+          'stroke-dasharray':dashes,'stroke-dashoffset':offset},parent);
       }
+      svg('path',{d:path,fill:'none',stroke:ink,'stroke-width':selected?5.5:4.5,'stroke-linecap':'round','data-shade':ink,
+        'stroke-dasharray':dashes,'data-packet-speed':Math.abs(velocity).toFixed(1),
+        'data-packet-velocity':velocity.toFixed(1),class:'ex-pulse'+(velocity>0?'':' ex-back'),
+        'stroke-dashoffset':offset},parent);
     }
     // A hose, the shape around wires that are bundled: a tube around the middle line `d` of a wire that carries
     // a list of numbers, ribbed so that it reads as a hose and not as one thick wire. The value track and the
@@ -603,7 +641,7 @@
         html('p',{},this.sidebar,'Open a box to replace this view with its contents. Use the path above to come back out.');
         html('h3',{},this.sidebar,'At this level');
         for(const node of this.model.children())this.button(this.sidebar,node.label,()=>this.choose(node,{shiftKey:false}));
-        html('p',{},this.sidebar,'Blue arrows carry values forward. Amber arrows carry loads back. A dashed track shows zero. A dotted gray track has no numeric observation.');
+        html('p',{},this.sidebar,'Blue arrows carry values forward. Amber arrows carry loads back; the packets are evenly spaced, and the larger the load, the faster they move, so the more pass per second. A positive load, one that raises its source, travels back toward the source; a negative one travels away from it, and its arrowhead turns round. Paused, read a load by selecting its wire. A zero load has no packets; a wire whose field reads it and never pushes it, so that its load is always zero, has no amber track. A dotted gray track has no numeric observation.');
         if(this.options.description)html('p',{},this.sidebar,this.options.description);
       }
       if(this.focusSignal&&wires.length>1){
@@ -616,7 +654,8 @@
         if(this.focusSignal)html('p',{},row,'To '+(this.model.nodes.get(wire.target)?.label||'the boundary'));
         for(const [key,label] of [['value',wire.argument===false?'Coordinate value':'Value'],['load',wire.inclination?'Inclination':'Returning load']]){
           const line=html('label',{},row,label+' ');html('output',{},line,E.format(wire[key]));
-          html('div',{class:'ex-scale'},row,'High color at |'+key+'| ≥ '+(wire[key+'Scale']??1)+(wire[key+'Unit']?' '+wire[key+'Unit']:''));
+          if(key==='load'||E.packets.valuePackets!=='steady'){const s=wire[key+'Scale']??1,unit=wire[key+'Unit']?' '+wire[key+'Unit']:'';
+            html('div',{class:'ex-scale'},row,'Packets slowest at |'+key+'| ≤ '+E.format(s*E.packets.bottom)+unit+', fastest at ≥ '+E.format(s*E.packets.top)+unit+'; each tenfold step '+Math.pow(E.packets.fastest/E.packets.slowest,1/Math.log10(E.packets.top/E.packets.bottom)).toFixed(2)+'× faster');}
         }
         if(E.dimension(wire)>1)html('p',{},row,'A hose: '+E.dimension(wire)+' wires bundled, one per number'+(wire.standsFor?', standing in for '+wire.standsFor.replace('^','^('  )+(wire.standsFor.includes('^')?')':''):'')+'. Click a mouth of the hose to unwrap that end into its wires.');
         if(wire.description)html('p',{},row,wire.description);

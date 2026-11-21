@@ -79,7 +79,67 @@ test('invalid hierarchy and saved layouts are rejected, unknown loads remain unk
   const sc=scene(),m=new E.Model(sc);assert.throws(()=>m.group(['eye','casing-0']));
   assert.equal(m.restore({version:1,root:'feeding',groups:[{id:'bad',parent:'feeding',members:['bad','receiver']}]}),false);
   const bad=JSON.parse(JSON.stringify(sc));bad.nodes[1].parent='receiver';assert.throws(()=>E.validate(bad));
-  assert.equal(E.intensity(null),null);assert.notEqual(E.color(null),E.color(0));
+  assert.equal(E.intensity(null),null);assert.equal(E.packetSpeed(null,1,'load'),null);
+});
+test('a load sets its packets\' speed at one spacing; a value\'s packets are steady',()=>{
+  // packets per unit of model time passing a point: speed over the one spacing
+  const P=E.packets,rate=(x,s)=>{const v=E.packetSpeed(x,s,'load');return v?v/P.spacing:0;};
+  assert.equal(rate(0,1),0);
+  // feeding's nonzero loads span ten decades at scale 1: each decade a distinct rate, and the smallest still flows
+  const loads=[1e-3,1e-2,.5,4.5,20,90],rates=loads.map(x=>rate(x,1));
+  for(let i=1;i<rates.length;i++)assert.ok(rates[i]>1.05*rates[i-1]);
+  // each tenfold step about doubles the rate; the meal's load on the battery (about 12) beats the wheels' drain (0.7)
+  assert.ok(Math.abs(rate(1,1)/rate(.1,1)-2)<.05);assert.ok(rate(12,1)>2*rate(.7,1));
+  assert.ok(Math.abs(rate(P.top,1)-P.fastest/P.spacing)<1e-9);assert.equal(rate(1e6,1),rate(P.top,1));
+  assert.ok(Math.abs(rate(1e-9,1)-P.slowest/P.spacing)<1e-12);
+  // at the page's top playback, 8 units a second, a packet moves under half the spacing in a 60 Hz frame
+  assert.ok(P.fastest*8/60<P.spacing/2);
+  assert.equal(rate(-.5,1),rate(.5,1));assert.equal(rate([3,4],10),rate(.5,1));
+  assert.ok(Math.abs(rate(1,2)-rate(.5,1))<1e-12);
+  assert.equal(E.packetSpeed(0,1,'value'),P.steady);assert.equal(E.packetSpeed(7,1,'value'),P.steady);
+  assert.equal(E.packetSpeed(null,1,'value'),null);
+});
+test('a load\'s sign is its packets\' direction of travel; a value\'s go forward',()=>{
+  const V=(x,k='load')=>E.packetVelocity(x,1,k);
+  // positive from source to target: the meal's charge travels back to the battery, the wheels' drain away from it
+  assert.ok(V(12)<0);assert.ok(V(-.7)>0);
+  for(const x of [1e-3,.7,12,500])assert.equal(V(-x),-V(x));
+  for(const x of [1e-3,.7,12])assert.equal(Math.abs(V(x)),E.packetSpeed(x,1,'load'));
+  assert.equal(V(0),null);assert.equal(V(null),null);
+  // a hose's load has no one sign: back, at the speed of its size
+  assert.equal(V([3,-4]),-E.packetSpeed([3,-4],1,'load'));
+  assert.ok(V(-5,'value')>0);assert.ok(V(5,'value')>0);
+});
+test('a field that reads a wire and never pushes it sends no load on it, at any state',()=>{
+  // the memory's battery payment, −c_mem u² db: it reads the meal rate u and pushes the battery b
+  const pay={form:{letters:{'Meal rate':'u','Battery':'b'},terms:[{c:'-c_mem*u**2',h:'b'}]}};
+  assert.equal(E.pushes(pay,'Meal rate'),false);assert.equal(E.pushes(pay,'Battery'),true);
+  // through an abbreviation an h uses
+  const live={form:{letters:{'Battery':'b','Look':'r'},where:[['live','θ(b/b_0)']],terms:[{c:'r',h:'live'}]}};
+  assert.equal(E.pushes(live,'Battery'),true);assert.equal(E.pushes(live,'Look'),false);
+  // no written form, or no letter: may push
+  assert.equal(E.pushes({},'Battery'),true);assert.equal(E.pushes(pay,'Grip'),true);
+  // and on the feeding run, every wire the marks are found not to push carries zero load
+  const L=require('./food-learning.js');let s=L.start();const read=new Set();
+  for(let n=0;n<1800;n++){
+    if(n%150===0){const m=new E.Model(A.observeLearning(s,L.PLACES.slice(),L.DEFAULTS,n*.004));
+      for(const id of m.nodes.keys())if(m.children(id).length){m.enter(id);
+        for(const w of m.project().wires){const node=m.nodes.get(w.target);
+          if(node?.form&&!E.pushes(node,w.label)){read.add(w.label+' into '+w.target);assert.equal(E.magnitude(w.load)??0,0,w.label+' into '+w.target);}}}}
+    s=L.rk4(s,.004,L.PLACES.slice(),L.DEFAULTS);
+  }
+  assert.ok(read.has('Meal rate into pay-mem')||[...read].some(x=>x.startsWith('Meal rate')),[...read].join('; '));
+  console.log('wires read and never pushed:',read.size);
+});
+test('a value\'s shade is its place in its wire\'s range, light low and dark high',()=>{
+  const S=E.packets.shade,shade=(v,lo,hi)=>E.valueShade((v-lo)/(hi-lo));
+  assert.equal(E.valueShade(0),S.light);assert.equal(E.valueShade(1),S.dark);
+  assert.equal(E.valueShade(null),E.valueShade(.5));assert.equal(E.valueShade(7),S.dark);
+  // the same in mV or V, and with zero moved: v -> a v + b, a > 0
+  for(const v of [-65,-20,30])assert.equal(shade(v,-70,40),shade(v/1000+.07,-.07+.07,.04+.07));
+  // darker for higher: the sum of the channels falls
+  const sum=c=>[1,3,5].reduce((s,i)=>s+parseInt(c.slice(i,i+2),16),0);
+  assert.ok(sum(E.valueShade(.2))>sum(E.valueShade(.8)));
 });
 test('reading and regrouping never changes the simulation trajectory',()=>{
   const a=A.adapter(),b=A.adapter();const m=new E.Model(a.snapshot());

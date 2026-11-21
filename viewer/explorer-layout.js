@@ -52,6 +52,8 @@
     return segments.every(s=>Array.from({length:41},(_,i)=>sample(s,i/40)).every(p=>
       p.x>=18&&p.x<=width-18&&p.y>=22&&p.y<=height-22&&!rects.some(r=>inside(p,r,12))));
   }
+  // A polyline from port to port is clear when its stretch between the two port leads is, as an S's is.
+  const clearBetween=(pts,rects,width,height)=>clear(pts.slice(2,-1).map((q,i)=>line(pts[i+1],q)),rects,width,height);
   function soften(points){
     // Remove collinear grid points before making generous smooth turns.
     const pts=[];
@@ -101,6 +103,11 @@
     const end=point(Math.min(b.x-32,target.x-target.w/2-34),b.y);
     let middle;
     if(end.x>=start.x){const arm=(end.x-start.x)/2;
+      // A forward wire is a rounded step, whose stretches `separate` can move: every S between two columns would
+      // be steepest at the same place, on top of each other, and an S cannot be moved off another wire's level
+      // stretch. The S is kept for a wire whose step would not clear the parts.
+      {const mx=start.x+arm,pts=[a,start,point(mx,start.y),point(mx,end.y),end,b];
+        if(clearBetween(pts,rects,width,height))return {points:pts};}
       const candidate=[curve(start,point(start.x+arm,start.y),point(end.x-arm,end.y),end)];
       if(clear(candidate,rects,width,height))middle=candidate;
     }
@@ -109,19 +116,105 @@
       const crossed=rects.filter(r=>r.x+r.w/2>=end.x&&r.x-r.w/2<=start.x);
       const lanes=[Math.min(...crossed.map(r=>r.y-r.h/2))-42-lane,Math.max(...crossed.map(r=>r.y+r.h/2))+42+lane];
       lanes.sort((u,v)=>Math.abs(u-start.y)+Math.abs(u-end.y)-Math.abs(v-start.y)-Math.abs(v-end.y));
-      for(const y of lanes){const ar=Math.max(24,Math.abs(start.y-y)/3),br=Math.max(24,Math.abs(end.y-y)/3);
-        const topA=point(start.x,y),topB=point(end.x,y),candidate=[
-          curve(start,point(start.x+ar,start.y),point(start.x+ar,y),topA),line(topA,topB),
-          curve(topB,point(end.x-br,y),point(end.x-br,end.y),end)];
-        if(clear(candidate,rects,width,height)){middle=candidate;break;}
+      // The U is a polyline, rounded by `soften` after `separate` has given it a lane of its own.
+      for(const y of lanes){
+        const pts=[a,start,point(start.x,y),point(end.x,y),end,b];
+        if(clearBetween(pts,rects,width,height))return {points:pts};
       }
     }
-    if(!middle){
-      const pts=gridRoute(start,end,rects,width,height,lane);
-      return soften([a,...pts,b]);
-      // Short paths can consist of one point. The port leads still form a wire.
+    // Short paths can consist of one point. The port leads still form a wire.
+    if(!middle)return {points:[a,...gridRoute(start,end,rects,width,height,lane),b]};
+    return {segments:[line(a,start),...middle,line(end,b)]};
+  }
+  // Wires that share a channel are given lanes of their own, so that two wires meet only where they cross, at a
+  // point, and never run on top of each other along a stretch (David, 2026-11-21, 66ce7547: "crossings should raise
+  // codimension"): before this pass, 58% of the feeding explorer's wire length lay within 10 px of another wire
+  // running the same way. Each routed wire is a polyline whose first and last stretches, at its ports, stay put.
+  // A stretch between is moved across its own direction: upright stretches less than `gap` apart whose spans
+  // overlap form a channel, and are spread `gap` apart within the free room around them (no part's rectangle,
+  // and not past the wire's own ports). Their order across the channel is the one that crosses least: a stretch
+  // is placed by which way the wire turns at its two ends. One turning back the same way at both ends (a U
+  // opening left) goes nearest that side, the shorter one nearer; one turning left at its top and right at its
+  // bottom goes further left the lower it lies, so that wires dropping to a column of ports nest without
+  // crossing. Level stretches are then done the same way, turned a quarter.
+  function separate(polylines,rects,width,height,gap=12){
+    const simplify=pts=>{const out=[];
+      for(const p of pts){if(out.length&&same(out.at(-1),p))continue;
+        while(out.length>1){const a=out.at(-2),b=out.at(-1);if(Math.abs((b.x-a.x)*(p.y-b.y)-(b.y-a.y)*(p.x-b.x))>1e-6)break;out.pop();}
+        out.push(point(p.x,p.y));}
+      return out;};
+    // A long first or last stretch keeps only 16 px at its port, so that branches leaving one fork, or wires
+    // entering ports in a row, can part soon after: the rest of the stretch may move, joined to the stub by a jog.
+    const stub=pts=>{if(pts.length<2)return pts;
+      const cut=(p,q)=>{const d=Math.hypot(q.x-p.x,q.y-p.y);return d>48?point(p.x+(q.x-p.x)*16/d,p.y+(q.y-p.y)*16/d):null;};
+      const head=cut(pts[0],pts[1]),out=[pts[0],...(head?[head,point(head.x,head.y)]:[]),...pts.slice(1,-1)];
+      const tail=cut(pts.at(-1),pts.at(-2));
+      return [...out,...(tail?[point(tail.x,tail.y),tail]:[]),pts.at(-1)];};
+    const lines=polylines.map(simplify).map(stub),short={x:0,y:0};
+    for(const axis of ['x','y','x','y']){
+      // axis 'x': upright stretches, moved in x; axis 'y': level stretches, moved in y.
+      const along=axis==='x'?'y':'x',items=[];
+      lines.forEach((pts,w)=>{for(let k=1;k+2<pts.length;k++){const p=pts[k],q=pts[k+1];
+        if(Math.abs(p[axis]-q[axis])>1e-6||Math.abs(p[along]-q[along])<1e-6)continue;
+        const lo=Math.min(p[along],q[along]),hi=Math.max(p[along],q[along]);
+        const [first,last]=p[along]<q[along]?[pts[k-1],pts[k+2]]:[pts[k+2],pts[k-1]];
+        // which way the wire turns at the stretch's low end and at its high end, −1 or +1 across the channel
+        // (an end joined to a stub has no turn yet; it takes the other end's, so that the stretch nests as a U)
+        let dl=Math.sign(first[axis]-p[axis]),dh=Math.sign(last[axis]-p[axis]);
+        if(!dl)dl=dh;if(!dh)dh=dl;
+        // An upright stretch stays between the wire's points on either side of it, so that the level stretches
+        // before and after it keep their directions and the wire never doubles back on itself. (A level stretch
+        // moved past its neighbour only turns an upright the other way, a zigzag, not a loop.)
+        // The bound is read from the wire as it stands when its channel is placed, since another of its stretches
+        // may have moved since.
+        const s0=Math.sign(p[axis]-pts[k-1][axis]),s1=Math.sign(q[axis]-pts[k+2][axis]);
+        items.push({w,k,at:p[axis],lo,hi,dl,dh,get bound(){const b=[-Infinity,Infinity],now=lines[w];if(axis!=='x')return b;
+          for(const [s,far] of [[s0,now[k-1]],[s1,now[k+2]]]){if(s>0)b[0]=Math.max(b[0],far[axis]+8);else if(s<0)b[1]=Math.min(b[1],far[axis]-8);}
+          return b;}});}});
+      const meets=(u,v)=>u.lo<v.hi-1&&v.lo<u.hi-1;
+      const group=it=>it.dl<0&&it.dh<0?0:it.dl<0&&it.dh>0?1:it.dl>0&&it.dh<0?2:3;
+      const order=(u,v)=>group(u)-group(v)||(group(u)===0?(u.hi-u.lo)-(v.hi-v.lo):group(u)===3?(v.hi-v.lo)-(u.hi-u.lo):
+        group(u)===1?(v.lo+v.hi)-(u.lo+u.hi):(u.lo+u.hi)-(v.lo+v.hi))||u.w-v.w||u.k-v.k;
+      // A channel's place: its wires in order, `gap` apart (less if the room is short), centred where they were,
+      // inside the free room: nothing of a part's rectangle across the channel's span, the page's margins, and
+      // each stretch kept short of its own wire's ports.
+      function place(cluster){
+        cluster.sort(order);
+        const lo=Math.min(...cluster.map(c=>c.lo)),hi=Math.max(...cluster.map(c=>c.hi)),center=cluster.reduce((s,c)=>s+c.at,0)/cluster.length;
+        const room=[axis==='x'?18:22,(axis==='x'?width-18:height-22)];
+        for(const r of rects){const [rl,rh,al,ah]=axis==='x'?[r.x-r.w/2-14,r.x+r.w/2+14,r.y-r.h/2,r.y+r.h/2]:[r.y-r.h/2-14,r.y+r.h/2+14,r.x-r.w/2,r.x+r.w/2];
+          if(ah<=lo||al>=hi)continue;if(rh<=center)room[0]=Math.max(room[0],rh);else if(rl>=center)room[1]=Math.min(room[1],rl);}
+        const free=Math.max(0,room[1]-room[0]),step=cluster.length<2?gap:Math.min(gap,free/(cluster.length+1)),span=step*(cluster.length-1);
+        const begin=Math.min(room[1]-step/2-span,Math.max(room[0]+step/2,center-span/2));
+        // Each stretch is then held between its own wire's neighbouring points: pushed on past its neighbours
+        // in the channel where it must be, but never so that its wire doubles back.
+        const to=cluster.map((c,i)=>free?begin+i*step:c.at);
+        for(let i=1;i<to.length;i++)to[i]=Math.max(to[i],Math.min(to[i-1]+step,cluster[i].bound[1]));
+        for(let i=to.length-2;i>=0;i--)to[i]=Math.min(to[i],Math.max(to[i+1]-step,cluster[i].bound[0]));
+        cluster.forEach((c,i)=>{c.to=Math.min(c.bound[1],Math.max(c.bound[0],to[i]));});        return {cluster,step:free?step:gap,lack:cluster.length<2?0:(cluster.length+1)*gap-free};
+      }
+      // Channels first by where the stretches lie; then any two channels whose placed wires come closer than a
+      // gap, across spans that meet, are one channel, placed again, until no two are.
+      items.sort((u,v)=>u.at-v.at);
+      let channels=[];const done=new Set();
+      for(const seed of items){if(done.has(seed))continue;const cluster=[seed];done.add(seed);
+        for(let grew=true;grew;){grew=false;
+          for(const it of items)if(!done.has(it)&&!cluster.some(c=>c.w===it.w)&&cluster.some(c=>Math.abs(c.at-it.at)<gap&&meets(c,it))){cluster.push(it);done.add(it);grew=true;}}
+        channels.push(place(cluster));}
+      for(let merged=true;merged;){merged=false;
+        outer:for(let i=0;i<channels.length;i++)for(let j=i+1;j<channels.length;j++){
+          const A=channels[i],B=channels[j],near=Math.min(A.step,B.step,gap)-.5;
+          // (two stretches of one wire never share a channel: each is held by the other's place)
+          if(!A.cluster.some(u=>B.cluster.some(v=>u.w===v.w))&&A.cluster.some(u=>B.cluster.some(v=>meets(u,v)&&Math.abs(u.to-v.to)<near))){
+            channels.splice(j,1);channels[i]=place([...A.cluster,...B.cluster]);merged=true;break outer;}}}
+      for(const channel of channels){
+        // placed again as the wires now stand, then written, one channel at a time
+        const {cluster,lack}=place(channel.cluster);
+        // what the channel lacks of `gap` between each two of its wires and half a gap at each side
+        short[axis]=Math.max(short[axis],lack);
+        for(const c of cluster){const pts=lines[c.w];pts[c.k][axis]=c.to;pts[c.k+1][axis]=c.to;}      }
     }
-    return [line(a,start),...middle,line(end,b)];
+    return {lines,short};
   }
   // The rows of a spring's terminals, and how far down its bend each wire has turned where it meets the resistor.
   const SPRING_ROWS=46,SPRING_TURN=9;
@@ -208,18 +301,36 @@
     }
     const reach=(n,side)=>Math.max(0,...positions.get(n.id).groups.filter(g=>g.side===side).map(g=>g.reach));
     const columns=[...new Set(inner.map(n=>column.get(n.id)))].sort((a,b)=>a-b),groups=columns.map(c=>inner.filter(n=>column.get(n.id)===c).sort((a,b)=>(a.row??0)-(b.row??0)));
-    const heights=groups.map(ns=>ns.reduce((s,n)=>s+positions.get(n.id).h+68,0)-68);
+    // The parts are placed with `rowGap` between two parts of a column and `colGap` between columns, at first 68 and
+    // 148; when a channel between them has too little room for its wires to lie `separate`'s gap apart, the gaps
+    // grow by what the most crowded channel lacked, and the parts are placed again, at most three more times.
+    // The gaps are found with every part where the layout puts it; the viewer's own placements, saved against
+    // those gaps, are then applied once.
+    let rowGap=68,colGap=148,placed;
+    const moved=options.placements&&Object.keys(options.placements).length>0;
+    for(let round=0;round<4;round++){
+      placed=place(rowGap,colGap,false);
+      if(placed.short.x<=1&&placed.short.y<=1)break;
+      if(round===3)break;
+      rowGap=Math.min(68+600,rowGap+Math.ceil(placed.short.y));colGap=Math.min(148+600,colGap+Math.ceil(placed.short.x));
+    }
+    if(moved)placed=place(rowGap,colGap,true);
+    placed.result.gaps={row:rowGap,column:colGap,short:placed.short};
+    return placed.result;
+    function place(rowGap,colGap,saved){
+    const heights=groups.map(ns=>ns.reduce((s,n)=>s+positions.get(n.id).h+rowGap,0)-rowGap);
     const incoming=boundaries.filter(n=>n.side==='in'||(!n.side&&positions.get(n.id).outputs.length>0)),outgoing=boundaries.filter(n=>!incoming.includes(n));
     let height=Math.max(270,Math.max(0,...heights)+152,Math.max(incoming.length,outgoing.length)*26+140);
-    let x=160;
+    // The margins, between the boundary ports and the first and last columns, grow with the gap between columns.
+    let x=colGap+12;
     for(const ns of groups){const width=Math.max(...ns.map(n=>positions.get(n.id).w));let y=(height-heights[groups.indexOf(ns)])/2;
       // A column leaves room on each side for the fans of its parts' unwrapped hoses.
       x+=Math.max(...ns.map(n=>reach(n,'inputs')));
-      for(const n of ns){const p=positions.get(n.id);p.x=x+width/2;p.y=y+p.h/2;y+=p.h+68;}x+=width+148+Math.max(...ns.map(n=>reach(n,'outputs')));
+      for(const n of ns){const p=positions.get(n.id);p.x=x+width/2;p.y=y+p.h/2;y+=p.h+rowGap;}x+=width+colGap+Math.max(...ns.map(n=>reach(n,'outputs')));
     }
-    let width=Math.max(420,x-148+160);
+    let width=Math.max(420,x+12);
     for(const n of inner){const p=positions.get(n.id);p.orderY=p.y;
-      const moved=options.placements?.[n.id];if(!moved)continue;
+      const moved=saved&&options.placements?.[n.id];if(!moved)continue;
       if(!Number.isFinite(moved.x)||!Number.isFinite(moved.y))throw Error('Invalid saved position');
       p.x=Math.max(150+p.w/2,moved.x);p.y=Math.max(76+p.h/2,moved.y);
       width=Math.max(width,p.x+p.w/2+160);height=Math.max(height,p.y+p.h/2+110);
@@ -295,12 +406,14 @@
       const start=point(port.x,port.y),end=port.fork;
       forks.push({port,start,end,wires:port.wires,tracks:wireTracks([line(start,end)])});
     }
-    for(const w of edges){const a=positions.get(w.source),b=positions.get(w.target),out=endAt(a,'outputs',w.outKey),input=endAt(b,'inputs',w.inKey);
+    const routes=edges.map((w,i)=>{const a=positions.get(w.source),b=positions.get(w.target),out=endAt(a,'outputs',w.outKey),input=endAt(b,'inputs',w.inKey);
       w.start=out.fork||point(out.x,out.y);w.end=point(input.x,input.y);
-      w.segments=route(w.start,w.end,a,b,rects,width,height,(edges.indexOf(w)%4)*7);w.path=path(w.segments);
-      w.tracks=wireTracks(w.segments);
+      return route(w.start,w.end,a,b,rects,width,height,(i%4)*7);});
+    const polylines=routes.map(r=>r.points).filter(Boolean),{lines:lanes,short}=separate(polylines,rects,width,height);
+    let next=0;
+    edges.forEach((w,i)=>{w.segments=routes[i].segments||soften(lanes[next++]);w.path=path(w.segments);w.tracks=wireTracks(w.segments);});
+    return {result:{positions,width,height,edges,forks},short};
     }
-    return {positions,width,height,edges,forks};
   }
   E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks,springRows:SPRING_ROWS,springTurn:SPRING_TURN};
   if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom,hoseEnd,endAt};
