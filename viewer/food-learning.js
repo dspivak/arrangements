@@ -65,8 +65,10 @@
     const pull=p.memoryDrive*Math.tanh((target-cart)/1.5);
     const body=[...state.slice(0,8),0,0,...state.slice(NR)];
     const f=base.field(body,places,p,{pull});
-    const mealRate=f.eatAll-4*f.live*base.theta(-state[1])*meal;
-    const release=base.dtheta(state[1])*(-f.grip)*base.theta(-f.grip/0.05);
+    // The rates the memory motors are told. Each motor reads the battery and drives its store at
+    // live(b) times its told rate, so no rate here carries live; f.told.grip is what the gripper tells its motor.
+    const mealRate=f.eatAll-4*base.theta(-state[1])*meal;
+    const release=base.dtheta(state[1])*(-f.told.grip)*base.theta(-f.told.grip/0.05);
     const mealError=-Math.expm1(-meal/4)-usualAt(state,cart);
     const map=searchMap(state);
     const usualRates=[], freshRates=[], weightRates=[], contactRates=[], emptyRates=[], ageRates=[];
@@ -75,27 +77,26 @@
     const choosing=base.theta((cosine-0.4)/0.35);
     const finishChoice=base.theta((cosine-0.1)/0.25);
     const atTarget=base.theta((2.25-(target-cart)**2)/1.25);
-    const awakeAndSearching=f.live*f.free;
-    const clockRate=awakeAndSearching*(atTarget+(1-atTarget)*finishChoice);
+    const searching=f.free;
+    const clockRate=searching*(atTarget+(1-atTarget)*finishChoice);
     let goalRate=0;
     if(choosing>0){
       const n=Math.floor(angle/(2*Math.PI)+0.5);
-      goalRate=4*awakeAndSearching*choosing*(quantile(map,variate(p.searchSeed,n))-target);
+      goalRate=4*searching*choosing*(quantile(map,variate(p.searchSeed,n))-target);
     }
-    let cost=mealRate**2+clockRate**2+goalRate**2;
     for(let i=0;i<centres.length;i++){
       const here=bump(cart-centres[i]), there=bump(gaze-centres[i]);
       const a=release*mealError*here;
       const availability=state[fresh+i];
       const speed=returnRate(state[weights+i]);
-      const b=f.live*(speed*(1-availability)
-        -(4*here+4*there)*availability);
+      const b=speed*(1-availability)
+        -(4*here+4*there)*availability;
       // The rising edge samples the previous visit before sustained sight writes the new one.
       const looking=base.theta((.55**2-(gaze-centres[i])**2)/(.75*.55**2));
       const c=10*state[contact+i], lastEmpty=10*state[empty+i];
-      const dc=12*f.live*(looking-c);
+      const dc=12*(looking-c);
       const arrival=2.5*base.dtheta(2.5*(c-.1))*dc*base.theta(dc/.1);
-      const write=12*f.live*looking*base.theta((c-.55)/.25);
+      const write=12*looking*base.theta((c-.55)/.25);
       const cleared=base.theta((lastEmpty-.5)/.4);
       const elapsed=80*state[age+i];
       const exposure=speed*elapsed;
@@ -103,15 +104,17 @@
       const slope=exposure*Math.exp(-exposure)*(1-speed/.1);
       const dw=4*arrival*cleared*(red-prediction)*slope;
       const de=.1*write*(1-red-lastEmpty);
-      const dt=f.live*cleared*(1-looking)/80-write*state[age+i];
+      const dt=cleared*(1-looking)/80-write*state[age+i];
       usualRates.push(a); freshRates.push(b); weightRates.push(dw);
       contactRates.push(.1*dc); emptyRates.push(de); ageRates.push(dt);
-      cost+=a*a+b*b+dw*dw+(.1*dc)**2+de*de+dt*dt;
     }
-    f.pay.memory=p.memoryCost*cost;
+    const told=[mealRate,...usualRates,...freshRates,goalRate,clockRate,
+      ...weightRates,...contactRates,...emptyRates,...ageRates];
+    const realized=told.map(v=>f.live*v);
+    f.told.memory=told;
+    f.pay.memory=p.memoryCost*realized.reduce((sum,v)=>sum+v*v,0);
     f.rate[0]-=f.pay.memory;
-    f.rate=[...f.rate.slice(0,8),mealRate,...usualRates,...freshRates,goalRate,clockRate,
-      ...weightRates,...contactRates,...emptyRates,...ageRates,...f.rate.slice(base.NR)];
+    f.rate=[...f.rate.slice(0,8),...realized,...f.rate.slice(base.NR)];
     f.loss+=f.pay.memory;
     f.pull=pull; f.target=target;
     return f;

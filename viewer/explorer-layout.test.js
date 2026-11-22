@@ -22,7 +22,7 @@ test('two wires meet only where they cross, at a point, never along a stretch',(
   // the separating pass that was 61% of the receiver's wire length and 29% of the mouth's.
   const L=require('./food-learning.js');
   const m=new E.Model(A.observeLearning(L.start(),L.PLACES.slice(),L.DEFAULTS,0));
-  for(const scope of ['receiver','mouth','eye','lever']){
+  for(const scope of ['receiver','mouth','eye','look-part','lever','grip-part']){
     m.enter(scope);const {edges}=G.layout(m.project());
     const samples=edges.map(w=>w.segments.flatMap(s=>Array.from({length:40},(_,i)=>{
       const a=G.sample(s,i/40),b=G.sample(s,(i+.5)/40),d=Math.hypot(b.x-a.x,b.y-a.y)||1;
@@ -100,7 +100,10 @@ test('a motor is one compact mark: the wire it turns ends at its pulley, the bat
   const L=require('./food-learning.js'),places=[0,5];
   const m=new E.Model(A.observeLearning(L.start(places,[10,8]),places,L.DEFAULTS));
   const parents=new Set(m.scene.nodes.filter(n=>n.glyph==='motor').map(n=>n.parent));let seen=0;
-  assert.deepEqual([...parents].sort(),['attachment-0','attachment-1','eye','lever','memory','wheels']);
+  // Each motor stands in its own part's box with the static map that computes what it is told (David, 2026-11-22,
+  // 779795d2, "B").
+  assert.deepEqual([...parents].sort(),['attachment-0/latch-part','attachment-1/latch-part',
+    ...L.stores.map(({id})=>id+'-part'),'grip-part','lift-part','look-part','scan-part','wheel-part'].sort());
   for(const parent of parents){
     m.enter(parent);const project=m.project(),g=check(project);
     for(const n of project.nodes.filter(n=>n.glyph==='motor')){
@@ -269,8 +272,11 @@ test('a hose stays wrapped where it crosses a boundary, and every hose end of th
   assert.ok(crossing.length>=2);assert.ok(crossing.every(port=>port.hose===19&&port.end===undefined));
   model.enter('memory');
   const project=model.project(),wrapped=check(project);let ends=0;
-  for(const id of ['yield','yield-rate','yield-motor','return','return-rate']){
-    const p=wrapped.positions.get(id);
+  model.enter('yield-part');
+  const drive=model.project(),driveWrapped=check(drive);
+  for(const [view,laid,id] of [[project,wrapped,'yield'],[project,wrapped,'yield-part'],[project,wrapped,'return'],
+    [project,wrapped,'return-part'],[drive,driveWrapped,'yield-rate'],[drive,driveWrapped,'yield-motor']]){
+    const project=view,wrapped=laid,p=wrapped.positions.get(id);
     for(const port of [...p.inputs,...p.outputs].filter(port=>port.end)){
       const open=check(project,{toggled:[port.end]}),group=open.positions.get(id).groups.find(g=>g.end===port.end);
       assert.equal(group.ports.length,19);assert.equal(port.wires[0].standsFor,'ℝ^[−9, 9]','the hose says what its list stands in for');assert.equal(group.ports[0].label,port.label+' at −9');assert.equal(group.ports[18].label,port.label+' at 9');

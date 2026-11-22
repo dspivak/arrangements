@@ -193,40 +193,51 @@ def test_identity_passes_values_and_loads():
 
 
 def test_motor_field():
-    C = 0.02
-    for b, q, t, P in RNG.normal(size=(5, 4)):
-        _, xi = field(fp.motor(C), [], [b, q, t, P])
-        np.testing.assert_allclose(xi, [-t * (t + P) / C, t, 0.0, 0.0], atol=1e-12)
+    """Told a push t, the motor applies live(b) t: the whole push from the level ``wake`` up,
+    none on an empty battery, part in between."""
+    C, wake = 0.02, 1.0
+    for b, q, t, P in RNG.normal(size=(8, 4)) + np.array([0.6, 0.0, 0.0, 0.0]):
+        g = fp.theta(b / wake)
+        _, xi = field(fp.motor(C, wake), [], [b, q, t, P])
+        np.testing.assert_allclose(xi, [-g * t * (g * t + P) / C, g * t, 0.0, 0.0], atol=1e-12)
+    _, xi = field(fp.motor(C, wake), [], [0.0, 0.3, 2.0, -1.0])
+    np.testing.assert_allclose(xi, [0.0, 0.0, 0.0, 0.0])
 
 
 def test_motor_at_a_rate_against_a_spring():
     """A battery, a store, a spring on the store, and a motor told the spring's load: the
-    store moves at the chosen rate, and the battery pays the store's friction C u^2 plus the
-    work done against the spring."""
-    C, u, kappa, q0, tau = 0.02, 0.7, 3.0, 0.3, 1e-3
-    parts = [fp.rod_segment(1.0, 5.0, "battery"), fp.rod_segment(C, q0, "store"),
-             fp.motor_at_rate(C), fp.send(fp.spring(), {0: kappa})]
-    wiring = fp.transfer("driven store", 5, 2, 0, 0,
-                         lambda m, n: jnp.stack([m[0], m[1], jnp.asarray(u), -kappa * m[1], m[1]]))
-    system = fp.fill(parts, wiring)
-    b, q = ravel_pytree(open_step(system, EMPTY, duration=tau)(system.P.init))[0]
-    np.testing.assert_allclose(q, q0 + tau * u, atol=1e-14)
-    np.testing.assert_allclose(b, 5.0 - tau * (C * u * u + kappa * q0 * u), atol=1e-14)
+    store moves at the chosen rate times live(b), and the battery pays the store's friction
+    C u^2 plus the work done against the spring, at that rate. On an empty battery the store
+    stays where it is and nothing is paid."""
+    C, u, kappa, q0, tau, wake = 0.02, 0.7, 3.0, 0.3, 1e-3, 1.0
+    for b0 in [5.0, 0.5, 0.0]:
+        g = float(fp.theta(b0 / wake))
+        parts = [fp.rod_segment(1.0, b0, "battery"), fp.rod_segment(C, q0, "store"),
+                 fp.motor_at_rate(C, wake), fp.send(fp.spring(), {0: kappa})]
+        wiring = fp.transfer("driven store", 5, 2, 0, 0,
+                             lambda m, n: jnp.stack([m[0], m[1], jnp.asarray(u), -kappa * m[1], m[1]]))
+        system = fp.fill(parts, wiring)
+        b, q = ravel_pytree(open_step(system, EMPTY, duration=tau)(system.P.init))[0]
+        np.testing.assert_allclose(q, q0 + tau * g * u, atol=1e-14)
+        np.testing.assert_allclose(b, b0 - tau * (C * (g * u) ** 2 + kappa * q0 * g * u), atol=1e-14)
+    assert 0.0 < float(fp.theta(0.5 / wake)) < 1.0
 
 
 def test_sweep_field_and_circle():
-    C, A, nu, gamma = 0.002, 6.0, 0.6, 0.05
-    for b, q1, q2, g, e in RNG.normal(size=(5, 5)):
-        _, xi = field(fp.sweep(C, A, nu, gamma), [], [b, q1, q2, g, e])
+    C, A, nu, gamma, wake = 0.002, 6.0, 0.6, 0.05, 1.0
+    for b, q1, q2, g, e in RNG.normal(size=(8, 5)) + np.array([0.6, 0.0, 0.0, 0.0, 0.0]):
+        _, xi = field(fp.sweep(C, wake, A, nu, gamma), [], [b, q1, q2, g, e])
+        L = fp.theta(b / wake)
         ring = A * A - q1 * q1 - q2 * q2
         r1 = g * (nu * q2 + gamma * ring * q1) + e
         r2 = g * (-nu * q1 + gamma * ring * q2)
-        np.testing.assert_allclose(xi, [-C * (r1 * r1 + r2 * r2), C * r1, C * r2, 0.0, 0.0], atol=1e-12)
+        np.testing.assert_allclose(xi, [-C * L * L * (r1 * r1 + r2 * r2), C * L * r1, C * L * r2, 0.0, 0.0],
+                                   atol=1e-12)
     # Gate open, no extra rate: the stores go round the circle and the battery pays C nu^2 A^2
     # per unit of duration; gate shut: they stop.
     def run(gate, steps, tau=0.01):
         parts = [fp.rod_segment(1.0, 10.0, "battery"), fp.rod_segment(C, A, "look"),
-                 fp.rod_segment(C, 0.0, "scan"), fp.sweep(C, A, nu, gamma)]
+                 fp.rod_segment(C, 0.0, "scan"), fp.sweep(C, wake, A, nu, gamma)]
         wiring = fp.transfer("eye", 5, 3, 0, 0,
                              lambda m, n: jnp.stack([m[0], m[1], m[2], jnp.asarray(gate), jnp.asarray(0.0)]))
         system = fp.fill(parts, wiring)

@@ -24,8 +24,8 @@ Everything else is composed from these by the library's own ``compose_seq`` and
 * ``damper``    -- note ``eqn.damper``, a dragger and a return spring;
 * ``contact``   -- a spring and a damper on one stretch, each behind a gate wire: the
   note's ground and its lever's attachment (``sec.source``, ``sec.gates``);
-* ``motor``     -- note ``eqn.motor``, two pushes; ``motor_at_rate`` is it sent the push that
-  moves its store at a chosen rate;
+* ``motor``     -- note ``eqn.motor``, two pushes, told a push; ``motor_at_rate``, two pushes,
+  told a rate; each reads the battery and is only as active as ``live`` of it;
 * ``latch``     -- note ``eqn.contact_latch``, a store and its motor;
 * ``sweep``     -- the note's sweep, two motors;
 * ``send`` and ``discard`` -- a part with a constant sent in on some input wires, or with
@@ -307,31 +307,39 @@ def latch(capacity: float, rate: float, wake: float, initial: float = 0.0, label
 
     Inputs: the battery ``b``; whether the latch is free to engage, ``U``; the targets
     ``D`` to acquire and ``T`` to retain; and the load ``P`` the rest of the arrangement
-    puts on the store. Output: ``v``. With ``s = engagement(v)``, the motor of the given
-    capacity drives the store at the rate
-    ``rate * theta(b / wake) * (U ((1 - s) D + s T) - v)``: toward ``U D`` while the latch
-    is not engaged and toward ``U T`` once it is, so what it takes to engage and what it
-    takes to stay engaged differ. The battery pays ``capacity u^2 - P u`` at the rate ``u``.
+    puts on the store. Output: ``v``. With ``s = engagement(v)``, the latch tells its motor
+    the rate ``rate * (U ((1 - s) D + s T) - v)``: toward ``U D`` while the latch is not
+    engaged and toward ``U T`` once it is, so what it takes to engage and what it takes to
+    stay engaged differ. The motor reads the battery and drives the store at that rate times
+    ``live(b, wake)``, the note's rate; the battery pays ``capacity u^2 - P u`` at the rate ``u``.
     """
     def route(m: Array, n: Array) -> Array:
         v = m[0]
         b, free, acquire, retain, other = n
         s = engagement(v)
-        u = rate * theta(b / wake) * (free * ((1 - s) * acquire + s * retain) - v)
+        u = rate * (free * ((1 - s) * acquire + s * retain) - v)
         return jnp.stack([b, v, u, other])
 
     return fill([rod_segment(capacity, initial, f"{label} store", stages=stages, h=h),
-                 motor_at_rate(capacity, f"{label} motor")],
+                 motor_at_rate(capacity, wake, f"{label} motor")],
                 transfer(label, 4, 1, 5, 1, route, lambda m: m))
 
 
-def motor(capacity: float, label: str = "motor", width: int = 1) -> Arrangement:
-    """The motor ``1 -> <4|0>`` (note ``eqn.motor``) for a store of the given capacity.
+def live(b: Array, wake: float) -> Array:
+    """How awake a motor is at the battery level ``b``: ``theta(b / wake)``, ``0`` on an empty
+    battery and ``1`` from the level ``wake`` up (note ``live``)."""
+    return theta(b / wake)
 
-    Inputs: the battery ``b``, the store ``q``, the push ``tau``, and the load ``P`` the rest
-    of the arrangement puts on the store. Field ``tau dq - tau (tau + P) / capacity db``: the
-    store moves at ``(tau + P) / capacity``, so the battery pays the power ``tau`` times that
-    rate. Load-free at ``tau`` and ``P``. It must be sent the true ``P``.
+
+def motor(capacity: float, wake: float, label: str = "motor", width: int = 1) -> Arrangement:
+    """The motor ``1 -> <4|0>`` (note ``eqn.motor``) for a store of the given capacity, told a push.
+
+    Inputs: the battery ``b``, the store ``q``, the push ``tau`` it is told, and the load
+    ``P`` the rest of the arrangement puts on the store. It reads the battery: it applies the
+    push ``g tau``, with ``g = live(b, wake)``, so on an empty battery it applies none. Field
+    ``g tau dq - g tau (g tau + P) / capacity db``: the store moves at
+    ``(g tau + P) / capacity``, so the battery pays the power ``g tau`` times that rate.
+    Load-free at ``tau`` and ``P``. It must be sent the true ``P``.
 
     With ``width = n`` it drives ``n`` stores of the one capacity from the one battery:
     inputs ``(b, q_1..q_n, tau_1..tau_n, P_1..P_n)``, the field the sum of the ``n`` motors'.
@@ -339,30 +347,46 @@ def motor(capacity: float, label: str = "motor", width: int = 1) -> Arrangement:
     if capacity <= 0:
         raise ValueError("the driven store's capacity is positive")
     n = width
+
+    def applied(v: Array) -> Array:
+        return live(v[0], wake) * v[1 + n:1 + 2 * n]
+
     return pushes(label, 1 + 3 * n,
-                  [("drive", lambda v: v[1 + n:1 + 2 * n], lambda v: v[1:1 + n]),
-                   ("pay", lambda v: -jnp.sum(v[1 + n:1 + 2 * n] * (v[1 + n:1 + 2 * n] + v[1 + 2 * n:])) / capacity,
+                  [("drive", applied, lambda v: v[1:1 + n]),
+                   ("pay", lambda v: -jnp.sum(applied(v) * (applied(v) + v[1 + 2 * n:])) / capacity,
                     lambda v: v[0])])
 
 
-def motor_at_rate(capacity: float, label: str = "motor at a rate", width: int = 1) -> Arrangement:
-    """A motor that drives its store at a chosen rate ``u``: inputs ``(b, q, u, P)``, the motor
-    sent the push ``capacity * u - P``. The battery pays ``capacity u^2 - P u`` (note
-    ``sec.general``, the paragraph after ``eqn.motor``). ``width`` as for ``motor``."""
+def motor_at_rate(capacity: float, wake: float, label: str = "motor at a rate", width: int = 1) -> Arrangement:
+    """The motor told a rate ``u`` (note ``sec.general``, the paragraph after ``eqn.motor``):
+    inputs ``(b, q, u, P)``. It reads the battery and drives its store at the rate ``g u``,
+    ``g = live(b, wake)``, by pushing ``capacity g u - P``; the battery pays
+    ``capacity (g u)^2 - P g u``. On an empty battery it drives at rate ``0`` and holds its
+    store against ``P``. ``width`` as for ``motor``."""
+    if capacity <= 0:
+        raise ValueError("the driven store's capacity is positive")
     n = width
-    wiring = transfer(label, 1 + 3 * n, 0, 1 + 3 * n, 0,
-                      lambda m, v: jnp.concatenate([v[:1 + n], capacity * v[1 + n:1 + 2 * n] - v[1 + 2 * n:],
-                                                    v[1 + 2 * n:]]))
-    return fill([motor(capacity, width=n)], wiring)
+
+    def rate(v: Array) -> Array:
+        return live(v[0], wake) * v[1 + n:1 + 2 * n]
+
+    def applied(v: Array) -> Array:
+        return capacity * rate(v) - v[1 + 2 * n:]
+
+    return pushes(label, 1 + 3 * n,
+                  [("drive", applied, lambda v: v[1:1 + n]),
+                   ("pay", lambda v: -jnp.sum(applied(v) * rate(v)), lambda v: v[0])])
 
 
-def sweep(capacity: float, radius: float, nu: float, gamma: float, label: str = "sweep") -> Arrangement:
+def sweep(capacity: float, wake: float, radius: float, nu: float, gamma: float,
+          label: str = "sweep") -> Arrangement:
     """The sweep ``1 -> <5|0>`` (note ``sec.general``): two motors with ``P = 0`` driving two
     stores round the circle of the given radius, at ``nu`` radians per unit of duration,
     returning to that circle at the rate ``gamma``.
 
     Inputs: the battery ``b``, the stores ``q1, q2``, a gate ``g`` and an extra rate ``e`` on
-    the first store. Field ``C r1 dq1 + C r2 dq2 - C (r1^2 + r2^2) db`` with
+    the first store. The motors read the battery, so with ``L = live(b, wake)`` the field is
+    ``C L r1 dq1 + C L r2 dq2 - C L^2 (r1^2 + r2^2) db`` with
     ``r1 = g (nu q2 + gamma (A^2 - q1^2 - q2^2) q1) + e`` and
     ``r2 = g (-nu q1 + gamma (A^2 - q1^2 - q2^2) q2)``.
     """
@@ -374,5 +398,5 @@ def sweep(capacity: float, radius: float, nu: float, gamma: float, label: str = 
         zero = jnp.zeros_like(b)
         return jnp.stack([b, q1, capacity * r1, zero, b, q2, capacity * r2, zero])
 
-    return fill([motor(capacity, "motor 1"), motor(capacity, "motor 2")],
+    return fill([motor(capacity, wake, "motor 1"), motor(capacity, wake, "motor 2")],
                 transfer(label, 8, 0, 5, 0, route))

@@ -46,7 +46,7 @@
   function encounter(s, places, P, receiverSize = NR) {
     const tip = s[2], cart = s[3], live = theta(s[0]/P.b0);
     const stillHolding = theta((s[1]+.8)/.4);
-    const grip = [], mouth = [], engaged = [], engageSlope = [], latchRate = [], available = [], score = [], latch = [], firstChoice = [], unblocked = [];
+    const grip = [], mouth = [], engaged = [], engageSlope = [], latchTold = [], latchRate = [], available = [], score = [], latch = [], firstChoice = [], unblocked = [];
     for (let k = 0; k < places.length; k++) {
       const i = receiverSize+NC*k, height = s[i+2], horizontal = near(cart-places[k], P.Rh)[0];
       grip.push(horizontal*near(height-tip, P.R)[0]);
@@ -67,9 +67,11 @@
       const acquire = theta((available[i]-.15)/.15)*first*(1-stillHolding);
       const retain = 1-(1-available[i])*(1-stillHolding);
       const target = free*((1-engaged[i])*acquire+engaged[i]*retain);
-      latchRate.push(P.latchRate*live*(target-latch[i]));
+      // The rate the latch tells its motor; the motor reads the battery and drives at live times it.
+      latchTold.push(P.latchRate*(target-latch[i]));
+      latchRate.push(live*latchTold[i]);
     }
-    return {grip, mouth, engaged, engageSlope, latchRate, available, score, firstChoice, unblocked};
+    return {grip, mouth, engaged, engageSlope, latchTold, latchRate, available, score, firstChoice, unblocked};
   }
 
   // The single opener and digestor expose their available effort to the surroundings.
@@ -93,15 +95,22 @@
       seen += red * e; dseen += red * (-2 * u / P.w) * e;
     }
     const free = theta(1 - 2 * seen);
+    // Every motor reads the battery: told a rate (or the drive, a torque), it drives at live times it.
+    // `told` holds what each motor is told; the realized rates below are live times those.
     // two sweeps: the eye's (r, s) and the patrol's (eta, zeta), each round its circle while free
     const ring = P.A * P.A - r * r - sc * sc;
-    const lookR = live * (free * (P.omega * sc + P.gam * ring * r) + P.lam * dseen);
-    const lookS = live * free * (-P.omega * r + P.gam * ring * sc);
     const ringp = P.B * P.B - eta * eta - zeta * zeta;
-    const patE = learner ? 0 : live * free * (P.nup * zeta + P.gamp * ringp * eta);
-    const patZ = learner ? 0 : live * free * (-P.nup * eta + P.gamp * ringp * zeta);
     const search = learner ? learner.pull : P.kexp * (eta - y);
-    const torque = live * (P.ktau * seen * r + free * search);
+    const told = {
+      look: free * (P.omega * sc + P.gam * ring * r) + P.lam * dseen,
+      scan: free * (-P.omega * r + P.gam * ring * sc),
+      patrol: learner ? 0 : free * (P.nup * zeta + P.gamp * ringp * eta),
+      patrolScan: learner ? 0 : free * (-P.nup * eta + P.gamp * ringp * zeta),
+      torque: P.ktau * seen * r + free * search,
+    };
+    const lookR = live * told.look, lookS = live * told.scan;
+    const patE = live * told.patrol, patZ = live * told.patrolScan;
+    const torque = live * told.torque;
     // the lever: grip toward a full casing at its tip, lift toward the mouth while holding
     let K = 0;
     const contact = encounter(s, places, P), mouth = mouthEfforts(b, l, P);
@@ -109,8 +118,9 @@
       const f = s[NR + NC * k], x = s[NR + NC * k + 2];
       K += contact.engaged[k]*contact.grip[k] * theta((f - P.f0) / P.f0);
     }
-    const grip = P.lgrip * live * (K * (2 - l) - (1 - K) * (l + 1));
-    const lift = P.llift * live * (hold * (P.x0 - h) + (1 - hold) * (P.xg - h));
+    told.grip = P.lgrip * (K * (2 - l) - (1 - K) * (l + 1));
+    told.lift = P.llift * (hold * (P.x0 - h) + (1 - hold) * (P.xg - h));
+    const grip = live * told.grip, lift = live * told.lift;
     let dJl = 0, dJh = 0, Fy = 0, eatAll = 0, pryAll = 0, attach = 0, ground = 0, damp = 0, latchPay=0, latchLoss=0;
     const rates = [], casings = [];
     for (let k = 0; k < n; k++) {
@@ -163,7 +173,7 @@
       energy += f + mu * mu / (2 * P.m) + P.m * P.g * x + 0.5 * P.kappa * (x - z) * (x - z);
       loss += P.kappa * P.kappa / P.beta * (x - z) * (x - z);
     }
-    return { rate, live, hold, seen, free, torque, grip, lift, wheel, pay, eatAll, pryAll, casings, energy, loss, patE };
+    return { rate, live, hold, seen, free, torque, grip, lift, told, wheel, pay, eatAll, pryAll, casings, energy, loss, patE };
   }
 
   function rk4(s, h, places, P, evaluate = field) {

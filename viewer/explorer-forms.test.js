@@ -142,7 +142,7 @@ test('every formula on a feeding field mark gives the loads the model returns, t
   assert.deepEqual(thin,[],'forms checked at fewer than ten nonzero loads');
 });
 
-test('a motor at a rate hears its rate alone: each mark is wired to the rate and to the one wire it pushes',()=>{
+test('a motor at a rate hears its rate and the battery: each mark is wired to them and to the one wire it pushes',()=>{
   // The eye in the learning receiver, and the patrol receiver's four motors (which no page shows).
   const scenes=[A.observeLearning(L.start(),L.PLACES.slice(),L.DEFAULTS)];
   const patrol=A.adapter();patrol.step(.5);scenes.push(patrol.snapshot());
@@ -150,17 +150,18 @@ test('a motor at a rate hears its rate alone: each mark is wired to the rate and
   for(const sc of scenes)for(const node of sc.nodes)if(node.kind==='field'&&/^(look|scan|patrol|patrol-scan)-motor\//.test(node.id)){
     const part=node.id.split('/')[0],rate=part.replace('-motor','-rate'),entering=sc.wires.filter(w=>w.target===node.id);
     const pushed=part==='look-motor'?'look':part==='scan-motor'?'scan':part==='patrol-motor'?'patrol-point':'patrol-scan';
-    assert.deepEqual(entering.map(w=>w.source).sort(),[rate,node.label==='Battery payment'?'battery':pushed].sort(),node.id);
+    // Every motor reads the battery (David, 2026-11-22, 779795d2), so the battery enters both marks.
+    assert.deepEqual(entering.map(w=>w.source).sort(),[...new Set([rate,'battery',node.label==='Battery payment'?'battery':pushed])].sort(),node.id);
     const verdict=Forms.check(node.form,entering.map(w=>({label:w.label,value:w.value,load:w.load})));
     assert.ok(verdict.ok,`${node.id}: ${verdict.error||JSON.stringify(verdict.rows)}`);
     seen++;
   }
   assert.equal(seen,12);   // two marks for each of look and scan in both receivers, and for the two patrol motors
-  // The drive hears its torque and, for the payment, the axle's load on the wheel; what the torque law reads
-  // enters the torque's static map.
+  // The drive hears its torque and the battery and, for the payment, the axle's load on the wheel; what the
+  // torque law reads enters the torque's static map.
   for(const sc of scenes){
     const sources=id=>sc.wires.filter(w=>w.target===id).map(w=>w.source).sort();
-    assert.deepEqual(sources('drive/field'),['drive-torque','wheel']);
+    assert.deepEqual(sources('drive/field'),['battery','drive-torque','wheel']);
     assert.deepEqual(sources('drive/field-1'),['battery','drive-torque','wheel-load']);
     // A spring is one mark with no box: its two wires, equal and opposite loads, and its cost as its form.
     const axle=sc.nodes.find(n=>n.id==='axle'),ends=sc.wires.filter(w=>w.target==='axle');

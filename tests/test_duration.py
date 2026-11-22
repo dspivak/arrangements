@@ -26,7 +26,7 @@ Added with the look-ahead (David's "yes," 2026-10-10), predictions before the co
    duration 1, still at 0, and its momentum with no other push keeps ``1 - c tau`` of itself;
 8. a part whose look-ahead is half the coming duration is the leapfrog step in one round: second order
    (the error falls by about 4 when the duration halves) where the full look-ahead falls by about 2.
-   This part is Ch 3 ``ex.look_ahead``; added for it (Claude Opus 5.5, 00f2d232, 2026-11-12), before the code:
+   This part is Ch 3 ``ex.leapfrog``; added for it (Claude Opus 5.5, 00f2d232, 2026-11-12), before the code:
 10. a mass ``m = 2`` with that look-ahead, ``q + (tau/2) p/m``, on a spring and under a constant load, run by ``Phi`` at
     durations ``1/2`` and ``3/2``, takes the step ``eqn.leapfrog_update``; under the constant load its state is
     Newton's at both durations (``exc.leapfrog_accuracy`` (b)), and the phase part's position falls short by
@@ -214,7 +214,7 @@ def test_half_look_ahead_is_second_order():
 
 
 def leapfrog_mass(m, q0, p0):
-    """Ch 3 ``ex.look_ahead``: a mass ``m`` reading out ``q + (tau/2) p/m`` (``eqn.leapfrog_lookahead``); told the load
+    """Ch 3 ``ex.leapfrog``: a mass ``m`` reading out ``q + (tau/2) p/m`` (``eqn.leapfrog_lookahead``); told the load
     ``xi`` there, ``p' = p + tau xi`` and it coasts the rest of the step on ``p'`` (``eqn.leapfrog_update``)."""
     def timed(s, xi, t):
         p_new = s[1] + t * xi

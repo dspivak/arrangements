@@ -253,15 +253,23 @@ test('each feeding map publishes one distinct readout with its own dependencies'
   };
   const perCasing=keys=>places.flatMap((_,i)=>keys.map(key=>'casing-'+i+'/'+key));
   assert.deepEqual(leaves('attachment-0/latch-rate'),[...perCasing(['height','food','latch','place']),
-    'in-grip','in-tip','in-cart','in-battery'].sort());
+    'in-grip','in-tip','in-cart'].sort());
   assert.deepEqual(leaves('sum-keep'),[...perCasing(['food','height','latch','place']),'in-tip','in-cart'].sort());
   assert.deepEqual(leaves('sum-opened'),[...perCasing(['opening','height','latch','place']),'in-opener','in-cart'].sort());
   assert.deepEqual(leaves('sum-eaten'),[...perCasing(['food','opening','height','latch','place']),'in-digestor','in-cart'].sort());
-  assert.deepEqual(args('meal-rate'),['battery','grip','meal','sum-eaten']);
-  assert.deepEqual(args('eye-contact-rate'),['battery','eye-contact','memory-gaze']);
-  assert.deepEqual(args('clock-rate'),['battery','cart','clock','destination','sum-red']);
-  assert.deepEqual(args('yield-rate'),['cart','grip','grip-rate','meal','yield']);
-  assert.deepEqual(args('grip-rate'),['battery','grip','sum-keep']);
+  // No rate map reads the battery: every motor reads it itself (David, 2026-11-22, 779795d2).
+  assert.deepEqual(args('meal-rate'),['grip','meal','sum-eaten']);
+  assert.deepEqual(args('eye-contact-rate'),['eye-contact','memory-gaze']);
+  assert.deepEqual(args('clock-rate'),['cart','clock','destination','sum-red']);
+  // A motor's box has no outputs (David, 2026-11-22, 779795d2, "B"): the yield's rule computes the grip's rate
+  // from what that rate reads, and nothing outside the grip's box reads the grip rate.
+  assert.deepEqual(args('yield-rate'),['cart','grip','meal','sum-keep','yield']);
+  assert.deepEqual(args('grip-rate'),['grip','sum-keep']);
+  const within=(id,box)=>{for(let n=nodes.get(id);n;n=nodes.get(n.parent))if(n.id===box)return true;return false;};
+  for(const n of sc.nodes.filter(n=>n.glyph==='motor')){
+    const box=n.parent;assert.equal(nodes.get(box).kind,'box',n.id);
+    assert.deepEqual(sc.wires.filter(w=>within(w.source,box)&&!within(w.target,box)),[],box+' has no outputs');
+  }
 });
 
 test('varying the digestion effort during contact changes eating alone among the six readouts',()=>{
@@ -280,8 +288,8 @@ test('varying the digestion effort during contact changes eating alone among the
 test('the fingers, battery and spring each show the dependencies of their own load',()=>{
   const sc=A.adapter().snapshot();
   const inputs=id=>sc.wires.filter(w=>w.target===id&&w.argument!==false).map(w=>w.label).sort();
-  assert.deepEqual(inputs('gripper/field'),['Chosen grip rate','Other grip load']);
-  assert.deepEqual(inputs('gripper/field-1'),['Chosen grip rate','Grip torque']);
+  assert.deepEqual(inputs('gripper/field'),['Battery','Chosen grip rate','Other grip load']);
+  assert.deepEqual(inputs('gripper/field-1'),['Battery','Chosen grip rate','Grip torque']);
   assert.deepEqual(inputs('casing-0/gravity/field'),[]);
   assert.deepEqual(inputs('casing-0/spring'),['Air memory 1','Height 1']);
   for(const n of sc.nodes.filter(n=>n.kind==='field')){

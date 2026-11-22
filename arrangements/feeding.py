@@ -133,8 +133,12 @@ def _return_rate(weight):
     return .1 * jax.nn.sigmoid(weight-jnp.log(7.))
 
 
-def _food_memory(q, grip, live, seen, eat, p):
-    """Learn typical yield at release and local return speed on a later look."""
+def _food_memory(q, grip, seen, eat, p):
+    """Learn typical yield at release and local return speed on a later look.
+
+    The rates the memory's motors are told. Each motor reads the battery and drives its store
+    at ``live(b)`` times its rate, so no rate here carries ``live``; ``grip`` is the rate the
+    gripper tells its motor."""
     y, gaze, meal = q[3], q[3] + q[5], q[7]
     centres = jnp.asarray(CENTRES)
     size = len(CENTRES)
@@ -144,16 +148,16 @@ def _food_memory(q, grip, live, seen, eat, p):
     here = jnp.exp(-(y-centres)**2)
     there = jnp.exp(-(gaze-centres)**2)
     release = jax.grad(theta)(q[1]) * (-grip) * theta(-grip/.05)
-    meal_rate = eat - 4 * live * theta(-q[1]) * meal
+    meal_rate = eat - 4 * theta(-q[1]) * meal
     usual_rate = release * (-jnp.expm1(-meal/4) - jnp.dot(usual, here)) * here
     _, masses = _search_map(usual, fresh)
     speed = _return_rate(weights)
-    fresh_rate = live*(speed*(1-fresh) - 4*(here+there)*fresh)
+    fresh_rate = (speed*(1-fresh) - 4*(here+there)*fresh)
     looking = near(gaze-centres, .55)
     contact_level, last_empty = 10*contact, 10*empty
-    dc = 12*live*(looking-contact_level)
+    dc = 12*(looking-contact_level)
     arrival = 2.5*jax.vmap(jax.grad(theta))(2.5*(contact_level-.1))*dc*theta(dc/.1)
-    write = 12*live*looking*theta((contact_level-.55)/.25)
+    write = 12*looking*theta((contact_level-.55)/.25)
     cleared = theta((last_empty-.5)/.4)
     red = theta(seen/.5)
     def revisit_loss(w, elapsed):
@@ -161,11 +165,11 @@ def _food_memory(q, grip, live, seen, eat, p):
         return .5*(prediction-red)**2
     weight_rate = -4*arrival*cleared*jax.vmap(jax.grad(revisit_loss))(weights, 80*age)
     empty_rate = .1*write*(1-red-last_empty)
-    age_rate = live*cleared*(1-looking)/80 - write*age
+    age_rate = cleared*(1-looking)/80 - write*age
     choosing = theta((jnp.cos(angle)-.4)/.35)
     finish = theta((jnp.cos(angle)-.1)/.25)
     near_goal = theta((2.25-(target-y)**2)/1.25)
-    searching = live*theta(1-2*seen)
+    searching = theta(1-2*seen)
     clock_rate = searching*(near_goal + (1-near_goal)*finish)
     def select(_):
         n = jnp.floor(angle/(2*jnp.pi)+.5)
@@ -223,7 +227,10 @@ def _body_by_hand(*, parameters, stages, h, learning, memory, cart):
         scan=live*free*(-p['omega']*r+p['gam']*ring*sc)
         qq=qq.at[5].add(p['csee']*look).at[6].add(p['csee']*scan).at[0].add(-p['csee']*(look*look+scan*scan))
         if learning:
-            rates, search = _food_memory(q[:strokes], grip, live, seen, eaten, p)
+            # Each memory motor reads the battery: its rule is written with live = 1 and the
+            # motor drives at live(b) times the rate it is told.
+            rates, search = _food_memory(q[:strokes], p['lgrip']*(keep*(2-l)-(1-keep)*(l+1)), seen, eaten, p)
+            rates = live * rates
             capacity = p['memoryCost']
         else:
             eta,zeta=q[7:9]

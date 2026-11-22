@@ -63,8 +63,11 @@ great." A page that departs from one says why in its own header comment.
 14. **A moving mark that shows a rate adds up that rate frame by frame, with its sign.** The tanks' first version
     moved the pipe's dashes by "time since the page loaded × the current flow." That runs backward as the flow
     falls, and David saw water going from the lower tank to the higher one.
-15. **The page's model is checked against the library.** Run the same arrangement in the library and compare
-    numbers, then say on the page what was checked. The listener's test compares the page with
+15. **The page's model is checked against the library.** The model is the library's composite of the note's parts,
+    and the page is produced from it, never a field written by hand in JavaScript or a one-box receiver with a
+    hand-written field (David, 2026-11-19, 6a32afbb: "the ICM arrangement needs to be the 20-100 boxes alraedy used in
+    the note. it needs to be those and then the library needs to compose them"). Run the same arrangement in the library
+    and compare numbers, then say on the page what was checked. The listener's test compares the page with
     `listener.run_script`. The tanks were checked against `tests/test_two_tanks.py`'s tanks with the book's linear
     spout, for one-second steps. A page whose scene is recorded from a run is recorded by a function in the library,
     `arrangements/scenes.py`, and its `source` line names that function; the disintegration page's first builder

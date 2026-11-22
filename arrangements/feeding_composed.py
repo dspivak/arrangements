@@ -93,33 +93,35 @@ def source(place: float, food: float = 10., *, parameters: Mapping[str, float] |
 # ---------------------------------------------------------------------------
 
 
-def _grip_rate(b: Array, grip: Array, keep: Array, p: Mapping[str, float]) -> Array:
-    """The note's ``grip``: toward 2 while a casing worth keeping is held, toward -1 otherwise."""
-    return p['lgrip'] * theta(b / p['b0']) * (keep * (2 - grip) - (1 - keep) * (grip + 1))
+def _grip_rate(grip: Array, keep: Array, p: Mapping[str, float]) -> Array:
+    """The rate the gripper tells its motor: toward 2 while a casing worth keeping is held,
+    toward -1 otherwise. The motor, reading the battery, drives the grip at this times
+    ``live(b)``, the note's ``grip``."""
+    return p['lgrip'] * (keep * (2 - grip) - (1 - keep) * (grip + 1))
 
 
 def gripper(p: Mapping[str, float]) -> Arrangement:
-    """The gripper ``1 -> <4|0>`` (note ``eqn.gripper``): the motor of capacity ``cgrip`` sent
-    the push ``cgrip * grip - P``. Inputs: battery, grip, the encounter's ``K``, and the
-    attachment's pull on the grip, which is the motor's other load."""
+    """The gripper ``1 -> <4|0>`` (note ``eqn.gripper``): the motor of capacity ``cgrip`` told
+    the rate ``_grip_rate`` and the true other load ``P``. Inputs: battery, grip, the
+    encounter's ``K``, and the attachment's pull on the grip, which is the motor's other load."""
     def route(m: Array, n: Array) -> Array:
         b, grip, keep, pull = n
-        return jnp.stack([b, grip, p['cgrip'] * _grip_rate(b, grip, keep, p) - pull, pull])
+        return jnp.stack([b, grip, _grip_rate(grip, keep, p), pull])
 
-    return fp.fill([fp.motor(p['cgrip'])], fp.transfer("gripper", 4, 0, 4, 0, route))
+    return fp.fill([fp.motor_at_rate(p['cgrip'], p['b0'], "grip motor")], fp.transfer("gripper", 4, 0, 4, 0, route))
 
 
 def lever(p: Mapping[str, float]) -> Arrangement:
-    """The lever ``1 -> <4|0>``: the motor of capacity ``clift`` driving the tip toward the
-    mouth while the grip holds and toward the ground otherwise. Inputs: battery, tip, grip,
-    and the attachment's pull on the tip."""
+    """The lever ``1 -> <4|0>``: the motor of capacity ``clift`` told the rate that takes the
+    tip toward the mouth while the grip holds and toward the ground otherwise. Inputs:
+    battery, tip, grip, and the attachment's pull on the tip."""
     def route(m: Array, n: Array) -> Array:
         b, tip, grip, pull = n
         hold = theta(grip)
-        lift = p['llift'] * theta(b / p['b0']) * (hold * (p['x0'] - tip) + (1 - hold) * (p['xg'] - tip))
-        return jnp.stack([b, tip, p['clift'] * lift - pull, pull])
+        lift = p['llift'] * (hold * (p['x0'] - tip) + (1 - hold) * (p['xg'] - tip))
+        return jnp.stack([b, tip, lift, pull])
 
-    return fp.fill([fp.motor(p['clift'])], fp.transfer("lever", 4, 0, 4, 0, route))
+    return fp.fill([fp.motor_at_rate(p['clift'], p['b0'], "lift motor")], fp.transfer("lever", 4, 0, 4, 0, route))
 
 
 def wheels(p: Mapping[str, float], cart: float = 0., *, stages: int = 1, h: float = 1.) -> Arrangement:
@@ -129,7 +131,7 @@ def wheels(p: Mapping[str, float], cart: float = 0., *, stages: int = 1, h: floa
     step = dict(stages=stages, h=h)
     parts = [fp.mass(p['M'], cart, 0., "cart", **step),
              fp.send(fp.dragger(p['betac'], cart, "wheel dragger", **step), {0: p['kappac']}, "wheel"),
-             fp.motor(p['betac'], "drive")]
+             fp.motor(p['betac'], p['b0'], "drive")]
 
     def route(m: Array, n: Array) -> Array:
         y, wheel = m
@@ -155,11 +157,11 @@ def _memory_start(p: Mapping[str, float], memory) -> list[tuple[str, Array]]:
             ("return rate", weights), ("eye contact", zeros), ("last empty", zeros), ("time away", zeros)]
 
 
-def memory_motors(capacity: float, widths: list[int], names: list[str]) -> Arrangement:
-    """One motor per memory store, each driving its store at a chosen rate with other load 0,
-    which is the true one: nothing else acts on these stores. Inputs, per store: battery, the
-    store, its rate."""
-    motors = [fp.send(fp.motor_at_rate(capacity, f"{name} motor", n), {1 + 2 * n + j: 0. for j in range(n)},
+def memory_motors(capacity: float, wake: float, widths: list[int], names: list[str]) -> Arrangement:
+    """One motor per memory store, each told a rate with other load 0, which is the true one:
+    nothing else acts on these stores. Each reads the battery. Inputs, per store: battery,
+    the store, its rate."""
+    motors = [fp.send(fp.motor_at_rate(capacity, wake, f"{name} motor", n), {1 + 2 * n + j: 0. for j in range(n)},
                       f"{name} motor, P=0") for name, n in zip(names, widths)]
     size = sum(1 + 2 * n for n in widths)
     return fp.fill(motors, fp.transfer("memory motors", size, 0, size, 0, lambda m, n: n))
@@ -197,18 +199,21 @@ def body(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: f
               fp.rod_segment(p['csee'], 0., "look", **step),
               fp.rod_segment(p['csee'], p['A'], "scan", **step),
               *[fp.rod_segment(capacity, v, name, **step) for name, v in start]]
-    stateless = [gripper(p), lever(p), fp.sweep(p['csee'], p['A'], p['omega'], p['gam'], "eye"),
-                 memory_motors(capacity, widths, names) if learning
-                 else fp.sweep(p['cpat'], p['B'], p['nup'], p['gamp'], "patrol")]
+    stateless = [gripper(p), lever(p), fp.sweep(p['csee'], p['b0'], p['A'], p['omega'], p['gam'], "eye"),
+                 memory_motors(capacity, p['b0'], widths, names) if learning
+                 else fp.sweep(p['cpat'], p['b0'], p['B'], p['nup'], p['gamp'], "patrol")]
 
+    # Every motor reads the battery itself, so no rate told to a motor carries live(b), and
+    # nothing here reads the battery except to pass it to the motors. The memory's rules read
+    # the rate the gripper tells its motor.
     def route(m: Array, n: Array) -> Array:
         b, grip, tip, y, look, scan = m[:6]
         rest = m[6:]
         seen, climb, keep, pull_grip, pull_tip, _, eaten = n
-        live, free = theta(b / p['b0']), theta(1 - 2 * seen)
+        free = theta(1 - 2 * seen)
         if learning:
             q = jnp.concatenate([jnp.stack([b, grip, tip, y, jnp.zeros_like(b), look, scan]), rest])
-            rates, search = _food_memory(q, _grip_rate(b, grip, keep, p), live, seen, eaten, p)
+            rates, search = _food_memory(q, _grip_rate(grip, keep, p), seen, eaten, p)
             cuts = [0]
             for n_k in widths:
                 cuts.append(cuts[-1] + n_k)
@@ -216,12 +221,12 @@ def body(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: f
                     for x in (b[None], rest[cuts[i]:cuts[i + 1]], rates[cuts[i]:cuts[i + 1]])]
         else:
             search = p['kexp'] * (rest[0] - y)
-            tail = [jnp.stack([b, rest[0], rest[1], live * free, jnp.zeros_like(b)])]
-        torque = live * (p['ktau'] * seen * look + free * search)
+            tail = [jnp.stack([b, rest[0], rest[1], free, jnp.zeros_like(b)])]
+        torque = p['ktau'] * seen * look + free * search
         return jnp.concatenate([jnp.stack([b, torque]),                               # wheels
                                 jnp.stack([b, grip, keep, pull_grip]),                # gripper
                                 jnp.stack([b, tip, grip, pull_tip]),                  # lever
-                                jnp.stack([b, look, scan, live * free, p['lam'] * live * climb]),  # eye
+                                jnp.stack([b, look, scan, free, p['lam'] * climb]),   # eye
                                 *tail])
 
     inner_in = 2 + 4 + 4 + 5 + (sum(1 + 2 * n_k for n_k in widths) if learning else 5)

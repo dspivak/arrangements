@@ -106,7 +106,7 @@ def ref_loss(q, X, Y):
 # The token: what it sends, and its strategy (the fixed architecture, no weights of its own).
 # ---------------------------------------------------------------------------
 
-SEND = M + M                 # the token's send: address x, value x (Ch 4 sec.transformer_attention)
+SEND = M + M                 # the token's send: address x, value x (Ch 4 sec.attention_heads)
 HEAR = HEADS * M + (RHO + HEADS * M * M)   # per round: each head value, the rule value (rho and every W_O W_V)
 
 

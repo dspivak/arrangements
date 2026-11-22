@@ -226,7 +226,11 @@ second has the bottom row and ends at the plug of the motor's cord; the wires it
 hears stand between and end at the side of its body (`MOTOR` in `explorer-layout.js`). Clicked, it opens into its two pushes, whose count
 is written under the circle. In feeding every motor is drawn so: the gripper, the lift,
 the look and the scan, the drive, the nine memory motors and each Contact's latch motor
-(`motorPart` in `feeding-arrangement.js`).
+(`motorPart` in `feeding-arrangement.js`). Each stands in a box of its own (`drivePart`)
+with the static map that computes what it is told, the Grip drive holding the grip rate and
+the grip motor: the box has no outputs, so a part that needs the same rate, as the memory's
+yield rule needs the grip's, reads what that rate reads and computes it (David, 2026-11-22,
+779795d2: "you're right, B.").
 
 **A load-free input port carries a black wall.** An input port is load-free when no mark
 its wire enters, however deep inside the part, can push it: each such mark has a written
