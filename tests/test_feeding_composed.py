@@ -32,8 +32,14 @@ def flat(state):
     return np.asarray(ravel_pytree(state)[0])
 
 
+def _unlidded(*a, **kw):
+    """The casing as it was before P109 (k), without its lid and speed: the one ``source_by_hand``
+    types out."""
+    return feeding_composed.source(*a, lid=False, **kw)
+
+
 def test_same_interface_readouts_and_field():
-    old, new = feeding.source_by_hand(4., 10.), feeding_composed.source(4., 10.)
+    old, new = feeding.source_by_hand(4., 10.), _unlidded(4., 10.)
     for a in ("in_dim_M", "out_dim_M", "in_dim_N", "out_dim_N"):
         assert getattr(old, a) == getattr(new, a)
     assert old.P.Q_dim == new.P.Q_dim == 4 and new.out_dim_N == 4
@@ -47,8 +53,28 @@ def test_same_interface_readouts_and_field():
         np.testing.assert_allclose(pull(new), pull(old), rtol=0, atol=1e-13)
 
 
+def test_the_lid_adds_a_store_and_two_readouts():
+    """The casing since P109 (k), ``1 -> <0|6>``: configuration (f, lid, x, z_air, z_g). With no
+    load on the lid and the speed, its field is the lidless casing's on (f, x, z_air, z_g) and
+    the lid is still; its fifth output is the lid, its sixth the air dragger's stretch times
+    kappa / beta, which is the casing's speed once the air's memory has caught up."""
+    old, new = _unlidded(4., 10.), feeding_composed.source(4., 10.)
+    assert (new.in_dim_N, new.out_dim_N, new.P.Q_dim) == (0, 6, 5)
+    p = feeding.DEFAULTS
+    keep = jnp.array([0, 2, 3, 4])
+    for _ in range(20):
+        q = jnp.asarray(RNG.normal(size=5) * np.array([3., .3, .3, .3, .05]) + np.array([5., .3, -.4, -.4, 0.]))
+        out = new.out_f(q, EMPTY)
+        np.testing.assert_allclose(out[:4], old.out_f(q[keep], EMPTY), rtol=0, atol=1e-14)
+        np.testing.assert_allclose(out[4:], [q[1], p['kappa'] * (q[2] - q[3]) / p['beta']], rtol=0, atol=1e-12)
+        loads = jnp.concatenate([LOADS, jnp.zeros(2)])
+        rate = new.omega(q, EMPTY, loads)[0]
+        assert rate[1] == 0.
+        np.testing.assert_allclose(rate[keep], old.omega(q[keep], EMPTY, LOADS)[0], rtol=0, atol=1e-11)
+
+
 def test_same_euler_step():
-    old, new = feeding.source_by_hand(-8., 2.), feeding_composed.source(-8., 2.)
+    old, new = feeding.source_by_hand(-8., 2.), _unlidded(-8., 2.)
     a = open_step(old, EMPTY, LOADS, duration=1e-3)(old.P.init)
     b = open_step(new, EMPTY, LOADS, duration=1e-3)(new.P.init)
     np.testing.assert_allclose(flat(b), flat(a), rtol=0, atol=1e-14)
@@ -59,7 +85,7 @@ def test_same_runge_kutta_run():
     inputs = (EMPTY, trivial_omega(0))
     loads = lambda _: (LOADS, EMPTY)
     ends = []
-    for build in (feeding.source_by_hand, feeding_composed.source):
+    for build in (feeding.source_by_hand, _unlidded):
         dynamics = PhiK(build(4., 10., stages=4, h=.004))
 
         @jax.jit
@@ -179,17 +205,18 @@ def _leaves(record):
 def test_the_explorer_shows_the_coupling_parts():
     """``mouth_coupling(2)``: per casing a contact and a latch, and the one wide push that takes."""
     new = feeding_composed.mouth_coupling(2)
-    values = jnp.asarray(np.concatenate([[3., 1.5, -.2, 0., .4, 1.],
-                                         [10., -.2, 1., 0., 8., -.4, 0., .2], [0., 1.]]))
+    values = jnp.asarray(np.concatenate([[3., 1.5, -.2, 0., .4, 1., 1.],
+                                         [10., -.2, 1., 0., .8, 0., 8., -.4, 0., .2, 0., .3], [0., 1.]]))
     record = explore.inspect(new, values=values)
     assert record["label"] == "spatial coupling"
     names = _leaves(record)
     for name in ("seeker, casings and pile", "contact latch 1 store", "contact latch 2 store", "attachment 1",
-                 "attachment 2", "push: taking"):
+                 "attachment 2", "push: taking", "push: spilling", "hands battery"):
         assert names.count(name) == 1, name
     assert names.count("memory") == 2                    # the two attachments' strokes
-    # Per contact: spring 2, damper 4, latch motor 2; and the wide push that takes.
-    assert sum(n.startswith("push") for n in names) == 2 * 8 + 1
+    # Per contact: spring 2, damper 4, latch motor 2; the wide push that takes; since P109 (k)
+    # per casing a lid motor 2, the wide push that spills, and the hands' cord, a spring, 2.
+    assert sum(n.startswith("push") for n in names) == 2 * 8 + 1 + 2 * 2 + 1 + 2
     explore.scene(record)
 
 
@@ -210,9 +237,9 @@ def test_the_explorer_shows_the_body_parts():
 
 
 def test_the_explorer_shows_the_casing_parts():
-    record = explore.inspect(feeding_composed.source(4., 10.), loads=LOADS)
+    record = explore.inspect(feeding_composed.source(4., 10.), loads=jnp.concatenate([LOADS, jnp.zeros(2)]))
     names = _leaves(record)
-    for name in ("food", "casing", "memory", "push: weight"):
+    for name in ("food", "lid", "casing", "memory", "push: weight"):
         assert name in names, name
     assert "opening" not in names
     assert names.count("memory") == 2            # the air's memory and the ground damper's stroke

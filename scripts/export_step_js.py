@@ -1073,7 +1073,9 @@ def _input_loads(part, q, m, n):
 
 
 # The battery's rate, split by what draws on it or charges it (``observe``'s ``pays``).
-PAYS = ("gripper", "lever", "wheels", "eye", "memory", "contact latches", "mouth", "gut wall", "in all")
+# Since P109 (k) each is what that organ's cord draws from the robot's battery.
+PAYS = ("gripper", "lever", "wheels", "eye", "memory", "hands (latches and lids)", "mouth", "basal cost", "gut wall",
+        "in all")
 # The grams the mouth moves, per unit of duration (``observe``'s ``flows``).
 FLOWS = ("taken", "into the chamber", "husks into the collector", "taken up by the gut wall",
          "collector to the pile")
@@ -1162,43 +1164,53 @@ def slot_model(count, places=None, foods=None, h=H, knobs=KNOBS):
         _, filler, seeker = robot.construction
         q_robot = q_world[:robot.P.Q_dim]
         q_filler, q_seeker = q_robot[:filler.P.Q_dim], q_robot[filler.P.Q_dim:]
-        body, mouth, collector, _ = parts = _parts_at(seeker, 4, q_seeker, empty, told)
+        # The seeker's parts (P109 (k)): the body, the mouth, the collector, the slot, the mouth's
+        # battery and cord, the satiety store and its motor, the basal cost.
+        body, mouth, collector, _, _, mouth_cord, _, _, basal = _parts_at(seeker, 9, q_seeker, empty, told)
         handed = seeker.in_f(q_seeker, filler.out_f(q_filler, empty), told)     # what the slot hands the filler
         gut = _input_loads(filler, q_filler, empty, handed)
         mouth_loads = _input_loads(*mouth)
         settle_rate = mouth[0].omega(*mouth[1:])[0]
         export = _input_loads(*collector)
         # ``feeding_composed.body``'s parts, in its order: six stores (the fourth the wheels), the
-        # memory's stores, then the gripper, the lever, the eye and one learner per memory store.
+        # memory's stores, the organs' batteries, then the gripper, the lever, the eye, one learner
+        # per memory store, and the organs' cords (``feeding_composed.ORGANS``: drive, grip, lift,
+        # eye, brain). What each organ draws on the robot's battery is its cord's load there.
         size = _left_spine(body[0].construction[1])
-        memory = (size - 9) // 2
-        roles = [None, None, None, "wheels", None, None, *[None] * memory, "gripper", "lever", "eye",
-                 *["memory"] * memory]
+        organs = 5
+        memory = (size - 9 - 2 * organs) // 2
+        roles = [None, None, None, None, None, None, *[None] * memory, *[None] * organs, None, None, None,
+                 *[None] * memory, "wheels", "gripper", "lever", "eye", "memory"]
         by_name = {}
         for role, (part, *at) in zip(roles, _parts_at(body[0], size, *body[1:]), strict=True):
             if role:
                 by_name.setdefault(role, []).append((part, at))
         battery_of = lambda name: sum((_input_loads(part, *at)[0] for part, at in by_name.get(name, [])), 0.)
         motors = [battery_of(name) for name in ("gripper", "lever", "wheels", "eye", "memory")]
-        pieces = _factors(inside.construction[2], 2 * count + 1)
+        # The coupling's pieces: per casing a contact and a latch, then taking, one lid motor per
+        # casing, spilling, the hands' battery and the hands' cord, which carries the latches' and
+        # lids' draw.
+        pieces = _factors(inside.construction[2], 3 * count + 4)
         q_pieces = q_inside[inside.construction[1].P.Q_dim:]
         sent_pieces, qa, na = sent[8:], 0, 0
-        latches = 0.
+        hands = 0.
         for k, piece in enumerate(pieces):
-            if count <= k < 2 * count:
-                latches = latches + _input_loads(piece, q_pieces[qa:qa + piece.P.Q_dim], empty,
-                                                 sent_pieces[na:na + piece.in_dim_N])[0]
+            if k == 3 * count + 3:
+                hands = _input_loads(piece, q_pieces[qa:qa + piece.P.Q_dim], empty,
+                                     sent_pieces[na:na + piece.in_dim_N])[0]
             qa, na = qa + piece.P.Q_dim, na + piece.in_dim_N
-        pays = jnp.stack([*motors, latches, mouth_loads[1], gut[1], store(rate, "battery")[0]])
+        pays = jnp.stack([*motors, hands, _input_loads(*mouth_cord)[0], _input_loads(*basal)[0], gut[1],
+                          store(rate, "battery")[0]])
         flows = jnp.stack([told[5], settle_rate[0], mouth_loads[2], -gut[0], export[0]])
 
         # What the body's wiring tells the wheels, the gripper's and lever's motors, and the eye.
-        wheels = by_name["wheels"][0][1][2]
-        grip_motor = _parts_at(by_name["gripper"][0][0], 1, *by_name["gripper"][0][1])[0][3]
-        lift_motor = _parts_at(by_name["lever"][0][0], 1, *by_name["lever"][0][1])[0][3]
-        eye = by_name["eye"][0][1][2]
-        told_motors = jnp.stack([wheels[1], grip_motor[2], lift_motor[2], eye[3]])
-        return (told, out[:6], out[6:6 + 4 * count], out[6 + 4 * count:], store(flat, "usual yield"),
+        parts_of = lambda i: _parts_at(body[0], size, *body[1:])[i]
+        at_part = 6 + memory + organs
+        wheels, gripper, lever, eye = (parts_of(3), parts_of(at_part), parts_of(at_part + 1), parts_of(at_part + 2))
+        grip_motor = _parts_at(gripper[0], 1, *gripper[1:])[0][3]
+        lift_motor = _parts_at(lever[0], 1, *lever[1:])[0][3]
+        told_motors = jnp.stack([wheels[3][1], grip_motor[2], lift_motor[2], eye[3][3]])
+        return (told, out[:7], out[7:7 + 6 * count], out[7 + 6 * count:], store(flat, "usual yield"),
                 richness, masses, store(flat, "destination"), rate, pays, flows, told_motors)
 
     def curve(flat, at):
@@ -1214,13 +1226,14 @@ def slot_model(count, places=None, foods=None, h=H, knobs=KNOBS):
                     start=(places, foods, params, zeros, zeros, np.zeros(1), np.asarray([6.])),
                     curve=(np.asarray(initial), np.zeros(1)))
     names = ("mouthPass", "mouthCost", "absorbYield", "uptake", "clearance", "chamberCap", "collectorCap",
-             "leat", "b0", "memoryCost", "x0", "xg")
+             "leat", "b0", "memoryCost", "x0", "xg", "wLocal", "battCap", "sateRoom", "hungryRoom", "lidOpen")
     metadata = dict(casings=count, places=places.tolist(), foods=foods.tolist(), h=h, knobs=list(knobs),
                     defaults=params.tolist(), initial=np.asarray(initial).tolist(), stores=layout,
                     entryStore=[i for i, s in enumerate(layout) for _ in range(s["size"])],
                     parameters={k: DEFAULTS[k] for k in names}, centres=list(CENTRES), samples=SAMPLES.tolist(),
                     observed=dict(told=list(SLOT_SEEKER_INPUTS), seeker=list(SLOT_SEEKER_OUTPUTS),
-                                  casings=["food", "height", "red", "place"], pile=["mass", "acceptance"],
+                                  casings=["food", "height", "red", "place", "lid", "speed"],
+                                  pile=["mass", "acceptance"],
                                   usual="usual yield per centre", richness="richness per centre",
                                   masses="search mass per centre", destination="destination store",
                                   rate="the rate of every entry of the state", pays=list(PAYS), flows=list(FLOWS),

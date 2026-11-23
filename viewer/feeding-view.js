@@ -106,7 +106,7 @@ function createFeedingView(container, options = {}) {
     <button id="b-what" aria-expanded="false">What is this?</button>
     <button id="b-check" aria-expanded="false">What was checked</button>
   </div>
-  <p class="explain" id="t-what" hidden>Each casing sends its redness to the scanning eye. The mouth has two halves: the spatial coupling reaches, realizing the rate at which food leaves the held casing, and the mouth settles it, keeping the pass share in its chamber and sending the husks to the collector. The robot's slot is filled by the gut wall, which takes up a share of the chamber per unit of time and pays the battery for each gram. Meal size trains the usual yield. The search curve gives less weight to neighborhoods the eye or body has just covered; its area is one. The robot pays for changing these memories, running the eye, the gripper, the lever and the wheels, and for each gram the mouth tears off, from the battery its gut wall charges.</p>
+  <p class="explain" id="t-what" hidden>Each casing sends its redness to the scanning eye. The mouth has two halves: the spatial coupling reaches, realizing the rate at which food leaves the held casing, and the mouth settles it, keeping the pass share in its chamber and sending the husks to the collector. The robot's slot is filled by the gut wall, which takes up a share of the chamber per unit of time and pays the battery for each gram. Meal size trains the usual yield. The search curve gives less weight to neighborhoods the eye or body has just covered; its area is one. The robot pays for changing these memories, running the eye, the gripper, the lever, the wheels and the lids, and for each gram the mouth tears off. Each organ runs from a small battery of its own, recharged from the robot's battery by a cord; the robot's battery is charged by the gut wall, slowly, and not beyond its cap. Hunger is the room left under that cap once the chamber's food is counted: a sated robot closes what it holds, lets go and stops seeking.</p>
   <p class="explain" id="t-check" hidden>The page steps with JavaScript written from the library's composite by scripts/export_step_js.py, one file per count of casings; tests/test_export_step_js.py checks that its step and every number shown here equal the library's to 1e-12. viewer/feeding-slot.test.js runs whole outings on the generated code: the cart finds a remembered meal at either end of the line, two seeds send it to opposite ends first, a place it has emptied loses its search weight, and every gram the mouth takes ends in the chamber, the gut wall or the husks.</p>
 </div>`;
   const elements = new Map(Array.from(container.querySelectorAll('[id]'), e => [e.id, e]));
@@ -132,7 +132,10 @@ function createFeedingView(container, options = {}) {
   const PARAM = M.parameters;
   const defaults = () => Float64Array.from(M.defaults);
   const knobIndex = name => M.knobs.indexOf(name);
-  let places = M.places.slice(), foods = M.foods.map(f => (f > 1 ? FULL : EMPTY)), cart0 = 0, batt0 = 6;
+  let places = M.places.slice(), foods = M.foods.map(f => (f > 1 ? FULL : EMPTY)), cart0 = 0, batt0 = 3;
+  // The battery starts at 3 (6 before P109 (k)): from 6 one casing sates the robot, and a sated robot at rest stays
+  // sated, against David's "let's have hunger be filled by 2 casings" (2026-11-23); from 1 the cart runs dry on its
+  // way to a casing 8 away.
   let params = defaults();
   let s, t, playing = false, speed = 2, hist, obs = null, switching = false;
   let carriedMemory = null;
@@ -161,7 +164,9 @@ function createFeedingView(container, options = {}) {
   }
   function restart() { s = startState(); t = 0; hist = []; observeNow(); record(); }
   function observeNow() { obs = M.observe(s, places, params); }
-  const totalFood = () => obs.casings.reduce((acc, v, i) => acc + (i % 4 === 0 ? v : 0), 0);
+  // Each casing's readouts, in the module's order (since P109 (k): food, height, red, place, lid, speed).
+  const casingOut = (k, name) => obs.casings[M.observed.casings.length * k + M.observed.casings.indexOf(name)];
+  const totalFood = () => places.reduce((acc, _, k) => acc + casingOut(k, 'food'), 0);
   function record() { hist.push([t, value('battery'), totalFood(), value('cart'), value('cart') + value('look'), obs.pile[0]]); }
   // Switch to the module for another count of casings, carrying every store over by its name.
   function switchTo(module, carry) {
@@ -242,10 +247,14 @@ function createFeedingView(container, options = {}) {
     // the casings: closed shells, no hinge; the mouth tears the food out
     places.forEach((p, k) => {
       const f = s[casingAt(k, 'food')], x = s[casingAt(k, 'casing')];
-      const red = obs.casings[4 * k + 2], cx = sx(p), cy = sy(x) + 12, w = 44, hh = 30;
+      const red = casingOut(k, 'red'), cx = sx(p), cy = sy(x) + 12, w = 44, hh = 30;
       const g = el('g', { class: 'grab' });
-      el('path', { d: `M ${cx - w / 2} ${cy - hh} Q ${cx - w / 2} ${cy} ${cx} ${cy} Q ${cx + w / 2} ${cy} ${cx + w / 2} ${cy - hh} Q ${cx} ${cy - hh - 8} ${cx - w / 2} ${cy - hh} Z`,
+      el('path', { d: `M ${cx - w / 2} ${cy - hh} Q ${cx - w / 2} ${cy} ${cx} ${cy} Q ${cx + w / 2} ${cy} ${cx + w / 2} ${cy - hh}`,
         fill: 'var(--panel)', stroke: red > 0.5 ? 'var(--food)' : 'var(--empty)', 'stroke-width': 3 }, g);
+      // the lid (P109 (k)): hinged at the casing's left rim, swung up by the lid store's level
+      const open = Math.max(0, Math.min(1, casingOut(k, 'lid'))), swing = -open * 1.3;
+      el('line', { x1: cx - w / 2, y1: cy - hh, x2: cx - w / 2 + w * Math.cos(swing), y2: cy - hh + w * Math.sin(swing),
+        stroke: red > 0.5 ? 'var(--food)' : 'var(--empty)', 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
       const fh = (hh - 6) * Math.min(1, f / FULL);
       el('rect', { x: cx - w / 2 + 6, y: cy - 3 - fh, width: w - 12, height: fh, rx: 3, fill: 'var(--food)', opacity: .35 + .5 * red }, g);
       el('text', { x: cx, y: cy - hh - 12, 'text-anchor': 'middle', 'font-size': 12, fill: red > 0.5 ? 'var(--food)' : 'var(--muted)', 'font-family': 'var(--data)' }, g).textContent = fw(f, 1, 4);
@@ -287,17 +296,25 @@ function createFeedingView(container, options = {}) {
     el('line', { x1: ex, y1: eyY, x2: lx, y2: GY - 6, stroke: 'var(--eye)', 'stroke-width': 1.5 + 2.5 * seenUnit, 'stroke-dasharray': seen > 0.5 ? '' : '5 4', opacity: .9 });
     el('circle', { cx: ex, cy: eyY, r: 7, fill: 'var(--panel)', stroke: 'var(--eye)', 'stroke-width': 2.5 });
     el('circle', { cx: lx, cy: GY - 6, r: 5 + 6 * seenUnit, fill: seen > 0.05 ? 'var(--food)' : 'var(--eye)', opacity: .35 + .5 * seenUnit });
-    // battery gauge, top left
-    const GW = 160, frac = Math.min(1, value('battery') / 20);
+    // battery gauge, top left, full at the battery's cap (P109 (k)); beside it the chamber's
+    // pending energy, which counts toward the cap in hunger, and whether the robot is hungry
+    const GW = 160, cap = PARAM.battCap, frac = Math.min(1, value('battery') / cap);
+    const pending = Math.min(1 - frac, PARAM.absorbYield * value('mouth ready store') / cap);
     el('rect', { x: X0, y: 52, width: GW, height: 14, rx: 3, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 1.5 });
     el('rect', { x: X0 + 2, y: 54, width: Math.max(0, (GW - 4) * frac), height: 10, rx: 2, fill: 'var(--batt)', opacity: .85 });
-    el('text', { x: X0 + GW + 10, y: 64, 'font-size': 13, fill: 'var(--batt)', 'font-family': 'var(--data)' }).textContent = 'battery ' + fw(value('battery'), 2, 5);
+    el('rect', { x: X0 + 2 + Math.max(0, (GW - 4) * frac), y: 54, width: Math.max(0, (GW - 4) * pending), height: 10, rx: 2,
+      fill: 'var(--food)', opacity: .45 });
+    el('text', { x: X0 + GW + 10, y: 64, 'font-size': 13, fill: 'var(--batt)', 'font-family': 'var(--data)' }).textContent =
+      'battery ' + fw(value('battery'), 2, 5) + ' of ' + fw(cap, 1, 4);
+    const hunger = obs.seeker[M.observed.seeker.indexOf('hunger')];
+    el('text', { x: X0, y: 84, 'font-size': 13, fill: hunger > 0.5 ? 'var(--food)' : 'var(--muted)', 'font-family': 'var(--data)' })
+      .textContent = (hunger > 0.5 ? 'hungry' : 'sated') + ' (hunger ' + fw(hunger, 2, 4) + ')';
     el('text', { x: X1, y: 64, 'text-anchor': 'end', 'font-size': 13, fill: 'var(--muted)', 'font-family': 'var(--data)' }).textContent = 'time ' + fw(t, 1, 5);
   }
   let drag = null, moved = false;
   function dragStart(e, what) {
     if (playing || t > 0) {
-      if (what !== 'cart' && obs.casings[4 * what + 2] < 0.5) { s[casingAt(what, 'food')] = FULL; observeNow(); draw(); }
+      if (what !== 'cart' && casingOut(what, 'red') < 0.5) { s[casingAt(what, 'food')] = FULL; observeNow(); draw(); }
       return;
     }
     drag = what; moved = false; scene.setPointerCapture(e.pointerId);
@@ -358,7 +375,7 @@ function createFeedingView(container, options = {}) {
     const rate = label => obs.rate[at(label)];
     const [seen, , , , , taken] = obs.told;
     const [torque, gripRate, liftRate, free] = obs.told_motors;
-    const [gripper, lever, wheels, eye, memory, latches, mouth, gut, total] = obs.pays;
+    const [gripper, lever, wheels, eye, memory, latches, mouth, basal, gut, total] = obs.pays;
     const [, intoChamber, husks, uptake, toPile] = obs.flows;
     let k = -1, most = 0;
     places.forEach((_, i) => { const d = -obs.rate[casingAt(i, 'food')]; if (d > most) { most = d; k = i; } });
@@ -368,7 +385,8 @@ function createFeedingView(container, options = {}) {
       `<p>The <span class="l">gripper</span> is told the rate <span class="out">${fw(gripRate, 2, 6, true)}</span> (grip <span class="out">${fw(value('engagement'), 2, 5, true)}</span>), the <span class="l">lever</span> the rate <span class="out">${fw(liftRate, 2, 6, true)}</span> (tip at height <span class="out">${fw(value('tip'), 2, 5, true)}</span>).` +
       (k >= 0 && taken > 1e-4 ? ` The mouth tears food off casing ${k + 1} at <span class="out">${fw(taken, 2, 5)}</span> grams per unit of time.</p>` : ` The mouth takes nothing.</p>`) +
       `<p>Of each gram taken, <span class="out">${PARAM.mouthPass.toFixed(2)}</span> goes into the <span class="f">chamber</span> (<span class="out">${fw(intoChamber, 2, 5)}</span>) and the rest, husks, into the <span class="a">collector</span> (<span class="out">${fw(husks, 2, 5)}</span>), which empties onto the pile at <span class="out">${fw(toPile, 2, 5)}</span>. The <span class="a">gut wall</span> takes up <span class="out">${fw(uptake, 2, 5)}</span> from the chamber, which holds <span class="out">${fw(value('mouth ready store'), 2, 5)}</span>.</p>` +
-      `<p>The <span class="b">battery</span> moves by what the gut wall gives, <span class="out">${fw(gut, 3, 6, true)}</span> (<span class="out">${PARAM.absorbYield.toFixed(2)}</span> per gram taken up), what the mouth pays, <span class="out">${fw(mouth, 3, 6, true)}</span> (<span class="out">${PARAM.mouthCost.toFixed(2)}</span> per gram torn off), and what the motors pay: gripper <span class="out">${fw(gripper, 3, 6, true)}</span>, lever <span class="out">${fw(lever, 3, 6, true)}</span>, wheels <span class="out">${fw(wheels, 3, 6, true)}</span>, eye <span class="out">${fw(eye, 3, 6, true)}</span>, memory <span class="out">${fw(memory, 3, 6, true)}</span>, contact latches <span class="out">${fw(latches, 3, 6, true)}</span>; in all <span class="out">${fw(total, 3, 6, true)}</span>.</p>`;
+      `<p>The <span class="b">battery</span> moves by what the gut wall gives, <span class="out">${fw(gut, 3, 6, true)}</span> (<span class="out">${PARAM.absorbYield.toFixed(2)}</span> per gram taken up, less as the battery nears its cap, <span class="out">${PARAM.battCap.toFixed(1)}</span>), and by what each organ's cord draws to recharge that organ's own battery, from which its motors run: gripper <span class="out">${fw(gripper, 3, 6, true)}</span>, lever <span class="out">${fw(lever, 3, 6, true)}</span>, wheels <span class="out">${fw(wheels, 3, 6, true)}</span>, eye <span class="out">${fw(eye, 3, 6, true)}</span>, memory <span class="out">${fw(memory, 3, 6, true)}</span>, hands (contact latches and lids) <span class="out">${fw(latches, 3, 6, true)}</span>, mouth <span class="out">${fw(mouth, 3, 6, true)}</span> (it pays <span class="out">${PARAM.mouthCost.toFixed(2)}</span> per gram torn off), and the basal cost of keeping the body alive <span class="out">${fw(basal, 3, 6, true)}</span>; in all <span class="out">${fw(total, 3, 6, true)}</span>.</p>` +
+      `<p>The robot is <span class="out">${obs.seeker[M.observed.seeker.indexOf('hunger')] > 0.5 ? 'hungry' : 'sated'}</span>: it becomes sated when the room left under the cap, once the chamber's food is counted, falls below <span class="out">${PARAM.sateRoom.toFixed(1)}</span>, and hungry again only when that room is above <span class="out">${PARAM.hungryRoom.toFixed(1)}</span>. A sated robot does not scan, drive toward what it sees or grip; it closes the lid of what it holds and then lets go. A casing's lid opens only at the mouth while the robot is hungry, and an open casing that moves spills food onto the pile.</p>`;
   }
 
   // ---------- the record over time (the axis compresses; the page never grows) ----------

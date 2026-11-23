@@ -28,8 +28,11 @@ from arrangements import feeding_parts as fp
 from arrangements import feeding_recursive as fr
 from arrangements.interpretation import trivial_omega
 from arrangements.pcK import PhiK
+from arrangements.feeding import DEFAULTS
 from arrangements.wiring import compose_seq
+from tests.feeding_layout import configuration_index, flat_index
 
+ORGAN_BATTERIES = [f"{name} battery" for name in (*fc.ORGANS, "mouth", "hands")]
 jax.config.update("jax_enable_x64", True)
 EMPTY = jnp.zeros(0)
 RNG = np.random.default_rng(5)
@@ -67,12 +70,15 @@ def test_the_robot_style_s_loads_have_the_feeder_form():
     feeder = compose_seq(_absorber(), fc.robot_style())
     assert (feeder.in_dim_M, feeder.out_dim_M, feeder.in_dim_N, feeder.out_dim_N) == (0, 0, 4, 0)
     field = jax.jit(lambda q, h: feeder.omega(q, EMPTY, h))
-    q0 = np.asarray(fc.robot_style().P.position(fc.robot_style().P.init))
+    robot = fc.robot_style()
+    at = configuration_index(robot)
+    q0 = np.asarray(robot.P.position(robot.P.init))
+    masses = [at("mouth ready store"), at("husk collector store"), at("food")]
     took = 0.
     for _ in range(30):
         q = q0 + RNG.normal(size=q0.shape) * .3
-        q[0] = RNG.uniform(0., 4.)                        # the robot's own battery
-        q[9:12] = RNG.uniform(0., 3., size=3)             # its chamber, collector and casing's food: masses
+        q[at("battery")] = RNG.uniform(0., 4.)            # the robot's own battery
+        q[masses] = RNG.uniform(0., 3., size=3)           # its chamber, collector and casing's food: masses
         h = jnp.asarray(RNG.uniform(0., 3., size=4) * np.array([1., 1., 1., 1 / 3]))
         dh = np.asarray(field(jnp.asarray(q), h)[2])
         assert dh[0] <= 0. and dh[2] >= 0. and dh[3] == 0.
@@ -90,7 +96,7 @@ def test_it_fills_the_outer_robot_s_slot():
     end = jax.jit(lambda s: jax.lax.fori_loop(0, 2500, tick, s))(world.P.init)
     flat = np.asarray(ravel_pytree(end)[0])
     assert np.all(np.isfinite(flat))
-    pile = float(flat[-3])                                # pile, then the coupling's stroke and latch
+    pile = float(flat[flat_index(world)("pile on the ground store")])
     assert pile > 1.                                      # husks from both mouths reached the ground
 
 
@@ -107,21 +113,29 @@ def test_styles_compose_in_either_order():
 
 
 def _net_per_gram(feeder, seed, steps):
-    """Net energy delivered per gram taken: the reserve's gain plus what the feeder's own
-    batteries hold (a robot's battery counts at 1 per unit, as the reserve does)."""
-    out = _run(_meal(feeder, seed=seed, **STEP), steps, steps)[-1]
+    """Net energy delivered per gram taken: the reserve's gain plus the charge the feeder's own
+    batteries hold (a robot's battery counts at 1 per unit, as the reserve does; since P109 (k)
+    each organ battery of a robot, capacity ``cLocal``, at ``cLocal`` per unit)."""
+    meal = _meal(feeder, seed=seed, **STEP)
+    out = _run(meal, steps, steps)[-1]
     batteries = 0.
     if feeder.label.endswith("robot style") or "robot" in feeder.label:
-        batteries = out[3]                                # the robot's own battery comes first among its stores
+        at = flat_index(meal)
+        batteries = out[at("battery")] + DEFAULTS['cLocal'] * sum(out[at(name)] for name in ORGAN_BATTERIES)
     return (out[1] - 3. + batteries) / (seed - out[0])
 
 
 def test_the_robot_style_s_energy_per_gram_is_not_constant():
     """The same meal of 5 grams, read at 10 and at 40 units of duration: the hopper delivers the
     same per gram both times (its stores drained); the robot delivers less at 40 than at 10,
-    since its motors kept drawing on the reserve while nothing was left to eat."""
-    hopper = compose_seq(_absorber(), _hopper_layer(**STEP))
-    robot = compose_seq(_absorber(), fc.robot_style(**STEP))
+    since its motors kept drawing on the reserve while nothing was left to eat.
+
+    The absorber inside takes up at 2, its rate before P109 (k): at the slow default 0.15 the
+    hopper's stores are not drained at 10 units (it reads 0.37 there, 0.48 at 40), and that
+    would test the gut wall's speed, not the yield pair."""
+    fast = fc.absorber_filler({'uptake': 2.})
+    hopper = compose_seq(fast, _hopper_layer(**STEP))
+    robot = compose_seq(fast, fc.robot_style(**STEP))
     counts = {}
     for name, feeder in (('hopper', hopper), ('robot', robot)):
         counts[name] = [_net_per_gram(feeder, 5., steps) for steps in (2500, 10000)]

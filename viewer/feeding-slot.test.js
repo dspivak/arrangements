@@ -26,10 +26,11 @@ function stores(M) {
 }
 const params = (M, changes = {}) => Float64Array.from(M.knobs.map((k, i) => changes[k] ?? M.defaults[i]));
 const zeros = M => new Float64Array(M.centres.length);
-function start(M, places, foods, {cart = 0, memory = null, seed} = {}) {
+function start(M, places, foods, {cart = 0, memory = null, seed, battery = 3} = {}) {
   const p = params(M, seed === undefined ? {} : {searchSeed: seed});
   const usual = memory ? memory : zeros(M);
-  return {M, places, p, s: Float64Array.from(M.start(places, foods, p, usual, zeros(M), [cart], [6]))};
+  // The page's starting battery, 3 since P109 (k) (feeding-view.js): from 6 one casing sates the robot.
+  return {M, places, p, s: Float64Array.from(M.start(places, foods, p, usual, zeros(M), [cart], [battery]))};
 }
 // Run for `time` units; `sample(t, run)` is called every unit of time.
 function outing(run, time, sample) {
@@ -82,10 +83,11 @@ for (const seed of [37, 127]) {
   assert.ok(committed && inspected && food(run, 0) < .1 && food(run, 1) < .1, `seed ${seed} feeds at both ends`);
 }
 
-// Distant recall: trained at one end, started at the other, the cart heads back and eats.
+// Distant recall: trained at one end, started at the other, the cart heads back and eats. It crosses 16 units,
+// which a battery of 3 does not pay for (since P109 (k) the cart arrives dry), so it starts at 6.
 for (const x of [-8, 8]) {
   const trained = outing(start(M1, [x], [10], {cart: x}), 14);
-  const run = start(M1, [x], [10], {cart: -x, memory: usual(trained)});
+  const run = start(M1, [x], [10], {cart: -x, memory: usual(trained), battery: 6});
   assert.ok(Math.abs(destination(run) - x) < 1, `recall of ${x} from ${-x}`);
   assert.ok(food(outing(run, 40), 0) < .1, `the cart reaches ${x} and eats`);
 }
@@ -95,11 +97,14 @@ const blank = outing(start(M2, places, foods), 60);
 assert.ok(food(blank, 0) < .1 && food(blank, 1) < .1, 'a blank memory finds both casings');
 
 // The page's start: at 2 the eye holds +4 and the wheels push toward it; +4 has no search weight.
-// The husks are (1 - pass share) of every gram taken, all along.
+// The husks are (1 - pass share) of every gram taken, all along. Since P109 (k) an open casing that moves spills
+// food onto the pile too, so of the food gone, T grams were taken and S spilled, and the pile and collector hold
+// (1 - p) T + S: the spilled grams are S = (husks - (1 - p) gone) / p, never negative and small here. (With
+// spilling off the identity is exact: tests/test_feeding_mouth.py's meal.)
 const local = start(M3, M3.places, M3.foods);
 const before = M3.places.map((_, k) => food(local, k));
 const husks = r => r.s[stores(M3).at('husk collector store')] + r.s[stores(M3).at('pile on the ground store')];
-let husksChecked = 0;
+let husksChecked = 0, spilt = 0;
 outing(local, 35, (t, r) => {
   const o = M3.observe(r.s, r.places, r.p);
   if (t === 2) {
@@ -107,17 +112,20 @@ outing(local, 35, (t, r) => {
     const {density} = M3.curve(r.s, [4]);
     assert.ok(density[M3.samples.length] < .001, 'no search weight at +4 while it is in view');
   }
-  const taken = before.reduce((acc, f, k) => acc + f - food(r, k), 0);
-  assert.ok(Math.abs(husks(r) - (1 - M3.parameters.mouthPass) * taken) < 1e-9, 'husks are the rest of each gram');
-  husksChecked += taken > 1;
+  const gone = before.reduce((acc, f, k) => acc + f - food(r, k), 0), p = M3.parameters.mouthPass;
+  const S = (husks(r) - (1 - p) * gone) / p;
+  assert.ok(S > -1e-9 && S <= gone + 1e-9, 'husks are the rest of each gram taken, and the pile holds what spilled');
+  spilt = Math.max(spilt, S);
+  husksChecked += gone > 1;
 });
 assert.ok(food(local, 0) < .1 && food(local, 1) < .1 && husksChecked > 10, 'the cart eats +4 and +8');
+assert.ok(spilt < 1.5, `spilled ${spilt.toFixed(3)} g of 20`);
 
 // A casing added mid-run, empty and far from the cart, changes nothing: the state carried into the
 // three-casing module steps as the two-casing one does.
 const two = outing(start(M2, [4, 8], [10, 10]), 5);
 const three = {M: M3, places: [4, 8, -8.5], p: two.p,
-               s: Float64Array.from(M3.start([4, 8, -8.5], [10, 10, .05], two.p, zeros(M3), zeros(M3), [0], [6]))};
+               s: Float64Array.from(M3.start([4, 8, -8.5], [10, 10, .05], two.p, zeros(M3), zeros(M3), [0], [3]))};
 feedingCarry(M2, two.s, M3, three.s);
 outing(two, 2); outing(three, 2);
 const keys = require('./feeding-view.js').feedingStoreKeys;

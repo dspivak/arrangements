@@ -44,10 +44,37 @@ DEFAULTS = dict(m=1., g=2., beta=.2, kappa=40., x0=0., R=.5, kappa0=100., b0=1.,
                 # gram, chamber and collector capacities, the collector's clearance, and the
                 # absorber's energy per gram and uptake rate.
                 mouthPass=.8, mouthCost=.03, chamberCap=8., collectorCap=4., clearance=1.,
-                absorbYield=1., uptake=2.,
+                # uptake: the gut wall's rate, slow, so digestion goes on while the cart moves (book
+                # P109 (k); David, 2026-11-23: "it can take a good amount of time"); 2 before (k).
+                absorbYield=1., uptake=.15,
                 # A robot-style seeker inside another's slot (book P109 (j)): the rate at which it
                 # lays out the mass it is handed among its casings, and its battery's cord to the reserve.
-                layRate=1., cord=2.)
+                layRate=1., cord=2.,
+                # Book P109 (k), David, 2026-11-23, b679b569: "local batteries per part: i can use it
+                # however i want and it gets recharged at a rate set by the larger arrangement". Each
+                # organ has a battery of capacity cLocal, corded to the robot's by a spring of
+                # conductance cordOrgan; its motors are awake from wLocal of their own battery up.
+                # The robot's battery stops charging at battCap (the gut wall slows over the last
+                # capWidth); hunger is theta((battCap - b - absorbYield z) / hungerWidth), z the
+                # chamber. Each casing has a lid of capacity cLid, driven by the hands' lid motor at
+                # lidRate, open for eating from lidOpen up; an open lid spills at spillRate times
+                # the casing's speed. The numbers are b679b569's, proposed: cLocal small, since an
+                # organ's battery sits at the robot's level and so holds cLocal times it; battCap 12.5,
+                # since from battery 1 two casings bring the battery plus the chamber to about 11.8
+                # (c5f9ecc9's 16 left out what the motors spend while the gut works,
+                # .scratch/p109k-b679b569/small.py).
+                # Satiety (b679b569, proposed, from the small example: without a memory, hunger
+                # chatters, letting go and taking back the one casing): a store in the mouth, driven
+                # at satRate toward 1 once the room cap - b - absorbYield z is below sateRoom and
+                # toward 0 once it is above hungryRoom, each over hungerWidth; hunger is 1 - satiety.
+                cLocal=.02, wLocal=.1, cordOrgan=1., battCap=12.5, capWidth=1., hungerWidth=.5,
+                sateRoom=1., hungryRoom=3.5, satRate=4.,
+                cLid=.02, lidRate=4., lidOpen=.5, spillRate=1., vSpill=.5,
+                # The basal cost, a constant drain on the robot's battery while it holds some (David,
+                # 2026-11-23, 222a18e7: "yes to constant drain"), so a sated robot grows hungry at rest.
+                # 0.02 is 222a18e7's choice: at 0.05 the patrol cart of the note's episode and one seed of the
+                # page's two-site trip ran dry between meals; 0.02 is the largest of the two tried that did not.
+                basal=.02)
 
 def theta(t):
     # Safe branches prevent inactive 1/0 branches poisoning derivatives.

@@ -102,7 +102,10 @@ def test_every_written_formula_is_the_codes(feeding):
 def test_a_spring_is_drawn_as_one_spring_between_its_ends(feeding):
     arr, d = feeding
     springs = [n for n in d.nodes if n.get("glyph") == "spring"]
-    assert len(springs) == 22    # per casing 4, per attachment 3, the wheel's dragger
+    # per casing 4, per attachment 3, the wheel's dragger; since P109 (k) seven cords, each a
+    # spring from the robot's battery to an organ's (drive, grip, lift, eye, brain, mouth, hands)
+    assert len(springs) == 22 + 7
+    assert sum(n["label"].endswith("cord") for n in springs) == 7
     attachment = next(n for n in springs if n["label"] == "Attachment 1 spring")
     # its stretch is the casing's height minus the tip: the two wires, and the gate on its third terminal
     assert set(attachment["form"]["letters"].values()) == {"x", "y", "g"}
@@ -118,9 +121,17 @@ def test_the_boxes_are_the_ones_the_code_names(feeding):
     inside = {n["id"] for n in d.nodes if n["parent"] == "seeker-with-a-slot"}
     assert {"body-and-motors", "mouth", "husk-collector", "gut-wall"} <= inside
     motors = [n for n in d.nodes if n.get("glyph") == "motor"]
-    assert len(motors) == 3 + 1 + 2 + 2 + 9      # latches, drive, grip and lift, the eye's two, the learners
-    for m in motors:
-        assert m["turns"] and m["powered"] == "Battery"
+    # latches, drive, grip and lift, the eye's two, the learners; since P109 (k) a lid motor per
+    # casing and the satiety motor
+    assert len(motors) == 3 + 1 + 2 + 2 + 9 + 3 + 1
+    # Each motor is drawn powered by its organ's battery (P109 (k), David's local batteries):
+    # the hands' runs the latches and the lid motor, the brain's the nine learners, the mouth's
+    # the satiety motor.
+    from collections import Counter
+    assert all(m["turns"] for m in motors)
+    assert Counter(m["powered"] for m in motors) == {"Hands battery": 6, "Drive battery": 1, "Grip battery": 1,
+                                                    "Lift battery": 1, "Eye battery": 2, "Brain battery": 9,
+                                                    "Mouth battery": 1}
 
 
 def test_a_robot_in_the_slot_is_drawn_inside_the_seeker():

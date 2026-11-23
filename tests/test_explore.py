@@ -115,9 +115,10 @@ def test_feeding_one_and_three_casings_use_same_composition_api():
     for places,foods in [((0.,),(3.,)),((0.,1.,2.),(3.,4.,5.))]:
         arr=feeding(places,foods)
         _,world,coupling=arr.construction
-        # the coupling is sent the seeker's six outputs, each casing's four and the pile's two
+        # the coupling is sent the seeker's seven outputs, each casing's six and the pile's two
+        # (since P109 (k): the seeker's hunger, each casing's lid and speed)
         assert coupling.label=='spatial coupling'
-        assert world.out_dim_N==coupling.out_dim_M==6+4*len(foods)+2
+        assert world.out_dim_N==coupling.out_dim_M==7+6*len(foods)+2
         assert world.in_dim_N==coupling.in_dim_M==8
 
 
@@ -145,7 +146,8 @@ def _stores_by_key(arr):
 def test_a_single_seeker_releases_its_first_casing_before_feeding_from_the_next():
     """One casing held and eaten from; a second set down at the same place while the latch holds
     the first, its state carried over store by store as the page carries it: the second is not
-    touched until the first is released, then both are eaten. (Until 2026-11-23 this ran on the
+    touched until the first is released, then the first is eaten and the second eaten from
+    until the robot is sated, when it closes the second and lets go. (Until 2026-11-23 this ran on the
     hinged model with ``feeding.add_casing``.)"""
     from jax.flatten_util import ravel_pytree
     from arrangements.pcK import PhiK
@@ -175,8 +177,16 @@ def test_a_single_seeker_releases_its_first_casing_before_feeding_from_the_next(
     during = advance(two, carried, 500)
     assert during[at(keys_two, food(0))] < held[at(keys_one, food(0))]
     assert during[at(keys_two, food(1))] == 10. and during[at(keys_two, latch(2))] == 0.
-    after = advance(two, during, 3000)
-    assert after[at(keys_two, food(0))] < .1 and after[at(keys_two, food(1))] < .1
+    # Since P109 (k) the robot is sated before the second casing is empty (at about 8 units the
+    # battery and the chamber leave less than sateRoom under the cap), so it closes that casing's
+    # lid and lets go of it with about 2.7 g left (David, 2026-11-23: "let go and leave ... close
+    # the casing").
+    after = advance(two, during, 4000)
+    lid = lambda k: ('casing', k, 'lid', 0)
+    satiety = next(key for key in keys_two if key[-2] == 'satiety')
+    assert after[at(keys_two, food(0))] < .1 and 1. < after[at(keys_two, food(1))] < 5.
+    assert after[at(keys_two, satiety)] > .9
+    assert after[at(keys_two, lid(1))] < .05 and after[at(keys_two, latch(2))] < .05
 
 
 def test_separate_coordinate_maps_keep_inactive_inputs_and_individual_loads():

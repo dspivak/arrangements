@@ -23,9 +23,10 @@ test('the two directions separate along the route and meet at each port and fork
   }
 });
 // Three checks fail on the composite scene, as layout findings for explorer-layout.js, not as regressions: marked
-// todo so they run and report (2026-11-23: the seeker level has 4.8% of its wire length on another wire; at the
+// todo so they run and report (2026-11-23: the seeker level has 4.8% of its wire length on another wire, 17.0% since
+// P109 (k) added the organs' batteries and cords; at the
 // spatial coupling a casing's height crosses a latch's map; a wire leaving the nested group crosses the time-away rule).
-test('two wires meet only where they cross, at a point, never along a stretch',{todo:'4.8% at the seeker level of the composite'},()=>{
+test('two wires meet only where they cross, at a point, never along a stretch',{todo:'17.0% at the seeker level of the composite'},()=>{
   // David, 2026-11-21: the Mouth's incoming wires were "blocked by other wires … crossings should raise codimension".
   // A wire runs on top of another where it lies within 10 px of it, nearly parallel, away from its two ends; before
   // the separating pass that was 61% of the receiver's wire length and 29% of the mouth's.
@@ -112,9 +113,11 @@ test('moving a part reroutes every crossing wire, preserves port order, and leav
   const m=new E.Model(scene()),p=m.project(),before=JSON.stringify(p),initial=G.layout(p);
   const original=initial.positions.get('casing-4').outputs.map(p=>p.key);
   const start=initial.positions.get('casing-4'),body=initial.positions.get('seeker-with-a-slot');
+  // The seeker moves 40 right: since P109 (k) it is drawn larger, and 140 (the move before) leaves too little space
+  // beside the spatial coupling, which `place` rightly refuses (222a18e7).
   for(const placements of [
     {'casing-4':{x:start.x+32,y:start.y}},
-    {'casing-4':{x:body.x,y:initial.height+120},'seeker-with-a-slot':{x:body.x+140,y:body.y}}
+    {'casing-4':{x:body.x,y:initial.height+120},'seeker-with-a-slot':{x:body.x+40,y:body.y}}
   ]){
     const moved=check(p,{placements});
     assert.deepEqual(moved.positions.get('casing-4').outputs.map(p=>p.key),original);
