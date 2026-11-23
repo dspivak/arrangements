@@ -46,6 +46,7 @@ Everything here is one closed arrangement built by nesting and stepped by the dy
 """
 
 import itertools
+from dataclasses import replace
 
 import jax
 import jax.numpy as jnp
@@ -117,7 +118,10 @@ def group(q_A, q_B, w=W, leak=0.0, label="pair"):
         omega=coupler_omega,
         label=f"{label}_wiring",
     )
-    return compose_seq(tensor_arrangements([part(q_A, f"A_{label}"), part(q_B, f"B_{label}")]), coupler)
+    # named ``label``, so the pair is drawn as one box holding A, B and its wiring (book task
+    # well-factored-2ac0e890), not looked through into the parent
+    return replace(compose_seq(tensor_arrangements([part(q_A, f"A_{label}"), part(q_B, f"B_{label}")]), coupler),
+                   label=label)
 
 
 def parent(kappa=KAPPA):

@@ -11,7 +11,15 @@
  *     constants: {c_see: 0.002},                           // optional numbers, by letter
  *     where:     [['live', 'θ(b/b_0)']],                   // optional abbreviations, each from those before it
  *     terms:     [{c: 'c_see*look_r', h: 'r'}],            // the form is  sum c d(h)
+ *     words:     {c_see: 'what looking costs'},            // what each constant and abbreviation is
+ *     lists:     {u: 19},                                  // the letters whose wire carries a list, and its length
  *   }
+ *
+ * Everything in a written formula is explained (David, 2026-11-23: "Everything in the formula needs to be
+ * defined"): a name is a wire entering the mark, whose letter its terminal carries, or it is in `glossary`,
+ * the side panel's lines, opened by a click on the mark or the formula: its number or formula, and its words. A function beyond the standard
+ * ones has its words in `functionWords`, added beside the function. `unexplained` lists what is left, which
+ * the page's test holds empty. A letter that is a list is written with the index j, and the sum over j written.
  *
  * c, h and the abbreviations are expressions in the arithmetic Python and JavaScript share
  * (+ - * / **, parentheses, numbers, names, calls), read with Python's precedences (-x**2 is
@@ -30,10 +38,15 @@
   // A wire may carry a list of numbers (a store of several). Arithmetic then goes entry by entry, a number
   // beside a list standing for each entry, a one-argument function is applied to each entry, and Σ adds a
   // list up. A term whose c and h are lists is the sum over entries of c_j d(h_j), a push of that width.
-  const each=f=>(a,b)=>Array.isArray(a)?a.map((x,i)=>f(x,Array.isArray(b)?b[i]:b)):Array.isArray(b)?b.map(y=>f(a,y)):f(a,b);
+  const each=f=>(a,b)=>{
+    if(Array.isArray(a)&&Array.isArray(b)&&a.length!==b.length)throw Error(`A list of ${a.length} beside a list of ${b.length}`);
+    return Array.isArray(a)?a.map((x,i)=>f(x,Array.isArray(b)?b[i]:b)):Array.isArray(b)?b.map(y=>f(a,y)):f(a,b);};
   const plus=each((x,y)=>x+y),minus=each((x,y)=>x-y),times=each((x,y)=>x*y),over=each((x,y)=>x/y),raise=each((x,y)=>x**y);
   const total=x=>Array.isArray(x)?x.reduce((a,b)=>a+b,0):x;
   functions.Σ=total;functions.Σ.whole=true;
+  // A function's words: {head: what stands before the colon, when it is not the bare name; words}.
+  const functionWords={};
+  const standard=new Set(['exp','log','sqrt','abs','sin','cos','tanh','min','max']);
   const cache=new Map();
   function parse(text){
     if(cache.has(text))return cache.get(text);
@@ -173,12 +186,19 @@
     if((t.op==='*'||t.op==='/')){const a=hoist(t.a);if(a.op==='neg')return {op:'neg',a:{op:t.op,a:a.a,b:t.b}};return {...t,a};}
     return t;
   };
+  let listed={};       // while a form is written: its letters that are lists
   function name(n){
-    const cut=n.indexOf('_'),base=cut>0?n.slice(0,cut):n,sub=cut>0?n.slice(cut+1):'';
+    const cut=n.indexOf('_'),base=cut>0?n.slice(0,cut):n,sub=(cut>0?n.slice(cut+1):'')+(n in listed?(cut>0?',':'')+'j':'');
     const runs=[{text:base,italic:[...base].length===1}];
     if(sub)runs.push({text:sub,shift:-1});
     return runs;
   }
+  const names=t=>t.op==='name'?[t.n]:t.op==='call'?t.args.flatMap(names):t.op==='num'?[]:[t.a,...(t.b?[t.b]:[])].flatMap(names);
+  const calls=t=>t.op==='call'?[t.n,...t.args.flatMap(calls)]:t.op==='name'||t.op==='num'?[]:[t.a,...(t.b?[t.b]:[])].flatMap(calls);
+  // Is the value a list, so that the index j in it is still free?
+  const free=t=>t.op==='name'?t.n in listed:t.op==='call'?!functions[t.n]?.whole&&t.args.some(free):t.op==='num'?false:[t.a,...(t.b?[t.b]:[])].some(free);
+  const SUM=[{text:'Σ'},{text:'j',shift:-1}];
+  const within=(form,f)=>{const before=listed;listed=form.lists||{};try{return f();}finally{listed=before;}};
   const number=v=>v===.5?'½':String(+v.toPrecision(6));
   function runs(t,parent=0,right=false){
     t=hoist(t);
@@ -187,7 +207,7 @@
     switch(t.op){
       case 'num':return [{text:number(t.v)}];
       case 'name':return name(t.n);
-      case 'call':return [...name(t.n),{text:'('},...t.args.flatMap((a,k)=>[...(k?[{text:', '}]:[]),...runs(a)]),{text:')'}];
+      case 'call':return [...(t.n==='Σ'?SUM:name(t.n)),{text:'('},...t.args.flatMap((a,k)=>[...(k?[{text:', '}]:[]),...runs(a)]),{text:')'}];
       // A sum under a minus sign is wrapped, a product is not: −(a + b), −a b.
       case 'neg':return wrap([{text:'−'},...runs(t.a,2)],parent>1||right);
       case '+':case '-':return wrap([...runs(t.a,1),{text:t.op==='+'?' + ':' − '},...runs(t.b,1,true)],parent>1||(parent===1&&right));
@@ -213,16 +233,60 @@
     let c=hoist(parse(entry.c)),negative=false;
     if(c.op==='neg'){negative=true;c=c.a;}else if(c.op==='num'&&c.v<0){negative=true;c={op:'num',v:-c.v};}
     const h=parse(entry.h),d=h.op==='name'?[{text:'d'},...name(h.n)]:[{text:'d('},...runs(h),{text:')'}];
-    const one=c.op==='num'&&c.v===1;
-    return {negative,runs:one?d:[...runs(c,2),{text:' '},...d]};
+    const one=c.op==='num'&&c.v===1,sum=free(c)||free(h)?[...SUM,{text:'\u2009'}]:[];
+    return {negative,runs:one?[...sum,...d]:[...sum,...runs(c,2),{text:' '},...d]};
   }
   // The whole form on one line: its terms joined by their signs; the zero form is 0.
   function written(form){
     if(!form.terms?.length)return [{text:'0'}];
-    return form.terms.flatMap((entry,k)=>{const t=term(entry);return [{text:k?(t.negative?' − ':' + '):(t.negative?'−':'')},...t.runs];});
+    return within(form,()=>form.terms.flatMap((entry,k)=>{const t=term(entry);return [{text:k?(t.negative?' − ':' + '):(t.negative?'−':'')},...t.runs];}));
   }
   // Each abbreviation as name = formula, in order.
-  const definitions=form=>(form.where||[]).map(([n,text])=>[...name(n),{text:' = '},...runs(parse(text))]);
-  const api={functions,parse,value,environment,loads,check,lawCheck,pullbackCheck,runs,term,written,definitions,plain};
+  const definitions=form=>within(form,()=>(form.where||[]).map(([n,text])=>[...name(n),{text:' = '},...runs(parse(text))]));
+  // What a form or a law uses, in the order a reader meets it: its formulas' names, each abbreviation's own
+  // names after it, and the functions called. Abbreviations are followed; nothing unused is listed.
+  function uses(form){
+    const where=new Map(form.where||[]),seen=[],functionsSeen=[];
+    const visit=tree=>{
+      for(const f of calls(tree))if(!functionsSeen.includes(f))functionsSeen.push(f);
+      for(const n of names(tree))if(!seen.includes(n)){seen.push(n);if(where.has(n))visit(parse(where.get(n)));}
+    };
+    if(form.terms)for(const {c,h} of form.terms){visit(parse(c));visit(parse(h));}
+    else if(form.where?.length)visit(parse(form.where.at(-1)[1]));     // a law's value is its last abbreviation
+    return {names:seen,functions:functionsSeen};
+  }
+  const entering=form=>new Set(Object.values(form.letters||{}));
+  const constant=v=>[].concat(v).length>1?'a list of '+v.length+' numbers':number(+[].concat(v)[0]);
+  // The lines that explain a formula, {head, words}: `head` in runs (a name with its number or its formula), then words.
+  function glossary(form){
+    const {names:used,functions:called}=uses(form),letters=entering(form),where=new Map(form.where||[]),lines=[];
+    for(const n of used){
+      if(letters.has(n))continue;
+      const value=where.has(n)?runs(parse(where.get(n))):form.constants&&n in form.constants?[{text:constant(form.constants[n])}]:null;
+      lines.push({head:[...name(n),...(value?[{text:' = '},...value]:[])],words:form.words?.[n]||''});
+    }
+    const lists=used.filter(n=>n in (form.lists||{}));
+    if(lists.length){
+      const shown=within(form,()=>lists.map(n=>name(n)));
+      lines.push({head:SUM,words:'the sum over j = 1, …, '+form.lists[lists[0]]+', where '});
+      const last=lines.at(-1);
+      last.tail=[...shown.flatMap((r,k)=>[...(k?[{text:' and '}]:[]),...r]),...wordRuns(lists.length>1?' are the j-th numbers on their hoses':' is the j-th number on its hose')];
+    }
+    for(const f of called)if(!(lists.length&&f==='Σ')&&functionWords[f])lines.push({head:functionWords[f].head?wordRuns(functionWords[f].head):name(f),words:functionWords[f].words});
+    return lines;
+  }
+  // The names and functions of a form that nothing explains: neither a wire's letter nor in the glossary with words.
+  function unexplained(form){
+    const {names:used,functions:called}=uses(form),letters=entering(form),where=new Map(form.where||[]);
+    const bad=used.filter(n=>!letters.has(n)&&!(form.words?.[n]&&(where.has(n)||n in (form.constants||{}))));
+    for(const f of called)if(!standard.has(f)&&!functionWords[f]&&!(f==='Σ'&&Object.keys(form.lists||{}).length))bad.push(f);
+    return bad;
+  }
+  // Words as runs: a letter standing alone is slanted and a subscript lowered (`onlySubscripted`: the second alone).
+  function wordRuns(text,onlySubscripted=false){
+    if(onlySubscripted)return text.split(/(\p{L}_[\p{L}\p{N}]+)/u).flatMap((s,k)=>k%2?name(s):s?[{text:s}]:[]);
+    return text.split(/(?<![\p{L}\p{N}_’])((?!a(?![_(]))\p{L}(?:_[\p{L}\p{N}]+)?)(?![\p{L}\p{N}_’])/u).flatMap((s,k)=>k%2?name(s):s?[{text:s}]:[]);
+  }
+  const api={functions,functionWords,parse,value,environment,loads,check,lawCheck,pullbackCheck,runs,term,written,definitions,glossary,unexplained,wordRuns,plain};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ArrangementForms=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

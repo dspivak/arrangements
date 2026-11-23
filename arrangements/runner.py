@@ -696,15 +696,20 @@ def library_run_jit(net: Net, steps: int, check: int = 2, every: int = 1) -> Lis
     return out
 
 
-def couple(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int]) -> Arrangement:
+def couple(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int],
+           names: Tuple[str, str] = ("net a", "net b")) -> Arrangement:
     """Two nets with ports, wired to each other: b's i-th inbox hears a's output a_to_b[i], and
-    a's i-th inbox hears b's output b_to_a[i]. Returns the closed library arrangement."""
+    a's i-th inbox hears b's output b_to_a[i]. Returns the closed library arrangement, whose wiring
+    holds two boxes, each net named by ``names`` (book task well-factored-2ac0e890: unnamed, the
+    explorer looked through both nets and drew all their leaves in the one wiring)."""
+    from dataclasses import replace
+
     import jax.numpy as jnp
 
     from .arrangement import Arrangement, zero_form
     from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
-    A, B = denote(to_term(net_a)), denote(to_term(net_b))
+    A, B = (replace(denote(to_term(n)), label=name) for n, name in zip((net_a, net_b), names))
     ja = len(net_a.outputs)
     route = jnp.asarray([ja + i for i in b_to_a] + list(a_to_b), dtype=int)
     W = Arrangement(P=trivial_parameter(), in_dim_M=A.in_dim_N + B.in_dim_N, out_dim_M=A.out_dim_N + B.out_dim_N,

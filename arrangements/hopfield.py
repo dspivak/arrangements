@@ -312,7 +312,7 @@ def hopfield_edges(W: np.ndarray) -> List[Tuple[int, int]]:
 
 def hopfield_arrangement(
     W: np.ndarray, biases: Sequence[float], dt: float,
-    parameter: Callable[[ReactiveVectorSpace], CotCoalg] = configuration,
+    parameter: Callable[[ReactiveVectorSpace], CotCoalg] = configuration, fast: bool = True,
 ) -> Arrangement:
     """The closed Hopfield arrangement, by genuine composition in ``arr``:
 
@@ -350,7 +350,15 @@ def hopfield_arrangement(
         hopfield_neuron(float(biases[v]), degrees[v], dt, parameter=parameter) for v in range(N)
     ] + [hopfield_synapse(float(W[i, j])) for (i, j) in edges]
     wired = compose_seq(_tensor_balanced(boxes), hopfield_wire(N, edges))
-    return replace(wired, label=f"hopfield(N={N}, E={len(edges)}, dt={dt:g})")
+    label = f"hopfield(N={N}, E={len(edges)}, dt={dt:g})"
+    if len(boxes) <= 7:
+        return replace(wired, label=label)
+    # Nested (book task well-factored-2ac0e890): a box of neurons and a box of synapses, each
+    # nested in blocks of at most seven; run by the flat composite's maps. The state is read and
+    # written by leaves (``tests/chain.py``'s ``state_like``), in neuron order as before.
+    from .nest_groups import nest_groups
+    return nest_groups(boxes, hopfield_wire(N, edges), [(N, "neurons", "neuron"), (len(edges), "synapses", "synapse")],
+                       label=label, flat=wired, fast=fast)
 
 
 # ---------------------------------------------------------------------------

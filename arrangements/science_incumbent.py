@@ -53,7 +53,7 @@ from .coalgebra import configuration
 from .functors import Phi
 from .active_inference import _IN_DIR, _IN_POS
 from .rvect import ReactiveVectorSpace, euclidean
-from .science_native import draw_source, wire_boxes
+from .science_native import draw_source, wire_boxes, world_and
 from .science_payment import gate
 
 K_FIG, NX = 8, 8                     # figures per sign; excusable B draws (hard variant)
@@ -129,13 +129,11 @@ def dependent(s0: float, pi: float, c: float, f: float, s1: float, hold: int, la
                 lambda q, n_in: gate(q, s1) * (pi * n_in[:1] - c - f) / hold, label)
 
 
-@partial(jax.jit, static_argnames=("hold", "counts"))
-def incumbent_run(A: Array, B: Array, S0: Array, d: float, delta: Array, sigma: float, pi: float, c: float, f: float,
-                  s1: float, F1: float, hold: int, counts: int) -> Array:
-    """Wire world, reader, fund and dependents (starting supplies ``S0``, length ``N_DEP``); run by ``Phi``. ``A`` and
-    ``B``: the ``nA`` and ``nB`` draws; ``delta``: the ``K_FIG`` figures' costs.
-    Returns per count end: ``lambda``, ``F``, supplies, and the cumulative paid-in and drawn (observed from
-    the states, summed step by step; nothing fed back)."""
+def incumbent(A: Array, B: Array, S0: Array, d: float, delta: Array, sigma: float, pi: float, c: float, f: float,
+              s1: float, F1: float, hold: int) -> Arrangement:
+    """The closed composite ``incumbent_run`` runs: the world, the incumbent reader and the excuse fund beside a
+    box of the ``N_DEP`` dependents (nested seven to a block). The configuration is world, reader, fund,
+    dependents, in that order."""
     nA, nB = A.shape[0], B.shape[0]
     seen = jnp.tril(jnp.ones((nB + 1, nB)), -1)
     rows = jnp.concatenate([jnp.tile(A, (nB + 1, 1)), jnp.tile(B, (nB + 1, 1)), seen], axis=1)
@@ -145,7 +143,20 @@ def incumbent_run(A: Array, B: Array, S0: Array, d: float, delta: Array, sigma: 
              [(1, 1 + j) for j in range(NX)] + [(0, nA + nB + j) for j in range(NX)]
              + [(3 + i, 0) for i in range(N_DEP)]]
     feeds += [[(1, 0)] for _ in range(N_DEP)]
-    arr = wire_boxes(boxes, feeds)
+    return wire_boxes(boxes, feeds, world_and(N_DEP, "dependents", "dependents",
+                                              ("world", "incumbent reader", "excuse fund")), label="incumbent")
+
+
+@partial(jax.jit, static_argnames=("hold", "counts"))
+def incumbent_run(A: Array, B: Array, S0: Array, d: float, delta: Array, sigma: float, pi: float, c: float, f: float,
+                  s1: float, F1: float, hold: int, counts: int) -> Array:
+    """Wire world, reader, fund and dependents (starting supplies ``S0``, length ``N_DEP``); run by ``Phi``. ``A`` and
+    ``B``: the ``nA`` and ``nB`` draws; ``delta``: the ``K_FIG`` figures' costs.
+    Returns per count end: ``lambda``, ``F``, supplies, and the cumulative paid-in and drawn (observed from
+    the states, summed step by step; nothing fed back)."""
+    nB = B.shape[0]
+    seen = jnp.tril(jnp.ones((nB + 1, nB)), -1)
+    arr = incumbent(A, B, S0, d, delta, sigma, pi, c, f, s1, F1, hold)
     O = Phi(arr)
     na = 1 + NX * 2 * K_FIG
     dl = jnp.concatenate([jnp.asarray(delta, float)] * 2)
@@ -330,5 +341,5 @@ def run_fixer_arm(F: int, seeds: Iterable[int] = range(10), d: float = 3.0, nA: 
     return np.asarray(lam), np.asarray(att), pairs_all
 
 
-__all__ = ["reader", "fund", "dependent", "incumbent_run", "run_arm", "summarize", "j_candidates", "j_pairs",
+__all__ = ["reader", "fund", "dependent", "incumbent", "incumbent_run", "run_arm", "summarize", "j_candidates", "j_pairs",
            "fixer_reader", "fixer_run", "run_fixer_arm"]

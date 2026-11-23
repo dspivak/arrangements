@@ -258,7 +258,7 @@ def figurine_runs():
     for _ in range(steps):
         sa, sb = R.couple_by_hand(fig, world, a2b, b2a, sa, sb)
         hand.append((dict(sa), dict(sb)))
-    L = R.couple(fig, world, a2b, b2a)
+    L = R.couple(fig, world, a2b, b2a, names=("figurine", "world"))
     lib = R.arrangement_run_jit(L, steps, check=1, every=1)
     return dict(fig=fig, wires=wires, world=world, a2b=a2b, b2a=b2a, beliefs=beliefs, guesses=guesses, g=g,
                 hand=hand, lib=lib, steps=steps)

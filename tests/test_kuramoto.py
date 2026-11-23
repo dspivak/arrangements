@@ -34,6 +34,8 @@ Checks:
 5. the CDLM trajectories (``regress/kuramoto.npz``) to rtol 1e-10.
 """
 
+import functools
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -41,9 +43,9 @@ import numpy as np
 from arrangements.coalgebra import configuration, phase
 from arrangements.functors import Phi
 from arrangements.kuramoto import kuramoto_arrangement, kuramoto_wire
-from arrangements.polynomial import nest_left, unnest_left
+from arrangements.polynomial import nest_left
 
-from tests.chain import IN_POS, load_regress
+from tests.chain import IN_POS, flat_state, load_regress, state_like
 
 _TRIV = lambda _o: (jnp.zeros(0), jnp.zeros(0))
 
@@ -72,9 +74,21 @@ _EDGES = [(0, 1), (1, 2), (2, 3), (0, 2)]
 # boxes' and the wiring's states the trivial ``R^0``; these convert to flat angles.
 
 
+# Above seven boxes the composite is nested (book task well-factored-2ac0e890; ``kuramoto_arrangement``), its state
+# bracketed accordingly; the bracketing depends only on N and E, so it is read off a reference composite's init and
+# filled by leaves (``tests/chain.py``'s ``state_like``). The angles are the nonempty leaves, in oscillator order.
+
+
+@functools.lru_cache(maxsize=None)
+def _init_like(N, E, kind):
+    return kuramoto_arrangement([0.0] * N, [(0, 1)] * E, 0.0, parameter=configuration if kind == "conf" else phase).P.init
+
+
 def _conf_state(theta, E):
     theta = jnp.asarray(theta, float)
     N = theta.shape[0]
+    if N + E > 7:
+        return state_like(_init_like(N, E, "conf"), theta)
     parts = [theta[i:i + 1] for i in range(N)] + [jnp.zeros(0)] * E
     return (nest_left(parts), jnp.zeros(0))
 
@@ -82,18 +96,19 @@ def _conf_state(theta, E):
 def _phase_state(theta, xi, E):
     theta, xi = jnp.asarray(theta, float), jnp.asarray(xi, float)
     N = theta.shape[0]
+    if N + E > 7:
+        return state_like(_init_like(N, E, "phase"), jnp.stack([theta, xi], axis=1).reshape(-1))
     parts = [(theta[i:i + 1], xi[i:i + 1]) for i in range(N)] + [jnp.zeros(0)] * E
     return (nest_left(parts), jnp.zeros(0))
 
 
 def _conf_flat(state, N, E):
-    parts = unnest_left(state[0], N + E)
-    return jnp.concatenate(parts[:N])
+    return flat_state(state)
 
 
 def _phase_flat(state, N, E):
-    parts = unnest_left(state[0], N + E)[:N]
-    return (jnp.concatenate([q for q, _ in parts]), jnp.concatenate([p for _, p in parts]))
+    qp = flat_state(state).reshape(N, 2)
+    return qp[:, 0], qp[:, 1]
 
 
 def _rhs(theta, omegas, edges, K):

@@ -71,7 +71,7 @@ LOG2PI = float(np.log(2.0 * np.pi))
 
 def port_wire(sources: Sequence[int], out_dim: int) -> Arrangement:
     """``R^-`` of the function ``i |-> sources[i]`` from in-port to out-port coordinates."""
-    src = jnp.asarray(sources, dtype=int)
+    src = np.asarray(sources, dtype=int)     # numpy, so the wiring stays static under jit (``nesting`` reads it)
     return Arrangement(
         P=trivial_parameter(),
         in_dim_M=len(sources), out_dim_M=out_dim, in_dim_N=0, out_dim_N=0,
@@ -82,16 +82,34 @@ def port_wire(sources: Sequence[int], out_dim: int) -> Arrangement:
     )
 
 
-def wire_boxes(boxes: Sequence[Arrangement], feeds: Sequence[Sequence[Tuple[int, int]]]) -> Arrangement:
+def wire_boxes(boxes: Sequence[Arrangement], feeds: Sequence[Sequence[Tuple[int, int]]],
+               groups: Optional[Sequence[Tuple[int, str, str]]] = None, label: Optional[str] = None) -> Arrangement:
     """The closed composite of ``boxes`` (each ``I -> <in_b | out_b>``), in-port coordinate ``c`` of box
-    ``b`` fed by ``feeds[b][c] = (source box, source out coordinate)``."""
+    ``b`` fed by ``feeds[b][c] = (source box, source out coordinate)``.
+
+    ``groups`` (``(count, box name, part name)``, consecutive runs of ``boxes``) nests the composite by
+    ``nest_groups.nest_groups`` so that no box holds more than seven (book task well-factored, David,
+    2026-11-23: "good factorizations should have 2-7 boxes inside"): a run of one box stays the box, a longer
+    run is a box of its own, nested seven to a block. The configuration keeps the boxes' order, and the nested
+    composite computes by the flat one's maps (``nesting.run_flat``); ``tests/test_science_nested.py`` checks
+    the nested maps against the flat ones."""
     offs = np.cumsum([0] + [b.out_dim_N for b in boxes])
     sources = []
     for b, box in enumerate(boxes):
         if box.in_dim_M or box.out_dim_M or len(feeds[b]) != box.in_dim_N:
             raise ValueError(f"box {b}: bad interface or feed")
         sources += [int(offs[k] + c) for (k, c) in feeds[b]]
-    return compose_seq(tensor_arrangements(list(boxes)), port_wire(sources, int(offs[-1])))
+    w = port_wire(sources, int(offs[-1]))
+    if groups is None:
+        return compose_seq(tensor_arrangements(list(boxes)), w)
+    from .nest_groups import nest_groups
+    return nest_groups(list(boxes), w, groups, label=label)
+
+
+def world_and(m: int, box: str, part: str, before: Sequence[str] = ("world",)) -> List[Tuple[int, str, str]]:
+    """The groups of a world (and the single boxes ``before`` names) beside ``m`` boxes of one kind in a box
+    ``box`` (blocks ``part i-j``), for ``wire_boxes``."""
+    return [(1, name, name) for name in before] + [(m, box, part)]
 
 
 def _reader(dim: int, init, in_dim: int, out_dim: int, readout, force, label: str) -> Arrangement:
@@ -164,7 +182,7 @@ def community_native(Y0: Array, X: Array, W: np.ndarray, alpha: float, beta: flo
         boxes.append(_reader(n, Y0[j], d * n + 1, n, jax.nn.log_softmax,
                              lambda y, n_in, dc=dcost: -dc(y, n_in), f"holder {j}"))
         feeds.append([(k + 1, c) for k in nb[j] for c in range(n)] + [(0, j)])
-    return wire_boxes(boxes, feeds)
+    return wire_boxes(boxes, feeds, world_and(m, "holders", "holders"), label="community")
 
 
 @partial(jax.jit, static_argnames=("W_key", "alpha", "beta", "arm", "steps"))
@@ -229,7 +247,8 @@ def summaries_native(draws: Array, A: np.ndarray, mus: Array, arm: str, steps: i
         boxes.append(_reader(2, jnp.zeros(2), 2 * m, 2, lambda q: q,
                              lambda q, n_in: n_in.reshape(m, 2).sum(0), "journal"))
         feeds.append([(k + 1, c) for k in range(m) for c in (0, 1)])
-    return wire_boxes(boxes, feeds)
+    after = [(1, "journal", "journal")] if arm == "journal" else []
+    return wire_boxes(boxes, feeds, world_and(m, "holders", "holders") + after, label="summaries")
 
 
 @partial(jax.jit, static_argnames=("A_key", "arm", "steps"))
@@ -326,7 +345,7 @@ def conclusions_native(draws: Array, A: np.ndarray, mus: Array, slices: Sequence
         boxes.append(conclusion_holder(jnp.asarray(p0), wj, mus, dt, arm, frame, eps, alpha, tau_inv,
                                        f"holder {j}"))
         feeds.append([(k + 1, c) for k in nb[j] for c in range(n)] + [(0, j)])
-    return wire_boxes(boxes, feeds)
+    return wire_boxes(boxes, feeds, world_and(m, "holders", "holders"), label="conclusions")
 
 
 @partial(jax.jit, static_argnames=("A_key", "slices", "hold", "arm", "frame", "eps", "alpha", "tau_inv"))
@@ -522,5 +541,5 @@ def rival_excuses_run(A: Array, B: Array, d: float, delta: Array, v: float, K: i
     return lam
 
 
-__all__ = ["rival_excuse_reader", "rival_excuses_run", "excuse_world", "excuse_reader", "excuses_native_run", "conclusion_holder", "conclusions_native", "conclusions_native_run", "port_wire", "wire_boxes", "draw_source", "run_positions", "neighbours",
+__all__ = ["rival_excuse_reader", "rival_excuses_run", "excuse_world", "excuse_reader", "excuses_native_run", "conclusion_holder", "conclusions_native", "conclusions_native_run", "port_wire", "wire_boxes", "world_and", "draw_source", "run_positions", "neighbours",
            "community_native", "community_native_run", "summaries_native", "summaries_native_run"]

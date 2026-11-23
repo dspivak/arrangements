@@ -33,7 +33,7 @@ from jax.typing import ArrayLike
 from .arrangement import Arrangement, exact, zero_form
 from .coalgebra import CotCoalgK
 from .hopfield import _tensor_balanced
-from .light_lattice import face_edges, lattice_wire
+from .light_lattice import face_edges, lattice_of, lattice_wire
 from .wiring import compose_seq, trivial_parameter
 
 _z = jnp.zeros(0)
@@ -157,7 +157,7 @@ def tank_lattice(N: int, E0: ArrayLike, B0: ArrayLike, rule: Literal["euler", "r
     edges' starting voltages, ``B0`` the ``N^2`` faces' starting fluxes."""
     parts = [tank_edge(lift(rule, READ_1, V_1, [E0[e]], 1, tau, K)) for e in range(2 * N * N)]
     parts += [coil_face(lift(rule, READ_1, V_1, [B0[f]], 1, tau, K)) for f in range(N * N)]
-    return compose_seq(_tensor_balanced(parts), lattice_wire(N))
+    return lattice_of(N, parts)
 
 
 def tank_edge_stagger(s0: float, tau: float) -> Arrangement:
@@ -181,7 +181,7 @@ def tank_lattice_stagger(N: int, E0: ArrayLike, B0: ArrayLike, tau: float) -> Ar
     ``E0`` and ``B0`` as in ``tank_lattice``."""
     parts = [tank_edge_stagger(E0[e], tau) for e in range(2 * N * N)]
     parts += [coil_face_stagger(B0[f], tau) for f in range(N * N)]
-    return compose_seq(_tensor_balanced(parts), lattice_wire(N))
+    return lattice_of(N, parts)
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ def flux_lattice(N: int, A0: ArrayLike, X0: ArrayLike, rule: Literal["euler", "r
     else:
         edges = [flux_edge(lift(rule, READ_2, V_2, [A0[e], X0[e]], 1, tau, K)) for e in range(2 * N * N)]
     faces = [spring_face() for _ in range(N * N)]
-    return compose_seq(_tensor_balanced(edges + faces), lattice_wire(N))
+    return lattice_of(N, edges + faces)
 
 
 # ---------------------------------------------------------------------------

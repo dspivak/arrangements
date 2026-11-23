@@ -350,10 +350,14 @@ def commons(
         couplers = [catch_coupler_insulated(Rhat, f"C{i + 1}^ins") for i in range(N)]
     if s is not None:
         couplers.append(sanction_coupler(s, N))
-    wired = compose_seq(
-        compose_seq(tensor_arrangements(boxes), fan_wire(1 + N, picks)),
-        tensor_arrangements(couplers),
-    )
+    fanned = compose_seq(tensor_arrangements(boxes), fan_wire(1 + N, picks))
+    if len(boxes) > 7:
+        # Nested (book task well-factored-2ac0e890): the resource beside a box ``extractors``, nested in blocks of at
+        # most seven (``nest_groups``); it computes by ``fanned``'s maps, and its configuration is still (R, x_1..x_N).
+        from .nest_groups import nest_groups
+        fanned = nest_groups(boxes, fan_wire(1 + N, picks), [(1, "resource", "resource"), (N, "extractors", "Ext")],
+                             label=f"resource and extractors(N={N})", flat=fanned)
+    wired = compose_seq(fanned, tensor_arrangements(couplers))
     kind = "gov" if s is not None else ("ins" if Rhat is not None else "oa")
     return replace(wired, label=label or f"commons[{kind}](N={N})")
 

@@ -107,15 +107,23 @@ def balanced_tensor(parts: Sequence[Arrangement]) -> Arrangement:
 
 
 def spot_ring(u0: Numbers, v0: Numbers, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512, Dv: float = 0.256,
-              dt: float = 0.5) -> Arrangement:
+              dt: float = 0.5, fast: bool = True) -> Arrangement:
     """The closed ring ``ring_wire . (cells (x) exchanges (x) reactions (x) joints)``, cells at ``(u0, v0)``, two vectors
-    with one entry per cell."""
+    with one entry per cell.
+
+    Nested (book task well-factored-2ac0e890; ``nest_groups.nest_sites``): site ``i`` is a box holding cell ``i``, its
+    exchange, its reaction and the joint to its right; the sites are nested in arcs of at most seven (``sites 1-7``),
+    and the arcs again. With ``fast`` it computes by the flat composite above (the same numbers, bit for bit); its
+    state has the nested bracketing, so it is read by ``amounts`` and written by ``state_at``."""
     N = len(u0)
     boxes = ([cell_box(u0[i], v0[i], dt) for i in range(N)]
              + [exchange_box(F, k) for _ in range(N)]
              + [growth_box() for _ in range(N)]
              + [joint_box(Du, Dv) for _ in range(N)])
-    return compose_seq(balanced_tensor(boxes), ring_wire(N))
+    flat = compose_seq(balanced_tensor(boxes), ring_wire(N))
+    from .nest_groups import nest_sites
+    return nest_sites(boxes, ring_wire(N), [[i, N + i, 2 * N + i, 3 * N + i] for i in range(N)], "site", "sites",
+                      label=f"spot ring({N})", fast=fast, flat=flat)
 
 
 def seed(N: int, width: int = 10) -> Tuple[np.ndarray, np.ndarray]:
@@ -162,12 +170,19 @@ def numpy_step(u: np.ndarray, v: np.ndarray, *, F: float = 0.04, k: float = 0.06
 
 
 def state_at(arr: Arrangement, u: np.ndarray, v: np.ndarray) -> Any:
-    """The ring's state with the cells at ``(u, v)`` (the cells' leaves come first, in order; the rest are empty)."""
+    """The ring's state with the cells at ``(u, v)`` (the cells' leaves are the nonempty ones, in cell order)."""
+    return _cells_into(arr, [jnp.array([float(u[i]), float(v[i])]) for i in range(len(u))])
+
+
+def _cells_into(arr: Arrangement, cells: List[Any]) -> Any:
+    """``arr.P.init`` with its nonempty leaves, the cells', replaced by ``cells`` in order."""
     import jax
 
     leaves, tree = jax.tree_util.tree_flatten(arr.P.init)
-    N = len(u)
-    new = [jnp.array([float(u[i]), float(v[i])]) for i in range(N)] + leaves[N:]
+    it = iter(cells)
+    new = [next(it) if jnp.size(x) else x for x in leaves]
+    if next(it, None) is not None:
+        raise ValueError("more cells than the ring has")
     return jax.tree_util.tree_unflatten(tree, new)
 
 
@@ -285,16 +300,21 @@ def pattern_ring_wire(N: int) -> Arrangement:
 
 
 def pattern_ring(u0: Numbers, v0: Numbers, p0: Numbers, *, F: float = 0.04, k: float = 0.06, Du: float = 0.512,
-                 Dv: float = 0.256, Dp: float = 0.256, eps: float = 0.0, dt: float = 0.5) -> Arrangement:
+                 Dv: float = 0.256, Dp: float = 0.256, eps: float = 0.0, dt: float = 0.5,
+                 fast: bool = True) -> Arrangement:
     """The closed ring ``pattern_ring_wire . (cells (x) exchanges (x) reactions (x) wells (x) joints)``, cells at
-    ``(u0, v0, p0)``, three vectors with one entry per cell."""
+    ``(u0, v0, p0)``, three vectors with one entry per cell. Nested by site as ``spot_ring`` (a site: the cell, its
+    exchange, reaction, well and the joint to its right)."""
     N = len(u0)
     boxes = ([pattern_cell_box(u0[i], v0[i], p0[i], dt) for i in range(N)]
              + [pattern_exchange_box(F, k) for _ in range(N)]
              + [pattern_reaction_box(eps) for _ in range(N)]
              + [well_box() for _ in range(N)]
              + [pattern_joint_box(Du, Dv, Dp) for _ in range(N)])
-    return compose_seq(balanced_tensor(boxes), pattern_ring_wire(N))
+    flat = compose_seq(balanced_tensor(boxes), pattern_ring_wire(N))
+    from .nest_groups import nest_sites
+    return nest_sites(boxes, pattern_ring_wire(N), [[i + j * N for j in range(5)] for i in range(N)], "site",
+                      "sites", label=f"pattern ring({N})", fast=fast, flat=flat)
 
 
 def pattern_seed(N: int, signs: Sequence[float], centers: Optional[Sequence[int]] = None, width: int = 10,
@@ -318,12 +338,7 @@ def pattern_amounts(arr: Arrangement, state: Any) -> Tuple[np.ndarray, np.ndarra
 
 def pattern_state_at(arr: Arrangement, u: np.ndarray, v: np.ndarray, p: np.ndarray) -> Any:
     """The ring's state with the cells at ``(u, v, p)``."""
-    import jax
-
-    leaves, tree = jax.tree_util.tree_flatten(arr.P.init)
-    N = len(u)
-    new = [jnp.array([float(u[i]), float(v[i]), float(p[i])]) for i in range(N)] + leaves[N:]
-    return jax.tree_util.tree_unflatten(tree, new)
+    return _cells_into(arr, [jnp.array([float(u[i]), float(v[i]), float(p[i])]) for i in range(len(u))])
 
 
 def spot_signs(v: np.ndarray, p: np.ndarray, threshold: float = 0.1) -> List[float]:

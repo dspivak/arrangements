@@ -21,7 +21,9 @@
   // feeding.theta: exp(-1/x) is taken as 0 below x = 1/700, as the library does.
   const rho=x=>x>1/700?Math.exp(-1/x):0;
   const theta=t=>{const a=rho(t),b=rho(1-t);return a/(a+b);};
-  if(root.ArrangementForms)root.ArrangementForms.functions.θ=theta;
+  const thetaWords={head:'θ(t) = ρ(t)/(ρ(t) + ρ(1 − t))',
+    words:'a smooth step, 0 for t\u00a0≤\u00a00 and 1 for t\u00a0≥\u00a01, where ρ(t) is exp(−1/t) for t\u00a0>\u00a00 and 0 otherwise'};
+  if(root.ArrangementForms){root.ArrangementForms.functions.θ=theta;root.ArrangementForms.functionWords.θ=thetaWords;}
 
   function compositeAdapter(data,options={}){
     // A generated step of the whole composite takes milliseconds, so a frame takes a few at most and
@@ -63,6 +65,6 @@
     if(!data.step)delete adapter.step;
     return adapter;
   }
-  const api={compositeAdapter,theta};
+  const api={compositeAdapter,theta,thetaWords};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.FeedingExplorerComposite=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

@@ -28,7 +28,7 @@ consecutive and wirings carry no state; ``tests/test_nesting.py`` checks the two
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import List, Sequence, Tuple
+from typing import Any, List, Sequence, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -39,7 +39,14 @@ from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 
 def _matrices(w: Arrangement):
-    """The matrices of a static wiring's maps: ``out = Wo m``, ``in = Wm m + Wn n``."""
+    """The matrices of a static wiring's maps: ``out = Wo m``, ``in = Wm m + Wn n``. Read
+    eagerly even when called while tracing (a composite built inside a jitted function), since
+    the wiring is static."""
+    with jax.ensure_compile_time_eval():
+        return _matrices_now(w)
+
+
+def _matrices_now(w: Arrangement):
     q = jnp.zeros(0)
     m0, n0 = jnp.zeros(w.out_dim_M), jnp.zeros(w.in_dim_N)
     Wo = np.asarray(jax.jacfwd(lambda m: w.out_f(q, m))(m0)).reshape(w.out_dim_N, w.out_dim_M)
@@ -148,7 +155,216 @@ def factor_linear(parts: Sequence[Arrangement], w: Arrangement,
     return replace(compose_seq(tensor_arrangements(pieces), u), label=label or w.label)
 
 
-def carry_state(flat_state, nested_init):
+def _supports(fn, sizes, rows):
+    """For each result coordinate of ``fn``, the argument coordinates it may read (traced; an
+    upper bound when the trace cannot tell, so never too few)."""
+    from ._explorer_inputs import coordinate_inputs
+    if rows == 0:
+        return []
+    args = [jnp.zeros(s) for s in sizes]
+    (found,) = coordinate_inputs(lambda *xs: jnp.ravel(fn(*xs)), tuple(args), [rows])
+    return [set(support) for support, _ in found]
+
+
+def factor_route(parts: Sequence[Arrangement], w: Arrangement,
+                 blocks: Sequence[Tuple[Sequence[int], str]], label: str | None = None,
+                 fast: bool = True, block_meta: Sequence[dict] | None = None) -> Arrangement:
+    """``w . (x) parts`` regrouped by meaning, for any static wiring ``w`` (its maps may compute:
+    gates, rates, sums), with each computation moved into the block whose parts it feeds.
+
+    ``blocks`` lists ``(indices, name)``: the parts (by index into ``parts``) each block holds, in
+    the order they are to sit; every part in exactly one block. A block of one part is the part.
+    Inside block ``b`` the wiring ``v_b`` computes every input of the block's parts from the
+    block's own outputs and from copies of what it reads outside, which are its exposed inputs;
+    its exposed outputs are the outputs read outside it. Between the blocks ``u`` only copies
+    (each exposed input is one outer input or one exposed output; its transpose adds the loads)
+    and computes the outer outputs. Equal to the flat composite because ``v_b`` evaluates ``w``'s
+    own input map on the values its rows read (traced supports, so nothing a row reads is
+    missing), and ``u`` passes each of those values unchanged.
+
+    The configuration is the parts' in block order. With ``fast`` the result computes by the
+    flat composite of the parts in that order (``run_flat``). ``block_meta`` adds meta to each
+    block (port names for the explorer).
+    """
+    parts = list(parts)
+    order = [i for idx, _ in blocks for i in idx]
+    if sorted(order) != list(range(len(parts))):
+        raise ValueError("factor_route: every part in exactly one block")
+    a = [p.in_dim_N for p in parts]
+    b = [p.out_dim_N for p in parts]
+    a_at, b_at = np.cumsum([0] + a), np.cumsum([0] + b)
+    A, B, C = int(a_at[-1]), int(b_at[-1]), w.in_dim_N
+    q0 = jnp.zeros(0)
+    in_sup = _supports(lambda m, n: w.in_f(q0, m, n), [B, C], A)       # indices < B: m; >= B: n
+    out_sup = _supports(lambda m: w.out_f(q0, m), [B], w.out_dim_N)
+    read_out = set().union(*out_sup) if out_sup else set()
+
+    infos = []
+    for idx, name in blocks:
+        I = np.concatenate([np.arange(a_at[i], a_at[i + 1]) for i in idx]).astype(int)
+        O = np.concatenate([np.arange(b_at[i], b_at[i + 1]) for i in idx]).astype(int)
+        Oset = set(O.tolist())
+        reads = set().union(*[in_sup[i] for i in I]) if len(I) else set()
+        single = len(idx) == 1
+        # A block of one part is the part itself; ``u`` computes its inputs, so everything they
+        # read is exposed, its own outputs included. A larger block computes its own.
+        sources = sorted(reads) if single else sorted(reads - Oset)
+        infos.append(dict(idx=list(idx), name=name, I=I, O=O, single=single, sources=sources))
+    for k, x in enumerate(infos):
+        others = set().union(*[set(y["sources"]) for j, y in enumerate(infos) if j != k or y["single"]])
+        x["exposed"] = [j for j in x["O"].tolist() if j in others or j in read_out]
+        if x["single"] and len(x["exposed"]) != len(x["O"]):
+            x["exposed"] = x["O"].tolist()      # a bare part shows every output it has
+
+    def embed(pairs, size):
+        z = jnp.zeros(size)
+        for where, values in pairs:
+            if len(where) and jnp.size(values):
+                z = z.at[jnp.asarray(where)].set(values)
+        return z
+
+    def full(x, size):
+        """``x``, or zeros of ``size`` when called with no arguments: the explorer evaluates a
+        coordinate that reads nothing at an empty argument list (``explore_composite.readings``)."""
+        return x if jnp.size(x) == size else jnp.zeros(size)
+
+    pieces = []
+    for x in infos:
+        if x["single"]:
+            pieces.append(parts[x["idx"][0]])
+            continue
+        O, I, src, exp = x["O"], x["I"], x["sources"], x["exposed"]
+        src_m = [s for s in src if s < B]
+        src_n = [s - B for s in src if s >= B]
+        local_exp = jnp.asarray([int(np.where(O == j)[0][0]) for j in exp], dtype=int)
+
+        def v_out(q, m, local_exp=local_exp, O=O):
+            return full(m, len(O))[local_exp] if len(local_exp) else jnp.zeros(0)
+
+        def v_in(q, m, e, O=O, I=I, src_m=src_m, src_n=src_n, src=src):
+            m, e = full(m, len(O)), full(e, len(src))
+            full_m = embed([(O, m), (src_m, e[:len(src_m)])], B)
+            full_n = embed([(src_n, e[len(src_m):])], C)
+            return w.in_f(q0, full_m, full_n)[jnp.asarray(I)] if len(I) else jnp.zeros(0)
+
+        v = Arrangement(trivial_parameter(), len(I), len(O), len(src), len(exp), v_out, v_in, zero_form,
+                        f"{x['name']} wiring")
+        inner = replace(compose_seq(tensor_arrangements([parts[i] for i in x["idx"]]), v), label=x["name"])
+        meta = (block_meta or [{}] * len(infos))[len(pieces)]
+        pieces.append(replace(inner, meta={**(inner.meta or {}), **meta}) if meta else inner)
+
+    exp_all = [j for x in infos for j in x["exposed"]]
+    pos = {j: k for k, j in enumerate(exp_all)}
+    width = sum(len(x["I"]) if x["single"] else len(x["sources"]) for x in infos)
+
+    def u_out(q, m):
+        return w.out_f(q0, embed([(exp_all, m)], B))
+
+    def u_in(q, m, n):
+        m, n = full(m, len(exp_all)), full(n, C)
+        vals = []
+        for x in infos:
+            if x["single"]:     # a bare part's inputs, computed here from what they read
+                rows = w.in_f(q0, embed([(exp_all, m)], B), n)
+                vals.append(rows[jnp.asarray(x["I"])] if len(x["I"]) else jnp.zeros(0))
+            else:               # a block's exposed inputs: copies
+                vals.append(jnp.stack([m[pos[s]] if s < B else n[s - B] for s in x["sources"]])
+                            if x["sources"] else jnp.zeros(0))
+        return jnp.concatenate(vals) if vals else jnp.zeros(0)
+
+    u = Arrangement(trivial_parameter(), width, len(exp_all), C, w.out_dim_N, u_out, u_in, zero_form, w.label)
+    nested = replace(compose_seq(tensor_arrangements(pieces), u), label=label or w.label, meta=w.meta)
+    if not fast:
+        return nested
+    return run_flat(nested, _flat_in_order(parts, w, order))
+
+
+def _leaves(tree):
+    if isinstance(tree, int):
+        return [tree]
+    return [i for child in tree[1] for i in _leaves(child)]
+
+
+Tree = Union[int, Tuple[str, list]]     # a part's index, or (a box's name, its children)
+
+
+def factor_tree(parts: Sequence[Arrangement], w: Arrangement, tree: Tree, fast: bool = True) -> Arrangement:
+    """``w . (x) parts`` nested as ``tree`` says: a tree is a part's index, or ``(name, children)``
+    for a box named ``name`` holding its children; the root's name labels the whole. Each level
+    is ``factor_route``; the configuration is the parts' in the tree's left-to-right order."""
+    parts = list(parts)
+
+    def build(ps, wiring, node):
+        name, children = node
+        local = {i: k for k, i in enumerate(ps_index[id(ps)])} if id(ps) in ps_index else None
+        blocks = [([local[i] if local else i for i in _leaves(c)], c[0] if not isinstance(c, int) else "")
+                  for c in children]
+        whole = factor_route(ps, wiring, blocks, label=name, fast=False)
+        _, inner, u = whole.construction
+        pieces = []
+        _flatten_tensor(inner, pieces, len(children))
+        out = []
+        for piece, child in zip(pieces, children):
+            if isinstance(child, int) or all(isinstance(g, int) for g in child[1]):
+                out.append(piece)
+                continue
+            _, sub_inner, v = piece.construction
+            sub_parts = []
+            _flatten_tensor(sub_inner, sub_parts, len(_leaves(child)))
+            ps_index[id(sub_parts)] = _leaves(child)
+            out.append(build(sub_parts, v, child))
+        return replace(compose_seq(tensor_arrangements(out), u), label=name, meta=whole.meta)
+
+    ps_index = {}
+    nested = build(parts, w, tree)
+    if not fast:
+        return nested
+    return run_flat(nested, _flat_in_order(parts, w, _leaves(tree)))
+
+
+def _flatten_tensor(a, out, count):
+    """The ``count`` factors of a left-nested ``tensor_arrangements``, in order."""
+    for _ in range(count - 1):
+        _, a, last = a.construction
+        out.insert(0, last)
+    out.insert(0, a)
+
+
+def _flat_in_order(parts, w, order):
+    """``w . (x) parts`` with the parts taken in ``order``: the same composite, its configuration
+    and ports permuted (the wiring reads its arguments back in the original order)."""
+    a = [p.in_dim_N for p in parts]
+    b = [p.out_dim_N for p in parts]
+    a_at, b_at = np.cumsum([0] + a), np.cumsum([0] + b)
+    perm_b = np.concatenate([np.arange(b_at[i], b_at[i + 1]) for i in order]).astype(int)
+    perm_a = np.concatenate([np.arange(a_at[i], a_at[i + 1]) for i in order]).astype(int)
+    back_b = np.argsort(perm_b)
+    q0 = jnp.zeros(0)
+    pb, pa = jnp.asarray(perm_b), jnp.asarray(perm_a)
+    bb = jnp.asarray(back_b)
+    wp = Arrangement(trivial_parameter(), w.in_dim_M, w.out_dim_M, w.in_dim_N, w.out_dim_N,
+                     lambda q, m: w.out_f(q0, m[bb]),
+                     lambda q, m, n: w.in_f(q0, m[bb], n)[pa], zero_form, w.label)
+    return compose_seq(tensor_arrangements([parts[i] for i in order]), wp)
+
+
+def run_flat(nested: Arrangement, flat: Arrangement) -> Arrangement:
+    """``nested`` computed by ``flat``'s maps: the 'parts explosion' David allowed, 2026-11-23,
+    2ac0e890: "i think it's ok to compile the entire thing to one "parts explosion" ODE befroe
+    running it if the parentheses are costly to keep around".
+
+    The two are the same morphism of ``arr`` (associativity; ``tests/test_nesting.py`` checks the
+    nested composite's own maps against the flat one's), and both take the configuration as one
+    vector in the same order, so the flat maps can stand in for the nested ones. The
+    construction, which the explorer draws, stays the nested one; the parameter stays the nested
+    one, so its state has the nested bracketing."""
+    if (nested.P.Q_dim, nested.in_dim_M, nested.out_dim_M, nested.in_dim_N, nested.out_dim_N) != \
+            (flat.P.Q_dim, flat.in_dim_M, flat.out_dim_M, flat.in_dim_N, flat.out_dim_N):
+        raise ValueError("run_flat: the two arrangements have different shapes")
+    return replace(nested, out_f=flat.out_f, in_f=flat.in_f, omega=flat.omega)
+
+
+def carry_state(flat_state: Any, nested_init: Any) -> Any:
     """A state of the flat composite as a state of the nested one: the same numbers, part by part,
     in the nested composite's bracketing (a tensor's state is a pair, so the bracketing of the
     parts shows in the state's shape; the wirings' states are empty)."""
@@ -161,6 +377,93 @@ def carry_state(flat_state, nested_init):
     return jax.tree_util.tree_unflatten(tree, out)
 
 
+# ---------------------------------------------------------------------------
+# Counting the boxes inside each box, as the explorer draws them.
+# ---------------------------------------------------------------------------
+
+_MARK_PARTS = ("push", "pushes", "spring", "motor")
+
+
+def _is_wiring(a: Arrangement) -> bool:
+    return not a.construction and a.P.Q_dim == 0 and a.omega is zero_form and not (a.meta or {}).get("part")
+
+
+def _default_label(a: Arrangement) -> bool:
+    _, f, g = a.construction
+    return a.label == f"({g.label} . {f.label})"
+
+
+def _is_leaf(a: Arrangement) -> bool:
+    return not a.construction or (a.meta or {}).get("part") in _MARK_PARTS
+
+
+def is_box(a: Arrangement) -> bool:
+    """A box is a ``compose_seq`` node whose second factor is a wiring, or a compose node given
+    its own label; a compose of two non-wirings under its default label is looked through."""
+    if _is_leaf(a) or a.construction[0] != "compose" or (a.meta or {}).get("wrapper"):
+        return False
+    return (not _default_label(a)) or _is_wiring(a.construction[2])
+
+
+def _flatten(a: Arrangement, out: list) -> None:
+    if _is_leaf(a):
+        if not _is_wiring(a):
+            out.append(a)
+        return
+    if is_box(a):
+        out.append(a)
+        return
+    _, f, g = a.construction
+    _flatten(f, out)
+    _flatten(g, out)
+
+
+def contents(a: Arrangement) -> List[Arrangement]:
+    """What is drawn directly inside box ``a``: boxes and primitive parts, wirings left out."""
+    _, f, g = a.construction
+    out: List[Arrangement] = []
+    _flatten(f, out)
+    if not _is_wiring(g):
+        _flatten(g, out)
+    return out
+
+
+def box_name(a: Arrangement) -> str:
+    if is_box(a) and _default_label(a):
+        return a.construction[2].label
+    return a.label or "(unnamed)"
+
+
+def box_counts(a: Arrangement) -> List[Tuple[str, int]]:
+    """Every box under ``a`` (``a`` itself if it is one, else the boxes at its top level, which
+    is counted too, as ``"(top level)"``) with how many boxes and parts it holds directly: the
+    property of being well-factored is that each count is between 2 and 7 (book task
+    well-factored, David, 2026-11-23: "good factorizations should have 2-7 boxes inside")."""
+    found: List[Tuple[str, int]] = []
+    seen = set()
+
+    def visit(b):
+        if id(b) in seen:
+            return
+        seen.add(id(b))
+        kids = contents(b)
+        found.append((box_name(b), len(kids)))
+        for k in kids:
+            if is_box(k):
+                visit(k)
+
+    if is_box(a):
+        visit(a)
+    elif a.construction:
+        top: List[Arrangement] = []
+        _flatten(a, top)
+        found.append(("(top level)", len(top)))
+        for x in top:
+            if is_box(x):
+                visit(x)
+    return found
+
+
 def even_blocks(n: int, most: int = 7) -> List[int]:
     """Sizes of ``ceil(n / most)`` nearly equal consecutive blocks covering ``n`` things, each at
     most ``most`` (one block, of size ``n``, when ``n <= most``)."""
@@ -170,10 +473,22 @@ def even_blocks(n: int, most: int = 7) -> List[int]:
 
 
 def nest(parts: Sequence[Arrangement], w: Arrangement, name: str = "parts", most: int = 7,
-         label: str | None = None, _spans=None) -> Arrangement:
+         label: str | None = None, fast: bool = True) -> Arrangement:
     """``w . (x) parts`` with every box holding at most ``most`` things: consecutive parts are
     grouped into blocks of nearly equal size, named ``name i-j`` by the parts they hold, and the
-    blocks grouped again while there are more than ``most`` of them."""
+    blocks grouped again while there are more than ``most`` of them.
+
+    With ``fast`` (the default) the result computes by the flat composite's maps (``run_flat``):
+    the nesting costs about 1.7 times the flat composite's time a step on a ring of 120 cells and
+    a complete graph of 40 when run through its own maps, and nothing when run flat (run,
+    2026-11-23, ``.scratch/well-factored-2ac0e890/timing.py`` in the book repo)."""
+    nested = _nest(list(parts), w, name, most, label, None)
+    if not fast or len(parts) <= most:
+        return nested
+    return run_flat(nested, compose_seq(tensor_arrangements(list(parts)), w))
+
+
+def _nest(parts, w, name, most, label, _spans):
     parts = list(parts)
     spans = _spans or [(i + 1, i + 1) for i in range(len(parts))]
     if len(parts) <= most:
@@ -186,4 +501,4 @@ def nest(parts: Sequence[Arrangement], w: Arrangement, name: str = "parts", most
         new_spans.append((lo, hi))
         at += s
     pieces, u = _factor(parts, w, blocks)
-    return nest(pieces, u, name, most, label, new_spans)
+    return _nest(pieces, u, name, most, label, new_spans)

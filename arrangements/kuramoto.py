@@ -208,6 +208,7 @@ def kuramoto_arrangement(
     coupling: float,
     sharp_scale: float = 1.0,
     parameter: ParameterRule = configuration,
+    fast: bool = True,
 ) -> Arrangement:
     """The closed Kuramoto arrangement, by genuine composition in ``arr``:
 
@@ -235,7 +236,14 @@ def kuramoto_arrangement(
         kuramoto_oscillator(float(omegas[v]), degrees[v], sharp_scale, parameter)
         for v in range(N)
     ] + [kuramoto_coupling(coupling) for _ in edges]
+    label = f"kuramoto(N={N}, E={len(edges)}, K={coupling:g})"
+    if len(boxes) > 7:
+        # Nested (book task well-factored-2ac0e890): a box of oscillators and a box of edges,
+        # each nested in blocks of at most seven; run by the flat maps. Its state is read by
+        # leaves, in oscillator order as before.
+        from .nest_groups import nest_groups
+        return nest_groups(boxes, kuramoto_wire(N, edges),
+                           [(N, "oscillators", "oscillator"), (len(edges), "couplings", "coupling")],
+                           label=label, fast=fast)
     wired = compose_seq(tensor_arrangements(boxes), kuramoto_wire(N, edges))
-    return replace(
-        wired, label=f"kuramoto(N={N}, E={len(edges)}, K={coupling:g})"
-    )
+    return replace(wired, label=label)

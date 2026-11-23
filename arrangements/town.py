@@ -38,7 +38,10 @@ claims arriving after a delay, its assessment on the plant's liability wire (``e
 arriving from outside the town and does not run it); stage 3 an insurer who reads the court; stage 4 her estimate as
 well, read through a box that remembers yesterday, so its state is not the one number of ``account_town``'s
 estimator. Beside these are records (``memory``, ``delay``, ``money``, and with ``diligence=True`` the insurer's
-``books``). ``build`` is the general constructor, with a plant of one dial for the earlier runs. Every town is a
+``books``). From stage 2 the boxes are nested by meaning (``town_tree``): the plant and the townspeople, the
+claims (memory and delay), the court, the insurer (premium and books), her estimate and the money, each box
+holding 2 to 7 things; ``Town.slots`` follow the nesting's order. ``build`` is the general constructor, with a
+plant of one dial for the earlier runs. Every town is a
 closed composite; ``run`` takes its effort field and integrator step by step, checked equal to the dynamics functor
 ``Phi`` in ``tests/test_town_smoke.py`` and ``tests/test_town_account.py``.
 
@@ -58,6 +61,7 @@ from jax import Array
 
 from .arrangement import Arrangement, Numbers, zero_form
 from .coalgebra import configuration
+from .nesting import _leaves, factor_tree
 from .rvect import euclidean
 from .wiring import compose_seq, tensor_arrangements, trivial_parameter
 
@@ -118,6 +122,11 @@ class Town:
     settings: Settings
     stage: int
     clean: bool = False
+    # the boxes, the flat wiring and the nesting ``build`` made ``arr`` from (``arr`` is
+    # ``factor_tree(parts, wiring, tree)``; ``tests/test_nested_models.py`` checks it)
+    parts: tuple = ()
+    wiring: Optional[Arrangement] = None
+    tree: Any = None
 
     def field(self, q):
         return self.arr.omega(q, EMPTY, EMPTY)[0]
@@ -158,17 +167,17 @@ def build(stage: int, settings: Settings = Settings(), *, connect_report: bool =
         raise ValueError('diligence needs an insurer (stage 3 or 4)')
     revenue = 0.0 if power_to_town else settings.benefit
     c = settings
-    boxes, slots, outs, sources = [], {}, {}, []
-    offset = sent = 0
+    boxes, local, outs, sources = [], {}, {}, []
+    sent = 0
 
-    # slots index the configurations (what Town.value reads); outs index what each box
-    # publishes (what the wiring reads). They differ only for the two-dial plant.
+    # local says where each slot sits in its box's configuration (what Town.value reads, once the
+    # boxes' order in the nesting is known); outs index what each box publishes (what the wiring
+    # reads). They differ only for the two-dial plant.
     def add(box, source, name=None):
-        nonlocal offset, sent
+        nonlocal sent
         name = name or box.label
-        slots[name] = slice(offset, offset + box.P.Q_dim)
+        local[name] = (len(boxes), 0, box.P.Q_dim)
         outs[name] = slice(sent, sent + box.out_dim_N)
-        offset += box.P.Q_dim
         sent += box.out_dim_N
         boxes.append(box)
         sources.append(source)
@@ -200,7 +209,7 @@ def build(stage: int, settings: Settings = Settings(), *, connect_report: bool =
         add(own_cost('plant', [c.output0, c.clean0], int(priced), plant_cost, c.dt,
                      publish=lambda q: jnp.array([q[0], (1-q[1])*q[0]]),
                      push=pushback(plant_cost)), price)
-        slots['output'], slots['cleanliness'] = slice(0, 1), slice(1, 2)
+        local['output'], local['cleanliness'] = (0, 0, 1), (0, 1, 2)
         outs['output'], outs['smoke'] = slice(0, 1), slice(1, 2)
         outs['power'] = outs['output']
 
@@ -296,14 +305,43 @@ def build(stage: int, settings: Settings = Settings(), *, connect_report: bool =
     for box, source in extra:
         add(box, (lambda m, name=source: at(m, name)) if isinstance(source, str) else source)
 
-    inner = tensor_arrangements(boxes)
     outer = Arrangement(
         P=trivial_parameter(), in_dim_M=sum(b.in_dim_N for b in boxes),
         out_dim_M=sent, in_dim_N=0, out_dim_N=0,
         out_f=lambda q, m: EMPTY,
         in_f=lambda q, m, e: jnp.concatenate([source(m) for source in sources]),
         omega=zero_form, label='town wiring')
-    return Town(compose_seq(inner, outer), slots, c, stage, clean)
+    tree = town_tree(boxes, local)
+    if tree is None:
+        arr, order = compose_seq(tensor_arrangements(boxes), outer), list(range(len(boxes)))
+    else:
+        arr, order = factor_tree(boxes, outer, tree), _leaves(tree)
+    start = dict(zip(order, np.cumsum([0] + [boxes[i].P.Q_dim for i in order])))
+    slots = {name: slice(int(start[i]) + lo, int(start[i]) + hi) for name, (i, lo, hi) in local.items()}
+    return Town(arr, slots, c, stage, clean, tuple(boxes), outer, tree)
+
+
+def town_tree(boxes: Sequence[Arrangement], local: dict) -> Optional[Tuple[str, list]]:
+    """How ``build`` nests the town from stage 2 on (book task ``well-factored-2ac0e890``: every box
+    holds 2-7 things, each a part that makes sense): the plant and the townspeople it smokes on, as
+    in Eve's first model; the claims, the memory that turns smoke and new coughing into the claims
+    evidence and the delay that brings each claim to court; the court (``assessed``); the insurer,
+    its premium and with ``diligence`` its books; her estimate; the money; then any ``extra`` box.
+    ``None`` (flat) at stage 1, where the town is two boxes."""
+    if 'memory' not in local:
+        return None
+    where = {name: i for name, (i, _, _) in local.items()}
+
+    def block(name, members):
+        found = [where[m] for m in members if m in where]
+        return found[0] if len(found) == 1 else (name, found) if found else None
+
+    children = [block('plant and townspeople', ['plant' if 'plant' in where else 'output', 'coughing']),
+                block('claims', ['memory', 'delay']), where['assessed'],
+                block('insurer', ['premium', 'books']), block('estimate', ['estimate']), where['money']]
+    children = [x for x in children if x is not None]
+    # the extra boxes come after the money, in the order they were added
+    return ('town', children + list(range(where['money'] + 1, len(boxes))))
 
 
 def eve_town(stage: int = 1, settings: Settings = Settings(), **options: Any) -> Town:

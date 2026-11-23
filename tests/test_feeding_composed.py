@@ -203,20 +203,22 @@ def _leaves(record):
 
 
 def test_the_explorer_shows_the_coupling_parts():
-    """``mouth_coupling(2)``: per casing a contact and a latch, and the one wide push that takes."""
+    """``mouth_coupling(2)``: per casing its handling box, with a contact, a latch, the push that
+    takes and the push that spills (book task well-factored: one box per casing)."""
     new = feeding_composed.mouth_coupling(2)
     values = jnp.asarray(np.concatenate([[3., 1.5, -.2, 0., .4, 1., 1.],
                                          [10., -.2, 1., 0., .8, 0., 8., -.4, 0., .2, 0., .3], [0., 1.]]))
     record = explore.inspect(new, values=values)
     assert record["label"] == "spatial coupling"
     names = _leaves(record)
-    for name in ("seeker, casings and pile", "contact latch 1 store", "contact latch 2 store", "attachment 1",
-                 "attachment 2", "push: taking", "push: spilling", "hands battery"):
+    for name in ("split", "choose", "seeker, casing 1 and pile", "seeker, casing 2 and pile", "contact latch 1 store",
+                 "contact latch 2 store", "attachment 1", "attachment 2", "hands battery"):
         assert names.count(name) == 1, name
+    assert names.count("push: taking") == names.count("push: spilling") == 2
     assert names.count("memory") == 2                    # the two attachments' strokes
-    # Per contact: spring 2, damper 4, latch motor 2; the wide push that takes; since P109 (k)
-    # per casing a lid motor 2, the wide push that spills, and the hands' cord, a spring, 2.
-    assert sum(n.startswith("push") for n in names) == 2 * 8 + 1 + 2 * 2 + 1 + 2
+    # Per casing: the contact's spring 2 and damper 4, the latch's motor 2, taking 1, the lid
+    # motor 2, spilling 1; and the hands' cord, a spring, 2.
+    assert sum(n.startswith("push") for n in names) == 2 * (8 + 1 + 2 + 1) + 2
     explore.scene(record)
 
 

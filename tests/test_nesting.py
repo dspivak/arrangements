@@ -82,7 +82,7 @@ def test_ring_nested_equals_flat():
     edges = [(v, (v + 1) % V) for v in range(V)] + [((v + 1) % V, v) for v in range(V)]
     parts, w = _vertices(V, edges), graph_wire(V, edges)
     flat = compose_seq(tensor_arrangements(parts), w)
-    nested = nest(parts, w, "cells", label="ring")
+    nested = nest(parts, w, "cells", label="ring", fast=False)
     counts = _counts(nested, [])
     assert counts and all(2 <= c <= 7 for c in counts), counts
     _agree(flat, nested)
@@ -93,9 +93,12 @@ def test_complete_graph_nested_equals_flat():
     edges = [(a, b) for a in range(V) for b in range(V) if a != b]
     parts, w = _vertices(V, edges), graph_wire(V, edges)
     flat = compose_graph(V, edges, 1.3, .7, onsite=lambda q: 0.1 * jnp.sum(q ** 4), parameter=phase)
-    nested = nest(parts, w, "neurons", label="complete")
+    nested = nest(parts, w, "neurons", label="complete", fast=False)
     assert all(2 <= c <= 7 for c in _counts(nested, []))
     _agree(flat, nested)
+    fast = nest(parts, w, "neurons", label="complete")
+    assert _counts(fast, []) == _counts(nested, [])      # drawn nested
+    _agree(flat, fast)                                    # run flat
 
 
 def test_chain_with_outer_ports():

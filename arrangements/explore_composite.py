@@ -171,8 +171,9 @@ def _classify(fn, sizes, size):
                 kind = ("diff", k, j)
         elif uncertain:
             # The trace gave only an upper bound (a gather, say): a constant or a copy is found
-            # by its values at three random points, which no other map matches.
-            if close(y, [zero[i]] * 3):
+            # by its values at three random points.
+            # Exactly, not nearly: a rate that is 1e-20 at the sampled points is no constant.
+            if all(v == zero[i] for v in y):
                 kind = ("const",)
             else:
                 for j in support:
@@ -321,7 +322,8 @@ class Diagram:
             kind = meta.get("kind")
             out["description"] = (f"The note's {meta['part']}" +
                                   (f"; its field's kind in the rubric: {kind} ({fp.RUBRIC.get(kind, '?')})" if kind else "")
-                                  + (f". Its formula: {meta['formula']}" if meta.get("formula") else "") + ".")
+                                  + (". Its formulas are under the two marks it opens into" if meta["part"] == "motor" else
+                                     f". It is {fp.spelled_out(meta)}" if meta.get("formula") else "") + ".")
             out["part"] = meta["part"]
         return out
 
@@ -584,6 +586,13 @@ class Diagram:
                 form = dict(letters=letters, constants=_numbers(constants), terms=[dict(c=term["c_text"], h=term["h_text"])])
                 if meta.get("where"):
                     form["where"] = [list(w) for w in meta["where"]]
+                # What is not on a wire is said in words; a letter sent a constant, too, by its input's name.
+                said = {**{l: name_ for l, name_, _ in inputs if l in constants}, **meta.get("words", {})}
+                form["words"] = {k: w for k, w in said.items()
+                                 if k in constants or k in dict(meta.get("where", ()))}
+                lists = {l: width for l, _, width in inputs if width > 1 and l in read and l not in constants}
+                if lists:
+                    form["lists"] = lists
                 self._node(node)["form"] = form
         if meta["part"] == "motor":
             motor = self._node(parent)
@@ -656,7 +665,9 @@ class Diagram:
             stretch = "x"
             items.append(("br", first, 0))
             self._node(node)["anchor"] = True
-        self._node(node).update(stiffness=K, form=dict(letters=letters, constants=_numbers(constants),
+        words = {} if "κ" not in constants else {"κ": "the spring's stiffness" if K == "κ"
+                                                     else "the spring's stiffness where g is 1"}
+        self._node(node).update(stiffness=K, form=dict(letters=letters, constants=_numbers(constants), words=words,
                                                        terms=[dict(c="-1", h=f"{K}/2*{stretch}**2")]))
         self.marks.append(dict(node=node, path=path, term=None, items=items, read=list(letters.values())))
 

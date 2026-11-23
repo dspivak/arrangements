@@ -255,6 +255,13 @@ def compose_chain(parts: Sequence[Arrangement]) -> Arrangement:
     Each ``Part_i`` must have source ``<R^0|R^0>`` and target ``<R|R>``. The
     composite's state is ``(nest_left([s_1, ..., s_K]), s_wire)`` with
     ``s_wire`` the wiring's trivial state ``R^0``.
+
+    More than seven parts are nested (``nesting.nest``, book task well-factored-2ac0e890): runs of
+    at most seven consecutive particles are boxes named ``particles i-j``, grouped again while
+    there are more than seven, so every box holds 2 to 7 things. The composite is the same
+    morphism of ``arr`` and runs by the flat maps; its state has the nested bracketing, so a
+    state is read and written by leaves (``tests/chain.py``'s ``state_like``), never by
+    ``nest_left``.
     """
 
     K = len(parts)
@@ -266,6 +273,10 @@ def compose_chain(parts: Sequence[Arrangement]) -> Arrangement:
         if not (P.out_dim_N == 1 and P.in_dim_N == 1):
             raise ValueError(f"Part {i}: expected target <R|R>")
 
+    if K > 7:
+        from .nesting import nest
+        with jax.ensure_compile_time_eval():    # the static wiring read eagerly, also inside a jit (compose_graph)
+            return nest(list(parts), chain_wire(K), "particles", label=f"chain({K})")
     return compose_seq(tensor_arrangements(list(parts)), chain_wire(K))
 
 
@@ -503,5 +514,12 @@ def compose_graph(
         )
         for v in range(num_vertices)
     ]
+    label = f"graph(V={num_vertices}, E={len(edges)}, vdim={vdim})"
+    if num_vertices > 7:    # nested, every box 2 to 7 things (nesting.nest; see compose_chain)
+        from .nesting import nest
+        # The wiring's matrices are read eagerly even when this is built inside a jit (the gyroscope's
+        # training builds it in its loss, its masses traced); only the static wiring is evaluated.
+        with jax.ensure_compile_time_eval():
+            return nest(vertices, graph_wire(num_vertices, edges, vdim=vdim), "vertices", label=label)
     wired = compose_seq(tensor_arrangements(vertices), graph_wire(num_vertices, edges, vdim=vdim))
-    return replace(wired, label=f"graph(V={num_vertices}, E={len(edges)}, vdim={vdim})")
+    return replace(wired, label=label)

@@ -90,6 +90,8 @@ RUBRIC = {"zero": "0", "spring": "0.5", "stopper": "stopper", "cost": "1", "Petr
           "push of some inputs": "3", "push of everything": "4"}
 
 # The functions a formula may call: those of ``viewer/explorer-forms.js`` and the page's theta.
+FUNCTION_WORDS = {"θ": "θ(t) = ρ(t)/(ρ(t) + ρ(1 - t)), a smooth step, 0 for t ≤ 0 and 1 for t ≥ 1, "
+                       "where ρ(t) is exp(-1/t) for t > 0 and 0 otherwise"}
 FUNCTIONS = {"exp": jnp.exp, "log": jnp.log, "sqrt": jnp.sqrt, "abs": jnp.abs, "sin": jnp.sin,
              "cos": jnp.cos, "tanh": jnp.tanh, "Σ": jnp.sum, "θ": theta}
 
@@ -104,6 +106,45 @@ def formula_names(text: str) -> set:
     """The names a formula uses, calls excepted."""
     import re
     return {m.group(1) for m in re.finditer(r"([^\W\d][\w]*)\s*(\()?", text) if not m.group(2)}
+
+
+def spelled_out(meta: Mapping) -> str:
+    """A part's ``formula``, then what each letter in it is: an input or an output by its name, a
+    constant by its number and its ``words``, an abbreviation by its words. A letter with neither is
+    a ``ValueError``, as it is for ``pushes``."""
+    import re
+    text = meta["formula"]
+    wires = {letter: name for letter, name, _ in [*meta.get("inputs", ()), *meta.get("outputs", ())]}
+    words, constants = meta.get("words", {}), meta.get("constants", {})
+    said, seen = [], set()
+    for m in re.finditer(r"(?<!\w)([^\W\d_](?:_\w+)?)(?![\w(])", text):
+        n = m.group(1)
+        if n in seen or n in ("a", "d") or (f"{n} = " in text and n not in words):
+            continue
+        seen.add(n)
+        if n in constants and words.get(n):
+            said.append(f"{n} = {float(constants[n]):g} is {words[n]}")
+        elif words.get(n):
+            said.append(f"{n} is {words[n]}")
+        elif n in wires:
+            said.append(f"{n} is the {wires[n]}")
+        else:
+            raise ValueError(f"{meta.get('part')}: no words for {n} in its formula {text}")
+    said += [FUNCTION_WORDS[f] for f in FUNCTION_WORDS if f"{f}(" in text]
+    return text.replace("**2", "²").replace("*", " ") + ("; here " + "; ".join(said) if said else "")
+
+
+def unexplained_names(meta: Mapping) -> set:
+    """The names the written formulas use that are neither an input's letter nor given ``words``."""
+    where = dict(meta.get("where", ()))
+    texts = [t[k] for t in meta.get("terms", ()) for k in ("c_text", "h_text") if t.get(k) is not None]
+    seen, todo = set(), [n for text in texts for n in formula_names(text)]
+    while todo:
+        n = todo.pop()
+        if n not in seen:
+            seen.add(n)
+            todo.extend(formula_names(where[n]) if n in where else ())
+    return seen - {letter for letter, _, _ in meta["inputs"]} - {k for k, w in meta.get("words", {}).items() if w}
 
 
 def _environment(meta: Mapping, v: Array) -> dict:
@@ -335,7 +376,7 @@ def fill(parts: Sequence[Arrangement], wiring: Arrangement) -> Arrangement:
 
 def pushes(label: str, dim: int, terms: Sequence[Term], *, inputs: Sequence[Tuple[str, str, int]] | None = None,
            forms: Sequence[Tuple[str, str]] | None = None, constants: Mapping[str, float] | None = None,
-           where: Sequence[Tuple[str, str]] = ()) -> Arrangement:
+           where: Sequence[Tuple[str, str]] = (), words: Mapping[str, str] | None = None) -> Arrangement:
     """The stateless part ``1 -> <dim|0>`` with inclination field ``sum_i c_i dh_i``.
 
     One ``push`` per term, fed by the circles ``c_i`` and ``h_i`` (note ``eqn.push_term``,
@@ -347,6 +388,9 @@ def pushes(label: str, dim: int, terms: Sequence[Term], *, inputs: Sequence[Tupl
     For drawing (``meta``): ``inputs`` names the input wires, ``(letter, name, width)`` each
     (by default ``v_1 .. v_dim``); ``forms`` writes each term's ``(c, h)`` in those letters,
     with ``constants`` and the abbreviations ``where``; ``check_formulas`` holds them to the code.
+    ``words`` says what each constant and abbreviation is, for the reader of the drawing (David,
+    2026-11-23: "Everything in the formula needs to be defined"): every name a formula uses is an
+    input, which the drawing shows entering, or has words here, else ``ValueError``.
     """
     inputs = list(inputs) if inputs is not None else [(f"v_{i + 1}", f"input {i + 1}", 1) for i in range(dim)]
     if sum(width for _, _, width in inputs) != dim:
@@ -354,12 +398,15 @@ def pushes(label: str, dim: int, terms: Sequence[Term], *, inputs: Sequence[Tupl
     if forms is not None and len(forms) != len(terms):
         raise ValueError("pushes: one (c, h) formula per term")
     meta = dict(part="pushes", kind="zero" if not terms else None, inputs=inputs, constants=dict(constants or {}),
-                where=list(where),
+                where=list(where), words=dict(words or {}),
                 terms=[dict(name=name, c=c, h=h, c_text=forms[i][0] if forms else None,
                             h_text=forms[i][1] if forms else None) for i, (name, c, h) in enumerate(terms)])
     if not terms:
         return Arrangement(trivial_parameter(), 0, 0, dim, 0, lambda q, m: EMPTY,
                            lambda q, m, n: EMPTY, zero_form, label, meta=meta)
+    unexplained = unexplained_names(meta)
+    if unexplained:
+        raise ValueError(f"pushes {label}: no words for {', '.join(sorted(unexplained))} in its formulas")
     widths = [int(jnp.ravel(h(jnp.zeros(dim))).shape[0]) for _, _, h in terms]
     boxes = [push(f"push: {name}", n) for (name, _, _), n in zip(terms, widths)]
 
@@ -454,8 +501,8 @@ def dragger(beta: float, memory: float = 0.0, label: str = "dragger", *,
     wiring = transfer(label, 2, 1, 2, 1, lambda m, n: jnp.stack([n[0], n[1] - m[0]]), lambda m: m)
     return with_meta(fill([rod_segment(beta, memory, "memory", stages=stages, h=h), spring()], wiring),
                      part="dragger", kind="spring", inputs=[("k", "stiffness", 1), ("x", "position", 1)],
-                     outputs=[("z", "memory", 1)], constants={"β": beta},
-                     formula="-d(k/2*(x - z)**2); the memory z moves at k*(x - z)/β")
+                     outputs=[("z", "memory", 1)], constants={"β": beta}, words={"β": "the memory's capacity"},
+                     formula="-d(k/2*(x - z)**2), and the memory z moves at k*(x - z)/β")
 
 
 def damper(beta: float, kappa_return: float, stroke: float = 0.0, label: str = "damper", *,
@@ -474,7 +521,9 @@ def damper(beta: float, kappa_return: float, stroke: float = 0.0, label: str = "
     return with_meta(fill([dragger(beta, stroke, stages=stages, h=h), back], wiring),
                      part="damper", kind="spring", inputs=[("k", "stiffness", 1), ("u", "gap", 1)],
                      outputs=[("z", "stroke", 1)] if read else [], constants={"β": beta, "κ_r": kappa_return},
-                     formula="-d(k/2*(u - z)**2 + κ_r/2*z**2); the stroke z moves at (k*(u - z) - κ_r*z)/β")
+                     words={"β": "the stroke's capacity", "κ_r": "the return spring's stiffness",
+                            "z": "the stroke"},
+                     formula="-d(k/2*(u - z)**2 + κ_r/2*z**2), and the stroke z moves at (k*(u - z) - κ_r*z)/β")
 
 
 def contact_cost(k_spring: float, k_damper: float) -> Callable[[Array, Array, Array, Array], Array]:
@@ -515,6 +564,8 @@ def contact(k_spring: float, k_damper: float, beta: float, kappa_return: float, 
                      inputs=[("g_s", "spring gate", 1), ("g_d", "damper gate", 1), ("u", "stretch", 1)],
                      outputs=[("z", "stroke", 1)],
                      constants={"κ_s": k_spring, "κ_d": k_damper, "β": beta, "κ_r": kappa_return},
+                     words={"κ_s": "the spring's stiffness where its gate is 1", "κ_r": "the return spring's stiffness",
+                            "κ_d": "the damper's stiffness where its gate is 1"},
                      formula="-d(κ_s*g_s/2*u**2 + κ_d*g_d/2*(u - z)**2 + κ_r/2*z**2)")
 
 
@@ -549,6 +600,9 @@ def latch(capacity: float, rate: float, wake: float, initial: float = 0.0, label
                      inputs=[("b", "battery", 1), ("U", "free to engage", 1), ("D", "acquire", 1),
                              ("T", "retain", 1), ("P", "other load", 1)],
                      outputs=[("v", "latch", 1)], constants={"λ": rate, "C": capacity, "b_0": wake},
+                     words={"λ": "how fast the latch moves to its target", "s": "how far the latch is engaged",
+                            "U": "whether it is free to engage", "D": "the target until it is engaged",
+                            "T": "the target once it is"},
                      formula="a motor told the rate λ*(U*((1 - s)*D + s*T) - v), s = θ((v - 0.3)/0.2)")
 
 
@@ -556,6 +610,21 @@ def live(b: Array, wake: float) -> Array:
     """How awake a motor is at the battery level ``b``: ``theta(b / wake)``, ``0`` on an empty
     battery and ``1`` from the level ``wake`` up (note ``live``)."""
     return theta(b / wake)
+
+
+def _motor_words(n: int) -> dict:
+    """What the names of a motor's formula are, beside the inputs the drawing shows entering."""
+    return {"C": "the capacity of the store the motor turns" if n == 1
+                 else f"the capacity of each of the {n} stores the motor turns",
+            "g": "how awake the motor is, 0 on an empty battery and 1 from the level b_0 up",
+            "b_0": "the battery level from which the motor is fully awake",
+            "P": "the load on that store from everything but the motor" if n == 1
+                 else "the load on each store from everything but the motor"}
+
+
+def _each(text: str, n: int) -> str:
+    """``text``, added over the motor's stores when there are several."""
+    return text if n == 1 else f"Σ({text})"
 
 
 def motor(capacity: float, wake: float, label: str = "motor", width: int = 1) -> Arrangement:
@@ -583,10 +652,10 @@ def motor(capacity: float, wake: float, label: str = "motor", width: int = 1) ->
                    ("pay", lambda v: -jnp.sum(applied(v) * (applied(v) + v[1 + 2 * n:])) / capacity,
                     lambda v: v[0])],
                   inputs=[("b", "battery", 1), ("q", "store", n), ("τ", "push", n), ("P", "other load", n)],
-                  forms=[("g*τ", "q"), ("-Σ(g*τ*(g*τ + P))/C", "b")],
-                  constants={"C": capacity, "b_0": wake}, where=[("g", "θ(b/b_0)")])
+                  forms=[("g*τ", "q"), (f"-{_each('g*τ*(g*τ + P)', n)}/C", "b")],
+                  constants={"C": capacity, "b_0": wake}, where=[("g", "θ(b/b_0)")], words=_motor_words(n))
     return with_meta(part, part="motor", kind="push of some inputs", glyph="motor", turns="q", powered="b",
-                     formula="g*τ*dq - Σ(g*τ*(g*τ + P))/C*db, g = θ(b/b_0)")
+                     formula=f"g*τ*dq - {_each('g*τ*(g*τ + P)', n)}/C*db, g = θ(b/b_0)")
 
 
 def motor_at_rate(capacity: float, wake: float, label: str = "motor at a rate", width: int = 1) -> Arrangement:
@@ -609,10 +678,10 @@ def motor_at_rate(capacity: float, wake: float, label: str = "motor at a rate", 
                   [("drive", applied, lambda v: v[1:1 + n]),
                    ("pay", lambda v: -jnp.sum(applied(v) * rate(v)), lambda v: v[0])],
                   inputs=[("b", "battery", 1), ("q", "store", n), ("u", "rate", n), ("P", "other load", n)],
-                  forms=[("C*g*u - P", "q"), ("-Σ((C*g*u - P)*g*u)", "b")],
-                  constants={"C": capacity, "b_0": wake}, where=[("g", "θ(b/b_0)")])
+                  forms=[("C*g*u - P", "q"), (f"-{_each('(C*g*u - P)*g*u', n)}", "b")],
+                  constants={"C": capacity, "b_0": wake}, where=[("g", "θ(b/b_0)")], words=_motor_words(n))
     return with_meta(part, part="motor", kind="push of some inputs", glyph="motor", turns="q", powered="b",
-                     formula="(C*g*u - P)*dq - Σ((C*g*u - P)*g*u)*db, g = θ(b/b_0)")
+                     formula=f"(C*g*u - P)*dq - {_each('(C*g*u - P)*g*u', n)}*db, g = θ(b/b_0)")
 
 
 def sweep(capacity: float, wake: float, radius: float, nu: float, gamma: float,
@@ -641,5 +710,9 @@ def sweep(capacity: float, wake: float, radius: float, nu: float, gamma: float,
                      inputs=[("b", "battery", 1), ("q_1", "store 1", 1), ("q_2", "store 2", 1),
                              ("g", "gate", 1), ("e", "extra rate", 1)],
                      constants={"C": capacity, "b_0": wake, "A": radius, "ν": nu, "γ": gamma},
-                     formula="two motors told r_1 = g*(ν*q_2 + γ*(A**2 - q_1**2 - q_2**2)*q_1) + e and "
-                             "r_2 = g*(-ν*q_1 + γ*(A**2 - q_1**2 - q_2**2)*q_2)")
+                     words={"C": "the capacity of each store", "A": "the radius of the circle they go round",
+                            "ν": "how many radians they go round per unit of duration",
+                            "γ": "how fast they return to that circle", "q_1": "the first store",
+                            "q_2": "the second", "e": "a further rate for the first store"},
+                     formula="two motors told the pushes C*r_1 and C*r_2, where r_1 = g*(ν*q_2 + γ*(A**2 - q_1**2 - q_2**2)*q_1) + e "
+                             "and r_2 = g*(-ν*q_1 + γ*(A**2 - q_1**2 - q_2**2)*q_2)")

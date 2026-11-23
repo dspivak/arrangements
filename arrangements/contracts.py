@@ -35,6 +35,7 @@ from .rvect import trivial
 from .stock_flow import stock_box, flow_box, _wire
 from .wiring import compose_seq, tensor_arrangements
 from .functors import closed_step
+from .nesting import even_blocks, factor_tree, run_flat
 
 EMPTY = jnp.zeros(0)
 
@@ -117,11 +118,13 @@ class ContractRun:
     stock_dim: int
 
     def read(self, state):
+        """The stocks by name. The configuration is worker by worker (effort, placement, cash), then the
+        fund's, the outside supplier's, the market's and the overhead's cash (``piecework``)."""
         q = self.arr.P.position(state)
         m = self.settlement_box.out_f(EMPTY, q)
         n = self.n
-        return dict(amplitudes=q[:n], positions=q[n:2*n], fund=q[2*n],
-                    worker_cash=q[2*n+1:3*n+1], outside_cash=q[3*n+1],
+        return dict(amplitudes=q[0:3*n:3], positions=q[1:3*n:3], fund=q[3*n],
+                    worker_cash=q[2:3*n:3], outside_cash=q[3*n+1],
                     market_cash=q[3*n+2], overhead_cash=q[3*n+3],
                     contracts=m[self.stock_dim:].reshape(n, 8))
 
@@ -131,7 +134,7 @@ def piecework(n: int, *, source: bool = True, wmax: float = 1., tau: float = .8,
               overhead: float = 2., leak: float = .1, alpha: float = 1., beta: float = 1.,
               needs: Optional[Numbers] = None, lam: float = .3,
               a0: float = .8, p0: float = .06, mu_a: float = .1, mu_p: float = .1, mu_f: float = .05,
-              legacy_receipts: bool = False, unsold_claim: float = .1) -> ContractRun:
+              legacy_receipts: bool = False, unsold_claim: float = .1, fast: bool = True) -> ContractRun:
     """Workers, two suppliers, contracts, a market and cash accounts.
 
     The historical receipt control credits the fund with the old spatially
@@ -141,6 +144,13 @@ def piecework(n: int, *, source: bool = True, wmax: float = 1., tau: float = .8,
     valuations are the contract's payment fractions; rates never exceed values.
     The fund's valuation is its sale price in this experiment. The external
     supplier consumes its output and pays from a recorded external balance.
+
+    Well-factored (book task well-factored, David, 2026-11-23: "good factorizations should have 2-7 boxes
+    inside"): the settlement box holds a box per worker (its effort, placement and cash; the workers nested
+    seven to a group in a box ``workers``) beside the fund's, outside's, market's and overhead's cash; the
+    flows are a box per worker (its wages-and-effort response, its two payments and its sales), nested the
+    same way, beside the overhead flow. With ``fast`` (the default) the composite computes by the flat
+    composite's maps (``nesting.run_flat``); ``tests/test_contracts.py`` checks the nested maps against them.
     """
     if (not isinstance(n, int) or n < 1 or tau <= 0 or value <= 0
             or outside_value <= 0 or unsold_claim <= 0 or not 0 <= wmax <= value
@@ -155,8 +165,12 @@ def piecework(n: int, *, source: bool = True, wmax: float = 1., tau: float = .8,
     if needs is not None and (len(needs) != n or not np.all(np.isfinite(needs))
                               or np.any(np.asarray(needs) < 0)):
         raise ValueError('one finite nonnegative need per worker required')
+    # The stocks worker by worker (book task well-factored, David, 2026-11-23: "make sure they are
+    # well-factored, so that the parts make sense"): worker j's effort, placement and cash, then the cash
+    # of the fund, the outside supplier, the market and the overhead.
     stock_dim = 3*n + 4
-    fund_idx, outside_idx, market_idx, overhead_idx = 2*n, 3*n+1, 3*n+2, 3*n+3
+    eff, pos, cash = (lambda j: 3*j), (lambda j: 3*j+1), (lambda j: 3*j+2)
+    fund_idx, outside_idx, market_idx, overhead_idx = 3*n, 3*n+1, 3*n+2, 3*n+3
 
     def offered(f):
         return gate(f, wmax, 1.)
@@ -187,49 +201,86 @@ def piecework(n: int, *, source: bool = True, wmax: float = 1., tau: float = .8,
     def settled(q):
         rows = []
         for j in range(n):
-            shares, rates = shares_rates(q[n+j], q[fund_idx])
-            rows.append(settlement(q[j], shares, values, rates / values))
+            shares, rates = shares_rates(q[pos(j)], q[fund_idx])
+            rows.append(settlement(q[eff(j)], shares, values, rates / values))
         return jnp.concatenate([q, *rows])
 
     settlement_box = _static(stock_dim, stock_dim+8*n, settled, 'piecework:contracts')
-    levels = [a0]*n + [p0]*n + [f0] + [0.]*n + [1e6, 1e6, 0.]
-    mobilities = [mu_a]*n + [mu_p]*n + [mu_f]*(n+4)
-    names = ([f'worker:{j}:effort' for j in range(n)]
-             + [f'worker:{j}:placement' for j in range(n)] + ['fund:cash']
-             + [f'worker:{j}:cash' for j in range(n)]
-             + ['outside:cash', 'market:cash', 'overhead:cash'])
-    stocks = tensor_arrangements([replace(stock_box(x, dt), label=label)
-        for x, dt, label in zip(levels, mobilities, names)])
-    arranged = compose_seq(stocks, settlement_box)
+    stock_list = []
+    for j in range(n):
+        stock_list += [replace(stock_box(a0, mu_a), label=f'worker:{j}:effort'),
+                       replace(stock_box(p0, mu_p), label=f'worker:{j}:placement'),
+                       replace(stock_box(0., mu_f), label=f'worker:{j}:cash')]
+    stock_list += [replace(stock_box(x, mu_f), label=label) for x, label in
+                   ((f0, 'fund:cash'), (1e6, 'outside:cash'), (1e6, 'market:cash'), (0., 'overhead:cash'))]
+    arranged = factor_tree(stock_list, settlement_box, ('piecework:contracts', _grouped(
+        [(f'worker:{j}', [eff(j), pos(j), cash(j)]) for j in range(n)], 'workers')
+        + [fund_idx, outside_idx, market_idx, overhead_idx]), fast=fast)
     dim = stock_dim + 8*n
-    boxes = []
+    per_worker = []
     for j in range(n):
         need = 0. if needs is None else float(needs[j])
         def worker_force(q, m, e, j=j, need=need):
-            da, dp = response(m[j], m[n+j], m[fund_idx], need)
-            force = jnp.zeros(dim).at[j].set(-da).at[n+j].set(-dp)
+            da, dp = response(m[eff(j)], m[pos(j)], m[fund_idx], need)
+            force = jnp.zeros(dim).at[eff(j)].set(-da).at[pos(j)].set(-dp)
             return EMPTY, force, EMPTY
-        boxes.append(Arrangement(configuration(trivial()), 0, dim, 0, 0,
+        flows = [Arrangement(configuration(trivial()), 0, dim, 0, 0,
             lambda q, m: EMPTY, lambda q, m, e: EMPTY, worker_force,
-            f'worker:{j}:wages-and-effort'))
+            f'worker:{j}:wages-and-effort')]
         off = stock_dim+8*j
         for supplier, payer in enumerate((fund_idx, outside_idx)):
-            boxes.append(replace(flow_box(lambda m, k=off+4+supplier: m[k],
-                dim, payer, 2*n+1+j), label=f'payment:{supplier}->worker:{j}'))
+            flows.append(replace(flow_box(lambda m, k=off+4+supplier: m[k],
+                dim, payer, cash(j)), label=f'payment:{supplier}->worker:{j}'))
         def revenue(m, off=off, j=j):
-            output = (jnp.exp(-m[n+j]**2/(2*tau))*m[j]
+            output = (jnp.exp(-m[pos(j)]**2/(2*tau))*m[eff(j)]
                       if legacy_receipts else m[off])
             return value * output
-        boxes.append(replace(flow_box(revenue, dim, market_idx, fund_idx),
+        flows.append(replace(flow_box(revenue, dim, market_idx, fund_idx),
                              label=f'market:fund-output:{j}'))
+        per_worker.append((f'worker:{j}:flows', flows))
     # The expense is nonnegative even when the fund is indebted; there is no
     # automatic income from the historical -leak*f term on a negative balance.
-    boxes.append(replace(flow_box(
+    overhead_flow = replace(flow_box(
         lambda m: overhead + leak*.05*jax.nn.softplus(m[fund_idx]/.05),
-        dim, fund_idx, overhead_idx), label='fund:overhead-and-leakage'))
-    routed = compose_seq(arranged, _wire(list(range(dim))*len(boxes), dim))
-    arr = compose_seq(routed, tensor_arrangements(boxes))
+        dim, fund_idx, overhead_idx), label='fund:overhead-and-leakage')
+    flat_flows = [f for _, fs in per_worker for f in fs] + [overhead_flow]
+    flat = compose_seq(compose_seq(compose_seq(tensor_arrangements(stock_list), settlement_box),
+                                   _wire(list(range(dim))*len(flat_flows), dim)),
+                       tensor_arrangements(flat_flows))
+    effects = [_flow_tree(x, dim) for x in _grouped(per_worker, 'workers', ' flows')] + [overhead_flow]
+    routed = compose_seq(arranged, _wire(list(range(dim))*len(effects), dim))
+    arr = compose_seq(routed, tensor_arrangements(effects))
+    if fast:
+        arr = run_flat(arr, flat)
     return ContractRun(arr, n, settlement_box, stock_dim)
+
+
+def _grouped(items, name, suffix='', most=7):
+    """``(name, children)`` items, one per worker, in consecutive groups of at most ``most`` (``nesting.even_blocks``)
+    named ``f'{name} i-j{suffix}'`` by the workers they hold (0-based, as the workers are labelled), grouped again
+    while there are more than ``most``; a single item stands alone. Returns the top-level list."""
+    spans = [(k, k) for k in range(len(items))]
+    while len(items) > most:
+        sizes, out, new_spans, at = even_blocks(len(items), most), [], [], 0
+        for s in sizes:
+            lo, hi = spans[at][0], spans[at + s - 1][1]
+            out.append((f'{name} {lo}-{hi}{suffix}', items[at:at + s]))
+            new_spans.append((lo, hi))
+            at += s
+        items, spans = out, new_spans
+    if len(items) > 1 and name and any(isinstance(x, tuple) for x in items):
+        return [(f'{name}{suffix}', items)]
+    return items
+
+
+def _flow_tree(node, dim):
+    """A flow, or ``(name, children)``: the box ``name`` holding its children, each fed a copy of the ``dim``
+    values (stocks and settlement) every flow reads; a copy of a copy is a copy, so the grouping changes nothing."""
+    if not isinstance(node, tuple):
+        return node
+    name, children = node
+    kids = [_flow_tree(c, dim) for c in children]
+    return replace(compose_seq(_wire(list(range(dim))*len(kids), dim), tensor_arrangements(kids)), label=name)
 
 
 def runner(
@@ -244,10 +295,10 @@ def runner(
     step = closed_step(model.arr, check=1)
     advance = jax.jit(lambda s: jax.lax.fori_loop(0, pre, lambda i, t: step(t), s))
     warmed = advance(model.arr.P.init if initial is None else initial)
-    # The nonempty state leaves are exactly the named scalar stocks, in order.
+    # The nonempty state leaves are exactly the named scalar stocks, in order (``ContractRun.read``).
     leaves, tree = jax.tree_util.tree_flatten(warmed)
     nonempty = [i for i, x in enumerate(leaves) if x.size]
-    fund_leaf = nonempty[2*model.n]
+    fund_leaf = nonempty[3*model.n]
     @jax.jit
     def after(drain):
         start = list(leaves)

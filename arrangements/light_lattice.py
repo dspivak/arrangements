@@ -130,8 +130,23 @@ def light_lattice(N: int = 8, kappa: float = 1.0, m: float = 1.0) -> Arrangement
     ``-kappa C^T C q``, produced by pullback-and-sum. The script's step at ``dt`` is
     ``kappa = dt^2, m = 1``."""
     parts = [edge_box(m) for _ in range(2 * N * N)] + [face_box(kappa) for _ in range(N * N)]
-    wired = compose_seq(_tensor_balanced(parts), lattice_wire(N))
-    return replace(wired, label=f"light_lattice(N={N}, kappa={kappa:g}, m={m:g})")
+    return lattice_of(N, parts, label=f"light_lattice(N={N}, kappa={kappa:g}, m={m:g})")
+
+
+def lattice_of(N: int, parts: List[Arrangement], label: str | None = None, fast: bool = True) -> Arrangement:
+    """``lattice_wire(N)`` composed with ``parts``, the ``2 N^2`` edges then the ``N^2`` faces, nested (book task
+    well-factored-2ac0e890): a box ``edges`` and a box ``faces``, each nested in blocks of at most seven
+    (``nest_groups``). It computes by the flat composite (balanced tensor); its state's leaves are the parts' in the
+    same order as before, so ``pack_state`` and the readers by leaves are unchanged. ``label`` defaults to
+    ``lattice_wire(N) of edge x 2N^2, face x N^2`` with the parts' own labels (a label opening with ``(`` is
+    read as an unnamed composite)."""
+    from .nest_groups import nest_groups
+    E = 2 * N * N
+    flat = compose_seq(_tensor_balanced(parts), lattice_wire(N))
+    if label is None:
+        label = f"lattice_wire(N={N}) of {parts[0].label} x {E}, {parts[E].label} x {N * N}"
+    return nest_groups(parts, lattice_wire(N), [(E, "edges", "edge"), (N * N, "faces", "face")], label=label,
+                       fast=fast, flat=flat)
 
 
 # ---------------------------------------------------------------------------

@@ -168,8 +168,17 @@ the abbreviations use the arithmetic Python and JavaScript share (`+ - * / **`, 
 with Python's precedences. A name may be any letters, Greek included; an underscore starts
 a subscript. A page adds the functions it needs to `ArrangementForms.functions`.
 
+**Everything in a formula is explained** (David, 2026-11-23: "either i can see it coming in from the left
+in the diagram … or it needs to be explained in words"). A name is the letter of a wire entering the mark,
+or it has `words`, and a click on the mark or on its formula opens the side panel, where a line gives its number
+or formula and those words (David, 2026-11-23, of those lines drawn under each formula: "all that text is too much there"); the functions
+beyond the standard ones have theirs in `ArrangementForms.functionWords`, added beside the function. A letter
+whose wire is a list (`lists`, its length) is written with the index j and the sum over j is written; a form
+with no list has no Σ. `Forms.unexplained(form)` lists what is left over, and the feeding test holds it
+empty; in the library, `feeding_parts.pushes` refuses a formula with a name that has neither.
+
 The view writes each letter after its terminal's name, the form under the mark (cut when
-long, whole in the sidebar with its abbreviations and constants), and at every snapshot
+long, whole in the sidebar), and at every snapshot
 evaluates the form at the values on the mark's entering wires and compares each load with
 the wire's `load`. A disagreement is drawn red and named in the sidebar, so a written
 formula is never trusted. Every entering wire that carries a load needs a letter, and a

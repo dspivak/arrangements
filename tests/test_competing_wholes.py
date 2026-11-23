@@ -17,6 +17,7 @@ import numpy as np
 from arrangements.arrangement import Arrangement, exact, zero_form
 from arrangements.coalgebra import configuration
 from arrangements.rvect import euclidean
+from arrangements.nesting import _flat_in_order, _leaves, factor_tree
 from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 from tests.test_bees_shadow import EMPTY, MOB, W, gfp_below, group, lfp_above, run_closed, run_phi, settle, steps_for, sun
@@ -306,8 +307,11 @@ def test_K10_the_share_is_a_port():
     assert leq(nu0, nu, EPS) and leq(mu0, mu, EPS)
 
 
-def graph_step(n, edges, s=5.0):
-    """Each edge a competition with a listener and a sun of its own; a part's supply sums its shares."""
+def graph_whole(n, edges, s=5.0, fast=True):
+    """The camps and one sun per edge, the parent giving each camp its shares; with two or more edges the
+    suns are one box, so the whole holds the camps and the suns (book task well-factored-2ac0e890: 2 to 7
+    things a box). Returns the boxes, the parent, the nesting and the composite (camps first, then suns,
+    the flat order)."""
     def in_f(q, m_out, n_in):
         ys = m_out[:n]
         supply = jnp.zeros(n)
@@ -320,7 +324,14 @@ def graph_step(n, edges, s=5.0):
         out_f=lambda q, m_out: EMPTY, in_f=in_f, omega=zero_form, label=f"competition_graph_{n}",
     )
     boxes = [group(3.0 - 0.3 * i, 1.5, label=f"camp{i}") for i in range(n)] + [sun(s) for _ in edges]
-    arr = compose_seq(tensor_arrangements(boxes), par)
+    suns = list(range(n, n + len(edges)))
+    tree = (par.label, [*range(n), ("suns", suns)] if len(suns) >= 2 else [*range(n), *suns])
+    return boxes, par, tree, factor_tree(boxes, par, tree, fast=fast)
+
+
+def graph_step(n, edges, s=5.0):
+    """Each edge a competition with a listener and a sun of its own; a part's supply sums its shares."""
+    arr = graph_whole(n, edges, s)[3]
     omega = arr.omega
     suns = jnp.full(len(edges), s)
 
@@ -350,6 +361,21 @@ def test_K11_the_obstruction_is_an_odd_cycle_not_a_count():
     assert line == [(1, -1, 1)]
     assert ring4 == [(1, -1, 1, -1)]
     assert ring3 == [] and ring5 == []
+
+
+def test_the_nested_graph_is_the_flat_one():
+    """``graph_whole``'s nesting (each camp a box, the suns one box), by its own maps, equals the flat
+    composite in the same order: the forcing at random points (book task well-factored-2ac0e890)."""
+    boxes, par, tree, made = graph_whole(5, [(0, 1), (1, 2), (2, 3), (3, 4), (4, 0)])
+    nested = factor_tree(boxes, par, tree, fast=False)
+    flat = _flat_in_order(boxes, par, _leaves(tree))
+    assert _leaves(tree) == list(range(len(boxes)))
+    rng = np.random.default_rng(15)
+    for _ in range(3):
+        q = jnp.asarray(rng.uniform(0.0, 4.0, flat.P.Q_dim))
+        for a in (nested, made):
+            for x, y in zip(flat.omega(q, EMPTY, EMPTY), a.omega(q, EMPTY, EMPTY)):
+                np.testing.assert_allclose(np.asarray(x), np.asarray(y), atol=1e-12)
 
 
 def test_K12_the_budget_bounds_a_frustrated_row_at_rest():

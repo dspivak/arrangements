@@ -63,7 +63,7 @@ import numpy as np
 from .arrangement import Arrangement, Numbers
 from .coalgebra import configuration
 from .rvect import euclidean
-from .science_native import draw_source, run_positions, wire_boxes
+from .science_native import draw_source, run_positions, wire_boxes, world_and
 
 N_HORSES = 4
 FAV = 0.5
@@ -139,7 +139,7 @@ def market(Y0: Array, outcomes_onehot: Array, W: Array, alpha_agree: float, alph
     for j in range(m):
         boxes.append(bettor(Y0[j], s0, W[j], H, logH, m, alpha_agree, alpha_evid, beta, c, f"bettor {j}"))
         feeds.append([(k + 1, i) for k in range(m) for i in range(K)] + [(0, x) for x in range(n)])
-    return wire_boxes(boxes, feeds)
+    return wire_boxes(boxes, feeds, world_and(m, "bettors", "bettors"), label="market")
 
 
 @partial(jax.jit, static_argnames=("steps",))
@@ -246,7 +246,7 @@ def market_gated(Y0: Array, S0: Array, outcomes_onehot: Array, W: Array, alpha_a
         boxes.append(bettor_gated(Y0[j], S0[j], W[j], H, jnp.log(H), m, alpha_agree, alpha_evid, beta, c, r, s1,
                                   f"bettor {j}"))
         feeds.append([(k + 1, i) for k in range(m) for i in range(K + 1)] + [(0, x) for x in range(n)])
-    return wire_boxes(boxes, feeds)
+    return wire_boxes(boxes, feeds, world_and(m, "bettors", "bettors"), label="market (gated)")
 
 
 @partial(jax.jit, static_argnames=("steps",))

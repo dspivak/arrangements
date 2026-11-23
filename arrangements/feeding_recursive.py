@@ -81,7 +81,8 @@ def absorber(energy_yield: float, uptake: float | Callable[[Array, Array, Array,
                      inputs=[("f", "food", 1), ("e", "reserve", 1), ("m_p", "parent mass", 1),
                              ("a_p", "parent acceptance", 1)],
                      forms=[(None if callable(uptake) else "k*f", "-f + ε*e")],
-                     constants={"ε": energy_yield, **({} if callable(uptake) else {"k": uptake})})
+                     constants={"ε": energy_yield, **({} if callable(uptake) else {"k": uptake})},
+                     words={"ε": "the energy the reserve gains per gram", "k": "the share of the food absorbed per unit of duration"})
 
 
 def collector(clearance: float, capacity: float | None = None, mass: float = 0., label: str = "collector", *,
@@ -91,7 +92,10 @@ def collector(clearance: float, capacity: float | None = None, mass: float = 0.,
     accept = admit(capacity)
     field = fp.pushes(f"{label}: export", 3, [("export", lambda v: clearance * v[0] * v[2], lambda v: v[1] - v[0])],
                       inputs=[("m", "store", 1), ("m_p", "parent mass", 1), ("a_p", "parent acceptance", 1)],
-                      forms=[("κ*m*a_p", "m_p - m")], constants={"κ": clearance})
+                      forms=[("κ*m*a_p", "m_p - m")], constants={"κ": clearance},
+                      words={"κ": "the share of its mass the store exports per unit of duration, the parent accepting",
+                             "a_p": "how far the parent accepts what is exported, from 0 to 1",
+                             "m_p": "the parent's mass"})
     wiring = fp.transfer(label, 3, 1, 2, 2, lambda m, n: jnp.concatenate([m, n]),
                          lambda m: jnp.stack([m[0], accept(m[0])]))
     return fp.with_meta(fp.fill([fp.rod_segment(1., mass, f"{label} store", stages=stages, h=h), field], wiring),
@@ -117,7 +121,9 @@ def separator(pass_fraction: float, cost: float, rate_law: RateLaw, ready: float
                         lambda v: p * v[0] + (1 - p) * v[3] - v[1] - c * v[2])],
                       inputs=[("z", "ready store", 1), ("f", "food", 1), ("e", "reserve", 1),
                               ("m_l", "local mass", 1), ("a_l", "local acceptance", 1)],
-                      forms=[(None, "p*z + (1 - p)*m_l - f - c*e")], constants={"p": p, "c": c})
+                      forms=[(None, "p*z + (1 - p)*m_l - f - c*e")], constants={"p": p, "c": c},
+                      words={"p": "the share of each gram taken that passes into the ready store z",
+                             "c": "what e pays per gram taken"})
     wiring = fp.transfer(label, 5, 1, 4, 1, lambda m, n: jnp.concatenate([m, n]), lambda m: m)
     return fp.fill([fp.rod_segment(1., ready, f"{label} ready store", stages=stages, h=h), field], wiring)
 
@@ -167,7 +173,9 @@ def settle(pass_fraction: float, cost: float, ready: float = 0., label: str = "m
                       [("settle", lambda v: v[1], lambda v: p * v[0] + (1 - p) * v[3] - c * v[2])],
                       inputs=[("z", "ready store", 1), ("J", "taken", 1), ("e", "reserve", 1),
                               ("m_l", "local mass", 1), ("a_l", "local acceptance", 1)],
-                      forms=[("J", "p*z + (1 - p)*m_l - c*e")], constants={"p": p, "c": c})
+                      forms=[("J", "p*z + (1 - p)*m_l - c*e")], constants={"p": p, "c": c},
+                      words={"p": "the share of each gram taken that passes into the ready store z",
+                             "c": "what e pays per gram taken"})
     wiring = fp.transfer(label, 5, 1, 4, 1, lambda m, n: jnp.concatenate([m, n]), lambda m: m)
     return fp.fill([fp.rod_segment(1., ready, f"{label} ready store", stages=stages, h=h), field], wiring)
 

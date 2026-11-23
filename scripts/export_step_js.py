@@ -1067,6 +1067,49 @@ def _parts_at(filled, count, q, m, n):
     return parts
 
 
+def _name(a):
+    """A node's name: its label, or for an unnamed composite (``"(g . f)"``) its wiring's."""
+    if a.label and not a.label.startswith("("):
+        return a.label
+    if a.construction and a.construction[0] == "compose":
+        return _name(a.construction[2])
+    return a.label
+
+
+def _names_below(a, memo):
+    if id(a) not in memo:
+        names = {_name(a)}
+        if a.construction:
+            names |= _names_below(a.construction[1], memo) | _names_below(a.construction[2], memo)
+        memo[id(a)] = names
+    return memo[id(a)]
+
+
+def _find(a, q, m, n, name, memo=None):
+    """Every node of ``a``'s construction named ``name``, outermost first, each as ``(node, q, m,
+    n)``: its configuration, the values its domain reads out and the inputs it is sent, at ``a``'s
+    point ``(q, m, n)``. A composite ``g . f`` locates ``f`` at ``(q_f, m, g.in_f(q_g, f.out_f(q_f,
+    m), n))`` and ``g`` at ``(q_g, f.out_f(q_f, m), n)``, as ``compose_seq`` does; a tensor splits.
+    Only subtrees that hold the name are entered, so a nested composite is found by its labels,
+    whatever its bracketing (book task well-factored)."""
+    memo = {} if memo is None else memo
+    if name not in _names_below(a, memo):
+        return []
+    found = [(a, q, m, n)] if _name(a) == name else []
+    if a.construction:
+        operation, f, g = a.construction
+        q_f, q_g = q[:f.P.Q_dim], q[f.P.Q_dim:]
+        if operation == "compose":
+            mid = f.out_f(q_f, m) if name in _names_below(f, memo) or name in _names_below(g, memo) else None
+            if name in _names_below(f, memo):
+                found += _find(f, q_f, m, g.in_f(q_g, mid, n), name, memo)
+            found += _find(g, q_g, mid, n, name, memo)
+        else:
+            found += _find(f, q_f, m[:f.out_dim_M], n[:f.in_dim_N], name, memo)
+            found += _find(g, q_g, m[f.out_dim_M:], n[f.in_dim_N:], name, memo)
+    return found
+
+
 def _input_loads(part, q, m, n):
     """The load ``part`` puts on its inputs at ``(q, m, n)``: its own one-form's component there."""
     return part.omega(q, m, n)[2]
@@ -1147,12 +1190,9 @@ def slot_model(count, places=None, foods=None, h=H, knobs=KNOBS):
         arr = build(places, params)
         q = arr.P.reads[0](unravel(flat))
         _, world, coupling = arr.construction
-        _, inside, wiring = coupling.construction
         q_world, q_coupling = q[:world.P.Q_dim], q[world.P.Q_dim:]
-        q_inside, q_wiring = q_coupling[:inside.P.Q_dim], q_coupling[inside.P.Q_dim:]
         out = world.out_f(q_world, empty)
-        sent = wiring.in_f(q_wiring, inside.out_f(q_inside, out), empty)
-        told = sent[:8]
+        told = coupling.in_f(q_coupling, out, empty)        # what the coupling sends the seeker
         richness, masses = _search_map(store(flat, "usual yield"), store(flat, "unexplored"))
 
         # The rate of every store: one Euler step of unit length of the same composite (``Phi``).
@@ -1164,52 +1204,34 @@ def slot_model(count, places=None, foods=None, h=H, knobs=KNOBS):
         _, filler, seeker = robot.construction
         q_robot = q_world[:robot.P.Q_dim]
         q_filler, q_seeker = q_robot[:filler.P.Q_dim], q_robot[filler.P.Q_dim:]
-        # The seeker's parts (P109 (k)): the body, the mouth, the collector, the slot, the mouth's
-        # battery and cord, the satiety store and its motor, the basal cost.
-        body, mouth, collector, _, _, mouth_cord, _, _, basal = _parts_at(seeker, 9, q_seeker, empty, told)
-        handed = seeker.in_f(q_seeker, filler.out_f(q_filler, empty), told)     # what the slot hands the filler
+        # The seeker's parts, found by their labels wherever the nesting puts them (book task
+        # well-factored): the mouth (the chamber, labeled as its box is, so the second found,
+        # the box being first), the husk collector, the mouth's cord, the basal cost. A part
+        # whose inner wiring carries its name is found twice; the outermost is the part.
+        find = lambda a, at, name: _find(a, *at, name)
+        at_seeker = (q_seeker, filler.out_f(q_filler, empty), told)
+        mouth = find(seeker, at_seeker, "mouth")[1]
+        collector, mouth_cord, basal = (find(seeker, at_seeker, x)[0] for x in
+                                        ("husk collector", "mouth cord", "basal cost"))
+        handed = seeker.in_f(*at_seeker)     # what the slot hands the filler
         gut = _input_loads(filler, q_filler, empty, handed)
         mouth_loads = _input_loads(*mouth)
         settle_rate = mouth[0].omega(*mouth[1:])[0]
         export = _input_loads(*collector)
-        # ``feeding_composed.body``'s parts, in its order: six stores (the fourth the wheels), the
-        # memory's stores, the organs' batteries, then the gripper, the lever, the eye, one learner
-        # per memory store, and the organs' cords (``feeding_composed.ORGANS``: drive, grip, lift,
-        # eye, brain). What each organ draws on the robot's battery is its cord's load there.
-        size = _left_spine(body[0].construction[1])
-        organs = 5
-        memory = (size - 9 - 2 * organs) // 2
-        roles = [None, None, None, None, None, None, *[None] * memory, *[None] * organs, None, None, None,
-                 *[None] * memory, "wheels", "gripper", "lever", "eye", "memory"]
-        by_name = {}
-        for role, (part, *at) in zip(roles, _parts_at(body[0], size, *body[1:]), strict=True):
-            if role:
-                by_name.setdefault(role, []).append((part, at))
-        battery_of = lambda name: sum((_input_loads(part, *at)[0] for part, at in by_name.get(name, [])), 0.)
-        motors = [battery_of(name) for name in ("gripper", "lever", "wheels", "eye", "memory")]
-        # The coupling's pieces: per casing a contact and a latch, then taking, one lid motor per
-        # casing, spilling, the hands' battery and the hands' cord, which carries the latches' and
-        # lids' draw.
-        pieces = _factors(inside.construction[2], 3 * count + 4)
-        q_pieces = q_inside[inside.construction[1].P.Q_dim:]
-        sent_pieces, qa, na = sent[8:], 0, 0
-        hands = 0.
-        for k, piece in enumerate(pieces):
-            if k == 3 * count + 3:
-                hands = _input_loads(piece, q_pieces[qa:qa + piece.P.Q_dim], empty,
-                                     sent_pieces[na:na + piece.in_dim_N])[0]
-            qa, na = qa + piece.P.Q_dim, na + piece.in_dim_N
+        # What each organ draws on the robot's battery is its cord's load there
+        # (``feeding_composed.ORGANS``: the drive is the wheels', grip the gripper's, lift the
+        # lever's, the brain the memory's); the hands' cord carries the latches' and lids' draw.
+        cord = lambda a, at, organ: _input_loads(*find(a, at, f"{organ} cord")[0])[0]
+        motors = [cord(seeker, at_seeker, organ) for organ in ("grip", "lift", "drive", "eye", "brain")]
+        hands = cord(coupling, (q_coupling, out, empty), "hands")
         pays = jnp.stack([*motors, hands, _input_loads(*mouth_cord)[0], _input_loads(*basal)[0], gut[1],
                           store(rate, "battery")[0]])
         flows = jnp.stack([told[5], settle_rate[0], mouth_loads[2], -gut[0], export[0]])
 
         # What the body's wiring tells the wheels, the gripper's and lever's motors, and the eye.
-        parts_of = lambda i: _parts_at(body[0], size, *body[1:])[i]
-        at_part = 6 + memory + organs
-        wheels, gripper, lever, eye = (parts_of(3), parts_of(at_part), parts_of(at_part + 1), parts_of(at_part + 2))
-        grip_motor = _parts_at(gripper[0], 1, *gripper[1:])[0][3]
-        lift_motor = _parts_at(lever[0], 1, *lever[1:])[0][3]
-        told_motors = jnp.stack([wheels[3][1], grip_motor[2], lift_motor[2], eye[3][3]])
+        sent_to = lambda name: find(seeker, at_seeker, name)[0][3]     # the inputs it is sent
+        told_motors = jnp.stack([sent_to("wheels")[1], sent_to("grip motor")[2], sent_to("lift motor")[2],
+                                 sent_to("eye")[3]])
         return (told, out[:7], out[7:7 + 6 * count], out[7 + 6 * count:], store(flat, "usual yield"),
                 richness, masses, store(flat, "destination"), rate, pays, flows, told_motors)
 

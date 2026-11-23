@@ -6,7 +6,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const E=require('./explorer-core.js'),G=require('./explorer-layout.js'),Forms=require('./explorer-forms.js');
 global.ArrangementForms=Forms;
 const C=require('./feeding-explorer-composite.js');
-Forms.functions.θ=C.theta;
+Forms.functions.θ=C.theta;Forms.functionWords.θ=C.thetaWords;
 const modules=['feeding-explorer-data.js','feeding-explorer-robot-data.js'].filter(f=>fs.existsSync(path.join(__dirname,f)));
 
 // Every drawn formula, evaluated at the values on its wires, gives the loads the library returned there.
@@ -51,6 +51,26 @@ for(const file of modules){
       for(const label of labels){
         const loaded=E.carriesLoad(model.nodes,{branches:entering.filter(w=>w.label===label)});
         assert.equal(loaded,label===m.turns||label===m.powered,`${m.id}: ${label}`);
+      }
+    }
+  });
+  test(file+': everything in a drawn formula is explained, by an entering wire or in words',()=>{
+    for(const n of data.scene.nodes){
+      const form=n.form||n.law;if(!form)continue;
+      assert.deepEqual(Forms.unexplained(form),[],n.id);
+      // The letters are on the terminals: each is on the one kind of wire that enters the mark.
+      const entering=new Set(data.scene.wires.filter(w=>w.target===n.id).map(w=>w.label));
+      for(const label of Object.keys(form.letters))assert.ok(entering.has(label),`${n.id}: no wire ${label}`);
+      if(n.form){
+        const line=Forms.plain(Forms.written(form));
+        assert.ok(line.length<=44,`${n.id}: its formula is cut on the canvas: ${line}`);
+        // A list is as long as the words under the formula say: its whole hose enters the mark.
+        for(const [letter,length] of Object.entries(form.lists||{})){
+          const label=Object.keys(form.letters).find(l=>form.letters[l]===letter);
+          assert.deepEqual(data.scene.wires.map((w,i)=>[w,data.branches[i].width]).filter(([w])=>w.target===n.id&&w.label===label).map(([,k])=>k),[length],`${n.id}: ${letter}`);
+        }
+        // A sum sign stands only where there is a list to add over, and then its index is explained.
+        assert.equal(line.includes('Σ'),!!form.lists,`${n.id}: ${line}`);
       }
     }
   });

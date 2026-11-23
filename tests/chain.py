@@ -111,27 +111,38 @@ def closed_run(arr: Arrangement, T: int):
     return positions, states
 
 
+def _chain_init(K, parameter):
+    """The initial state of ``compose_chain`` of ``K`` particles of kind ``parameter``: its
+    bracketing (left-nested for ``K <= 7``, nested in blocks above; ``wiring.compose_chain``)."""
+    from arrangements.wiring import compose_chain
+    return compose_chain([harmonic_particle(parameter, 1.0, 1.0)] * K).P.init
+
+
 def conf_state(q):
     """Flat ``q in R^K`` as the state of a chain of configuration particles."""
     K = q.shape[0]
-    return (nest_left([q[i:i + 1] for i in range(K)]), jnp.zeros(0))
+    if K <= 7:
+        return (nest_left([q[i:i + 1] for i in range(K)]), jnp.zeros(0))
+    from arrangements.coalgebra import configuration
+    return state_like(_chain_init(K, configuration), jnp.asarray(q))
 
 
 def phase_state(q, p):
     """Flat ``(q, p)`` as the state of a chain of phase particles."""
     K = q.shape[0]
-    return (nest_left([(q[i:i + 1], p[i:i + 1]) for i in range(K)]), jnp.zeros(0))
+    if K <= 7:
+        return (nest_left([(q[i:i + 1], p[i:i + 1]) for i in range(K)]), jnp.zeros(0))
+    from arrangements.coalgebra import phase
+    return state_like(_chain_init(K, phase), jnp.stack([jnp.asarray(q), jnp.asarray(p)], axis=1).reshape(-1))
 
 
 def conf_flat(state, K):
-    parts, _ = state
-    return jnp.concatenate(unnest_left(parts, K))
+    return flat_state(state)
 
 
 def phase_flat(state, K):
-    parts, _ = state
-    pairs = unnest_left(parts, K)
-    return jnp.concatenate([q for q, _ in pairs]), jnp.concatenate([p for _, p in pairs])
+    qp = flat_state(state).reshape(K, 2)
+    return qp[:, 0], qp[:, 1]
 
 
 def flat_state(state):

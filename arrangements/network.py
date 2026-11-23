@@ -205,11 +205,17 @@ def drawn_network(
     params0 = jnp.asarray(params0, dtype=float)
     data = jnp.asarray(data, dtype=float).reshape(-1, m)
     labels = jnp.asarray(labels, dtype=float).reshape(-1, n)
-    leaves = [example_box(data, "datum")]
-    leaves += [parameter_box(w, eta, f"w{i}") for i, w in enumerate(params0)]
-    leaves += [example_box(labels, "label")]
-    net = tensor_arrangements(leaves)
     P = len(params0)
+    weights = [parameter_box(w, eta, f"w{i}") for i, w in enumerate(params0)]
+    if P > 7:
+        # Nested (book task well-factored-2ac0e890): more than seven parameter boxes sit in a box ``parameters`` (the
+        # identity wiring), nested in blocks of at most seven, so the first layer holds the datum, the
+        # parameters and the label. Same position order; it computes by the flat maps. Blocks are numbered from 1
+        # (``parameters 1-7`` holds w0..w6).
+        from .nesting import nest
+        weights = [nest(weights, fan_box(P, list(range(P)), "copy"), "parameters", label="parameters")]
+    leaves = [example_box(data, "datum")] + weights + [example_box(labels, "label")]
+    net = tensor_arrangements(leaves)
 
     def affine(net, k_in, k_out, rest, W_at, b_at):
         """Wires ``[v (k_in), W (k_out x k_in), b (k_out or none), rest]`` -> ``[W v + b, rest]``."""

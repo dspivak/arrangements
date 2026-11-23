@@ -104,8 +104,9 @@ def test_labels():
     """ILLUSTRATE. The composites are what RESULTS.md says they are, read off their labels."""
     tank = tank_of("euler", 0.1).label
     flux = flux_lattice(N, A0, X0, "symplectic", 0.1).label
-    assert tank.startswith("(lattice_wire(N=6) . ") and "cap" in tank and "coil4" in tank
-    assert flux.startswith("(lattice_wire(N=6) . ") and "mass" in flux and "spring4" in flux
+    # Nested since well-factored-2ac0e890 (``light_lattice.lattice_of``): "lattice_wire(N=6) of cap x 72, coil4 x 36".
+    assert tank.startswith("lattice_wire(N=6) of ") and "cap" in tank and "coil4" in tank
+    assert flux.startswith("lattice_wire(N=6) of ") and "mass" in flux and "spring4" in flux
 
 
 @pytest.mark.parametrize("tau", [0.5, 0.1, 0.01])

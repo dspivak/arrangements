@@ -54,7 +54,7 @@ from .arrangement import Arrangement, Numbers
 from .coalgebra import configuration
 from .functors import Phi
 from .rvect import euclidean
-from .science_native import _IN_DIR, _IN_POS, draw_source, neighbours, wire_boxes
+from .science_native import _IN_DIR, _IN_POS, draw_source, neighbours, wire_boxes, world_and
 
 Z0 = 0.5
 
@@ -156,7 +156,7 @@ def failure_community(draws: Array, A: np.ndarray, mus: Array, slices: Sequence[
         boxes.append(failure_holder(jnp.asarray(p0), wj, mus, dt, arm, eps, beta, tau_inv, f"holder {j}",
                                     form))
         feeds.append([(k + 1, c) for k in nb[j] for c in range(2 * n)] + [(0, j)])
-    return wire_boxes(boxes, feeds)
+    return wire_boxes(boxes, feeds, world_and(m, "holders", "holders"), label="failure community")
 
 
 @partial(jax.jit, static_argnames=("A_key", "slices", "hold", "arm", "eps", "beta", "tau_inv", "form"))

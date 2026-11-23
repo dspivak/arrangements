@@ -547,10 +547,12 @@
           svg('text',{y:-p.h/2-12,'text-anchor':'middle',class:'ex-part-label'},g,node.label);
           // A field's 1-form under its mark, red when it disagrees with the loads on the mark's wires. A form
           // too long for the canvas is cut here and whole in the sidebar: a long one is a field not yet factored.
+          // Clicked, it or its mark opens the side panel, where each thing in it is explained (`writeGlossary`).
           if(Forms&&node.form){
             const line=Forms.written(node.form),long=Forms.plain(line).length>44;
-            const tag=svg('text',{y:p.h/2+15,'text-anchor':'middle',class:'ex-form'+(this.formCheck(node).ok?'':' ex-form-wrong'),stroke:'white','stroke-width':3,'paint-order':'stroke'},g);
+            const tag=svg('text',{y:p.h/2+15,'text-anchor':'middle',class:'ex-form ex-form-open'+(this.formCheck(node).ok?'':' ex-form-wrong'),stroke:'white','stroke-width':3,'paint-order':'stroke'},g);
             writeSvg(tag,long?[{text:Forms.plain(line).slice(0,42)+'…'}]:line);
+            svg('title',{},tag,'Click: what each letter is');
           }
           // A static map's law is written under its circle while the circle is the one chosen: each
           // abbreviation on its own line, whole, red when it disagrees with the value on the wire leaving it.
@@ -592,7 +594,21 @@
       const load=E.forkWire(leaving).load,back=Forms.pullbackCheck(node.law,entering.map(edge=>({label:edge.label,value:edge.value,load:edge.load})),load);
       return {...value,ok:back.ok,error:back.error,carries:!!E.magnitude(load)};
     }
-    // The constants of a form or a law, on one line of the sidebar: name = number.
+    // A part's description, the subscripts in its formulas lowered.
+    writeDescription(text){
+      const p=html('p',{},this.sidebar,Forms?undefined:text);
+      if(Forms)writeHtml(p,Forms.wordRuns(text,true));
+    }
+    // Under a form in the sidebar: the wires entering the mark by letter, then each thing that is not a wire.
+    writeGlossary(form){
+      const wires=Object.entries(form.letters||{});
+      if(wires.length){
+        const p=html('p',{class:'ex-form'},this.sidebar);
+        wires.forEach(([label,letter],k)=>writeHtml(p,[...(k?[{text:',  '}]:[]),...Forms.runs(Forms.parse(letter)),{text:': '+label}]));
+      }
+      for(const {head,words,tail} of Forms.glossary(form))writeHtml(html('p',{class:'ex-form'},this.sidebar),[...head,...(words?[{text:': '},...Forms.wordRuns(words)]:[]),...(tail||[])]);
+    }
+    // The constants of a law, on one line of the sidebar: name = number.
     writeConstants(written){
       const constants=Object.entries(written.constants||{});
       if(!constants.length)return;
@@ -649,8 +665,7 @@
         if(Forms&&n.form){
           html('h3',{},this.sidebar,'Inclination field');
           writeHtml(html('output',{class:'ex-form'},this.sidebar),Forms.written(n.form));
-          for(const line of Forms.definitions(n.form))writeHtml(html('p',{class:'ex-form'},this.sidebar),line);
-          this.writeConstants(n.form);
+          this.writeGlossary(n.form);
           const verdict=this.formCheck(n);
           html('p',{class:verdict.ok?'ex-form-agrees':'ex-form-wrong'},this.sidebar,verdict.ok?'This formula gives the loads now on its wires.'
             :verdict.error||('This formula disagrees with the model: '+verdict.rows.filter(r=>!r.ok).map(r=>`at ${r.letter} it gives ${E.format(r.got)}, the model ${E.format(r.want)}`).join('; ')+'.'));
@@ -666,7 +681,7 @@
             +(verdict.carries?', and the load on that wire goes back along each entering wire times the formula’s derivative there.':'.')
             :(verdict.error||`This formula gives ${E.format(verdict.got)}, the model ${E.format(verdict.want)}`)+'.');
         }
-        if(n.description)html('p',{},this.sidebar,n.description);
+        if(n.description)this.writeDescription(n.description);
         for(const [key,label] of [['value','State'],['configuration','Readout'],['inclination','Total inclination']])if(n[key]!==undefined){html('h3',{},this.sidebar,label);html('output',{},this.sidebar,E.format(n[key]));}
       }
       if(n||w)this.button(this.sidebar,'Show all wires',()=>{this.focusWire=null;this.focusSignal=null;this.focusNode=null;this.render();});
@@ -674,7 +689,7 @@
       if(w){const edge=this.geometry.edges.find(e=>e.branches.some(b=>b.id===w.id));wires=this.focusSignal?this.project.wires.filter(w=>E.signalKey(w)===this.focusSignal):edge?.branches||[w];}
       else if(n)wires=this.project.wires.filter(w=>w.source===n.id||w.target===n.id);
       if(!n&&!w){
-        const description=this.model.nodes.get(this.model.scope)?.description;if(description)html('p',{},this.sidebar,description);
+        const description=this.model.nodes.get(this.model.scope)?.description;if(description)this.writeDescription(description);
         html('p',{},this.sidebar,'Open a box to replace this view with its contents. Use the path above to come back out.');
         html('h3',{},this.sidebar,'At this level');
         for(const node of this.model.children())this.button(this.sidebar,node.label,()=>this.choose(node,{shiftKey:false}));

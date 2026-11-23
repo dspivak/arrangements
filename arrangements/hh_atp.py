@@ -2,7 +2,8 @@
 
 Quantities are SI, with amounts and total currents for a one-square-centimetre
 patch. Gate systems nest into channel systems; the channels, stores, leak
-and ATPase fill the membrane wiring. live_membrane exposes the composed
+and ATPase fill the membrane wiring, nested as two boxes, the stores and the
+flows (``membrane``). live_membrane exposes the composed
 library step and local observations to the browser exporter.
 """
 import math
@@ -16,6 +17,7 @@ from jax import Array
 from arrangements.arrangement import Arrangement, zero_form
 from arrangements.coalgebra import CotCoalg
 from arrangements.functors import open_step
+from arrangements.nesting import factor_tree
 from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
 
 jax.config.update("jax_enable_x64", True)
@@ -163,11 +165,23 @@ def membrane_wiring() -> Arrangement:
                   lambda m: jnp.stack([m[0], m[3]]))
 
 
-def membrane(capacity: float = CAPACITY, clamp: bool = False) -> Arrangement:
+MEMBRANE_TREE = ("membrane", [("stores", [0, 1, 2, 3]), ("flows", [4, 5, 6, 7])])
+
+
+def membrane_parts(capacity: float = CAPACITY, clamp: bool = False) -> list:
+    """The eight parts ``membrane_wiring`` holds, in its order."""
     stores = [capacitor(), ion_pool("sodium", NA_BATH, .050, clamp),
               ion_pool("potassium", K_BATH, -.077, clamp), atp_pool(clamp)]
-    return fill([*stores, sodium_channel(), potassium_channel(), leak(),
-                 sodium_potassium_pump(capacity)], membrane_wiring())
+    return [*stores, sodium_channel(), potassium_channel(), leak(), sodium_potassium_pump(capacity)]
+
+
+def membrane(capacity: float = CAPACITY, clamp: bool = False) -> Arrangement:
+    """The membrane wiring filled, nested as ``MEMBRANE_TREE`` (book task well-factored-2ac0e890: every
+    box holds 2 to 7 things): the *stores*, what the membrane holds (charge, sodium, potassium, ATP), and
+    the *flows*, what moves it (the two channels, the leak, the pump). The order is the flat one's, so the
+    state and the configuration are the same numbers in the same order; it computes by the flat
+    composite's maps (``nesting.run_flat``)."""
+    return factor_tree(membrane_parts(capacity, clamp), membrane_wiring(), MEMBRANE_TREE)
 
 
 def amounts(state: Any) -> np.ndarray:

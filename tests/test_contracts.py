@@ -39,6 +39,21 @@ def cash(arr, s):
     return np.asarray(arr.P.position(s))
 
 
+def total_cash(model, s):
+    """Every cash stock of a piecework model, summed (read by name: the configuration is worker by worker)."""
+    r = model.read(s)
+    return float(r['fund'] + np.sum(r['worker_cash']) + r['outside_cash'] + r['market_cash'] + r['overhead_cash'])
+
+
+def labels(a, out=None):
+    """Every label in ``a``'s construction (its boxes and parts, at every depth)."""
+    out = set() if out is None else out
+    out.add(a.label)
+    for x in (a.construction or ())[1:]:
+        labels(x, out)
+    return out
+
+
 def test_agreed_output_benefits_and_conserved_payments():
     c = contract([.6, .4], [2., 3.], [.5, 1/3])
     np.testing.assert_allclose(c.out_f(jnp.zeros(0), jnp.array([10.])),
@@ -82,11 +97,9 @@ def test_piecework_cash_is_transfers_not_the_workers_want():
         settled = np.asarray(before['contracts'])[0]
         expected = .05*(4*settled[0] - settled[4] - 2. - .1*20.)
         np.testing.assert_allclose(after['fund'] - before['fund'], expected, atol=1e-12)
-        old_cash = cash(arr, arr.P.init)[2:]
-        new_cash = cash(arr, step(arr.P.init))[2:]
-        np.testing.assert_allclose(new_cash.sum(), old_cash.sum(), atol=1e-9)
+        np.testing.assert_allclose(total_cash(model, step(arr.P.init)), total_cash(model, arr.P.init), atol=1e-9)
         rows.append(float(after['fund']))
-        assert 'piecework:contracts' in arr.label and 'payment:1->worker:0' in arr.label
+        assert {'piecework:contracts', 'payment:1->worker:0'} <= labels(arr)
     np.testing.assert_allclose(rows[0], rows[1], atol=1e-13)
 
 
@@ -100,8 +113,7 @@ def test_piecework_short_run_keeps_allocations_and_cash_consistent():
     assert np.isfinite(cash(model.arr, s)).all()
     assert (output >= 0).all()
     assert np.all(rows[:, :2].sum(axis=1) <= output + 1e-12)
-    np.testing.assert_allclose(cash(model.arr, s)[4:].sum(),
-                               cash(model.arr, model.arr.P.init)[4:].sum(), atol=1e-8)
+    np.testing.assert_allclose(total_cash(model, s), total_cash(model, model.arr.P.init), atol=1e-8)
 
 
 def test_unreachable_or_nonpaying_supplier_cannot_claim_output():
@@ -114,3 +126,26 @@ def test_unreachable_or_nonpaying_supplier_cannot_claim_output():
     row = np.asarray(unpaid.read(unpaid.arr.P.init)['contracts'])[0]
     np.testing.assert_allclose(row[[0, 2, 4, 6]], 0., atol=0.)
     assert row[1] > 0 and row[5] > 0
+
+
+@pytest.mark.parametrize('n', [1, 2, 8])
+def test_piecework_well_factored_nested_equals_flat(n):
+    """Book task well-factored-2ac0e890 (David, 2026-11-23: "good factorizations should have 2-7 boxes
+    inside"): a box per worker (effort, placement, cash) and a box of its flows, the workers seven to a
+    group, every box holding at most seven; the nested composite's own maps (``fast=False``) equal the
+    built composite's (the flat maps) at points along a run and over closed steps."""
+    from arrangements.nesting import box_counts, carry_state
+    kw = dict(needs=[.3 + .1 * j for j in range(n)], value=4., alpha=.5, source_position=1.5)
+    built, nested = piecework(n, **kw), piecework(n, fast=False, **kw)
+    counts = box_counts(built.arr)
+    assert counts == box_counts(nested.arr) and all(k <= 7 for _, k in counts), counts
+    assert ('piecework:contracts', 5) in counts and counts[0] == ('(top level)', 3)
+    step_b, step_n = closed_step(built.arr, check=1), closed_step(nested.arr, check=1)
+    s_b, s_n = built.arr.P.init, carry_state(built.arr.P.init, nested.arr.P.init)
+    e = jnp.zeros(0)
+    for _ in range(10):
+        q = built.arr.P.position(s_b)
+        np.testing.assert_allclose(np.asarray(built.arr.omega(q, e, e)[0]),
+                                   np.asarray(nested.arr.omega(q, e, e)[0]), atol=1e-12)
+        s_b, s_n = step_b(s_b), step_n(s_n)
+    np.testing.assert_allclose(cash(built.arr, s_b), cash(nested.arr, s_n), atol=1e-12)

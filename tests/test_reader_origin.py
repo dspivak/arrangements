@@ -127,6 +127,7 @@ import pytest
 
 from arrangements.arrangement import Arrangement, exact, zero_form
 from arrangements.coalgebra import configuration
+from arrangements.nesting import _flat_in_order, _leaves, factor_tree
 from arrangements.reaction_network import separability_ratio
 from arrangements.rvect import ReactiveVectorSpace, constant, euclidean
 from arrangements.wiring import compose_seq, tensor_arrangements, trivial_parameter
@@ -213,9 +214,22 @@ def transition_box(t):
     )
 
 
-def network(boxes, transitions):
-    """``compose_seq(tensor(boxes..., transitions...), wire)``, closed. ``boxes`` is a list
-    of ``(name, x0, rv)``; the composite's configuration is their values in that order."""
+SUPPLY_NAMES = ("F", "site", "site1", "site2", "S", "pore")
+
+
+def network(boxes, transitions, groups=()):
+    """``compose_seq(tensor(boxes..., transitions...), wire)``, closed, nested by meaning (book task
+    well-factored-2ac0e890: every box holds 2 to 7 things): the *species*, the *supplies* (fuel,
+    placements, pore: ``SUPPLY_NAMES``) and the *transitions*, each a box when it holds two or more.
+    ``groups`` lists ``(name, labels)``: transitions boxed together inside the transitions (``variants``
+    boxes each variant's own). ``boxes`` is a list of ``(name, x0, rv)``, species first; the composite's
+    configuration is their values in that order (the nesting keeps the flat order)."""
+    parts, wire, tree = network_parts(boxes, transitions, groups)
+    return factor_tree(parts, wire, tree)
+
+
+def network_parts(boxes, transitions, groups=()):
+    """The parts, the flat wire and the nesting ``network`` composes."""
     names = [b[0] for b in boxes]
     degree = {n: sum(r == n for t in transitions for r in t.reads) for n in names}
     offset, acc = {}, 0
@@ -235,7 +249,25 @@ def network(boxes, transitions):
     )
     parts = [box(x0, degree[n], rv, n) for n, x0, rv in boxes]
     parts += [transition_box(t) for t in transitions]
-    return compose_seq(tensor_arrangements(parts), wire)
+
+    def block(name, idx):
+        return idx[0] if len(idx) == 1 else (name, idx)
+
+    species = [i for i, n in enumerate(names) if n not in SUPPLY_NAMES]
+    held = [i for i, n in enumerate(names) if n in SUPPLY_NAMES]
+    assert species + held == list(range(len(names))), "species first, then supplies"
+    assert len(transitions) <= 7 or groups, "more than 7 transitions: box some of them with ``groups``"
+    at = {t.label: len(boxes) + k for k, t in enumerate(transitions)}
+    grouped = {label for _, labels in groups for label in labels}
+    inner = [block(name, [at[l] for l in labels]) for name, labels in groups]
+    inner += [at[t.label] for t in transitions if t.label not in grouped]
+    # the transitions' order inside their box is the flat one when nothing is grouped
+    children = [c for c in (block("species", species) if species else None,
+                            block("supplies", held) if held else None,
+                            block("transitions", inner) if inner else None) if c is not None]
+    tree = ("reaction network", children)
+    assert _leaves(tree) == sorted(_leaves(tree)) or groups, "the nesting keeps the flat order"
+    return parts, wire, tree
 
 
 def settle(arr, steps):
@@ -483,7 +515,12 @@ def binding_transitions(c, k_on, K):
 def binding(x, c, k_on, K, h=H_BIND):
     boxes = [("A", x[0], euclidean(1, h)), ("B", x[1], euclidean(1, h)),
              ("C", x[2], euclidean(1, h))] + supplies(c)
-    return network(boxes, binding_transitions(c, k_on, K))
+    return network(boxes, binding_transitions(c, k_on, K), BINDING_GROUPS)
+
+
+# what builds and what is lost, so the transitions box holds 3 (book task well-factored-2ac0e890)
+BINDING_GROUPS = (("production", ("assembly", "rebuild", "boundary production")),
+                  ("losses", ("damage", "saturating loss", "boundary loss", "leak")))
 
 
 def binding_run(x, c, k_on, K, duration, h=H_BIND):
@@ -609,7 +646,9 @@ def drifting(q, c, direction, h=H):
              ("F", c.fuel, HELD), ("site", c.site, HELD),
              ("S", c.substrate, constant(jnp.array([[h * V_DRIFT]]))),
              ("pore", c.rho, HELD)]
-    return network(boxes, ts)
+    # eight transitions: what builds and what is lost boxed, beside the drift
+    return network(boxes, ts, (("production", ("assembly", "rebuild", "boundary production")),
+                               ("losses", ("damage", "saturating loss", "boundary loss", "protected leak"))))
 
 
 def trajectory(arr, steps, every):
@@ -718,7 +757,10 @@ def variants(x, c, crowding, feed=None, h=H):
     boxes = [("A1", x[0], euclidean(1, h)), ("A2", x[1], euclidean(1, h)),
              ("B", x[2], euclidean(1, h)), ("F", x[3], fuel_rv),
              ("site1", 0.0, HELD), ("site2", D2, HELD), ("S", 0.0, HELD), ("pore", c.rho, HELD)]
-    return network(boxes, variants_transitions(c, crowding, feed))
+    return network(boxes, variants_transitions(c, crowding, feed), VARIANT_GROUPS)
+
+
+VARIANT_GROUPS = tuple((f"variant {i}", (f"rebuild {i}", f"loss {i}", f"leak {i}")) for i in (1, 2))
 
 
 START = [1.0, 1.0, 20.0, 1.0]
@@ -768,3 +810,33 @@ def test_T4c_on_a_fed_fuel_the_worse_match_is_lost_first():
     print(f"T4c at J = {J:.3f}: both", both[:4], "; A1 alone", alone[:4])
     assert both[1] > 1e-3
     assert both[0] < alone[0]
+
+
+def test_the_nested_networks_are_the_flat_ones():
+    """``network``'s nesting (species, supplies, transitions; each variant's transitions boxed), by its own
+    maps and as returned, equals the flat composite in the same order at random points, and every box
+    holds 2 to 7 things (book task well-factored-2ac0e890)."""
+    q = [0.7, 3.0]
+    cases = [([("A", q[0], euclidean(1, H)), ("B", q[1], euclidean(1, H))] + supplies(PORE),
+              direct_transitions(PORE), ()),
+             ([("A", q[0], euclidean(1, H)), ("B", q[1], euclidean(1, H))] + supplies(PORE),
+              potential_terms(PORE), ()),
+             ([("A1", 1.0, euclidean(1, H)), ("A2", 1.0, euclidean(1, H)), ("B", 20.0, euclidean(1, H)),
+               ("F", 1.0, euclidean(1, H)), ("site1", 0.0, HELD), ("site2", D2, HELD), ("S", 0.0, HELD),
+               ("pore", 0.0, HELD)], variants_transitions(EXPOSED, True, feed=2.0), VARIANT_GROUPS),
+             ([("A", 1.0, euclidean(1, H)), ("B", 2.0, euclidean(1, H)), ("C", 0.5, euclidean(1, H))]
+              + supplies(PORE), binding_transitions(PORE, 50.0, 0.5), BINDING_GROUPS)]
+    rng = np.random.default_rng(16)
+    for boxes, ts, groups in cases:
+        parts, wire, tree = network_parts(boxes, ts, groups)
+        made = factor_tree(parts, wire, tree)
+        nested = factor_tree(parts, wire, tree, fast=False)
+        flat = _flat_in_order(parts, wire, _leaves(tree))
+        def sizes(node):
+            return [] if isinstance(node, int) else [len(node[1])] + [s for c in node[1] for s in sizes(c)]
+        assert all(2 <= s <= 7 for s in sizes(tree)), sizes(tree)
+        for _ in range(3):
+            x = jnp.asarray(rng.uniform(0.1, 3.0, flat.P.Q_dim))
+            for a in (nested, made):
+                for u, v in zip(flat.omega(x, EMPTY, EMPTY), a.omega(x, EMPTY, EMPTY)):
+                    np.testing.assert_allclose(np.asarray(u), np.asarray(v), atol=1e-12)
