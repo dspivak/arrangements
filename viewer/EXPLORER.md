@@ -1,7 +1,12 @@
 # Arrangement explorer
 
 Open `feeding-explorer.html` directly in a browser. No server, build step, CDN or
-new dependency is needed. Press Play, click Receiver, then Wheels and Dragger.
+new dependency is needed. Press Play, click Seeker with a slot, then Body and motors
+(`?filler=robot` puts a whole robot in the seeker's slot; `?scope=ID` opens a level).
+Since 2026-11-22 the page is read from the library composite: see "Feeding, read from
+the composite" below. The earlier hand-typed graph, `feeding-arrangement.js`, and its models
+`feeding-model.js` and `food-learning.js` were retired on 2026-11-23; the node tests run on the
+composite's scene.
 The path above the picture returns to any enclosing arrangement. Shift-click
 parts (or use Select parts), give the group a name, then Put a box around. Open
 the new box, Remove this box, or Undo grouping. Grouping is saved locally.
@@ -226,7 +231,7 @@ second has the bottom row and ends at the plug of the motor's cord; the wires it
 hears stand between and end at the side of its body (`MOTOR` in `explorer-layout.js`). Clicked, it opens into its two pushes, whose count
 is written under the circle. In feeding every motor is drawn so: the gripper, the lift,
 the look and the scan, the drive, the nine memory motors and each Contact's latch motor
-(`motorPart` in `feeding-arrangement.js`). Each stands in a box of its own (`drivePart`)
+(in the retired hand-typed graph, `motorPart`; on the composite, every `motor_at_rate` part). Each stands in a box of its own (`drivePart`)
 with the static map that computes what it is told, the Grip drive holding the grip rate and
 the grip motor: the box has no outputs, so a part that needs the same rate, as the memory's
 yield rule needs the grip's, reads what that rate reads and computes it (David, 2026-11-22,
@@ -305,9 +310,10 @@ Each renderer is a function receiving `{group, node, scene, svg, width, height}`
 Draw within the supplied local SVG group centered at the origin. The `svg`
 helper creates elements with attributes and text safely. Renderers must not
 step or mutate the model. Nodes name their renderer with a string, and the
-registry can also provide defaults keyed by `kind`. `feeding-animations.js`
-is the example registry. Its wheels turn from the actual wheel state, its
-springs show their own stretch, and a casing uses its own food and height.
+registry can also provide defaults keyed by `kind`. `feeding-animations.js`,
+the example registry for the retired hand-typed feeding graph, was removed with it on 2026-11-23 (it
+is in the library's history: its wheels turned from the actual wheel state, its springs showed their
+own stretch, and a casing used its own food and height).
 Custom canvas or WebGL drawing can be mounted in an SVG `foreignObject`; the
 renderer is recreated on each observation. It may return a cleanup function,
 called before the next rendering and when the view is destroyed.
@@ -364,47 +370,37 @@ bridges, rather than claiming all examples have already been adapted.
 and styles into one offline file. It refuses nonfinite JSON. The result has the
 same navigation, grouping and inspection controls as the live example.
 
-## Feeding model and checks
+## Feeding, read from the composite
 
-`arrangements/feeding.py` builds sources and receiver using library tensor and
-composition, with source readouts in the order food, opening, access, height,
-red, place. The receiver owns its eye, wheels and search. Each casing owns its ground damper memory. The
-spatial coupling owns the stroke and latch of each contact. It connects the
-same seven receiver inputs and seven outputs to any number of six-output
-casings. Enter Receiver, then Mouth, to see its one opener and one digestor.
-When a second casing comes within reach during a grip, the first contact
-remains engaged until release. An exact tie with a free grip waits for a
-difference in the contact scores.
+`scripts/export_feeding_explorer.py` writes `feeding-explorer-data.js` (and, with `--robot`,
+`feeding-explorer-robot-data.js`) from `feeding_composed.feeding_with_slot(..., learning=True)`:
+the scene is `arrangements/explore_composite.diagram` of the composite's construction (a box per
+fill the code names, a store per integrand, a static map per computed group of numbers, a field
+mark per part with a field at the nicest kind of the rubric its `meta` records: a spring as one
+spring between the wires its stretch is the difference of, a motor as one motor opened into its
+two pushes, any other sum of pushes one mark per term wired only to what its traced code reads,
+with its formula in their letters), and `readings(state, places, params)` and `step(...)` are the
+library's own code exported by `export_step_js.javascript`. `feeding-explorer-composite.js` only
+copies their numbers into the scene. Checks: `tests/test_explore_composite.py` (the marks' forms
+add up to the composite's field at every store; each push mark reads what its trace reads; every
+formula is the code's) and `node --test viewer/feeding-explorer-composite.test.js` (every drawn
+formula gives the loads the library returned; motors' walls; every level lays out). Regenerate
+the data files after any change to the feeding parts.
 
-`feeding-arrangement.js` assembles the displayed contributions and integrates
-their sum for the patrol reference. Its six source-output loads agree with
-the library composition at five points in the 60-unit patrol episode.
-For the learning cart, the observer reads its live stores and motor rates.
-The learning regression compares the displayed field, mouth flows and memory
-loads with `food-learning.js` through a meal and a mid-grip casing addition.
-The generic explorer has no feeding constants.
-Spatial coupling shows the sums of the individual red signals, contact loads,
-food within grip, opening rates, and food taken. Each Contact computes its own
-contributions. When casings compete, each latch reads its own offer, the grip
-and battery, the comparison of contact scores, and the other latches. The
-opening and eating contributions have separate inputs. Food memory and
-search likewise shows one rate map for each of the nine stores. Select a
-map or follow its output port to inspect its immediate inputs. Click an input
-in the sidebar to follow it to its source. These wires
-describe dependencies for all configurations, including during a pause when
-an individual input happens to have no effect.
+## The feeding page inside the explorer
 
-The outer Illustrated view shares its scene, plots, playback, and editing
-controls with `feeding.html` through `feeding-view.js`. Its clock steps the
-food-learning receiver. The explorer observes that outing on each display
-update and on every edit or pause. Enter Receiver → Food memory and search
-to inspect the meal, destination, search clock, spatial stores and their
-motors. Enter Receiver → Mouth to read the held casing and the opening and
-eating rates at the same instant. The patrol adapter remains available for
-the earlier model and its independent field checks.
+The outer Illustrated view is `feeding.html`'s own view, `feeding-view.js`, which runs the one model:
+the code generated from `feeding_with_slot` (`feeding-slot-N.js`, one file per count of casings, by
+`scripts/export_step_js.py --slot --casings N`). On each display update the explorer's adapter takes
+the view's state, places, knobs and time (the view's `observe`) and redraws; the view's controls are
+the explorer's playback, and the form under the diagram adds a casing to the run. The diagram is drawn
+for the data file's three casings; while the run has another count it holds its last numbers and says
+so. With `?filler=robot` the explorer runs its own generated step. The page's checks:
+`node viewer/feeding-slot.test.js` (whole outings on the generated code), `tests/test_feeding_page.py`
+(each committed `feeding-slot-N.js` is the library's step) and `tests/test_feeding_slot_learning.py`.
 
-Run `node --test viewer/explorer.test.js viewer/explorer-layout.test.js`, `node viewer/feeding-model.test.js`,
-and `.venv/bin/python -m pytest tests/test_explore.py -q`. The browser regression
+Run `node --test viewer/explorer.test.js viewer/explorer-layout.test.js viewer/explorer-forms.test.js
+viewer/feeding-explorer-composite.test.js` and `.venv/bin/python -m pytest tests/test_explore.py -q`. The browser regression
 also checks click-through, grouping/undo, both styles, playback and mobile
 overflow; the book run records its script and results. Geometry checks visit
 every expandable feeding level and nested groups, testing actual port counts,

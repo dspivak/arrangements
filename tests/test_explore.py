@@ -18,8 +18,7 @@ from arrangements.wiring import compose_seq, parallel_arrangements, trivial_para
 from arrangements.explore import inspect, scene, write_html
 from arrangements.functors import Phi
 from arrangements.interpretation import trivial_omega
-from arrangements.feeding import feeding, pack_state, unpack_state
-from arrangements.feeding import add_casing, couple, receiver, source
+from arrangements.feeding import feeding
 
 jax.config.update('jax_enable_x64', True)
 EMPTY=jnp.zeros(0)
@@ -76,43 +75,9 @@ def test_tensor_scene_keeps_product_coordinates_and_boundary_directions():
     result=subprocess.run(['node','-e',script,json.dumps(sc)],cwd=viewer,capture_output=True,text=True)
     assert result.returncode==0,result.stderr
 
-def test_feeding_browser_field_and_port_loads_match_library_phi():
-    viewer=Path(__file__).resolve().parents[1]/'viewer'
-    source="""const F=require('./feeding-model.js'),A=require('./feeding-arrangement.js');
-    const samples=[];let s=F.START.slice();
-    for(let i=0;i<=30000;i++){if([0,6000,10000,23000,30000].includes(i)){
-      const a=A.evaluate(s,F.PLACES,F.DEFAULTS);samples.push({s,rate:a.rate,loads:F.PLACES.map((_,k)=>{
-        const targets=['Food ','Opening ','Access ','Height ','Red ','Place '].map(x=>x+(k+1));
-        const map=new Map(a.nodes.map(n=>[n.id,n]));
-        const sourceNodes=new Set(a.nodes.filter(n=>{while(n){if(n.id==='casing-'+k)return true;n=map.get(n.parent);}return false;}).map(n=>n.id));
-        return targets.map(label=>a.wires.filter(w=>w.label===label&&sourceNodes.has(w.source)&&!sourceNodes.has(w.target)).reduce((s,w)=>s+w.load,0));
-      })});}s=F.rk4(s,.002,F.PLACES,F.DEFAULTS);}console.log(JSON.stringify(samples));"""
-    samples=json.loads(subprocess.check_output(['node','-e',source],cwd=viewer,text=True))
-    parameters=json.loads(subprocess.check_output(['node','-e',"console.log(JSON.stringify(require('./feeding-model.js').DEFAULTS))"],cwd=viewer,text=True))
-    arr=feeding(parameters=parameters);phi=Phi(arr);tau=1e-5
-    # JIT one real Phi step; no hand integration stands in for it.
-    def step(state):
-        _,fiber=phi.step(state,tau)
-        return fiber((EMPTY,trivial_omega(0)))[1]((jnp.zeros(2),EMPTY))[1]
-    step=jax.jit(step)
-    for sample in samples:
-        state=pack_state(sample['s'],3)
-        new=unpack_state(step(state),3)
-        np.testing.assert_allclose(new,jnp.array(sample['s'])+tau*jnp.array(sample['rate']),atol=1e-12)
-        trace=inspect(arr,state)
-        np.testing.assert_allclose(trace['children'][1]['m_load'][7:],np.array(sample['loads']).reshape(-1),atol=1e-10)
-
-def test_feeding_four_rounds_agree_with_browser_rk4():
-    from arrangements.pcK import PhiK
-    viewer=Path(__file__).resolve().parents[1]/'viewer'
-    parameters=json.loads(subprocess.check_output(['node','-e',"console.log(JSON.stringify(require('./feeding-model.js').DEFAULTS))"],cwd=viewer,text=True))
-    arr=feeding(stages=4,h=.002,parameters=parameters)
-    phi=PhiK(arr)
-    # pcK rounds interface is exercised by its public run_one below.
-    out,new=phi.run_one((EMPTY,trivial_omega(0)),lambda out:(jnp.zeros(2),EMPTY))
-    viewer=Path(__file__).resolve().parents[1]/'viewer'
-    expected=json.loads(subprocess.check_output(['node','-e',"const F=require('./feeding-model.js');console.log(JSON.stringify(F.rk4(F.START,.002,F.PLACES,F.DEFAULTS)));"],cwd=viewer,text=True))
-    np.testing.assert_allclose(unpack_state(new,3),expected,atol=1e-12)
+# The two checks of the hand-typed page model (feeding-model.js, feeding-arrangement.js) against the library
+# left with that model on 2026-11-23; the page now steps with code generated from the composite, checked by
+# tests/test_feeding_page.py and tests/test_export_step_js.py.
 
 
 def test_multiround_inspection_reads_without_advancing():
@@ -146,50 +111,72 @@ def test_smooth_plot_observation_and_export():
     assert any(w['load'] is None for w in sc['wires'])
 
 
-def test_feeding_zero_and_three_casings_use_same_composition_api():
-    for places,foods in [((),()),((0.,1.,2.),(3.,4.,5.))]:
+def test_feeding_one_and_three_casings_use_same_composition_api():
+    for places,foods in [((0.,),(3.,)),((0.,1.,2.),(3.,4.,5.))]:
         arr=feeding(places,foods)
-        flat=jnp.array([3.,-1.,-.4,0.,0.,0.,0.,6.,0.,8.]+[x for f in foods for x in [f,0.,-.4,0.,-.4,0.,0.,0.]])
-        np.testing.assert_allclose(unpack_state(pack_state(flat,len(foods)),len(foods)),flat)
-        r=inspect(arr,pack_state(flat,len(foods)))
-        assert len(r['children'][1]['m_load'])==7+6*len(foods)
+        _,world,coupling=arr.construction
+        # the coupling is sent the seeker's six outputs, each casing's four and the pile's two
+        assert coupling.label=='spatial coupling'
+        assert world.out_dim_N==coupling.out_dim_M==6+4*len(foods)+2
+        assert world.in_dim_N==coupling.in_dim_M==8
 
 
-def test_a_single_receiver_releases_its_first_casing_before_feeding_from_the_next():
-    params = {'kexp': 0., 'ktau': 0.}
-    step = dict(parameters=params, stages=4, h=.002)
-    body = receiver(**step)
-    apple = source(0., 10., **step)
-    for count in (0, 1, 2, 4):
-        world = couple(body, [apple]*count, **step)
-        assert world.construction[1].construction[1] is body
-        assert body.in_dim_N == body.out_dim_N == 7
+def _stores_by_key(arr):
+    """Each store of a feeding composite by a key that does not depend on the count of casings
+    (as the page's ``feedingStoreKeys``): its casing and label, or its path and label, and an
+    occurrence count for repeats."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "export_step_js", Path(__file__).resolve().parents[1] / "scripts" / "export_step_js.py")
+    exporter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(exporter)
+    seen, keys, casing = {}, {}, 0
+    for s in exporter.stores(arr):
+        if s["path"] and s["path"][0].startswith("casing("):
+            casing += s["label"] == "food"
+            base = ("casing", casing - 1, s["label"])
+        else:
+            base = (tuple(s["path"]), s["label"])
+        seen[base] = seen.get(base, 0) + 1
+        keys[(*base, seen[base] - 1)] = s
+    return keys
 
-    from arrangements.pcK import PhiK
-    def advance(world, state, steps):
-        dynamics = PhiK(world)
-        def tick(_, state):
-            return dynamics.with_state(state).run_one((EMPTY,trivial_omega(0)),
-                                                     lambda _: (jnp.zeros(2),EMPTY))[1]
-        return jax.lax.fori_loop(0,steps,tick,state)
 
-    empty_world = couple(body,[],**step)
-    first, initial = add_casing(body,[],empty_world.P.init,apple,**step)
-    assert initial[0][0] is empty_world.P.init[0][0]
-    held = advance(first,initial,500)
-    # The spatial coupling's state nests by its parts now; the latch is the last number of the flat state.
-    assert unpack_state(held,1)[-1] > .99
-    # Carry the actual body and the first contact into the enlarged world.
-    (same_body,old_apple),_ = held
-    both,inserted = add_casing(body,[apple],held,apple,**step)
-    assert inserted[0][0] is same_body
-    during = advance(both,inserted,500)
-    flat = unpack_state(during,2)
-    # The casing's state nests by its parts now; its food is the first number of it.
+def test_a_single_seeker_releases_its_first_casing_before_feeding_from_the_next():
+    """One casing held and eaten from; a second set down at the same place while the latch holds
+    the first, its state carried over store by store as the page carries it: the second is not
+    touched until the first is released, then both are eaten. (Until 2026-11-23 this ran on the
+    hinged model with ``feeding.add_casing``.)"""
     from jax.flatten_util import ravel_pytree
-    assert flat[10] < ravel_pytree(old_apple)[0][0] and flat[18] == 10. and flat[19] == 0. and flat[25] == 0.
-    after = unpack_state(advance(both,during,3000),2)
-    assert after[10] < .1 and after[18] < .1
+    from arrangements.pcK import PhiK
+    params = {'kexp': 0., 'ktau': 0.}
+    step = dict(parameters=params, stages=4, h=.002, learning=False)
+    one = feeding((0.,), (10.,), **step)
+    two = feeding((0., 0.), (10., 10.), **step)
+
+    def advance(world, flat, steps):
+        dynamics = PhiK(world)
+        unravel = ravel_pytree(world.P.init)[1]
+        def tick(_, state):
+            return dynamics.with_state(state).run_one((EMPTY,trivial_omega(0)), lambda _: (jnp.zeros(2),EMPTY))[1]
+        return np.asarray(ravel_pytree(jax.lax.fori_loop(0,steps,tick,unravel(jnp.asarray(flat))))[0])
+
+    keys_one, keys_two = _stores_by_key(one), _stores_by_key(two)
+    at = lambda keys, key: keys[key]["start"]
+    latch = lambda k: next(key for key in keys_two if key[-2] == f'contact latch {k} store')
+    food = lambda k: ('casing', k, 'food', 0)
+    held = advance(one, ravel_pytree(one.P.init)[0], 500)
+    assert held[at(keys_one, latch(1))] > .99
+    # Carry every store into the two-casing world; the new casing and its contact keep their start.
+    carried = np.asarray(ravel_pytree(two.P.init)[0]).copy()
+    for key, s in keys_two.items():
+        if key in keys_one:
+            carried[s["start"]:s["start"] + s["size"]] = held[keys_one[key]["start"]:keys_one[key]["start"] + s["size"]]
+    during = advance(two, carried, 500)
+    assert during[at(keys_two, food(0))] < held[at(keys_one, food(0))]
+    assert during[at(keys_two, food(1))] == 10. and during[at(keys_two, latch(2))] == 0.
+    after = advance(two, during, 3000)
+    assert after[at(keys_two, food(0))] < .1 and after[at(keys_two, food(1))] < .1
 
 
 def test_separate_coordinate_maps_keep_inactive_inputs_and_individual_loads():

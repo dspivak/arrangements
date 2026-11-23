@@ -2,42 +2,77 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Feeding · Arrangement explorer</title><link rel="stylesheet" href="explorer.css"><link rel="stylesheet" href="feeding-view.css"></head>
 <body>
-<nav aria-label="Other arrangements" style="max-width:75rem;margin:.8rem auto;padding:0 1rem"><a class="ex-link" href="hodgkin-huxley-explorer.html">Explore Hodgkin–Huxley with ATP</a></nav>
+<!-- The diagram, every value and every load are read from the library composite
+     (feeding_composed.feeding_with_slot) by scripts/export_feeding_explorer.py; nothing about
+     feeding is typed on this page (book P109 (f), act (4)). One model runs: the feeding view's
+     (feeding-view.js, stepping the generated feeding-slot-N.js); the explorer reads its state,
+     places and knobs through the view's observe and draws them. The diagram is drawn for the
+     explorer data's count of casings; while the run has another count, it holds its last numbers
+     and says so. ?filler=robot fills the seeker's slot with a whole robot (P109 (j)), run by the
+     explorer's own generated step; ?scope=ID opens the page at a part. -->
+<nav aria-label="Other arrangements" style="max-width:75rem;margin:.8rem auto;padding:0 1rem">
+  <a class="ex-link" href="hodgkin-huxley-explorer.html">Explore Hodgkin–Huxley with ATP</a>
+  · <a class="ex-link" id="other-filler" href="?filler=robot">Fill the slot with a robot</a>
+</nav>
 <section id="feeding-view" class="feeding-ui"></section>
 <main id="explorer"></main>
 <form id="add-casing" style="max-width:75rem;margin:1rem auto;padding:0 1rem">
-  <label>Place on the line <input id="place" type="number" step="any" value="0" required></label>
+  <label>Place on the line <input id="place" type="number" step="any" value="0" min="-8.5" max="8.5" required></label>
   <button type="submit">Add a full casing</button>
+  <output id="casing-note"></output>
 </form>
-<script src="feeding-model.js"></script>
-<script src="food-learning.js"></script>
-<script src="feeding-view.js"></script>
 <script src="explorer-core.js"></script>
 <script src="explorer-layout.js"></script>
 <script src="explorer-forms.js"></script>
 <script src="explorer.js"></script>
-<script src="feeding-arrangement.js"></script>
-<script src="feeding-animations.js"></script>
+<script src="feeding-explorer-composite.js"></script>
+<script src="feeding-slot-3.js"></script>
+<script src="feeding-view.js"></script>
 <script>
+const query = new URLSearchParams(location.search);
+const robot = query.get('filler') === 'robot';
+const link = document.getElementById('other-filler');
 const rootView = document.getElementById('feeding-view');
-let explorer;
-const feeding = createFeedingView(rootView, {
-  onChange() { explorer?.refresh(); },
-  openReceiver() { explorer.enter('receiver'); explorer.crumbs.scrollIntoView({block: 'start'}); }
-});
-const adapter = {snapshot: () => feeding.observe(FeedingArrangement.observeLearning)};
-explorer = new ArrangementExplorer.View(document.getElementById('explorer'), adapter, {
-  renderers: FeedingAnimations, storageKey: 'feeding-learning-explorer-v1',
-  rootAnimation: rootView,
-  playback: feeding,
-  description: 'The receiver uses the same gripper, opener and digestor for every casing.'
-});
-// feeding-explorer.html?scope=wheels opens the page at that level (a part's id), scrolled to the diagram.
-const opened = new URLSearchParams(location.search).get('scope');
-if (opened) { explorer.enter(opened); explorer.crumbs.scrollIntoView({block: 'start'}); }
-document.getElementById('add-casing').addEventListener('submit', event => {
-  event.preventDefault();
-  feeding.addCasing(10, document.getElementById('place').valueAsNumber);
-});
+const form = document.getElementById('add-casing'), note = document.getElementById('casing-note');
+if (robot) { link.href = '?'; link.textContent = 'Fill the slot with the gut wall'; rootView.hidden = true; form.hidden = true; }
+const script = document.createElement('script');
+script.src = robot ? 'feeding-explorer-robot-data.js' : 'feeding-explorer-data.js';
+script.onload = () => {
+  const data = robot ? FeedingExplorerRobot : FeedingExplorer;
+  const adapter = FeedingExplorerComposite.compositeAdapter(data);
+  let explorer, feeding = null;
+  if (!robot) {
+    // The feeding view runs the model; the explorer copies its state, places and knobs.
+    const follow = ({state, places, params, time, module}) => {
+      const fits = module.casings === data.casings;
+      if (fits) {
+        adapter.state = Float64Array.from(state); adapter.places = places.slice();
+        adapter.params = Array.from(params); adapter.time = time;
+      }
+      note.textContent = fits ? '' : `The diagram is drawn for ${data.casings} casings; the run now has ${module.casings}, so the diagram holds its last numbers.`;
+      return fits;
+    };
+    feeding = createFeedingView(rootView, {
+      onChange() { if (feeding && feeding.observe(follow)) explorer?.refresh(); }
+    });
+    feeding.observe(follow);
+    delete adapter.step; delete adapter.reset;
+  }
+  explorer = new ArrangementExplorer.View(document.getElementById('explorer'), adapter, {
+    storageKey: robot ? 'feeding-composite-robot-explorer-v1' : 'feeding-composite-explorer-v1',
+    ...(feeding ? {rootAnimation: rootView, playback: feeding} : {}),
+    description: 'Read from the library composite feeding_with_slot: its boxes, stores, static maps and '
+      + 'inclination fields, each field at the nicest kind of the rubric it has, every value and load computed by the '
+      + 'library’s own code.'
+  });
+  const opened = query.get('scope');
+  if (opened) { explorer.enter(opened); explorer.crumbs.scrollIntoView({block: 'start'}); }
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    feeding?.addCasing(10, document.getElementById('place').valueAsNumber);
+  });
+  window.explorer = explorer; window.adapter = adapter; window.feeding = feeding;
+};
+document.body.append(script);
 </script>
 </body></html>

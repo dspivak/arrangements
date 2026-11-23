@@ -1,8 +1,62 @@
-/* The standalone scene and the explorer observe one food-learning outing per page. */
+/* The standalone scene and the explorer observe one food-learning outing per page.
+   The model is the library's composite, feeding_composed.feeding_with_slot (the separator mouth, the husk
+   collector, the pile on the ground, the gut wall in the slot, casings without a hinge), stepped by code
+   GENERATED from it by scripts/export_step_js.py: one module per count of casings, feeding-slot-N.js, global
+   FeedingSlotN, with step, observe, start and curve, and the metadata naming every store. No equation of the
+   model is typed here; the numbers shown are read off observe's fields and the module's metadata.
+   A casing added during a run loads the module for one more casing and carries the state over store by store,
+   matched by name (keyOf below); the new casing's stores start as that module's start() makes them.
+   The page object's observe(observer) calls observer({state, places, params, time, module, observed}).
+   Claude Opus 5.5, subagent of c5f9ecc9, 2026-11-22 (P109 (f) act (1), second half). */
+const FEEDING_BASE = (typeof document !== 'undefined' && document.currentScript)
+  ? new URL('.', document.currentScript.src).href : '';
+const FEEDING_MAX_CASINGS = 6;
+
+function feedingModule(count) {
+  return globalThis['FeedingSlot' + count] || null;
+}
+
+// Each store of a generated module named by a key that does not depend on the count of casings:
+// "casing k|label" for a casing's stores, "path|label" otherwise, with an occurrence count for repeats.
+function feedingStoreKeys(module) {
+  const seen = new Map(), keys = new Map();
+  for (const store of module.stores) {
+    const base = 'casing' in store ? `casing ${store.casing}|${store.label}` : `${store.path.join('/')}|${store.label}`;
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    keys.set(base + '|' + n, store);
+  }
+  return keys;
+}
+
+// Copy every store of `from` (a state of module `fromModule`) into `to` (a state of `toModule`) where
+// both modules have it; the rest of `to` is left as it is.
+function feedingCarry(fromModule, from, toModule, to) {
+  const old = feedingStoreKeys(fromModule);
+  for (const [key, store] of feedingStoreKeys(toModule)) {
+    const source = old.get(key);
+    if (source && source.size === store.size)
+      for (let j = 0; j < store.size; j++) to[store.start + j] = from[source.start + j];
+  }
+  return to;
+}
+
+function loadFeedingModule(count) {
+  const ready = feedingModule(count);
+  if (ready) return Promise.resolve(ready);
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = FEEDING_BASE + 'feeding-slot-' + count + '.js';
+    script.onload = () => (feedingModule(count) ? resolve(feedingModule(count)) : reject(Error('no module ' + count)));
+    script.onerror = () => reject(Error('could not load ' + script.src));
+    document.head.appendChild(script);
+  });
+}
+
 function createFeedingView(container, options = {}) {
   container.innerHTML = `<div class="wrap">
 <h1 class="standalone">Feeding</h1>
-  <p class="lede">The eye watches for red casings while the cart searches. When it sees one, the cart heads there to eat. A meal teaches the cart how much food a place yields. A later look teaches it how soon to come back. If the place is still empty, its chance of getting the next flag recovers more slowly.</p>
+  <p class="lede">The eye watches for red casings while the cart searches. When it sees one, the cart heads there to eat. The mouth tears food off the casing it holds: of each gram, a share goes into its chamber and the husks into a collector, which empties onto a pile on the ground. The gut wall in the robot's slot takes up what the chamber holds and charges the battery. A meal teaches the cart how much food a place yields; a later look teaches it how soon to come back.</p>
 
   <div class="ask">
     <span class="q">Will the cart find its way back to food it remembers?</span>
@@ -15,15 +69,15 @@ function createFeedingView(container, options = {}) {
 
   <div class="card">
     <h2>The line</h2>
-    <svg id="scene" viewBox="0 0 940 392" role="img" aria-label="The cart on the line, its eye's gaze, the casings on the ground, and the search probability density beneath the destination flag"></svg>
+    <svg id="scene" viewBox="0 0 940 420" role="img" aria-label="The cart on the line with its chamber and husk collector, its eye's gaze, the casings on the ground, the pile of husks, and the search probability density beneath the destination flag"></svg>
     <p class="hint"><strong>Next flag · probability per unit distance.</strong> The shaded area under each stretch of ground is its chance of getting the next flag. The curve updates as the cart explores. The flag marks the destination already chosen.</p>
     <div class="tools">
       <button id="enter-receiver" hidden>Open Receiver</button>
       <button id="add-full">Add a full casing</button>
       <button id="add-empty">Add an empty casing</button>
-      <span class="hint" style="margin:0">During an outing, click a depleted casing to refill it. You can also add a casing at any time. Before Play, drag the cart or a casing, click a casing to toggle its food, or drag it off either end to remove it.</span>
+      <span class="hint" style="margin:0" id="casing-hint">During an outing, click a depleted casing to refill it. You can also add a casing at any time, up to ${FEEDING_MAX_CASINGS}. Before Play, drag the cart or a casing, click a casing to toggle its food, or drag it off either end to remove it (one casing always stays).</span>
     </div>
-    <p style="margin:var(--s3) 0 0">The battery starts at <span class="knob" id="k-batt" tabindex="0"></span>. The eye sweeps out to <span class="knob" id="k-A" tabindex="0"></span> either way, and holding its gaze costs <span class="knob" id="k-see" tabindex="0"></span>; the wheels push with <span class="knob" id="k-tau" tabindex="0"></span> per unit of distance to what the eye holds. Between sightings, the cart heads toward one search destination. The flag marks that destination.</p>
+    <p style="margin:var(--s3) 0 0">The battery starts at <span class="knob" id="k-batt" tabindex="0"></span>. The eye sweeps out to <span class="knob" id="k-A" tabindex="0"></span> either way, and holding its gaze costs <span class="knob" id="k-see" tabindex="0"></span>; the wheels push toward what the eye holds with a torque of <span class="knob" id="k-tau" tabindex="0"></span>, easing off only within a quarter of a unit of it. Between sightings, the cart heads toward one search destination. The flag marks that destination.</p>
   </div>
 
   <div class="card">
@@ -42,17 +96,18 @@ function createFeedingView(container, options = {}) {
     <svg id="chart" viewBox="0 0 940 300" aria-label="Battery and food over time; the cart's place and where the eye looks"></svg>
     <div class="key">
       <span><i style="background:var(--batt)"></i>battery</span><span><i style="background:var(--food)"></i>food left in all casings</span>
+      <span><i style="background:var(--husk)"></i>husks on the pile</span>
       <span><i style="background:var(--wall)"></i>the cart's place</span><span><i style="background:var(--eye)"></i>where the eye looks</span>
     </div>
   </div>
 
-  <p class="standalone"><a href="feeding-explorer.html">Explore the food-learning receiver and its parts.</a></p>
+  <p class="standalone"><a href="feeding-explorer.html">Explore the feeding arrangement and its parts.</a></p>
   <div class="more">
     <button id="b-what" aria-expanded="false">What is this?</button>
     <button id="b-check" aria-expanded="false">What was checked</button>
   </div>
-  <p class="explain" id="t-what" hidden>Each casing sends its redness to the scanning eye. Meal size trains its usual yield. The search curve gives less weight to neighborhoods the eye or body has just covered. Its area is one. It pays for changing these memories, running the eye and driving the wheels from the same battery that its meals recharge.</p>
-  <p class="explain" id="t-check" hidden>The learning receiver is run in tangent IMC. A test compares its library steps with the browser calculation. When the eye returns after ten time units, an empty casing lowers the predicted chance of finding food after that wait, and a refilled casing raises it. With meals remembered at −8 and +8, two runs go to opposite ends first. Each cart feeds at both ends.</p>
+  <p class="explain" id="t-what" hidden>Each casing sends its redness to the scanning eye. The mouth has two halves: the spatial coupling reaches, realizing the rate at which food leaves the held casing, and the mouth settles it, keeping the pass share in its chamber and sending the husks to the collector. The robot's slot is filled by the gut wall, which takes up a share of the chamber per unit of time and pays the battery for each gram. Meal size trains the usual yield. The search curve gives less weight to neighborhoods the eye or body has just covered; its area is one. The robot pays for changing these memories, running the eye, the gripper, the lever and the wheels, and for each gram the mouth tears off, from the battery its gut wall charges.</p>
+  <p class="explain" id="t-check" hidden>The page steps with JavaScript written from the library's composite by scripts/export_step_js.py, one file per count of casings; tests/test_export_step_js.py checks that its step and every number shown here equal the library's to 1e-12. viewer/feeding-slot.test.js runs whole outings on the generated code: the cart finds a remembered meal at either end of the line, two seeds send it to opposite ends first, a place it has emptied loses its search weight, and every gram the mouth takes ends in the chamber, the gut wall or the husks.</p>
 </div>`;
   const elements = new Map(Array.from(container.querySelectorAll('[id]'), e => [e.id, e]));
   const element = id => elements.get(id);
@@ -62,8 +117,6 @@ function createFeedingView(container, options = {}) {
     controls.append(container.querySelector('.ask'));
     container.querySelectorAll('.standalone').forEach(e => { e.hidden = true; });
   }
-  const F = window.FoodLearning;
-  const P = { ...F.DEFAULTS };
   const NS = 'http://www.w3.org/2000/svg';
   const FIG = ' ';
   const fw = (v, dec, width, sign) => {          // fixed-width number (PRINCIPLES 12)
@@ -72,12 +125,58 @@ function createFeedingView(container, options = {}) {
     return s.padStart(width, FIG);
   };
   const FULL = 10, EMPTY = 0.05;
-  let places = F.PLACES.slice(), foods = F.FOODS.map(f => (f > 1 ? FULL : EMPTY)), cart0 = 0, batt0 = 6;
-  let s, t, playing = false, speed = 2, hist;
-  let carriedMemory;
-  function restart() { s = F.start(places, foods, cart0, P, carriedMemory); s[0] = batt0; t = 0; hist = []; record(); }
-  const totalFood = () => places.reduce((acc, _, k) => acc + s[F.NR + F.NC * k], 0);
-  function record() { hist.push([t, s[0], totalFood(), s[3], s[3] + s[6]]); }
+
+  // ---------- the generated model: the module for the present count of casings ----------
+  let M = feedingModule(3) || feedingModule(options.casings || 3);
+  if (!M) throw Error('feeding-view.js: load feeding-slot-3.js first');
+  const PARAM = M.parameters;
+  const defaults = () => Float64Array.from(M.defaults);
+  const knobIndex = name => M.knobs.indexOf(name);
+  let places = M.places.slice(), foods = M.foods.map(f => (f > 1 ? FULL : EMPTY)), cart0 = 0, batt0 = 6;
+  let params = defaults();
+  let s, t, playing = false, speed = 2, hist, obs = null, switching = false;
+  let carriedMemory = null;
+  // Where each store sits in the present module's state.
+  let layout;
+  function index(module) {
+    const byLabel = new Map(), casings = [];
+    for (const store of module.stores) {
+      if ('casing' in store) (casings[store.casing] ||= {})[store.label] = store.start;
+      else if (!byLabel.has(store.label)) byLabel.set(store.label, store.start);
+    }
+    return {byLabel, casings};
+  }
+  layout = index(M);
+  const at = label => {
+    const i = layout.byLabel.get(label);
+    if (i === undefined) throw Error('no store ' + label);
+    return i;
+  };
+  const value = label => s[at(label)];
+  const casingAt = (k, label) => layout.casings[k][label];
+  const zeros = () => new Float64Array(M.centres.length);
+  function startState() {
+    const memory = carriedMemory || {usual: zeros(), returnWeights: zeros()};
+    return Float64Array.from(M.start(places, foods, params, memory.usual, memory.returnWeights, [cart0], [batt0]));
+  }
+  function restart() { s = startState(); t = 0; hist = []; observeNow(); record(); }
+  function observeNow() { obs = M.observe(s, places, params); }
+  const totalFood = () => obs.casings.reduce((acc, v, i) => acc + (i % 4 === 0 ? v : 0), 0);
+  function record() { hist.push([t, value('battery'), totalFood(), value('cart'), value('cart') + value('look'), obs.pile[0]]); }
+  // Switch to the module for another count of casings, carrying every store over by its name.
+  function switchTo(module, carry) {
+    const old = s, oldModule = M;
+    M = module; layout = index(M);
+    s = startState();
+    if (carry) feedingCarry(oldModule, old, M, s);
+    observeNow();
+  }
+  function changeCount(count, carry, then) {
+    if (count < 1 || count > FEEDING_MAX_CASINGS) return;
+    switching = true;
+    loadFeedingModule(count).then(module => { switchTo(module, carry); switching = false; then(); draw(); },
+      error => { switching = false; console.error(error); });
+  }
   restart();
 
   // ---------- knobs: a number shown is a number you can slide, where it is shown ----------
@@ -95,58 +194,81 @@ function createFeedingView(container, options = {}) {
     show();
     return show;
   }
+  const param = name => params[knobIndex(name)];
+  const setParam = (name, v) => { params[knobIndex(name)] = v; if (t === 0) restart(); else observeNow(); };
   knob('k-speed', () => speed, v => { speed = v; }, 0.2, 8, 0.02, v => fw(v, 1, 3));
-  knob('k-batt', () => batt0, v => { batt0 = v; if (t === 0) { s[0] = v; hist = []; record(); } }, 0.2, 10, 0.02, v => fw(v, 1, 4));
-  knob('k-A', () => P.A, v => { P.A = v; if (t === 0) { s[7] = v; s[6] = 0; } }, 1, 10, 0.02, v => fw(v, 1, 4));
-  knob('k-see', () => P.csee, v => { P.csee = v; }, 0, 0.05, 0.0001, v => fw(v, 3, 5));
-  knob('k-tau', () => P.ktau, v => { P.ktau = v; }, 0.02, 1, 0.002, v => fw(v, 2, 4));
+  knob('k-batt', () => batt0, v => { batt0 = v; if (t === 0) restart(); }, 0.2, 10, 0.02, v => fw(v, 1, 4));
+  knob('k-A', () => param('A'), v => setParam('A', v), 1, 10, 0.02, v => fw(v, 1, 4));
+  knob('k-see', () => param('csee'), v => setParam('csee', v), 0.0005, 0.05, 0.0001, v => fw(v, 3, 5));
+  knob('k-tau', () => param('ktau'), v => setParam('ktau', v), 0.05, 1.5, 0.01, v => fw(v, 2, 4));
   // ---------- the scene: the line seen from the side; heights drawn larger than places ----------
   const scene = element('scene');
   const X0 = 30, X1 = 910, LO = -9, HI = 9, GY = 230, HS = 150;     // world place -> screen x; height -> screen y
   const sx = p => X0 + (X1 - X0) * (p - LO) / (HI - LO);
   const px = X => LO + (X - X0) / (X1 - X0) * (HI - LO);
-  const sy = x => GY - (x - P.xg) * HS;
+  const sy = x => GY - (x - PARAM.xg) * HS;
   function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || scene).appendChild(e); return e; }
-  function drawScene(samples, fd) {
+  // A store's level as a bar inside the receiver: its mass, against the capacity the model gives it.
+  function level(x, y, w, h, mass, capacity, color, name, parent) {
+    el('rect', { x, y, width: w, height: h, rx: 3, fill: 'var(--panel)', stroke: color, 'stroke-width': 1.5 }, parent);
+    const fh = (h - 4) * Math.max(0, Math.min(1, mass / capacity));
+    el('rect', { x: x + 2, y: y + h - 2 - fh, width: w - 4, height: fh, rx: 2, fill: color, opacity: .55 }, parent);
+    el('text', { x: x + w / 2, y: y - 4, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, parent).textContent = name;
+    el('text', { x: x + w / 2, y: y + h + 13, 'text-anchor': 'middle', 'font-size': 11, fill: color, 'font-family': 'var(--data)' }, parent).textContent = fw(mass, 2, 5);
+  }
+  function drawScene(samples) {
     scene.textContent = '';
-    const y = s[3], r = s[6], h = s[2];
+    const y = value('cart'), r = value('look'), h = value('tip'), grip = value('engagement');
+    const seen = obs.told[0];
     // ground and its scale
     el('rect', { x: X0, y: GY + 12, width: X1 - X0, height: 8, fill: 'var(--earth)', rx: 2 });
     for (let p = Math.ceil(LO); p <= HI; p += 1) {
       el('line', { x1: sx(p), x2: sx(p), y1: GY + 20, y2: GY + (p % 5 === 0 ? 30 : 25), stroke: 'var(--muted)' });
       if (p % 5 === 0) el('text', { x: sx(p), y: GY + 46, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)' }).textContent = p;
     }
+    // the pile of husks on the ground, under the line: the collector empties onto it
+    const pile = obs.pile[0], pw = 30 + 50 * Math.min(1, Math.sqrt(pile / 10)), ph = 4 + 22 * Math.min(1, Math.sqrt(pile / 10));
+    const pcx = X1 - 70, pby = GY + 82;
+    el('path', { d: `M ${pcx - pw} ${pby} Q ${pcx} ${pby - 2 * ph} ${pcx + pw} ${pby} Z`, fill: 'var(--husk)', opacity: .8 });
+    el('text', { x: pcx - pw - 8, y: pby - 2, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--muted)' }).textContent = 'pile of husks on the ground';
+    el('text', { x: pcx, y: pby + 15, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--husk)', 'font-family': 'var(--data)' }).textContent = fw(pile, 2, 5);
     // the eye's sweep: how far it can look either way
-    el('line', { x1: sx(y - P.A), x2: sx(y + P.A), y1: 26, y2: 26, stroke: 'var(--eye)', opacity: .25, 'stroke-width': 6, 'stroke-linecap': 'round' });
-    el('text', { x: sx(y + P.A) + 8, y: 30, 'font-size': 12, fill: 'var(--muted)' }).textContent = 'how far the eye sweeps';
-    drawSearchDensity(samples, fd.target);
-    // the casings
+    const A = param('A');
+    el('line', { x1: sx(y - A), x2: sx(y + A), y1: 26, y2: 26, stroke: 'var(--eye)', opacity: .25, 'stroke-width': 6, 'stroke-linecap': 'round' });
+    const right = sx(y + A) + 160 < X1;
+    el('text', { x: right ? sx(y + A) + 8 : Math.max(X0, sx(y - A)) - 8, y: 30, 'text-anchor': right ? 'start' : 'end',
+      'font-size': 12, fill: 'var(--muted)' }).textContent = 'how far the eye sweeps';
+    drawSearchDensity(samples, value('destination'));
+    // the casings: closed shells, no hinge; the mouth tears the food out
     places.forEach((p, k) => {
-      const [f, a, x] = s.slice(F.NR + F.NC * k, F.NR + F.NC * k + 3);
-      const red = fd.casings[k].red, cx = sx(p), cy = sy(x) + 12, w = 44, hh = 30;
+      const f = s[casingAt(k, 'food')], x = s[casingAt(k, 'casing')];
+      const red = obs.casings[4 * k + 2], cx = sx(p), cy = sy(x) + 12, w = 44, hh = 30;
       const g = el('g', { class: 'grab' });
-      const gapw = 32 * a;
-      el('path', { d: `M ${cx - gapw / 2} ${cy - hh} L ${cx - w / 2} ${cy - hh} Q ${cx - w / 2} ${cy} ${cx} ${cy} Q ${cx + w / 2} ${cy} ${cx + w / 2} ${cy - hh} L ${cx + gapw / 2} ${cy - hh}`,
+      el('path', { d: `M ${cx - w / 2} ${cy - hh} Q ${cx - w / 2} ${cy} ${cx} ${cy} Q ${cx + w / 2} ${cy} ${cx + w / 2} ${cy - hh} Q ${cx} ${cy - hh - 8} ${cx - w / 2} ${cy - hh} Z`,
         fill: 'var(--panel)', stroke: red > 0.5 ? 'var(--food)' : 'var(--empty)', 'stroke-width': 3 }, g);
       const fh = (hh - 6) * Math.min(1, f / FULL);
       el('rect', { x: cx - w / 2 + 6, y: cy - 3 - fh, width: w - 12, height: fh, rx: 3, fill: 'var(--food)', opacity: .35 + .5 * red }, g);
-      el('text', { x: cx, y: cy - hh - 8, 'text-anchor': 'middle', 'font-size': 12, fill: red > 0.5 ? 'var(--food)' : 'var(--muted)', 'font-family': 'var(--data)' }, g).textContent = fw(f, 1, 4);
-      el('rect', { x: cx - w / 2 - 6, y: cy - hh - 8, width: w + 12, height: hh + 32, fill: 'transparent' }, g);
+      el('text', { x: cx, y: cy - hh - 12, 'text-anchor': 'middle', 'font-size': 12, fill: red > 0.5 ? 'var(--food)' : 'var(--muted)', 'font-family': 'var(--data)' }, g).textContent = fw(f, 1, 4);
+      el('rect', { x: cx - w / 2 - 6, y: cy - hh - 12, width: w + 12, height: hh + 36, fill: 'transparent' }, g);
       g.addEventListener('pointerdown', e => dragStart(e, k));
     });
-    // the cart: body, wheels, mouth at height x0, the lever down to its tip at height h
-    const cx = sx(y), body = sy(P.x0) - 6;
+    // the cart: body with its chamber, husk collector and slot; wheels; the lever down to its tip at height h
+    const cx = sx(y), body = sy(PARAM.x0) - 6, BW = 168, BH = 64;
     const cg = el('g', { class: 'grab' });
-    el('rect', { x: cx - 46, y: body - 34, width: 92, height: 34, rx: 6, fill: 'var(--panel)', stroke: 'var(--wall)', 'stroke-width': 2 }, cg);
-    el('text', { x: cx, y: body - 13, 'text-anchor': 'middle', 'font-size': 13 }, cg).textContent = 'receiver';
-    const turn = (s[5] / 0.12) % (2 * Math.PI);
-    for (const dx of [-30, 30]) {
-      const wx = cx + dx, wy = body + 4;
+    el('rect', { x: cx - BW / 2, y: body - BH, width: BW, height: BH, rx: 6, fill: 'var(--panel)', stroke: 'var(--wall)', 'stroke-width': 2 }, cg);
+    level(cx - BW / 2 + 12, body - BH + 18, 26, 26, value('mouth ready store'), PARAM.chamberCap, 'var(--food)', 'chamber', cg);
+    level(cx - BW / 2 + 56, body - BH + 18, 26, 26, value('husk collector store'), PARAM.collectorCap, 'var(--husk)', 'husks', cg);
+    el('rect', { x: cx + 6, y: body - BH + 14, width: BW / 2 - 16, height: 34, rx: 4, fill: 'var(--faint)', stroke: 'var(--open)', 'stroke-dasharray': '4 3' }, cg);
+    el('text', { x: cx + 6 + (BW / 2 - 16) / 2, y: body - BH + 28, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, cg).textContent = 'slot:';
+    el('text', { x: cx + 6 + (BW / 2 - 16) / 2, y: body - BH + 42, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--open)' }, cg).textContent = 'gut wall';
+    const turn = (value('cart') / 0.12) % (2 * Math.PI);
+    for (const dx of [-50, 50]) {
+      const wx = cx + dx;
       el('line', { x1: wx, x2: wx, y1: body, y2: GY + 12 - 14, stroke: 'var(--wall)', 'stroke-width': 2 }, cg);
       el('circle', { cx: wx, cy: GY + 12 - 14, r: 14, fill: 'var(--panel)', stroke: 'var(--wall)', 'stroke-width': 2.5 }, cg);
       el('line', { x1: wx, y1: GY - 2, x2: wx + 12 * Math.cos(turn), y2: GY - 2 + 12 * Math.sin(turn), stroke: 'var(--wall)', 'stroke-width': 2 }, cg);
     }
-    el('rect', { x: cx - 50, y: body - 40, width: 100, height: GY - body + 40, fill: 'transparent' }, cg);
+    el('rect', { x: cx - BW / 2 - 4, y: body - BH - 6, width: BW + 8, height: GY - body + BH + 6, fill: 'transparent' }, cg);
     cg.addEventListener('pointerdown', e => dragStart(e, 'cart'));
     if (options.openReceiver) {
       el('title', {}, cg).textContent = t > 0 ? 'Open Receiver' : 'Click to open Receiver or drag to place it';
@@ -155,30 +277,27 @@ function createFeedingView(container, options = {}) {
         cg.addEventListener('click', options.openReceiver);
       }
     }
-    // lever: from the mouth down to its tip; jaws close as the grip holds
-    const tipy = sy(h) - 4, hold = fd.hold;
+    // lever: from the mouth down to its tip; the jaws close as the grip rises
+    const tipy = sy(h) - 4, hold = Math.max(0, Math.min(1, (grip + 1) / 3));
     el('line', { x1: cx, x2: cx, y1: body, y2: tipy, stroke: 'var(--grip)', 'stroke-width': 4, 'stroke-linecap': 'round' });
     for (const side of [-1, 1])
       el('line', { x1: cx, y1: tipy, x2: cx + side * (26 - 12 * hold), y2: tipy + 6, stroke: 'var(--grip)', 'stroke-width': 4, 'stroke-linecap': 'round' });
     // the eye and its gaze: a line from the eye to the place it looks at
-    const ex = cx + 34 * Math.sign(r || 1), eyY = body - 46, lx = sx(y + r);
-    el('line', { x1: ex, y1: eyY, x2: lx, y2: GY - 6, stroke: 'var(--eye)', 'stroke-width': 1.5 + 2.5 * fd.seen, 'stroke-dasharray': fd.seen > 0.5 ? '' : '5 4', opacity: .9 });
+    const ex = cx + (BW / 2 - 10) * Math.sign(r || 1), eyY = body - BH - 10, lx = sx(y + r), seenUnit = Math.min(1, seen);
+    el('line', { x1: ex, y1: eyY, x2: lx, y2: GY - 6, stroke: 'var(--eye)', 'stroke-width': 1.5 + 2.5 * seenUnit, 'stroke-dasharray': seen > 0.5 ? '' : '5 4', opacity: .9 });
     el('circle', { cx: ex, cy: eyY, r: 7, fill: 'var(--panel)', stroke: 'var(--eye)', 'stroke-width': 2.5 });
-    el('circle', { cx: lx, cy: GY - 6, r: 5 + 6 * fd.seen, fill: fd.seen > 0.05 ? 'var(--food)' : 'var(--eye)', opacity: .35 + .5 * fd.seen });
+    el('circle', { cx: lx, cy: GY - 6, r: 5 + 6 * seenUnit, fill: seen > 0.05 ? 'var(--food)' : 'var(--eye)', opacity: .35 + .5 * seenUnit });
     // battery gauge, top left
-    const BW = 160, frac = Math.min(1, s[0] / 12);
-    el('rect', { x: X0, y: 52, width: BW, height: 14, rx: 3, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 1.5 });
-    el('rect', { x: X0 + 2, y: 54, width: Math.max(0, (BW - 4) * frac), height: 10, rx: 2, fill: 'var(--batt)', opacity: .85 });
-    el('text', { x: X0 + BW + 10, y: 64, 'font-size': 13, fill: 'var(--batt)', 'font-family': 'var(--data)' }).textContent = 'battery ' + fw(s[0], 2, 5);
+    const GW = 160, frac = Math.min(1, value('battery') / 20);
+    el('rect', { x: X0, y: 52, width: GW, height: 14, rx: 3, fill: 'none', stroke: 'var(--wall)', 'stroke-width': 1.5 });
+    el('rect', { x: X0 + 2, y: 54, width: Math.max(0, (GW - 4) * frac), height: 10, rx: 2, fill: 'var(--batt)', opacity: .85 });
+    el('text', { x: X0 + GW + 10, y: 64, 'font-size': 13, fill: 'var(--batt)', 'font-family': 'var(--data)' }).textContent = 'battery ' + fw(value('battery'), 2, 5);
     el('text', { x: X1, y: 64, 'text-anchor': 'end', 'font-size': 13, fill: 'var(--muted)', 'font-family': 'var(--data)' }).textContent = 'time ' + fw(t, 1, 5);
   }
   let drag = null, moved = false;
   function dragStart(e, what) {
     if (playing || t > 0) {
-      if (what !== 'cart') {
-        const food = F.NR + F.NC * what;
-        if (s[food] <= P.fr) { s[food] = FULL; draw(); }
-      }
+      if (what !== 'cart' && obs.casings[4 * what + 2] < 0.5) { s[casingAt(what, 'food')] = FULL; observeNow(); draw(); }
       return;
     }
     drag = what; moved = false; scene.setPointerCapture(e.pointerId);
@@ -199,15 +318,21 @@ function createFeedingView(container, options = {}) {
       options.openReceiver();
       return;
     }
-    if (drag !== 'cart') {
-      if (!moved) foods[drag] = foods[drag] > 1 ? EMPTY : FULL;
-      else if (places[drag] < LO + 0.3 || places[drag] > HI - 0.3) { places.splice(drag, 1); foods.splice(drag, 1); }
+    const k = drag;
+    drag = null;
+    if (k !== 'cart') {
+      if (!moved) foods[k] = foods[k] > 1 ? EMPTY : FULL;
+      else if ((places[k] < LO + 0.3 || places[k] > HI - 0.3) && places.length > 1) {
+        places.splice(k, 1); foods.splice(k, 1);
+        changeCount(places.length, false, restart);
+        return;
+      }
     }
-    drag = null; restart(); draw();
+    restart(); draw();
   });
   function freePlace() {
     // the free place farthest from everything already on the line; while running, the casing joins the run as it is
-    const here = t > 0 ? s[3] : cart0;
+    const here = t > 0 ? value('cart') : cart0;
     let best = 0, bestd = -1;
     for (let p = LO + 1; p <= HI - 1; p += 0.5) {
       const d = Math.min(Math.abs(p - here), ...places.map(q => Math.abs(p - q)));
@@ -217,25 +342,33 @@ function createFeedingView(container, options = {}) {
   }
   function addCasing(food, place = freePlace()) {
     if (!Number.isFinite(place) || !Number.isFinite(food) || food < 0) throw Error("Invalid casing");
+    if (places.length >= FEEDING_MAX_CASINGS || switching) return Promise.resolve(false);
     places.push(place); foods.push(food);
-    s.push(...F.casing(food, P));
-    if (hist.at(-1)[0] === t) hist.pop();
-    record(); draw();
+    return new Promise(resolve => changeCount(places.length, t > 0, () => {
+      if (t === 0) { hist = []; }
+      else if (hist.at(-1)[0] === t) hist.pop();
+      record(); resolve(true);
+    }));
   }
   element('add-full').addEventListener('click', () => addCasing(FULL));
   element('add-empty').addEventListener('click', () => addCasing(EMPTY));
 
   // ---------- the calculation of the present moment, in the order the mathematics has it ----------
-  function drawCalc(fd) {
-    const r = fd.rate;
-    const k = fd.casings.findIndex(c => c.selected > 0);
-    const c = k >= 0 ? fd.casings[k] : null;
+  function drawCalc(atCart) {
+    const rate = label => obs.rate[at(label)];
+    const [seen, , , , , taken] = obs.told;
+    const [torque, gripRate, liftRate, free] = obs.told_motors;
+    const [gripper, lever, wheels, eye, memory, latches, mouth, gut, total] = obs.pays;
+    const [, intoChamber, husks, uptake, toPile] = obs.flows;
+    let k = -1, most = 0;
+    places.forEach((_, i) => { const d = -obs.rate[casingAt(i, 'food')]; if (d > most) { most = d; k = i; } });
     element('calc').innerHTML =
-      `<p>The <span class="e">eye</span> looks <span class="out">${fw(s[6], 2, 6, true)}</span> from the cart, at the place <span class="out">${fw(s[3] + s[6], 2, 6, true)}</span>; redness there: <span class="out">${fw(fd.seen, 2, 4)}</span>. So its scan runs at <span class="out">${fw(fd.free, 2, 4)}</span> of full speed, and its look distance changes at <span class="out">${fw(r[6], 2, 6, true)}</span>.</p>` +
-      `<p>At the cart, the usual meal score is <span class="out">${fw(F.maps(s, s[3])[0], 2, 5)}</span>. The search density here is <span class="out">${fw(F.maps(s, s[3])[1], 2, 5)}</span>. The search destination is <span class="out">${fw(fd.target, 2, 5, true)}</span>. The wheels apply torque <span class="out">${fw(fd.torque, 3, 6, true)}</span>.</p>` +
-      `<p>The <span class="l">lever</span> grips at <span class="out">${fw(fd.grip, 2, 6, true)}</span> (grip <span class="out">${fw(s[1], 2, 5, true)}</span>, holding <span class="out">${fw(fd.hold, 2, 4)}</span>) and lifts its tip at <span class="out">${fw(fd.lift, 2, 6, true)}</span> (tip <span class="out">${fw(s[2] - P.xg, 2, 5)}</span> above the ground).` +
-      (c ? ` Casing ${k+1} is in contact. At the mouth it pries at <span class="out">${fw(c.pry, 2, 5)}</span> and the receiver eats at <span class="out">${fw(c.eat, 2, 5)}</span>.</p>` : ` The grip is free.</p>`) +
-      `<p>The <span class="b">battery</span> moves by ${P.alpha.toFixed(2)}×eat − ${P.ctear.toFixed(2)}×pry − what the motors cost: gripper <span class="out">${fw(fd.pay.grip, 3, 6, true)}</span>, lever <span class="out">${fw(fd.pay.lift, 3, 6, true)}</span>, wheels <span class="out">${fw(fd.pay.drive, 3, 6, true)}</span>, eye <span class="out">${fw(fd.pay.eye, 3, 6, true)}</span>, memory <span class="out">${fw(fd.pay.memory, 3, 6, true)}</span>, contact <span class="out">${fw(fd.pay.contact, 3, 6, true)}</span>; in all <span class="out">${fw(r[0], 3, 6, true)}</span>.</p>`;
+      `<p>The <span class="e">eye</span> looks <span class="out">${fw(value('look'), 2, 6, true)}</span> from the cart, at the place <span class="out">${fw(value('cart') + value('look'), 2, 6, true)}</span>; redness there: <span class="out">${fw(seen, 2, 4)}</span>. So its scan runs at <span class="out">${fw(free, 2, 4)}</span> of full speed, and its look distance changes at <span class="out">${fw(rate('look'), 2, 6, true)}</span>.</p>` +
+      `<p>At the cart, the usual meal score is <span class="out">${fw(atCart.usual, 2, 5)}</span>. The search density here is <span class="out">${fw(atCart.density, 2, 5)}</span>. The search destination is <span class="out">${fw(value('destination'), 2, 5, true)}</span>. The wheels apply torque <span class="out">${fw(torque, 3, 6, true)}</span>.</p>` +
+      `<p>The <span class="l">gripper</span> is told the rate <span class="out">${fw(gripRate, 2, 6, true)}</span> (grip <span class="out">${fw(value('engagement'), 2, 5, true)}</span>), the <span class="l">lever</span> the rate <span class="out">${fw(liftRate, 2, 6, true)}</span> (tip at height <span class="out">${fw(value('tip'), 2, 5, true)}</span>).` +
+      (k >= 0 && taken > 1e-4 ? ` The mouth tears food off casing ${k + 1} at <span class="out">${fw(taken, 2, 5)}</span> grams per unit of time.</p>` : ` The mouth takes nothing.</p>`) +
+      `<p>Of each gram taken, <span class="out">${PARAM.mouthPass.toFixed(2)}</span> goes into the <span class="f">chamber</span> (<span class="out">${fw(intoChamber, 2, 5)}</span>) and the rest, husks, into the <span class="a">collector</span> (<span class="out">${fw(husks, 2, 5)}</span>), which empties onto the pile at <span class="out">${fw(toPile, 2, 5)}</span>. The <span class="a">gut wall</span> takes up <span class="out">${fw(uptake, 2, 5)}</span> from the chamber, which holds <span class="out">${fw(value('mouth ready store'), 2, 5)}</span>.</p>` +
+      `<p>The <span class="b">battery</span> moves by what the gut wall gives, <span class="out">${fw(gut, 3, 6, true)}</span> (<span class="out">${PARAM.absorbYield.toFixed(2)}</span> per gram taken up), what the mouth pays, <span class="out">${fw(mouth, 3, 6, true)}</span> (<span class="out">${PARAM.mouthCost.toFixed(2)}</span> per gram torn off), and what the motors pay: gripper <span class="out">${fw(gripper, 3, 6, true)}</span>, lever <span class="out">${fw(lever, 3, 6, true)}</span>, wheels <span class="out">${fw(wheels, 3, 6, true)}</span>, eye <span class="out">${fw(eye, 3, 6, true)}</span>, memory <span class="out">${fw(memory, 3, 6, true)}</span>, contact latches <span class="out">${fw(latches, 3, 6, true)}</span>; in all <span class="out">${fw(total, 3, 6, true)}</span>.</p>`;
   }
 
   // ---------- the record over time (the axis compresses; the page never grows) ----------
@@ -256,8 +389,9 @@ function createFeedingView(container, options = {}) {
         el('path', { d, fill: 'none', stroke: col, 'stroke-width': wdt || 2 }, chart);
       }
     };
-    const fmax = Math.max(12, Math.ceil(hist[0][2] / 5) * 5);
-    panel(20, 100, 0, fmax, [[1, 'var(--batt)'], [2, 'var(--food)']], 'energy');
+    const top = Math.max(...hist.map(hh => Math.max(hh[1], hh[2], hh[5])));
+    const fmax = Math.max(12, Math.ceil(top / 5) * 5);
+    panel(20, 100, 0, fmax, [[1, 'var(--batt)'], [2, 'var(--food)'], [5, 'var(--husk)']], 'battery and grams');
     panel(150, 120, LO, HI, [[4, 'var(--eye)', 1.2], [3, 'var(--wall)', 2.5]], 'place on the line');
     el('line', { x1: xs(t), x2: xs(t), y1: 14, y2: 274, stroke: 'var(--accent)', 'stroke-width': 1 }, chart);
     const step = T > 60 ? 20 : T > 30 ? 10 : 5;
@@ -265,13 +399,12 @@ function createFeedingView(container, options = {}) {
       el('text', { x: xs(k), y: 292, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, chart).textContent = k;
   }
 
+  // The usual yield and the search density along the line, and at the cart (generated: curve).
   function mapSamples() {
-    const map = F.searchMap(s);
-    return Array.from({length: 181}, (_, i) => {
-      const place = LO + i * (HI - LO) / 180;
-      const [yieldScore, density] = F.maps(s, place, map);
-      return {x: sx(place), yieldScore, density};
-    });
+    const c = M.curve(s, [value('cart')]);
+    const samples = M.samples.map((place, i) => ({x: sx(place), yieldScore: c.usual[i], density: c.density[i]}));
+    const last = M.samples.length;
+    return {samples, atCart: {usual: c.usual[last], density: c.density[last]}};
   }
 
   function curvePath(samples, ordinate) {
@@ -281,30 +414,30 @@ function createFeedingView(container, options = {}) {
 
   function drawSearchDensity(samples, target) {
     const plot = el('g', {id: 'search-density'});
-    const top = GY + 82, bottom = GY + 150;
+    const top = GY + 112, bottom = GY + 180;
     const peak = Math.max(...samples.map(sample => sample.density));
     const limit = Math.max(0.1, Math.ceil(peak * 10) / 10);
     const ys = density => bottom - (bottom - top) * density / limit;
-    for (const value of [0, limit]) {
-      const y = ys(value);
+    for (const v of [0, limit]) {
+      const y = ys(v);
       el('line', {x1: X0, x2: X1, y1: y, y2: y, stroke: 'var(--rule)'}, plot);
-      el('text', {x: X0 - 5, y: y + 4, 'text-anchor': 'end', 'font-size': 11}, plot).textContent = value;
+      el('text', {x: X0 - 5, y: y + 4, 'text-anchor': 'end', 'font-size': 11}, plot).textContent = v;
     }
     const curve = curvePath(samples, sample => ys(sample.density));
     el('path', {d: curve + ` L ${X1} ${bottom} L ${X0} ${bottom} Z`, fill: 'var(--open)', opacity: 0.19}, plot);
     el('path', {d: curve, fill: 'none', stroke: 'var(--open)', 'stroke-width': 2}, plot);
     const x = sx(target);
-    el('line', {x1: x, x2: x, y1: GY + 72, y2: bottom, stroke: 'var(--open)', 'stroke-dasharray': '3 3'}, plot);
-    el('path', {d: `M ${x} ${GY+72} v -20 l 12 4 l -12 5`, fill: 'var(--open)', stroke: 'var(--open)'}, plot);
+    el('line', {x1: x, x2: x, y1: GY + 102, y2: bottom, stroke: 'var(--open)', 'stroke-dasharray': '3 3'}, plot);
+    el('path', {d: `M ${x} ${GY+102} v -20 l 12 4 l -12 5`, fill: 'var(--open)', stroke: 'var(--open)'}, plot);
   }
 
   function drawYield(samples) {
     const plot = element('maps');
     plot.textContent = '';
     const top = Math.max(1, Math.ceil(Math.max(...samples.map(sample => sample.yieldScore))));
-    const ys = value => 95 - 65 * value / top;
+    const ys = v => 95 - 65 * v / top;
     el('line', {x1:X0, x2:X1, y1:ys(0), y2:ys(0), stroke:'var(--rule)'}, plot);
-    for (const value of [0,top]) el('text', {x:X0-8, y:ys(value)+4, 'text-anchor':'end', fill:'var(--muted)'}, plot).textContent = value;
+    for (const v of [0,top]) el('text', {x:X0-8, y:ys(v)+4, 'text-anchor':'end', fill:'var(--muted)'}, plot).textContent = v;
     for (const place of [-8,-4,0,4,8]) {
       el('text', {x:sx(place), y:135, 'text-anchor':'middle', fill:'var(--muted)'}, plot).textContent = place;
     }
@@ -314,27 +447,30 @@ function createFeedingView(container, options = {}) {
   let lastObservation = -Infinity;
   function draw(force = true) {
     const now = performance.now();
-    if (options.onChange && !force && now - lastObservation < 100) return;
+    if (!force && now - lastObservation < 100) return;     // numbers rewritten about ten times a second
     lastObservation = now;
-    render(F.field(s, places, P));
+    observeNow();
+    const {samples, atCart} = mapSamples();
+    drawScene(samples); drawYield(samples); drawChart(); drawCalc(atCart);
+    element('add-full').disabled = element('add-empty').disabled = places.length >= FEEDING_MAX_CASINGS;
     options.onChange?.();
-  }
-  function render(fd) {
-    const samples = mapSamples();
-    drawScene(samples, fd); drawYield(samples); drawChart(); drawCalc(fd);
   }
 
   // ---------- running: time on the page is the model's time ----------
-  const H = 0.004;
-  let last = null, animation;
+  const H = M.h;
+  let last = null, animation, owed = 0;
   function step(dt) {
-    let todo = dt;
-    while (todo > 1e-12) { const h = Math.min(H, todo); s = F.rk4(s, h, places, P); t += h; todo -= h; }
-    if (t - hist[hist.length - 1][0] > 0.05) record();
+    // The generated step is four Runge-Kutta rounds of the composite's fixed length h; what is left
+    // of dt is owed to the next call.
+    owed += dt;
+    while (owed > H / 2) {
+      s = M.step(s, places, params); t += H; owed -= H;
+      if (t - hist[hist.length - 1][0] > 0.05) { observeNow(); record(); }
+    }
   }
   function frame(now) {
     if (!playing) { last = null; return; }
-    if (last !== null) step(Math.min(0.1, (now - last) / 1000) * speed);
+    if (last !== null && !switching) step(Math.min(0.1, (now - last) / 1000) * speed);
     last = now;
     draw(false);
     if (playing) animation = requestAnimationFrame(frame);
@@ -358,16 +494,18 @@ function createFeedingView(container, options = {}) {
     enterButton.hidden = false;
     enterButton.addEventListener('click', options.openReceiver);
   }
+  const learned = () => ({usual: s.slice(at('usual yield'), at('usual yield') + M.centres.length),
+    returnWeights: s.slice(at('return rate'), at('return rate') + M.centres.length)});
   element('outing').addEventListener('click', () => {
     setPlaying(false);
-    P.searchSeed = crypto.getRandomValues(new Uint32Array(1))[0];
-    carriedMemory = F.learnedMemory(s);
+    params[knobIndex('searchSeed')] = crypto.getRandomValues(new Uint32Array(1))[0];
+    carriedMemory = learned();
     restart(); draw();
   });
   element('reset').addEventListener('click', () => {
     setPlaying(false);
-    P.searchSeed = F.DEFAULTS.searchSeed;
-    carriedMemory = undefined; restart(); draw();
+    params[knobIndex('searchSeed')] = M.defaults[knobIndex('searchSeed')];
+    carriedMemory = null; restart(); draw();
   });
   for (const k of ['what', 'check']) {
     const b = element('b-' + k), p = element('t-' + k);
@@ -375,12 +513,14 @@ function createFeedingView(container, options = {}) {
   }
   // #t=N opens the page already run to time N (for checking a page mid-run in headless Chrome; PRINCIPLES.md)
   const jump = /t=([\d.]+)/.exec(location.hash);
-  if (jump && Number.isFinite(+jump[1])) { const T = +jump[1]; while (t < T - 1e-9) step(Math.min(0.05, T - t)); }
+  if (jump && Number.isFinite(+jump[1])) step(+jump[1]);
   draw();
   return {
     controls,
     get playing() { return playing; },
     setPlaying, addCasing,
-    observe(observer) { return observer(s, places, P, t); }
+    observe(observer) { return observer({state: s, places, params, time: t, module: M, observed: obs}); }
   };
 }
+
+if (typeof module !== 'undefined' && module.exports) module.exports = {feedingStoreKeys, feedingCarry};

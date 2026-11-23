@@ -1,6 +1,8 @@
 """Coordinate dependencies used by the array explorer, independent of the observed values."""
 from __future__ import annotations
 
+from typing import Any, Callable, List, Sequence, Tuple
+
 import numpy as np
 import jax
 from jax.extend import core
@@ -62,6 +64,8 @@ def _propagate(graph, constants, inputs):
                 value = a[tuple(map(slice, p['start_indices'], p['limit_indices'], steps))]
             elif op == 'concatenate':
                 value = np.concatenate(args, axis=p['dimension'])
+            elif op == 'stack':
+                value = np.stack(args, axis=p['axis'])
             elif op == 'squeeze':
                 value = np.squeeze(a, axis=p['dimensions'])
             elif op == 'transpose':
@@ -96,7 +100,8 @@ def _propagate(graph, constants, inputs):
     return [read(var) for var in graph.outvars]
 
 
-def coordinate_inputs(fn, args, sizes):
+def coordinate_inputs(fn: Callable[..., Any], args: Sequence[np.ndarray],
+                      sizes: Sequence[int]) -> List[List[Tuple[List[int], bool]]]:
     """For each result return input indices and whether only an upper bound is known."""
     count = sum(x.size for x in args)
     start, symbols = 0, []

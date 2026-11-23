@@ -59,7 +59,7 @@ def admit(capacity: float | None) -> Callable[[Array], Array]:
     smoothly to ``0`` at the capacity. With no capacity it is the constant ``1``."""
     if capacity is None:
         return lambda m: jnp.ones_like(m)
-    if capacity <= 0:
+    if fp.nonpositive(capacity):
         raise ValueError("a store's capacity is positive")
     return lambda m: theta((capacity - m) / (capacity / 2))
 
@@ -77,7 +77,11 @@ def absorber(energy_yield: float, uptake: float | Callable[[Array, Array, Array,
     ``uptake`` is the law ``k * food``. It puts no load on the discard pair."""
     rate = uptake if callable(uptake) else (lambda food, reserve, mass, accept: uptake * food)
     return fp.pushes(label, 4, [("absorb", lambda v: rate(v[0], v[1], v[2], v[3]),
-                                 lambda v: -v[0] + energy_yield * v[1])])
+                                 lambda v: -v[0] + energy_yield * v[1])],
+                     inputs=[("f", "food", 1), ("e", "reserve", 1), ("m_p", "parent mass", 1),
+                             ("a_p", "parent acceptance", 1)],
+                     forms=[(None if callable(uptake) else "k*f", "-f + ε*e")],
+                     constants={"ε": energy_yield, **({} if callable(uptake) else {"k": uptake})})
 
 
 def collector(clearance: float, capacity: float | None = None, mass: float = 0., label: str = "collector", *,
@@ -85,10 +89,14 @@ def collector(clearance: float, capacity: float | None = None, mass: float = 0.,
     """The collector ``1 -> C``: a store ``m`` of discard, sending out ``(m, admit(m))``, with
     field ``export (d parentMass - dm)`` and ``export = clearance * m * parentAccept``."""
     accept = admit(capacity)
-    field = fp.pushes(f"{label}: export", 3, [("export", lambda v: clearance * v[0] * v[2], lambda v: v[1] - v[0])])
+    field = fp.pushes(f"{label}: export", 3, [("export", lambda v: clearance * v[0] * v[2], lambda v: v[1] - v[0])],
+                      inputs=[("m", "store", 1), ("m_p", "parent mass", 1), ("a_p", "parent acceptance", 1)],
+                      forms=[("κ*m*a_p", "m_p - m")], constants={"κ": clearance})
     wiring = fp.transfer(label, 3, 1, 2, 2, lambda m, n: jnp.concatenate([m, n]),
                          lambda m: jnp.stack([m[0], accept(m[0])]))
-    return fp.fill([fp.rod_segment(1., mass, f"{label} store", stages=stages, h=h), field], wiring)
+    return fp.with_meta(fp.fill([fp.rod_segment(1., mass, f"{label} store", stages=stages, h=h), field], wiring),
+                        inputs=[("m_p", "parent mass", 1), ("a_p", "parent acceptance", 1)],
+                        outputs=[("m", "mass", 1), ("a", "acceptance", 1)])
 
 
 def pile(mass: float = 0., label: str = "pile", *, stages: int = 1, h: float = 1.) -> Arrangement:
@@ -106,7 +114,10 @@ def separator(pass_fraction: float, cost: float, rate_law: RateLaw, ready: float
     p, c = pass_fraction, cost
     field = fp.pushes(f"{label}: separate", 5,
                       [("separate", lambda v: rate_law(v[0], v[1], v[2], v[3], v[4]),
-                        lambda v: p * v[0] + (1 - p) * v[3] - v[1] - c * v[2])])
+                        lambda v: p * v[0] + (1 - p) * v[3] - v[1] - c * v[2])],
+                      inputs=[("z", "ready store", 1), ("f", "food", 1), ("e", "reserve", 1),
+                              ("m_l", "local mass", 1), ("a_l", "local acceptance", 1)],
+                      forms=[(None, "p*z + (1 - p)*m_l - f - c*e")], constants={"p": p, "c": c})
     wiring = fp.transfer(label, 5, 1, 4, 1, lambda m, n: jnp.concatenate([m, n]), lambda m: m)
     return fp.fill([fp.rod_segment(1., ready, f"{label} ready store", stages=stages, h=h), field], wiring)
 
@@ -153,7 +164,10 @@ def settle(pass_fraction: float, cost: float, ready: float = 0., label: str = "m
     load-free at ``taken``."""
     p, c = pass_fraction, cost
     field = fp.pushes(f"{label}: settle", 5,
-                      [("settle", lambda v: v[1], lambda v: p * v[0] + (1 - p) * v[3] - c * v[2])])
+                      [("settle", lambda v: v[1], lambda v: p * v[0] + (1 - p) * v[3] - c * v[2])],
+                      inputs=[("z", "ready store", 1), ("J", "taken", 1), ("e", "reserve", 1),
+                              ("m_l", "local mass", 1), ("a_l", "local acceptance", 1)],
+                      forms=[("J", "p*z + (1 - p)*m_l - c*e")], constants={"p": p, "c": c})
     wiring = fp.transfer(label, 5, 1, 4, 1, lambda m, n: jnp.concatenate([m, n]), lambda m: m)
     return fp.fill([fp.rod_segment(1., ready, f"{label} ready store", stages=stages, h=h), field], wiring)
 

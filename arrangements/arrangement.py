@@ -30,7 +30,7 @@ reactive vector space ``Q`` and a potential ``U``) in CDLM's companion.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Sequence, Tuple, Union
+from typing import Any, Callable, Sequence, Tuple, Union
 
 import jax
 from jax import Array
@@ -69,6 +69,9 @@ class Arrangement:
     label: str = ""
     # Retain construction data for inspection; never used by the dynamics.
     construction: tuple = field(default=(), repr=False, compare=False)
+    # What a part is, for drawing it: its names, its kind of inclination field and its formula
+    # (``feeding_parts``, ``explore_composite``); never used by the dynamics.
+    meta: Any = field(default=None, repr=False, compare=False)
 
 
 def exact(U: Callable[[Array, Array, Array], Array]) -> OneForm:

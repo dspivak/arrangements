@@ -2,14 +2,15 @@
    a receiver on a cart on a line, with an eye that scans how far away it looks, and casings on the ground.
    Layout follows PRINCIPLES.md: one question in the bar with Play; the picture with what is yours to set drawn on it;
    the calculation of the present moment under it, in the order the mathematics has it; the record over time.
-   The model uses food-learning.js and feeding-model.js. The library and browser checks include complete search trips.
+   The model is generated from the library's feeding_composed.feeding_with_slot (feeding-slot-N.js, written by
+   scripts/export_step_js.py); viewer/feeding-slot.test.js runs whole search trips on it.
    Claude Opus 5.5, 2ff5d861 (first page), d531d927 (the cart and the eye) and 003367d0 (the patrol, damped contacts),
-   2026-11-18. */
+   2026-11-18; the separator mouth, the husks and the generated model, subagent of c5f9ecc9, 2026-11-22. */
 .feeding-ui {
   --ground: #eef1f3; --panel: #ffffff; --ink: #1b232c; --muted: #5a6672; --rule: #d3dae0;
   --accent: #2b4c8c; --accent-ink: #ffffff; --faint: rgba(43, 76, 140, 0.10);
   --batt: #2b6cb0; --food: #c0392b; --empty: #9aa5af; --grip: #7b3fa0; --open: #1f8f7e; --pos: #c07a12; --eye: #c07a12;
-  --wall: #3a4651; --earth: #c9b79c;
+  --wall: #3a4651; --earth: #c9b79c; --husk: #8a6634;
   --display: "Spectral", Georgia, serif; --body: "Public Sans", system-ui, sans-serif; --data: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
 }
@@ -18,7 +19,7 @@
     --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
     --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142,174,245,0.12);
     --batt: #6fa3e6; --food: #e5604f; --empty: #6b7782; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --eye: #e0a84a;
-    --wall: #b5c0ca; --earth: #5a4d3b;
+    --wall: #b5c0ca; --earth: #5a4d3b; --husk: #b08a52;
     color-scheme: dark;
   }
 }
@@ -26,7 +27,7 @@
   --ground: #11161c; --panel: #182029; --ink: #e3e8ed; --muted: #95a2ae; --rule: #2a3440;
   --accent: #8eaef5; --accent-ink: #0d1420; --faint: rgba(142,174,245,0.12);
   --batt: #6fa3e6; --food: #e5604f; --empty: #6b7782; --grip: #c08ae0; --open: #45c2ad; --pos: #e0a84a; --eye: #e0a84a;
-  --wall: #b5c0ca; --earth: #5a4d3b;
+  --wall: #b5c0ca; --earth: #5a4d3b; --husk: #b08a52;
   color-scheme: dark;
 }
 .feeding-ui [hidden] { display: none !important; }

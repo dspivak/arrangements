@@ -1,29 +1,29 @@
-"""Feeding's three constructors, composed by the library from the feeding note's parts.
+"""Feeding's constructors, composed by the library from the feeding note's parts.
 
 The note is the book repo's ``background/feeding-imc/feeding-imc.tex``; its composite is
-``feed_n = W_n . (R (x) S_1 (x) ... (x) S_n)`` (``eqn.feed``), and here are the three:
+``feed_n = W_n . (R (x) S_1 (x) ... (x) S_n)`` (``eqn.feed``), with the separator mouth of the
+recursive note (``recursive-feeding.tex``, book P109 (i)):
 
-* ``source``, the casing ``S_k`` (``eqn.source``): three integrands (food, opening, the
-  casing's mass) and three parts that read the casing's height (gravity, the air's dragger,
-  the ground), with circles for the access the opening gives, how red the casing is, and its
-  place;
-* ``seeker``, the receiver ``R``: ``body`` (its stores and motors) beside the opener and the
-  digestor;
-* ``spatial_coupling``, ``W_n``: per casing a contact and a latch, the casing side of
-  opening and eating, and one static map.
+* ``source``, the casing ``S_k`` (``eqn.source``): two integrands (food, the casing's mass)
+  and three parts that read the casing's height (gravity, the air's dragger, the ground),
+  with circles for how red the casing is and its place. It has no hinge: the mouth tears the
+  food out and pays per gram;
+* ``seeker_with_slot``, the receiver ``R``: ``body`` (its stores and motors) beside the mouth
+  (the chamber, ``feeding_recursive.settle``), the husk collector and an open slot, filled by
+  any feeder (``absorber_filler``, the gut wall, by default; ``hopper_filler``; ``robot_style``);
+* ``mouth_coupling``, ``W_n``: per casing a contact and a latch, the casing side of taking,
+  and one static map; the pile on the ground is the outermost discard.
 
-Each part is one of ``feeding_parts``; a composite is ``feeding_parts.fill``, that is
-``compose_seq`` after ``tensor_arrangements``, so it records its factors and
-``explore.inspect`` shows them. Every inclination field here is a ``push``.
-
-Each is the same morphism of IMC's Cartesian tangent subcategory as the single box in
-``feeding.py`` that types the summed field out by hand (``source_by_hand``,
-``_body_by_hand``, ``receiver_by_hand``, ``_encounter_by_hand``): same interface, same
-configuration, same readouts, same inclination field, same integrator scheme
-(``tests/test_feeding_composed.py``). ``feeding.feeding`` is built from these.
+``feeding_with_slot`` composes them; ``feeding.feeding`` is it. Each part is one of
+``feeding_parts``; a composite is ``feeding_parts.fill``, that is ``compose_seq`` after
+``tensor_arrangements``, so it records its factors and ``explore.inspect`` shows them. Every
+inclination field here is a ``push``. The body is the same morphism as ``feeding._body_by_hand``,
+its field typed out by hand (``tests/test_feeding_composed.py``).
 
 Built 2026-11-19 for the book's P109 (e) (Claude Fable 5.2, 6a32afbb), the casing and the
-body; 2026-11-21 for P109 (h) (Claude Fable 5.2, 86739fa7), the organs and the coupling.
+body; 2026-11-21 for P109 (h) (Claude Fable 5.2, 86739fa7), the organs and the coupling; the
+hinged casing, the opener and digestor and their coupling left on 2026-11-23 (P109 (i) act (5),
+Claude Opus 5.5, subagent of c5f9ecc9).
 """
 from __future__ import annotations
 
@@ -36,13 +36,15 @@ from jax import Array
 
 from . import feeding_parts as fp
 from .arrangement import Arrangement
-from .feeding import CENTRES, DEFAULTS, _destination, _food_memory, _search_map, _variate, near, theta
+from .feeding import (CENTRES, DEFAULTS, _destination, _memory_rules, _memory_values, _search_map, _variate,
+                      near, theta)
 from .wiring import compose_seq, parallel_arrangements, tensor_arrangements
 
 
 def gravity(m: float, g: float) -> Arrangement:
     """``push`` with constant coefficient ``-m g`` and target the height: field ``-m g dx``."""
-    return fp.pushes("gravity", 1, [("weight", lambda v: -m * g * jnp.ones_like(v[0]), lambda v: v[0])])
+    return fp.pushes("gravity", 1, [("weight", lambda v: -m * g * jnp.ones_like(v[0]), lambda v: v[0])],
+                     inputs=[("x", "height", 1)], forms=[("-m*g", "x")], constants={"m": m, "g": g})
 
 
 def ground(xg: float, kg: float, eps: float, kd: float, epsd: float, bd: float, kr: float,
@@ -62,30 +64,30 @@ def ground(xg: float, kg: float, eps: float, kd: float, epsd: float, bd: float, 
 
 
 def source(place: float, food: float = 10., *, parameters: Mapping[str, float] | None = None,
-           stages: int = 1, h: float = 1.) -> Arrangement:
-    """The casing ``1 -> <0|6>`` of the note's ``eqn.source``, composed from its parts.
-
-    Outputs: food, opening, access, height, red, place. Arguments as ``feeding.source``.
+           stages: int = 1, h: float = 1., hinge: bool = False) -> Arrangement:
+    """The casing ``1 -> <0|4>`` a separator mouth eats from (book P109 (i)), composed from
+    its parts: outputs food, height, red, place; configuration ``(f, x, z_air, z_g)``. It has
+    no opening: prying is paid per gram, by the mouth. (The hinged casing, with an opening
+    store and an access readout, left the library on 2026-11-23; ``hinge=True`` says so.)
     """
+    if hinge:
+        raise ValueError("the hinged casing left the library on 2026-11-23 (book P109 (i), act (5))")
     p = {**DEFAULTS, **(parameters or {})}
     step = dict(stages=stages, h=h)
     air = fp.discard(fp.send(fp.dragger(p['beta'], p['xg'], "air dragger", **step), {0: p['kappa']}), [0],
                      "air drag")
-    parts = [fp.rod_segment(1., food, "food", **step),
-             fp.rod_segment(1., 0., "opening", **step),
-             fp.mass(p['m'], p['xg'], 0., "casing", **step),
-             gravity(p['m'], p['g']),
-             air,
-             ground(p['xg'], p['kg'], p['eps'], p['kd'], p['epsd'], p['bd'], p['kr'], **step)]
-
+    body = [fp.mass(p['m'], p['xg'], 0., "casing", **step),
+            gravity(p['m'], p['g']),
+            air,
+            ground(p['xg'], p['kg'], p['eps'], p['kd'], p['epsd'], p['bd'], p['kr'], **step)]
     def publish(m: Array) -> Array:
-        f, a, x = m
-        return jnp.stack([f, a, theta((a - p['a1']) / (p['a2'] - p['a1'])), x,
-                          theta((f - p['fr']) / p['fr']), jnp.asarray(place, dtype=float)])
+        f, x = m
+        return jnp.stack([f, x, theta((f - p['fr']) / p['fr']), jnp.asarray(place, dtype=float)])
 
-    wiring = fp.transfer(f"casing({place:g})", 3, 3, 0, 6,
-                         lambda m, n: jnp.stack([m[2], m[2], m[2]]), publish)
-    return fp.fill(parts, wiring)
+    wiring = fp.transfer(f"casing({fp.number(place)})", 3, 2, 0, 4,
+                         lambda m, n: jnp.stack([m[1], m[1], m[1]]), publish)
+    return fp.with_meta(fp.fill([fp.rod_segment(1., food, "food", **step), *body], wiring),
+                        outputs=[("f", "food", 1), ("x", "height", 1), ("r", "red", 1), ("y", "place", 1)])
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +133,7 @@ def wheels(p: Mapping[str, float], cart: float = 0., *, stages: int = 1, h: floa
     step = dict(stages=stages, h=h)
     parts = [fp.mass(p['M'], cart, 0., "cart", **step),
              fp.send(fp.dragger(p['betac'], cart, "wheel dragger", **step), {0: p['kappac']}, "wheel"),
-             fp.motor(p['betac'], p['b0'], "drive")]
+             fp.motor(p['betac'], p['bDrive'], "drive")]
 
     def route(m: Array, n: Array) -> Array:
         y, wheel = m
@@ -157,6 +159,35 @@ def _memory_start(p: Mapping[str, float], memory) -> list[tuple[str, Array]]:
             ("return rate", weights), ("eye contact", zeros), ("last empty", zeros), ("time away", zeros)]
 
 
+def learner(name: str, rule, reads: list[int], width: int, capacity: float, wake: float,
+            read_names: list[str] | None = None) -> Arrangement:
+    """One store's learner ``1 -> <1 + width + sum(reads)|0>``: its circle, the rule, and the
+    motor it tells the rate, with other load 0 (nothing else acts on the store). Inputs: the
+    battery, the store, then what the rule reads, each at the width in ``reads`` (named
+    ``read_names`` in the part's ``meta``).
+
+    ``rule`` takes the store and what it reads as one list, in that order, and returns the
+    rate. The motor reads the battery and drives the store at ``live(b)`` times the rate."""
+    motor = fp.send(fp.motor_at_rate(capacity, wake, f"{name} motor", width),
+                    {1 + 2 * width + j: 0. for j in range(width)}, f"{name} motor, P=0")
+    cuts = [1 + width]
+    for k in reads:
+        cuts.append(cuts[-1] + k)
+
+    def route(m: Array, n: Array) -> Array:
+        b, store = n[:1], n[1:1 + width]
+        read = [n[cuts[i]:cuts[i + 1]] for i in range(len(reads))]
+        return jnp.concatenate([b, store, rule(store, *read)])
+
+    read_names = read_names or [f"input {i + 1}" for i in range(len(reads))]
+    return fp.with_meta(fp.fill([motor], fp.transfer(f"{name} rule", 1 + 2 * width, 0, cuts[-1], 0, route)),
+                        part="learner", kind="push of some inputs",
+                        inputs=[("b", "battery", 1), ("s", name, width),
+                                *[(f"r_{i + 1}", read, k) for i, (read, k) in enumerate(zip(read_names, reads))]],
+                        constants={"C": capacity, "b_0": wake},
+                        formula="a motor told the rule's rate u: (C*g*u)*ds - Σ(C*g*u*g*u)*db, g = θ(b/b_0)")
+
+
 def memory_motors(capacity: float, wake: float, widths: list[int], names: list[str]) -> Arrangement:
     """One motor per memory store, each told a rate with other load 0, which is the true one:
     nothing else acts on these stores. Each reads the battery. Inputs, per store: battery,
@@ -168,7 +199,7 @@ def memory_motors(capacity: float, wake: float, widths: list[int], names: list[s
 
 
 def body(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: float = 1.,
-         learning: bool = False, memory=None, cart: float = 0.) -> Arrangement:
+         learning: bool = False, memory=None, cart: float = 0., battery: float | None = None) -> Arrangement:
     """The body and its motors ``1 -> <7|5>``, composed from the note's parts.
 
     Inputs, from the encounter: seen, climb, K, the attachment's pulls on grip and tip, an
@@ -192,16 +223,34 @@ def body(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: f
     widths = [int(v.shape[0]) for _, v in start]
     extra = sum(widths)
 
-    stores = [fp.rod_segment(1., 6. if learning else 3., "battery", **step),
+    battery = (6. if learning else 3.) if battery is None else battery
+    stores = [fp.rod_segment(1., battery, "battery", **step),
               fp.rod_segment(p['cgrip'], -1., "engagement", **step),
               fp.rod_segment(p['clift'], p['xg'], "tip", **step),
               wheels(p, cart, **step),
               fp.rod_segment(p['csee'], 0., "look", **step),
               fp.rod_segment(p['csee'], p['A'], "scan", **step),
               *[fp.rod_segment(capacity, v, name, **step) for name, v in start]]
+    # One learner per memory store, its circle reading only what its rule names (book P109 (f),
+    # act (3)); the width of each value a rule may read.
+    rules = _memory_rules(p) if learning else []
+    width_of = dict(zip([key for key, _, _ in rules], widths), y=1, gaze=1, grip=1, grip_rate=1, seen=1, eaten=1)
+
+    def as_rule(key, reads, rule):
+        def rate(store, *read):
+            values = {k: (x[0] if width_of[k] == 1 else x) for k, x in zip((key, *reads), (store, *read))}
+            return rule(values)
+        return rate
+
+    # What each value a rule reads is called on its wire (the part's meta; drawing only).
+    called = {**dict(zip([key for key, _, _ in rules], names)), 'y': 'cart', 'gaze': 'gaze', 'grip': 'grip',
+              'grip_rate': 'grip rate', 'seen': 'red at gaze', 'eaten': 'food taken'}
+    learners = [learner(name, as_rule(key, reads, rule), [width_of[k] for k in reads], width_of[key], capacity, p['b0'],
+                        [called.get(k, k) for k in reads])
+                for (key, reads, rule), name in zip(rules, names)]
     stateless = [gripper(p), lever(p), fp.sweep(p['csee'], p['b0'], p['A'], p['omega'], p['gam'], "eye"),
-                 memory_motors(capacity, p['b0'], widths, names) if learning
-                 else fp.sweep(p['cpat'], p['b0'], p['B'], p['nup'], p['gamp'], "patrol")]
+                 *(learners if learning
+                   else [fp.sweep(p['cpat'], p['b0'], p['B'], p['nup'], p['gamp'], "patrol")])]
 
     # Every motor reads the battery itself, so no rate told to a motor carries live(b), and
     # nothing here reads the battery except to pass it to the motors. The memory's rules read
@@ -213,96 +262,144 @@ def body(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: f
         free = theta(1 - 2 * seen)
         if learning:
             q = jnp.concatenate([jnp.stack([b, grip, tip, y, jnp.zeros_like(b), look, scan]), rest])
-            rates, search = _food_memory(q, _grip_rate(grip, keep, p), seen, eaten, p)
-            cuts = [0]
-            for n_k in widths:
-                cuts.append(cuts[-1] + n_k)
-            tail = [x for i in range(len(widths))
-                    for x in (b[None], rest[cuts[i]:cuts[i + 1]], rates[cuts[i]:cuts[i + 1]])]
+            v = _memory_values(q, _grip_rate(grip, keep, p), seen, eaten)
+            search = p['memoryDrive'] * jnp.tanh((v['target'] - y) / 1.5)
+            tail = [jnp.concatenate([b[None], *(jnp.atleast_1d(v[k]) for k in (key, *reads))])
+                    for key, reads, _ in rules]
         else:
             search = p['kexp'] * (rest[0] - y)
             tail = [jnp.stack([b, rest[0], rest[1], free, jnp.zeros_like(b)])]
-        torque = p['ktau'] * seen * look + free * search
+        # Toward what the eye holds, the most torque ktau until within rDrive of it (P109 (c)).
+        torque = p['ktau'] * seen * jnp.tanh(look / p['rDrive']) + free * search
         return jnp.concatenate([jnp.stack([b, torque]),                               # wheels
                                 jnp.stack([b, grip, keep, pull_grip]),                # gripper
                                 jnp.stack([b, tip, grip, pull_tip]),                  # lever
                                 jnp.stack([b, look, scan, free, p['lam'] * climb]),   # eye
                                 *tail])
 
-    inner_in = 2 + 4 + 4 + 5 + (sum(1 + 2 * n_k for n_k in widths) if learning else 5)
+    inner_in = 2 + 4 + 4 + 5 + (sum(1 + width_of[key] + sum(width_of[k] for k in reads) for key, reads, _ in rules)
+                                if learning else 5)
     wiring = fp.transfer("body and motors", inner_in, 6 + extra, 7, 5, route, lambda m: m[:5])
-    return fp.fill(stores + stateless, wiring)
+    return fp.with_meta(fp.fill(stores + stateless, wiring),
+                        inputs=[(f"n_{i + 1}", name, 1) for i, name in
+                                enumerate(("seen", "climb", "K", "pull on grip", "pull on tip", "unused", "eaten"))],
+                        outputs=[(f"o_{i + 1}", name, 1) for i, name in
+                                 enumerate(("battery", "grip", "tip", "cart", "look"))])
 
 
 # ---------------------------------------------------------------------------
-# The mouth's organs and the receiver (note sec.arrangement, sec.receiver's table).
+# The separator mouth and its slot (book P109 (i), act (3); the recursive note's page
+# *A separator whose rate is set from outside*): the mouth is the half that settles, inside the
+# seeker; the half that reaches is the spatial coupling, which computes the rate at the held
+# casing and sends it in. The slot inside is the recursive note's feeder interface
+# F = <food, reserve, parent mass, parent acceptance | >.
 # ---------------------------------------------------------------------------
 
-
-def mouth_organ(name: str, per_unit: float) -> Arrangement:
-    """The battery side ``1 -> <2|0>`` of a mouth organ: ``push`` with coefficient
-    ``per_unit`` times a rate and target the battery. Inputs: the battery ``b`` and the rate
-    ``J`` realized outside the receiver. Field ``per_unit J db``, load-free at ``J``.
-    The opener is it with ``per_unit = -ctear``, the digestor with ``per_unit = alpha``."""
-    return fp.pushes(name, 2, [("settle", lambda v: per_unit * v[1], lambda v: v[0])])
+SLOT_SEEKER_INPUTS = ("seen", "climb", "K", "pull on grip", "pull on tip", "taken", "parent mass", "parent acceptance")
+SLOT_SEEKER_OUTPUTS = ("battery", "grip", "tip", "cart", "look", "effort")
 
 
-def seeker(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: float = 1.,
-           learning: bool = False, memory=None, cart: float = 0.) -> Arrangement:
-    """The receiver ``1 -> <7|7>`` (the note's ``R``): the body and its motors, the opener
-    and the digestor.
+def seeker_with_slot(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: float = 1.,
+                     learning: bool = False, memory=None, cart: float = 0., battery: float | None = None) -> Arrangement:
+    """The seeker with a separator mouth and an open slot, ``F -> <8|6>``.
 
-    Outputs: battery, grip, tip, cart, look, and the two efforts the mouth offers, opening
-    ``lpry live(b) hold(grip)`` and digestion ``leat live(b) hold(grip)``. Inputs: seen,
-    climb, K, the attachment's pulls on grip and tip, the opening rate realized and the food
-    taken per unit of duration; the last two go to the body and to the organs, which settle
-    them at the battery. The same morphism as ``feeding.receiver_by_hand``.
+    Parts: the body and its motors; the mouth, ``feeding_recursive.settle`` (the chamber, a
+    store of what the mouth has torn off, which receives the pass share of each gram taken,
+    puts the rest in the collector and charges the battery ``mouthCost`` per gram); the
+    collector of husks, ``feeding_recursive.collector``; and the identity on ``F``, the slot.
+
+    Inputs: seen, climb, K, the attachment's pulls on grip and tip (as ``body``'s), the rate
+    ``taken`` at which the spatial coupling realizes eating, and the parent's discard pair
+    (the pile on the ground, for the outermost seeker). Outputs: battery, grip, tip, cart,
+    look, and the effort the mouth offers, ``leat live(b) hold(grip) admit(chamber) accept``,
+    ``accept`` the collector's admission. The slot is handed the chamber's mass as its food,
+    the battery as its reserve and the collector's pair as its parent's.
     """
+    from . import feeding_recursive as fr
     p = {**DEFAULTS, **(parameters or {})}
+    step = dict(stages=stages, h=h)
+    chamber_admits = fr.admit(p['chamberCap'])
+    parts = [body(parameters=p, stages=stages, h=h, learning=learning, memory=memory, cart=cart, battery=battery),
+             fr.settle(p['mouthPass'], p['mouthCost'], 0., "mouth", **step),
+             fr.collector(p['clearance'], p['collectorCap'], 0., "husk collector", **step),
+             fp.identity(4, 0, "seeker slot")]
 
     def route(m: Array, n: Array) -> Array:
-        return jnp.concatenate([n, jnp.stack([m[0], n[5], m[0], n[6]])])
+        b, z, local = m[0], m[5], m[6:8]
+        seen, climb, keep, pull_grip, pull_tip, taken, parent = n[0], n[1], n[2], n[3], n[4], n[5], n[6:8]
+        return jnp.concatenate([jnp.stack([seen, climb, keep, pull_grip, pull_tip, jnp.zeros_like(taken), taken]),
+                                jnp.stack([taken, b]), local,
+                                parent,
+                                jnp.stack([z, b]), local])
 
     def publish(m: Array) -> Array:
-        b, grip = m[0], m[1]
-        return jnp.concatenate([m, jnp.stack([p['lpry'] * theta(b / p['b0']) * theta(grip),
-                                              p['leat'] * theta(b / p['b0']) * theta(grip)])])
+        b, grip, z, accept = m[0], m[1], m[5], m[7]
+        effort = p['leat'] * theta(b / p['b0']) * theta(grip) * chamber_admits(z) * accept
+        return jnp.concatenate([m[:5], effort[None]])
 
-    parts = [body(parameters=p, stages=stages, h=h, learning=learning, memory=memory, cart=cart),
-             mouth_organ("opener", -p['ctear']), mouth_organ("digestor", p['alpha'])]
-    return fp.fill(parts, fp.transfer("receiver", 11, 5, 7, 7, route, publish))
-
-
-# ---------------------------------------------------------------------------
-# The spatial coupling (note sec.arrangement, sec.gates): contacts, latches, static maps.
-# ---------------------------------------------------------------------------
+    wiring = fp.transfer("seeker with a slot", 7 + 4 + 2 + 4, 5 + 1 + 2, 8, 6, route, publish)
+    return fp.with_meta(replace(fp.fill(parts, wiring), label="seeker with a slot"),
+                        inputs=[(f"n_{i + 1}", name, 1) for i, name in enumerate(SLOT_SEEKER_INPUTS)],
+                        outputs=[(f"o_{i + 1}", name, 1) for i, name in enumerate(SLOT_SEEKER_OUTPUTS)])
 
 
-def spatial_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
-                     stages: int = 1, h: float = 1.) -> Arrangement:
-    """The spatial coupling ``W_n : B (x) S^n -> <0|2>`` of a receiver and ``count`` casings.
+def absorber_filler(parameters: Mapping[str, float] | None = None) -> Arrangement:
+    """The default filler of the slot: the recursive note's absorber, ``1 -> F``, a gut wall
+    that takes up ``uptake`` times what the chamber holds per unit of duration and gives the
+    battery ``absorbYield`` per gram."""
+    from . import feeding_recursive as fr
+    p = {**DEFAULTS, **(parameters or {})}
+    return fr.absorber(p['absorbYield'], p['uptake'], "gut wall")
 
-    Its parts, side by side with the identity on the receiver's and casings' interfaces
-    ``<7 | 7 + 6 n>``: per casing a ``contact`` (the lever's attachment: both gates sent
-    ``G_k``, the stretch ``x_k - h``) and a ``latch``; and two ``push`` boxes of width ``n``,
-    the casing side of opening, ``sum_k pry_k da_k``, and of eating, ``-sum_k eat_k df_k``.
-    One static map feeds them all and the receiver: the gates, the latch law's ``U_k``,
-    ``D_k``, ``T_k`` (note ``sec.gates``), the realized rates, what the eye sees, and the
-    loads ``P`` the attachment puts on the grip, the tip and each latch, which the motors of
-    those stores must be sent. It reads out the battery and the grip.
 
-    Configuration: the attachment strokes, then the latches. The same morphism as
-    ``feeding._encounter_by_hand``.
+def hopper_filler(pass_fraction: float = .5, cost: float = .02, speed: float = 2., capacity: float = 6.,
+                  clearance: float = 1., inner: Arrangement | None = None, *, parameters=None,
+                  stages: int = 1, h: float = 1.) -> Arrangement:
+    """A hopper around a feeder (the absorber by default): the recursive note's layer
+    ``L_{p,c}``, a collector and a separator around the slot, filled. A gut."""
+    from . import feeding_recursive as fr
+    step = dict(stages=stages, h=h)
+    inner = absorber_filler(parameters) if inner is None else inner
+    return fr.wrap(fr.layer(fr.collector(clearance, capacity, label="gut collector", **step),
+                            fr.separator(pass_fraction, cost, fr.process_rate(speed, capacity), label="gut", **step),
+                            label="hopper"), inner)
+
+
+def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
+                   stages: int = 1, h: float = 1., feeder: bool = False) -> Arrangement:
+    """The spatial coupling of a seeker with a slot, ``count`` hingeless casings and the pile:
+    ``<8|6> (x) <0|4>^count (x) <0|2> -> <0|2>``.
+
+    Its parts, beside the identity on the seeker's, casings' and pile's interfaces: per casing
+    a ``contact`` (the lever's attachment: both gates sent ``G_k``, the stretch ``x_k - h``)
+    and a ``latch``, and one wide ``push`` ("taking"), all fed by one static map, which also
+    computes the latch law's gates (note ``sec.gates``), what the eye sees, and the loads the
+    attachment puts on the grip, the tip and each latch. (Until 2026-11-23 the hinged model's
+    coupling had two pushes, opening and eating.) The coupling is the half of the separator
+    that reaches. At casing ``k`` it realizes
+    ``J_k = effort s_k near_Rh(cart - place_k) near_R(height_k - x0) food_k``, pushes
+    ``-J_k d food_k``, and tells the seeker ``sum_k J_k`` at its load-free input ``taken``,
+    with the pile's pair as its parent's.
+
+    With ``feeder`` it is the coupling of a robot inside another's slot (book P109 (j)),
+    ``<8|6> (x) <0|4>^count -> F``, ``F`` the feeder interface ``<food, reserve, parent
+    mass, parent acceptance | >``: no pile, the parent's pair arriving from outside; the mass
+    handed in on ``food`` laid out among the casings by one Petri transition per casing,
+    ``layRate food / count (d food_k - d food)``; and the robot's own battery joined to the
+    reserve by a cord, a spring of conductance ``cord`` between the two, whose field
+    ``-cord (b - reserve) d(b - reserve)`` moves charge from the fuller to the emptier.
     """
     p = {**DEFAULTS, **(parameters or {})}
     n = count
     step = dict(stages=stages, h=h)
     cost = fp.contact_cost(p['kappa0'], p['kd'])
+    width = 6 + 4 * n + (0 if feeder else 2)
 
-    def route(m: Array, _: Array) -> Array:
-        b, grip, tip, cart, look, pry, eat = m[:7]
-        food, opening, access, height, red, place = m[7:7 + 6 * n].reshape((n, 6)).T
-        stroke, latch = m[7 + 6 * n:7 + 7 * n], m[7 + 7 * n:]
+    def route(m: Array, outer: Array) -> Array:
+        b, grip, tip, cart, look, effort = m[:6]
+        food, height, red, place = m[6:6 + 4 * n].reshape((n, 4)).T
+        pile = outer[2:4] if feeder else m[6 + 4 * n:width]
+        stroke, latch = m[width:width + n], m[width + n:]
         along = near(cart - place, p['Rh'])
 
         def gate(grip, tip, latch):
@@ -315,8 +412,6 @@ def spatial_coupling(count: int, *, parameters: Mapping[str, float] | None = Non
         pulls = jax.grad(attachment, argnums=(0, 1, 2))(grip, tip, latch)
         g = gate(grip, tip, latch)
         s = fp.engagement(latch)
-
-        # The latch law's gates (note sec.gates): A_k, d_k, B_k, U_k, H, D_k, T_k.
         offered = near(height - tip, p['R']) * along * theta((food - p['f0']) / p['f0'])
         score = offered / (1 + ((height - tip) / p['R']) ** 2 + ((cart - place) / p['Rh']) ** 2)
         others = ~jnp.eye(n, dtype=bool)
@@ -325,28 +420,79 @@ def spatial_coupling(count: int, *, parameters: Mapping[str, float] | None = Non
         held = theta((grip + .8) / .4)
         acquire = theta((offered - .15) / .15) * first * (1 - held)
         retain = 1 - (1 - offered) * (1 - held)
-
-        # The mouth's realized rates at each casing, and what the eye sees.
-        at_mouth = s * along * near(height - p['x0'], p['R'])
-        opened, eaten = pry * at_mouth * (1 - opening), eat * at_mouth * access * food
+        taken = effort * s * along * near(height - p['x0'], p['R']) * food
         offset = (cart + look - place) / p['w']
         signal = red * jnp.exp(-offset ** 2)
-        told = jnp.stack([signal.sum(), jnp.sum(-2 * offset * signal / p['w']), jnp.sum(s * offered),
-                          -pulls[0], -pulls[1], opened.sum(), eaten.sum()])
-        return jnp.concatenate([told,
-                                jnp.stack([g, g, height - tip], axis=1).ravel(),
-                                jnp.stack([jnp.broadcast_to(b, (n,)), free, acquire, retain, -pulls[2]],
-                                          axis=1).ravel(),
-                                opened, opening, -eaten, food])
+        told = jnp.concatenate([jnp.stack([signal.sum(), jnp.sum(-2 * offset * signal / p['w']), jnp.sum(s * offered),
+                                           -pulls[0], -pulls[1], taken.sum()]), pile])
+        inner = [told,
+                 jnp.stack([g, g, height - tip], axis=1).ravel(),
+                 jnp.stack([jnp.broadcast_to(b, (n,)), free, acquire, retain, -pulls[2]], axis=1).ravel(),
+                 -taken, food]
+        if feeder:
+            handed, reserve = outer[0], outer[1]
+            laid = p['layRate'] * handed / n * jnp.ones(n)
+            inner += [laid, food - handed, (b - reserve)[None]]
+        return jnp.concatenate(inner)
 
     pieces = [*[fp.contact(p['kappa0'], p['kd'], p['bd'], p['kr'], 0., f"attachment {k + 1}", **step)
                 for k in range(n)],
               *[fp.latch(p['latchCost'], p['latchRate'], p['b0'], 0., f"contact latch {k + 1}", **step)
                 for k in range(n)],
-              fp.push("push: opening", n), fp.push("push: eating", n)]
-    # The identity beside all the pieces at once, not folded in with them one by one: the
-    # receiver's and casings' wires then pass one tensor, and ``explore.inspect`` evaluates
-    # the loads arriving on them once, not once per piece.
-    inside = parallel_arrangements(fp.identity(7, 7 + 6 * n, "receiver and casings"), tensor_arrangements(pieces))
-    wiring = fp.transfer("spatial coupling", 7 + 12 * n, 7 + 8 * n, 0, 2, route, lambda m: m[:2])
+              fp.push("push: taking", n)]
+    if feeder:
+        # The cord is a spring of constant stiffness between the robot's battery and the reserve.
+        pieces += [fp.push("push: laying out", n), fp.send(fp.spring("cord"), {0: p['cord']}, "cord")]
+    pieces_in = 10 * n + (2 * n + 1 if feeder else 0)
+    inside = parallel_arrangements(fp.identity(8, width, "seeker and casings" if feeder else "seeker, casings and pile"),
+                                   tensor_arrangements(pieces))
+    if feeder:
+        wiring = fp.transfer("inner spatial coupling", 8 + pieces_in, width + 2 * n, 4, 0, route)
+        return replace(compose_seq(inside, wiring), label="inner spatial coupling")
+    wiring = fp.transfer("spatial coupling", 8 + pieces_in, width + 2 * n, 0, 2, route, lambda m: m[:2])
     return replace(compose_seq(inside, wiring), label="spatial coupling")
+
+
+def robot_style(places=(2.,), *, parameters: Mapping[str, float] | None = None, stages: int = 1, h: float = 1.,
+                learning: bool = False, memory=None, cart: float = 0.) -> Arrangement:
+    """A robot-style seeker, an arrow ``F -> F`` of the tangent subcategory (book P109 (j);
+    David, 2026-11-21: "i think the seeker may be a copy of the whole robot, but i'm not sure
+    it needs to accomplish eerything the same way. a hopper is also a seeker. can we leave it
+    open to be filled by any seeker style?").
+
+    A whole robot, every organ kept (the run's call, his to change): a seeker with its own
+    separator mouth, husk collector, battery and slot, and ``len(places)`` hingeless casings
+    in its own arena, under ``mouth_coupling(..., feeder=True)``. Handed a mass on its food
+    wire, it lays it out among its casings and seeks it; its battery starts empty and is
+    joined to the reserve by a cord; its husks go to the parent's collector; its slot is open,
+    so ``compose_seq(filler, robot_style())`` is a feeder ``1 -> F`` for any feeder
+    ``filler``, a hopper, an absorber or another robot.
+    """
+    p = {**DEFAULTS, **(parameters or {})}
+    step = dict(stages=stages, h=h)
+    seeker = seeker_with_slot(parameters=p, learning=learning, memory=memory, cart=cart, battery=0., **step)
+    casings = [source(x, 0., parameters=p, hinge=False, **step) for x in places]
+    world = tensor_arrangements([seeker, *casings])
+    return replace(compose_seq(world, mouth_coupling(len(places), parameters=p, feeder=True, **step)),
+                   label="robot style")
+
+
+def feeding_with_slot(places=(4., -8., 8.), foods=(.05, 10., 10.), *, filler: Arrangement | None = None,
+                      parameters: Mapping[str, float] | None = None, stages: int = 1, h: float = 1.,
+                      learning: bool = False, memory=None, cart: float = 0., pile: float = 0.,
+                      battery: float | None = None) -> Arrangement:
+    """Feeding with a separator mouth: ``mouth_coupling(n) . ((seeker_with_slot . filler)
+    (x) casing_1 (x) ... (x) casing_n (x) pile)``, the casings without their hinge.
+    ``filler`` is any ``1 -> F`` (the absorber by default; a hopper; a seeker style).
+    ``battery`` is the battery's starting charge (``body``'s default when ``None``)."""
+    from . import feeding_recursive as fr
+    if len(places) != len(foods):
+        raise ValueError('One food per casing')
+    p = {**DEFAULTS, **(parameters or {})}
+    step = dict(stages=stages, h=h)
+    filler = absorber_filler(p) if filler is None else filler
+    robot = compose_seq(filler, seeker_with_slot(parameters=p, learning=learning, memory=memory, cart=cart,
+                                                 battery=battery, **step))
+    casings = [source(x, f, parameters=p, hinge=False, **step) for x, f in zip(places, foods)]
+    world = tensor_arrangements([robot, *casings, fr.pile(pile, "pile on the ground", **step)])
+    return compose_seq(world, mouth_coupling(len(casings), parameters=p, **step))

@@ -10,8 +10,9 @@
 </head>
 <body class="feeding-ui feeding-page">
 <main id="feeding-view" class="feeding-ui"></main>
-<script src="feeding-model.js"></script>
-<script src="food-learning.js"></script>
+<!-- The model: generated from arrangements.feeding_composed.feeding_with_slot by scripts/export_step_js.py.
+     The page starts with three casings; feeding-view.js loads feeding-slot-N.js for another count. -->
+<script src="feeding-slot-3.js"></script>
 <script src="feeding-view.js"></script>
 <script>const feeding = createFeedingView(document.getElementById('feeding-view'));</script>
 </body></html>

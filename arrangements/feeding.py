@@ -1,38 +1,53 @@
 """Feeding as a composite in IMC's Cartesian tangent subcategory.
 
-The spatial coupling takes a fixed receiver beside its casing sources (feeding-imc.tex, eqn.feed). Objects
+The spatial coupling takes a fixed seeker beside its casing sources (feeding-imc.tex, eqn.feed). Objects
 are interfaces, morphisms are Arrangement values, composition and tensor are
 the library constructors. No new categorical construction is claimed.
 Their integrators read configurations, forgetting mass momenta. The existing
 Phi / PhiK interpretation computes the inclination; the parameter responds.
-The browser's factored field is checked against this composite, including its
-six source-output loads. A zero eye capacity is a browser limiting convention,
-not a rod-segment integrator, so the library requires positive capacities.
+The library requires positive capacities.
 
-``feeding`` is built from three constructors, ``seeker`` (the note's receiver; ``receiver``
-is the same function), ``source`` and ``spatial_coupling``, each composed by
+``feeding`` is ``feeding_composed.feeding_with_slot`` (book P109 (i), act (5), 2026-11-23):
+the seeker with a separator mouth (its chamber), a husk collector and a slot filled by the
+gut wall, casings without a hinge, and the pile on the ground, each composed by
 ``compose_seq`` and ``tensor_arrangements`` from the note's general parts, in
-``feeding_composed.py`` and ``feeding_parts.py`` (book P109 (e), 2026-11-19, the casings and
-the body; P109 (h), 2026-11-21, the mouth's organs and the spatial coupling). The one field
-still typed out as a whole is inside a circle: the memory's rates, ``_food_memory``.
-``source_by_hand``, ``_body_by_hand``, ``receiver_by_hand`` and ``_encounter_by_hand`` are
-the earlier single boxes, kept as checks; regrouping changed no equation.
+``feeding_composed.py``, ``feeding_recursive.py`` and ``feeding_parts.py``. The memory's
+rates are nine circles, one per store, each in its learner's box with the motor it tells
+(``_memory_rules``, ``feeding_composed.learner``; P109 (f), act (3), 2026-11-22).
+``source_by_hand`` and ``_body_by_hand`` are single boxes with their fields typed out, kept
+as checks on ``source`` and ``feeding_composed.body``. The hinged model (a casing with an
+opening, the opener and digestor, their spatial coupling, and the page's flat state layout)
+left the library on 2026-11-23; it is in the history before that date.
 """
 from __future__ import annotations
-import functools
 import jax
 import jax.numpy as jnp
-from jax.flatten_util import ravel_pytree
-from .arrangement import Arrangement, exact, zero_form
+from .arrangement import Arrangement, exact
 from .coalgebra import CotCoalg, CotCoalgK
-from .wiring import compose_seq, parallel_arrangements, tensor_arrangements, trivial_parameter
 
 DEFAULTS = dict(m=1., g=2., beta=.2, kappa=40., x0=0., R=.5, kappa0=100., b0=1., f0=.1,
-                lgrip=2., lpry=2., leat=2., a1=.2, a2=.6, alpha=.8, cgrip=.02, ctear=.3,
+                # (The hinged model's lpry, a1, a2, alpha and ctear left with it on 2026-11-23.)
+                lgrip=2., leat=2., cgrip=.02,
                 xg=-.4, kg=400., eps=.05, Rh=.5, clift=.02, llift=2., M=.25, betac=.4,
-                kappac=40., ktau=.16, A=6., omega=.6, gam=.05, lam=3., w=.5, csee=.002, fr=.1,
+                # ktau: the most torque the drive applies toward what the eye holds, reached
+                # beyond rDrive of it; bDrive: the battery level at which the drive is fully awake
+                # (book P109 (c), David, 2026-11-18: "it should keep approaching the place").
+                # bDrive is b0, as for every other motor: with bDrive = 0.1 a cart on battery 0.3
+                # drives at full torque, empties the battery to 0.03 before it arrives, and the
+                # gripper, waking at b0, can no longer close (.scratch/p109-c5f9ecc9/drive_check.py).
+                # ktau = 0.3: a speed near ktau / betac = 0.75 and 0.3 of battery per unit of
+                # distance; at 0.6 the page's second trip of seed 127 arrives on an empty battery.
+                kappac=40., ktau=.3, rDrive=.25, bDrive=1., A=6., omega=.6, gam=.05, lam=3., w=.5, csee=.002, fr=.1,
                 kd=4000., bd=40., kr=10., epsd=.01, B=8., nup=.1, gamp=.005, cpat=.002, kexp=.1,
-                latchRate=40., latchCost=.0001, memoryDrive=.2, memoryCost=.001, searchSeed=37)
+                latchRate=40., latchCost=.0001, memoryDrive=.2, memoryCost=.001, searchSeed=37,
+                # The separator mouth and its slot (book P109 (i)): pass fraction, battery cost per
+                # gram, chamber and collector capacities, the collector's clearance, and the
+                # absorber's energy per gram and uptake rate.
+                mouthPass=.8, mouthCost=.03, chamberCap=8., collectorCap=4., clearance=1.,
+                absorbYield=1., uptake=2.,
+                # A robot-style seeker inside another's slot (book P109 (j)): the rate at which it
+                # lays out the mass it is handed among its casings, and its battery's cord to the reserve.
+                layRate=1., cord=2.)
 
 def theta(t):
     # Safe branches prevent inactive 1/0 branches poisoning derivatives.
@@ -70,9 +85,10 @@ def _parameter(init, indices, response, stages, h, label):
                     durational=lambda tau: _parameter(init,indices,response,4,h*tau,label))
 
 def source(place, food=10., *, parameters=None, stages=1, h=1.):
-    """Nullary source with six outputs: food, opening, access, height, red, place.
+    """Nullary source with four outputs: food, height, red, place. No hinge: the mouth tears
+    the food out (the hinged casing, with an opening and an access readout, left 2026-11-23).
 
-    Composed by the library from the note's parts (``feeding_composed.source``): three
+    Composed by the library from the note's parts (``feeding_composed.source``): two
     integrands, gravity, the air's dragger and the ground's spring and damper.
     """
     from .feeding_composed import source as composed
@@ -84,26 +100,36 @@ def source_by_hand(place, food=10., *, parameters=None, stages=1, h=1.):
     ``source`` (``tests/test_feeding_composed.py``); the model does not use it."""
     p={**DEFAULTS, **(parameters or {})}
     def response(s, xi):
-        return jnp.array([xi[0],xi[1],s[3]/p['m'],xi[2],xi[3]/p['beta'],xi[4]/p['bd']])
-    P=_parameter([food,0.,p['xg'],0.,p['xg'],0.],[0,1,2,4,5],response,stages,h,'casing integrator')
+        return jnp.array([xi[0],s[2]/p['m'],xi[1],xi[2]/p['beta'],xi[3]/p['bd']])
+    P=_parameter([food,p['xg'],0.,p['xg'],0.],[0,1,3,4],response,stages,h,'casing integrator')
     def cost(q,m,n):
-        f,a,x,z,zg=q;v=x-p['xg'];dg=v-zg
+        f,x,z,zg=q;v=x-p['xg'];dg=v-zg
         return (p['m']*p['g']*x+.5*p['kg']*theta(-v/p['eps'])*v*v+.5*p['kappa']*(x-z)**2
                 +.5*p['kd']*theta(-v/p['epsd'])*dg*dg+.5*p['kr']*zg*zg)
     def out(q,m):
-        f,a,x,z,zg=q
-        return jnp.array([f,a,theta((a-p['a1'])/(p['a2']-p['a1'])),x,theta((f-p['fr'])/p['fr']),place])
-    return Arrangement(P,0,0,0,6,out,lambda q,m,n:jnp.zeros(0),exact(lambda q,m,n:-cost(q,m,n)),label=f'casing({place:g})')
+        f,x,z,zg=q
+        return jnp.array([f,x,theta((f-p['fr'])/p['fr']),place])
+    return Arrangement(P,0,0,0,4,out,lambda q,m,n:jnp.zeros(0),exact(lambda q,m,n:-cost(q,m,n)),label=f'casing({place:g})')
 
 CENTRES = tuple(range(-9, 10))
 
 
+def usual_at(weights, x):
+    """The usual meal yield at the places ``x``: one bump per centre, weighted by its store."""
+    return jnp.exp(-(jnp.asarray(x)[..., None] - jnp.asarray(CENTRES))**2) @ weights
+
+
 def _search_map(weights, freshness):
-    centres = jnp.asarray(CENTRES)
-    basis = jnp.exp(-(centres[:, None] - centres[None, :])**2)
-    usual = basis @ weights
+    usual = usual_at(weights, jnp.asarray(CENTRES, dtype=float))
     richness = usual * theta(usual / .05)
     return richness, .00001 + freshness**2 * (.012 + richness**2)
+
+
+def density_at(masses, x):
+    """The search density at the places ``x``: the slope of the cumulative curve over its
+    total, so that its area over the line is one."""
+    slope = jax.vmap(jax.grad(_cumulative, argnums=1), in_axes=(None, 0))(masses, jnp.atleast_1d(x))
+    return slope / masses.sum()
 
 
 def _variate(seed, index):
@@ -114,85 +140,157 @@ def _variate(seed, index):
     return ((x ^ (x >> 15)).astype(float) + .5)/4294967296.
 
 
-def _destination(masses, u):
+def _cumulative(masses, x):
+    """The search map's cumulative curve at ``x``: the masses' smoothed steps summed."""
     centres = jnp.asarray(CENTRES)
     left, right = CENTRES[0], CENTRES[-1]
     scale = jnp.where((centres == left) | (centres == right), 2., 1.)
+    return jnp.dot(masses, scale*(theta((x-centres+1)/2) - .5*(centres == left)))
+
+
+@jax.custom_jvp
+def _destination(masses, u):
+    """The inverse of the cumulative curve at the share ``u`` of its total, computed to
+    rounding: 52 halvings of ``[-9, 9]`` leave an interval of ``18/2^52``, about ``4e-15``.
+    Its derivative is the inverse's own (below), not the halving's, which is zero."""
     threshold = masses.sum()*u
     def bisect(_, bounds):
         lo, hi = bounds
         x = (lo+hi)/2
-        cdf = scale*(theta((x-centres+1)/2) - .5*(centres == left))
-        below = jnp.dot(masses, cdf) < threshold
+        below = _cumulative(masses, x) < threshold
         return jnp.where(below,x,lo), jnp.where(below,hi,x)
-    lo, hi = jax.lax.fori_loop(0, 32, bisect, (float(left),float(right)))
+    lo, hi = jax.lax.fori_loop(0, 52, bisect, (float(CENTRES[0]),float(CENTRES[-1])))
     return (lo+hi)/2
+
+
+@_destination.defjvp
+def _destination_jvp(primals, tangents):
+    # The implicit function theorem on C(m, x) = u sum(m): dx = (du sum(m) + u sum(dm) - dC/dm . dm) / (dC/dx).
+    masses, u = primals
+    dm, du = tangents
+    x = _destination(masses, u)
+    slope = jax.grad(_cumulative, argnums=1)(masses, x)
+    moved = jax.jvp(lambda m: _cumulative(m, x), (masses,), (dm,))[1]
+    return x, (du*masses.sum() + u*dm.sum() - moved)/slope
 
 
 def _return_rate(weight):
     return .1 * jax.nn.sigmoid(weight-jnp.log(7.))
 
 
+def _looking(gaze):
+    """How squarely the eye rests on each centre."""
+    return near(gaze-jnp.asarray(CENTRES), .55)
+
+
+def _write(contact, gaze):
+    """Sustained sight of a centre: the eye has rested on it long enough to write."""
+    return 12*_looking(gaze)*theta((10*contact-.55)/.25)
+
+
+def _cleared(empty):
+    return theta((10*empty-.5)/.4)
+
+
+def _memory_rules(p):
+    """The memory's learners, one rule each: ``(store, what the rule reads, rate)``.
+
+    Each rule is the circle that tells its store's motor a rate; the motor reads the battery
+    and drives its store at ``live(b)`` times that rate, so no rate here carries ``live``.
+    What a rule may read: the stores by name (``meal``, ``usual``, ``fresh``, ``target``,
+    ``angle``, ``weights``, ``contact``, ``empty``, ``age``), and ``grip``, ``grip_rate``
+    (the rate the gripper tells its motor), ``y`` (the cart), ``gaze`` (cart plus look),
+    ``seen`` and ``eaten``. Book P109 (f), act (3): one circle per learner.
+    """
+    centres = jnp.asarray(CENTRES)
+    here = lambda y: jnp.exp(-(y-centres)**2)
+
+    def meal(v):
+        return jnp.atleast_1d(v['eaten'] - 4*theta(-v['grip'])*v['meal'])
+
+    def usual(v):
+        # The squared-error learner of typical yield: at release, the usual yield near the
+        # cart moves toward what the meal gave, -expm1(-meal/4).
+        g = v['grip_rate']
+        release = jax.grad(theta)(v['grip']) * (-g) * theta(-g/.05)
+        return release * (-jnp.expm1(-v['meal']/4) - jnp.dot(v['usual'], here(v['y']))) * here(v['y'])
+
+    def fresh(v):
+        speed = _return_rate(v['weights'])
+        return speed*(1-v['fresh']) - 4*(here(v['y'])+here(v['gaze']))*v['fresh']
+
+    def target(v):
+        _, masses = _search_map(v['usual'], v['fresh'])
+        angle, searching = v['angle'], theta(1-2*v['seen'])
+        choosing = theta((jnp.cos(angle)-.4)/.35)
+        def select(_):
+            n = jnp.floor(angle/(2*jnp.pi)+.5)
+            return 4*searching*choosing*(_destination(masses, _variate(p['searchSeed'], n))-v['target'])
+        return jnp.atleast_1d(jax.lax.cond(choosing>0, select, lambda _: jnp.array(0.), None))
+
+    def angle(v):
+        finish = theta((jnp.cos(v['angle'])-.1)/.25)
+        near_goal = theta((2.25-(v['target']-v['y'])**2)/1.25)
+        return jnp.atleast_1d(theta(1-2*v['seen'])*(near_goal + (1-near_goal)*finish))
+
+    def weights(v):
+        # The squared-error learner of the return rate: on arrival at a cleared centre, each
+        # weight descends the gradient of the revisit loss, half the squared gap between the
+        # predicted chance of finding food again and how red the place now looks.
+        contact_level = 10*v['contact']
+        dc = 12*(_looking(v['gaze'])-contact_level)
+        arrival = 2.5*jax.vmap(jax.grad(theta))(2.5*(contact_level-.1))*dc*theta(dc/.1)
+        red = theta(v['seen']/.5)
+        def revisit_loss(w, elapsed):
+            prediction = -jnp.expm1(-_return_rate(w)*elapsed)
+            return .5*(prediction-red)**2
+        return -4*arrival*_cleared(v['empty'])*jax.vmap(jax.grad(revisit_loss))(v['weights'], 80*v['age'])
+
+    def contact(v):
+        return .1*12*(_looking(v['gaze'])-10*v['contact'])
+
+    def empty(v):
+        return .1*_write(v['contact'], v['gaze'])*(1-theta(v['seen']/.5)-10*v['empty'])
+
+    def age(v):
+        return (_cleared(v['empty'])*(1-_looking(v['gaze']))/80
+                - _write(v['contact'], v['gaze'])*v['age'])
+
+    return [('meal', ('meal', 'grip', 'eaten'), meal),
+            ('usual', ('usual', 'meal', 'y', 'grip', 'grip_rate'), usual),
+            ('fresh', ('fresh', 'weights', 'y', 'gaze'), fresh),
+            ('target', ('target', 'angle', 'usual', 'fresh', 'seen'), target),
+            ('angle', ('angle', 'target', 'y', 'seen'), angle),
+            ('weights', ('weights', 'contact', 'empty', 'age', 'gaze', 'seen'), weights),
+            ('contact', ('contact', 'gaze'), contact),
+            ('empty', ('empty', 'contact', 'gaze', 'seen'), empty),
+            ('age', ('age', 'empty', 'contact', 'gaze'), age)]
+
+
+def _memory_values(q, grip_rate, seen, eat):
+    """The values the memory's rules read, from the receiver's configuration ``q``."""
+    size = len(CENTRES)
+    usual, fresh = q[8:8+size], q[8+size:8+2*size]
+    weights, contact, empty, age = q[10+2*size:].reshape(4, size)
+    return dict(y=q[3], gaze=q[3]+q[5], grip=q[1], grip_rate=grip_rate, seen=seen, eaten=eat,
+                meal=q[7], usual=usual, fresh=fresh, target=q[8+2*size], angle=q[9+2*size],
+                weights=weights, contact=contact, empty=empty, age=age)
+
+
 def _food_memory(q, grip, seen, eat, p):
     """Learn typical yield at release and local return speed on a later look.
 
-    The rates the memory's motors are told. Each motor reads the battery and drives its store
-    at ``live(b)`` times its rate, so no rate here carries ``live``; ``grip`` is the rate the
-    gripper tells its motor."""
-    y, gaze, meal = q[3], q[3] + q[5], q[7]
-    centres = jnp.asarray(CENTRES)
-    size = len(CENTRES)
-    usual, fresh = q[8:8+size], q[8+size:8+2*size]
-    target, angle = q[8+2*size:10+2*size]
-    weights, contact, empty, age = q[10+2*size:].reshape(4, size)
-    here = jnp.exp(-(y-centres)**2)
-    there = jnp.exp(-(gaze-centres)**2)
-    release = jax.grad(theta)(q[1]) * (-grip) * theta(-grip/.05)
-    meal_rate = eat - 4 * theta(-q[1]) * meal
-    usual_rate = release * (-jnp.expm1(-meal/4) - jnp.dot(usual, here)) * here
-    _, masses = _search_map(usual, fresh)
-    speed = _return_rate(weights)
-    fresh_rate = (speed*(1-fresh) - 4*(here+there)*fresh)
-    looking = near(gaze-centres, .55)
-    contact_level, last_empty = 10*contact, 10*empty
-    dc = 12*(looking-contact_level)
-    arrival = 2.5*jax.vmap(jax.grad(theta))(2.5*(contact_level-.1))*dc*theta(dc/.1)
-    write = 12*looking*theta((contact_level-.55)/.25)
-    cleared = theta((last_empty-.5)/.4)
-    red = theta(seen/.5)
-    def revisit_loss(w, elapsed):
-        prediction = -jnp.expm1(-_return_rate(w)*elapsed)
-        return .5*(prediction-red)**2
-    weight_rate = -4*arrival*cleared*jax.vmap(jax.grad(revisit_loss))(weights, 80*age)
-    empty_rate = .1*write*(1-red-last_empty)
-    age_rate = cleared*(1-looking)/80 - write*age
-    choosing = theta((jnp.cos(angle)-.4)/.35)
-    finish = theta((jnp.cos(angle)-.1)/.25)
-    near_goal = theta((2.25-(target-y)**2)/1.25)
-    searching = theta(1-2*seen)
-    clock_rate = searching*(near_goal + (1-near_goal)*finish)
-    def select(_):
-        n = jnp.floor(angle/(2*jnp.pi)+.5)
-        return 4*searching*choosing*(_destination(masses, _variate(p['searchSeed'], n))-target)
-    goal_rate = jax.lax.cond(choosing>0, select, lambda _: jnp.array(0.), None)
-    rates = jnp.concatenate([jnp.array([meal_rate]), usual_rate, fresh_rate, jnp.array([goal_rate,clock_rate]),
-                             weight_rate, .1*dc, empty_rate, age_rate])
-    return rates, p['memoryDrive']*jnp.tanh((target-y)/1.5)
-
-
-def _body(*, parameters, stages, h, learning, memory, cart):
-    """Body stores and motors. Its seven inputs summarize the current encounter.
-
-    Composed by the library from the note's parts (``feeding_composed.body``): gripper,
-    lever, wheels, the eye's sweep and one motor per memory store, with their stores.
-    """
-    from .feeding_composed import body as composed
-    return composed(parameters=parameters, stages=stages, h=h, learning=learning, memory=memory, cart=cart)
+    The rates the memory's motors are told, each from its own rule (``_memory_rules``),
+    concatenated in the stores' order; and the pull the search sends the wheels. ``grip`` is
+    the rate the gripper tells its motor."""
+    v = _memory_values(q, grip, seen, eat)
+    rates = jnp.concatenate([rule(v) for _, _, rule in _memory_rules(p)])
+    return rates, p['memoryDrive']*jnp.tanh((v['target']-v['y'])/1.5)
 
 
 def _body_by_hand(*, parameters, stages, h, learning, memory, cart):
-    """The same body as one box, its summed field typed out. Kept only as a check on
-    ``_body`` (``tests/test_feeding_composed.py``); the model does not use it."""
+    """``feeding_composed.body`` as one box, its summed field typed out. Kept only as a check
+    on it (``tests/test_feeding_composed.py``); the model does not use it."""
     p={**DEFAULTS, **(parameters or {})}
     if learning:
         zeros = jnp.zeros(len(CENTRES))
@@ -240,219 +338,25 @@ def _body_by_hand(*, parameters, stages, h, learning, memory, cart):
             search=p['kexp']*(eta-y)
             capacity=p['cpat']
         qq=qq.at[7:strokes].add(capacity*rates).at[0].add(-capacity*jnp.dot(rates,rates))
-        spring=p['kappac']*(y-zw);torque=live*(p['ktau']*seen*r+free*search)
+        spring=p['kappac']*(y-zw)
+        torque=theta(b/p['bDrive'])*(p['ktau']*seen*jnp.tanh(r/p['rDrive'])+free*search)
         qq=qq.at[3].add(-spring).at[4].add(spring+torque).at[0].add(-torque*(spring+torque)/p['betac'])
         return qq,jnp.zeros_like(m),jnp.zeros_like(n)
     return Arrangement(P,0,0,7,5,lambda q,m:q[jnp.array([0,1,2,3,5])],
                        lambda q,m,n:jnp.zeros(0),omega,label='body and motors')
 
 
-def _mouth_organ(name, width, capacity, battery_per_unit, flow_index, battery_scale):
-    """Expose this organ's available effort and settle its realized flow at the battery."""
-    def output(q, body):
-        effort = capacity * theta(body[0]/battery_scale) * theta(body[1])
-        return jnp.append(body, effort)
-
-    def exchange(q, body, surroundings):
-        load = jnp.zeros_like(body).at[0].set(battery_per_unit * surroundings[flow_index])
-        return jnp.zeros_like(q), load, jnp.zeros_like(surroundings)
-
-    return Arrangement(trivial_parameter(), 7, width, 7, width+1, output,
-                       lambda q,m,n:n, exchange, label=name)
-
-
-def seeker(*, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
-    """One seeker: the receiver ``R`` of the note. Its interface, organs and stores are
-    independent of its partners.
-
-    Composed by the library (``feeding_composed.seeker``): the body and its motors beside
-    the opener and the digestor, each organ a ``push`` that settles its realized rate at the
-    battery.
-    """
-    from .feeding_composed import seeker as composed
-    return composed(parameters=parameters, stages=stages, h=h, learning=learning, memory=memory, cart=cart)
-
-
-receiver = seeker
-
-
-def receiver_by_hand(*, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
-    """The same receiver with each mouth organ one box, its field typed out. Kept only as a
-    check on ``seeker`` (``tests/test_feeding_composed.py``); the model does not use it."""
-    p = {**DEFAULTS, **(parameters or {})}
-    body = _body(parameters=p, stages=stages, h=h, learning=learning, memory=memory, cart=cart)
-    opener = _mouth_organ('opener', 5, p['lpry'], -p['ctear'], 5, p['b0'])
-    digestor = _mouth_organ('digestor', 6, p['leat'], p['alpha'], 6, p['b0'])
-    return compose_seq(compose_seq(body, opener), digestor)
-
-
-def spatial_coupling(count, *, parameters=None, stages=1, h=1.):
-    """The spatial coupling ``W_n`` of one seeker and ``count`` sources (note ``eqn.feed``).
-
-    Composed by the library (``feeding_composed.spatial_coupling``): per casing a contact
-    and a latch, two pushes for the casing side of opening and eating, and one static map.
-    """
-    from .feeding_composed import spatial_coupling as composed
-    return composed(count, parameters=parameters, stages=stages, h=h)
-
-
-def _encounter_by_hand(count, p, stages, h):
-    """The same spatial coupling as one box, its field typed out. Kept only as a check on
-    ``spatial_coupling`` (``tests/test_feeding_composed.py``); the model does not use it.
-    Each contact owns its stroke and latch."""
-    def respond(s,xi):
-        return jnp.concatenate([xi[:count]/p['bd'],xi[count:]/p['latchCost']])
-    strokes = _parameter([0.]*(2*count), list(range(2*count)), respond,
-                         stages, h, 'contact strokes and latches')
-
-    def contacts(m):
-        return m[7:].reshape((count, 6)).T
-
-    def engagement(z):
-        return theta((z[count:]-.3)/.2)
-
-    def spring_energy(z, m):
-        _, grip, tip, cart, _, _, _ = m[:7]
-        _, _, _, height, _, place = contacts(m)
-        stretch = height - tip
-        gate = engagement(z)*theta(grip)*near(stretch,p['R'])*near(cart-place,p['Rh'])
-        stroke = z[:count]
-        return .5*jnp.sum(gate*(p['kappa0']*stretch**2+p['kd']*(stretch-stroke)**2)+p['kr']*stroke**2)
-
-    spring_grad = jax.grad(spring_energy, argnums=(0,1))
-
-    def available(m):
-        food, _, _, height, _, place = contacts(m)
-        return near(height-m[2],p['R'])*near(m[3]-place,p['Rh'])*theta((food-p['f0'])/p['f0'])
-
-    def latch_rates(z,m):
-        _, _, _, height, _, place = contacts(m)
-        offered = available(m)
-        score = offered/(1+((height-m[2])/p['R'])**2+((m[3]-place)/p['Rh'])**2)
-        others = ~jnp.eye(count,dtype=bool)
-        first = jnp.prod(jnp.where(others,theta((score[:,None]-score[None,:])/.05),1.),axis=1)
-        latch = z[count:]
-        free = jnp.prod(jnp.where(others,1-theta(latch/.3),1.),axis=1)
-        held = theta((m[1]+.8)/.4)
-        selected = engagement(z)
-        acquire = theta((offered-.15)/.15)*first*(1-held)
-        retain = 1-(1-offered)*(1-held)
-        target = free*((1-selected)*acquire+selected*retain)
-        return p['latchRate']*theta(m[0]/p['b0'])*(target-latch)
-
-    def flows(z,m):
-        food, opening, access, height, _, place = contacts(m)
-        reach = near(m[3]-place,p['Rh'])
-        contact = engagement(z)*reach*near(height-p['x0'],p['R'])
-        return m[5]*contact*(1-opening), m[6]*contact*access*food
-
-    def inputs(z,m,n):
-        _, _, _, cart, look, _, _ = m[:7]
-        _, _, _, _, red, place = contacts(m)
-        offset = (cart+look-place)/p['w']
-        signal = red*jnp.exp(-offset**2)
-        keep = jnp.sum(engagement(z)*available(m))
-        loads = -spring_grad(z,m)[1]
-        opened,eaten = flows(z,m)
-        return jnp.array([signal.sum(),jnp.sum(-2*offset*signal/p['w']),keep,
-                          loads[1],loads[2],opened.sum(),eaten.sum()])
-
-    def exchange(z,m,n):
-        dz,dm = spring_grad(z,m)
-        opened,eaten = flows(z,m)
-        loads = (-dm).at[7::6].add(-eaten).at[8::6].add(opened)
-        rate = latch_rates(z,m)
-        torque = p['latchCost']*rate+dz[count:]
-        loads = loads.at[0].add(-jnp.dot(torque,rate))
-        return (-dz).at[count:].add(torque),loads,jnp.zeros_like(n)
-
-    return Arrangement(strokes,7,7+6*count,0,2,lambda z,m:m[:2],inputs,exchange,
-                       label='spatial coupling')
-
-
-def couple(body, casings, *, parameters=None, stages=1, h=1., by_hand=False):
-    """Put this receiver instance in an environment containing the given casing instances:
-    ``W_n . (body (x) casing_1 (x) ... (x) casing_n)``. ``by_hand`` takes the typed-out
-    coupling in place of the composed one, as a check."""
-    p = {**DEFAULTS, **(parameters or {})}
-    casings = list(casings)
-    sources = tensor_arrangements(casings) if casings else Arrangement(
-        trivial_parameter(),0,0,0,0,lambda q,m:m,lambda q,m,n:n,zero_form,label='no casings')
-    coupling = (_encounter_by_hand(len(casings),p,stages,h) if by_hand
-                else spatial_coupling(len(casings),parameters=p,stages=stages,h=h))
-    return compose_seq(parallel_arrangements(body,sources), coupling)
-
-
-def _contacts(strokes, latches):
-    """The spatial coupling's state, which nests by its parts, from the contacts' strokes
-    and latches."""
-    as_coupling = _unravel_coupling(len(strokes))
-    return as_coupling(jnp.concatenate([jnp.asarray(strokes, dtype=float), jnp.asarray(latches, dtype=float)]))
-
-
-def add_casing(body, casings, state, new_casing, *, parameters=None, stages=1, h=1.):
-    """Between complete steps, insert one new source and a free contact into the live world."""
-    casings = tuple(casings)
-    count = len(casings)
-    (body_state, sources), contacts = state
-    contacts = ravel_pytree(contacts)[0]
-    if contacts.shape != (2*count,):
-        raise ValueError("expected a stroke and latch for each existing casing")
-    expanded = couple(body, (*casings,new_casing), parameters=parameters, stages=stages, h=h)
-    sources = (sources,new_casing.P.init) if count else new_casing.P.init
-    contacts = _contacts(jnp.append(contacts[:count],0.), jnp.append(contacts[count:],0.))
-    return expanded, ((body_state,sources),contacts)
-
-def feeding(places=(4.,-8.,8.), foods=(.05,10.,10.), *, parameters=None, stages=1, h=1., learning=False, memory=None, cart=0.):
-    """Put a fixed receiver and the casing sources side by side in a spatial coupling:
-    ``spatial_coupling(n) . (seeker (x) source_1 (x) ... (x) source_n)``, the three
-    constructors each composed by the library from the note's parts."""
+def feeding(places=(4.,-8.,8.), foods=(.05,10.,10.), *, parameters=None, stages=1, h=1., learning=False,
+            memory=None, cart=0., filler=None, pile=0., battery=None):
+    """Feeding with a separator mouth: ``feeding_composed.feeding_with_slot``, the seeker with
+    its chamber, husk collector and slot (filled by ``filler``, the gut wall by default), the
+    casings without a hinge, and the pile on the ground, under the spatial coupling."""
+    from .feeding_composed import feeding_with_slot
     if len(places)!=len(foods):raise ValueError('One food per casing')
     p={**DEFAULTS,**(parameters or {})}
-    for key in ['m','M','beta','betac','cgrip','clift','csee','cpat','bd','b0','f0','fr','R','Rh','w','eps','epsd','latchCost','latchRate']:
+    for key in ['m','M','beta','betac','cgrip','clift','csee','cpat','bd','b0','f0','fr','R','Rh','w','eps','epsd',
+                'latchCost','latchRate','chamberCap','collectorCap']:
         if p[key]<=0:raise ValueError(f'{key} must be positive')
-    if p['a2']<=p['a1']:raise ValueError('a2 must exceed a1')
-    if learning:
-        if p['memoryCost'] <= 0: raise ValueError('memoryCost must be positive')
-    parts=[source(x,f,parameters=p,stages=stages,h=h) for x,f in zip(places,foods)]
-    body=receiver(parameters=p,stages=stages,h=h,learning=learning,memory=memory,cart=cart)
-    return couple(body,parts,parameters=p,stages=stages,h=h)
-
-_PATROL_STATE = 10   # the receiver's state without learning: eight body numbers and the two patrol stores
-
-
-@functools.lru_cache(maxsize=None)
-def _unravel(learning):
-    """How a flat list of numbers nests into the receiver's state and into one casing's:
-    read off the composites' own starting states, whatever parts they are composed from."""
-    return (ravel_pytree(receiver(learning=learning).P.init)[1], ravel_pytree(source(0.).P.init)[1])
-
-
-@functools.lru_cache(maxsize=None)
-def _unravel_coupling(count):
-    """How ``count`` strokes then ``count`` latches nest into the spatial coupling's state:
-    read off the composite's own starting state."""
-    return ravel_pytree(spatial_coupling(count).P.init)[1]
-
-
-def pack_state(flat, count):
-    """The browser state in the library tensor's actual nesting.
-
-    The browser's order: the receiver's numbers (battery, grip, tip, cart, its momentum,
-    wheel, look, scan, memory), then per casing its six (food, opening, height, momentum,
-    air memory, ground stroke), its contact stroke and its latch.
-    """
-    flat=jnp.asarray(flat, dtype=float)
-    nr=len(flat)-8*count
-    as_body,as_source=_unravel(nr!=_PATROL_STATE)
-    sources=jnp.zeros(0) if not count else as_source(flat[nr:nr+6])
-    for k in range(1,count):sources=(sources,as_source(flat[nr+8*k:nr+6+8*k]))
-    return (as_body(flat[:nr]),sources),_contacts(flat[nr+6::8],flat[nr+7::8])
-
-def unpack_state(state, count):
-    (body,sources),strokes=state
-    strokes=ravel_pytree(strokes)[0]
-    receiver_state=ravel_pytree(body)[0]
-    parts=ravel_pytree(sources)[0].reshape((count,6)) if count else []
-    full=[jnp.concatenate([part,strokes[k:k+1],strokes[count+k:count+k+1]]) for k,part in enumerate(parts)]
-    return jnp.concatenate([receiver_state]+full)
+    if learning and p['memoryCost'] <= 0: raise ValueError('memoryCost must be positive')
+    return feeding_with_slot(places, foods, filler=filler, parameters=p, stages=stages, h=h, learning=learning,
+                             memory=memory, cart=cart, pile=pile, battery=battery)
