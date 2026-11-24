@@ -246,6 +246,45 @@ the grip motor: the box has no outputs, so a part that needs the same rate, as t
 yield rule needs the grip's, reads what that rate reads and computes it (David, 2026-11-22,
 779795d2: "you're right, B.").
 
+**A Petri transition is drawn as a machine.** A `field` node with `glyph: 'transition'` is a
+Petri transition: one term, a rate times d of a signed sum of stores with fixed weights
+(`feeding_parts.term_kind`). It has no circle. It is one mark, a picture of David's account of
+it (2026-11-19: "a conveyor belt that takes things of input-types and they go into a machine
+and out comes a conveyer belt of things of output type, and the machine runs at some rate"):
+a small red box with a gear in it, on the fill of a field's mark, with its name over it and
+its `form` under it, clickable as on any field. Each store's wire comes in level from the
+left. The wire of a store it takes from stands above the machine, and a red arrow runs from
+it into the machine's top; the wire of a store it gives to stands below, and a red arrow runs
+from the machine's bottom to it. So an arrow points the way the load's packets travel on its
+wire. A weight that is not 1 is written over its arrow. A wire the rate only hears ends at
+the machine's side, behind its black wall. A click on the machine is a click on the mark.
+
+The arrows and their weights are not sent: the view reads them off the node's written form
+(`transitionArcs` in `explorer.js`, the weight of each lettered wire in `h`), the form it
+checks against the model's loads at every snapshot, and the layout gives each wire its row
+(`TRANSITION`, `transitionShape` in `explorer-layout.js`). A node whose form is not of that
+shape, or that has none, is drawn as a plain field's circle.
+
+**A transition cut in two by a box's boundary is two halves**, each a `field` node drawn as a
+machine with only its own arrows; the wire that carries the rate into each half is what joins
+them, so nothing more is drawn (David, 2026-11-23, of a dashed arrow with words that marked the
+open side: "why an extra wire when we have one already"). In feeding the mouth's taking is cut
+so by the seeker's boundary: "Mouth: settle" (in Mouth) gives to the chamber and the husk
+collector, takes from the mouth's battery and hears the rate on the wire "Taken"; each
+casing's "Push: taking" (in its handling box, in the spatial coupling) takes from that casing's
+food at the rate on its wire "Push", and those rates are summed into "Taken". The library says
+a part is a half in its meta (`half`, `feeding_composed.TAKING_SETTLES` and `TAKING_REACHES`),
+since a half's own form need not be a transition by `term_kind`; the exporter reads it only to
+draw the half as a machine. (The viewer still draws an open side, a dashed arrow to a break
+with words, for a node that sends `open` and `openWords`; no exporter sends them.)
+
+A bare `push` whose target the wiring computes as the difference of two wires (spilling,
+`pile − food`; laying out) is joined to those two wires themselves and written `F d(x − y)`,
+so it is a transition by `term_kind` and is drawn as one; one whose target is minus a wire
+is written `F d(−x)` (`explore_composite._pushes_side_by_side`). `node --test
+viewer/explorer-transition.test.js` checks the arrows against the form, the rows, and a
+half's open side.
+
 **A load-free input port carries a black wall.** An input port is load-free when no mark
 its wire enters, however deep inside the part, can push it: each such mark has a written
 form that reads the wire and never pushes it (`carriesLoad` in `explorer-core.js`, from

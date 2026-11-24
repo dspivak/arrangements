@@ -28,7 +28,7 @@ Claude Opus 5.5, subagent of c5f9ecc9).
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Mapping
+from typing import List, Mapping, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -38,7 +38,7 @@ from . import feeding_parts as fp
 from .arrangement import Arrangement
 from .feeding import (CENTRES, DEFAULTS, _destination, _memory_rules, _memory_values, _search_map, _variate,
                       near, theta)
-from .nesting import factor_tree
+from .nesting import drawn, factor_tree
 from .wiring import compose_seq, parallel_arrangements, tensor_arrangements
 
 
@@ -385,6 +385,12 @@ def body(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: f
 # F = <food, reserve, parent mass, parent acceptance | >.
 # ---------------------------------------------------------------------------
 
+# Taking is one Petri transition cut in two by the seeker's boundary. Each half says so in its
+# ``meta['half']``: which side its other half's arrows are on, and where that half is, in words
+# (``explore_composite`` draws a half from it; ``viewer/EXPLORER.md``).
+TAKING_SETTLES = dict(open="takes", other="from the casing, in the spatial coupling")
+TAKING_REACHES = dict(open="gives", other="to the mouth")
+
 SLOT_SEEKER_INPUTS = ("seen", "climb", "K", "pull on grip", "pull on tip", "taken", "parent mass", "parent acceptance")
 SLOT_SEEKER_OUTPUTS = ("battery", "grip", "tip", "cart", "look", "effort", "hunger")
 
@@ -417,7 +423,7 @@ def seeker_with_slot(*, parameters: Mapping[str, float] | None = None, stages: i
     battery = (6. if learning else 3.) if battery is None else battery
     parts = [body(parameters=p, stages=stages, h=h, learning=learning, memory=memory, cart=cart, battery=battery,
                   organs=True),
-             fr.settle(p['mouthPass'], p['mouthCost'], 0., "mouth", **step),
+             fr.settle(p['mouthPass'], p['mouthCost'], 0., "mouth", half=TAKING_SETTLES, **step),
              fr.collector(p['clearance'], p['collectorCap'], 0., "husk collector", **step),
              fp.identity(4, 0, "seeker slot"),
              *organ_battery("mouth", battery, p, **step),
@@ -476,7 +482,11 @@ def absorber_filler(parameters: Mapping[str, float] | None = None) -> Arrangemen
     def uptake(food, reserve, mass, accept):
         return p['uptake'] * food * theta((p['battCap'] - reserve) / p['capWidth'])
 
-    return fr.absorber(p['absorbYield'], uptake, "gut wall")
+    return fr.absorber(p['absorbYield'], uptake, "gut wall", rate_text="k*f*θ((b_c - e)/w)",
+                       constants={"k": p['uptake'], "b_c": p['battCap'], "w": p['capWidth']},
+                       words={"k": "the share of the food absorbed per unit of duration, the reserve well below its cap",
+                              "b_c": "the reserve's cap",
+                              "w": "the width below the cap over which absorbing slows to nothing"})
 
 
 def hopper_filler(pass_fraction: float = .5, cost: float = .02, speed: float = 2., capacity: float = 6.,
@@ -580,7 +590,7 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
             values = [signal, -2 * offset * signal / p['w'], keep, -pulls[0], -pulls[1], taken,   # the seeker's share
                       g, g, height - tip,                                                         # attachment
                       hands, free, acquire, retain, -pulls[2],                                    # latch
-                      -taken, food,                                                               # taking
+                      taken, -food,                                                               # taking: taken d(-food)
                       hands, lid, lid_rate,                                                       # lid motor
                       spill, pile_mass - food]                                                    # spilling
             if feeder:
@@ -593,18 +603,22 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
 
         pieces = [fp.contact(p['kappa0'], p['kd'], p['bd'], p['kr'], 0., f"attachment {k + 1}", **step),
                   fp.latch(p['latchCost'], p['latchRate'], p['wLocal'], 0., f"contact latch {k + 1}", **step),
-                  fp.push("push: taking"),
+                  fp.with_meta(fp.push("push: taking"), half=TAKING_REACHES),
                   fp.send(fp.motor_at_rate(p['cLid'], p['wLocal'], f"lid motor {k + 1}"), {3: 0.},
                           f"lid motor {k + 1}, P=0"),
                   fp.push("push: spilling")]
         if feeder:
             pieces.append(fp.push("push: laying out"))
         inner_in = 6 + 15 + (2 if feeder else 0)
-        inside = parallel_arrangements(fp.identity(6, W, f"seeker and casing {k + 1}" if feeder
-                                                   else f"seeker, casing {k + 1} and pile"),
-                                       tensor_arrangements(pieces))
+        # Named for the explorer: the casing's share of what the seeker is told, and the box's readouts.
+        domain = fp.with_meta(fp.identity(6, W, f"seeker and casing {k + 1}" if feeder
+                                          else f"seeker, casing {k + 1} and pile"),
+                              inputs=[(None, f"{name} from casing {k + 1}", 1) for name in SLOT_SEEKER_INPUTS[:6]])
+        inside = parallel_arrangements(domain, tensor_arrangements(pieces))
         wiring = fp.transfer(f"handling casing {k + 1}", inner_in, W + 2, K, 2, route, publish)
-        return replace(compose_seq(inside, wiring), label=f"handling casing {k + 1}")
+        box = replace(compose_seq(inside, wiring), label=f"handling casing {k + 1}")
+        return replace(box, meta={**(box.meta or {}),
+                                  "outputs": [(None, f"casing {k + 1}'s score", 1), (None, "latch", 1)]})
 
     def hands_power() -> Arrangement:
         def route(m: Array, outer: Array) -> Array:
@@ -666,7 +680,18 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
         blocks += [([k], "") for k in range(n, len(boxes))]
         _, boxes_side_by_side, choose = factor_route(boxes, choose, blocks, label="choose", fast=False).construction
     else:
-        boxes_side_by_side = tensor_arrangements(boxes)
+        # The names of what choose hands each box, for the explorer (else "input 2 of (((handling
+        # casing 1 || ...)))"): the hands' level, whether the casing is first, whether it is free.
+        names = []
+        for k in range(n):
+            names += [(None, "the hands' battery level", 1), (None, f"casing {k + 1} is first", 1),
+                      (None, "free to engage", 1)]
+            if feeder:
+                names += [(None, "the mass handed in", 1), (None, "the parent's mass", 1)]
+        if feeder:
+            names += [(None, "the reserve's battery", 1), (None, "the parent's pair", 2)]
+        side = tensor_arrangements(boxes)
+        boxes_side_by_side = replace(side, meta={**(side.meta or {}), "inputs": names})
     # (choose . (boxes . split)): the boxes drawn directly inside the coupling, split and choose its wiring.
     return replace(compose_seq(compose_seq(split, boxes_side_by_side), choose), label=label)
 
@@ -789,6 +814,31 @@ def _mouth_coupling_flat(count: int, *, parameters: Mapping[str, float] | None =
     return replace(compose_seq(inside, wiring), label="spatial coupling")
 
 
+def _casings_at_top(casings: Sequence[Arrangement], beside: int) -> List[Arrangement]:
+    """The casings as they sit in the world beside ``beside`` other drawn things (the coupling
+    among them): themselves while the level holds at most seven, else in consecutive boxes
+    ``casings i-j`` of at most seven, each the casings side by side under the identity on their
+    interface (book task well-factored; David, 2026-11-23: "good factorizations should have 2-7
+    boxes inside"). Tensor is associative, so the world is the same morphism, its configuration
+    in the same order."""
+    from .nesting import even_blocks
+    casings = list(casings)
+    if len(casings) + beside <= 7:
+        return casings
+    out, at = [], 0
+    for size in even_blocks(len(casings), 7):
+        block = casings[at:at + size]
+        if size == 1:
+            out.append(block[0])
+        else:
+            name = f"casings {at + 1}-{at + size}"
+            side = tensor_arrangements(block)
+            out.append(replace(compose_seq(side, fp.identity(side.in_dim_N, side.out_dim_N, f"{name} wiring")),
+                               label=name))
+        at += size
+    return out
+
+
 def robot_style(places=(2.,), *, parameters: Mapping[str, float] | None = None, stages: int = 1, h: float = 1.,
                 learning: bool = False, memory=None, cart: float = 0.) -> Arrangement:
     """A robot-style seeker, an arrow ``F -> F`` of the tangent subcategory (book P109 (j);
@@ -808,7 +858,7 @@ def robot_style(places=(2.,), *, parameters: Mapping[str, float] | None = None, 
     step = dict(stages=stages, h=h)
     seeker = seeker_with_slot(parameters=p, learning=learning, memory=memory, cart=cart, battery=0., **step)
     casings = [source(x, 0., parameters=p, hinge=False, **step) for x in places]
-    world = tensor_arrangements([seeker, *casings])
+    world = tensor_arrangements([seeker, *_casings_at_top(casings, len(drawn(seeker)) + 1)])
     return replace(compose_seq(world, mouth_coupling(len(places), parameters=p, feeder=True, battery=0., **step)),
                    label="robot style")
 
@@ -818,8 +868,9 @@ def feeding_with_slot(places=(4., -8., 8.), foods=(.05, 10., 10.), *, filler: Ar
                       learning: bool = False, memory=None, cart: float = 0., pile: float = 0.,
                       battery: float | None = None) -> Arrangement:
     """Feeding with a separator mouth: ``mouth_coupling(n) . ((seeker_with_slot . filler)
-    (x) casing_1 (x) ... (x) casing_n (x) pile)``, the casings without their hinge.
-    ``filler`` is any ``1 -> F`` (the absorber by default; a hopper; a seeker style).
+    (x) casing_1 (x) ... (x) casing_n (x) pile)``, the casings without their hinge; when the
+    top level would hold more than seven (four casings and more, with the absorber), the casings
+    sit in a box ``casings 1-n`` (``_casings_at_top``). ``filler`` is any ``1 -> F`` (the absorber by default; a hopper; a seeker style).
     ``battery`` is the battery's starting charge (``body``'s default when ``None``)."""
     from . import feeding_recursive as fr
     if len(places) != len(foods):
@@ -831,5 +882,6 @@ def feeding_with_slot(places=(4., -8., 8.), foods=(.05, 10., 10.), *, filler: Ar
     robot = compose_seq(filler, seeker_with_slot(parameters=p, learning=learning, memory=memory, cart=cart,
                                                  battery=battery, **step))
     casings = [source(x, f, parameters=p, hinge=False, **step) for x, f in zip(places, foods)]
-    world = tensor_arrangements([robot, *casings, fr.pile(pile, "pile on the ground", **step)])
+    world = tensor_arrangements([robot, *_casings_at_top(casings, len(drawn(robot)) + 2),
+                                 fr.pile(pile, "pile on the ground", **step)])
     return compose_seq(world, mouth_coupling(len(casings), parameters=p, battery=battery, **step))

@@ -29,11 +29,11 @@ test('navigation exposes the seeker, then its wheels, while outside parts become
 });
 test('group, nested group, ungroup, undo and saved layouts preserve every crossing observation',()=>{
   const sc=scene(),original=JSON.stringify(sc),m=new E.Model(sc);m.enter('body-and-motors');
-  const id=m.group(['eye','wheels'],'Guidance');assert(m.project().nodes.some(n=>n.id===id));
+  const id=m.group(['seeing','wheels'],'Guidance');assert(m.project().nodes.some(n=>n.id===id));
   assert.equal(JSON.stringify(sc),original);m.enter(id);assert.equal(m.children().length,2);
   for(const w of m.project().wires){const real=sc.wires.find(x=>x.id===w.id);if(!real)continue;assert.deepEqual(w.value,real.value);assert.deepEqual(w.load,real.load);}
   const saved=m.save(),other=new E.Model(sc,saved);assert.equal(other.scope,id);assert.equal(other.children().length,2);
-  m.enter('body-and-motors');const outer=m.group([id,'lever'],'Movement');m.enter(outer);assert(m.ungroup(id));
+  m.enter('body-and-motors');const outer=m.group([id,'hand'],'Movement');m.enter(outer);assert(m.ungroup(id));
   assert.equal(m.children().length,3);assert(m.undo());assert(m.nodes.has(id));
   m.resetGroups();assert.equal(m.groups.length,0);assert(m.undo());assert.equal(m.groups.length,2);
 });
@@ -125,7 +125,7 @@ test('a value\'s shade is its place in its wire\'s range, light low and dark hig
 });
 test('reading and regrouping never changes the simulation trajectory',()=>{
   const a=C.compositeAdapter(data),b=C.compositeAdapter(data);const m=new E.Model(a.snapshot());
-  for(let i=0;i<30;i++){a.step(.02);b.step(.02);m.update(a.snapshot());m.enter('body-and-motors');if(i===0)m.group(['eye','wheels'],'Test');m.project();}
+  for(let i=0;i<30;i++){a.step(.02);b.step(.02);m.update(a.snapshot());m.enter('body-and-motors');if(i===0)m.group(['seeing','wheels'],'Test');m.project();}
   close(Array.from(a.state),Array.from(b.state),1e-13);
 });
 test('each feeding map publishes one distinct readout',()=>{

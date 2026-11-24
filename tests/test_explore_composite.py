@@ -119,7 +119,9 @@ def test_the_boxes_are_the_ones_the_code_names(feeding):
     assert {"seeker-with-a-slot", "spatial-coupling", "pile-on-the-ground"} <= top
     assert sum(1 for i in top if i.startswith("casing")) == 3
     inside = {n["id"] for n in d.nodes if n["parent"] == "seeker-with-a-slot"}
-    assert {"body-and-motors", "mouth", "husk-collector", "gut-wall"} <= inside
+    assert {"body-and-motors", "mouth", "gut-wall"} <= inside
+    # since the regrouping (book task well-factored) the husk collector sits in the mouth's box
+    assert "husk-collector" in {n["id"] for n in d.nodes if n["parent"] == "mouth"}
     motors = [n for n in d.nodes if n.get("glyph") == "motor"]
     # latches, drive, grip and lift, the eye's two, the learners; since P109 (k) a lid motor per
     # casing and the satiety motor

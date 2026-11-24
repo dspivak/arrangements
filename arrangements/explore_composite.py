@@ -17,7 +17,8 @@ into what the code names:
   to the two wires whose difference its stretch is and to the wire its stiffness is a multiple
   of; a motor as one motor, opened into its two pushes; any other sum of pushes as one mark per
   term, each wired only to the inputs its traced code reads, with its formula in their letters;
-  the zero field undrawn.
+  a Petri transition, and each half of one cut in two (``meta['half']``), marked to be drawn
+  as a machine (``glyph='transition'``); the zero field undrawn.
 
 Every wire is a **branch**: one value read by one mark or map. ``live_function`` returns a
 function of the state computing every branch's value and the load that its reader sends back
@@ -540,8 +541,9 @@ class Diagram:
             return self._spring(a, path, ni, container)
         if meta.get("kind") == "zero" or not meta.get("terms"):
             return None
-        if meta["part"] == "push" and a.in_dim_N > 2:
+        if meta["part"] == "push":
             return self._pushes_side_by_side(a, path, ni, container)
+        half = meta.get("half") if len(meta["terms"]) == 1 else None
         inputs = meta["inputs"]
         slices, at = {}, 0
         for letter, name, width in inputs:
@@ -562,7 +564,9 @@ class Diagram:
             name = label if len(meta["terms"]) == 1 else term["name"]
             node = self.node(_slug(name), parent, name, "field", rubric=kind, rubricRank=fp.RUBRIC[kind],
                              description=f"An inclination field, kind ({fp.RUBRIC[kind]}) of the rubric: a {kind}."
-                             + f" It reads {', '.join(slices[l][2] for l in read) or 'nothing'}.")
+                             + f" It reads {', '.join(slices[l][2] for l in read) or 'nothing'}."
+                             + (_half_words(half) if half else ""),
+                             **_transition(kind, half))
             items, letters, constants, split = [], {}, dict(meta.get("constants", {})), False
             for letter, name_, width in inputs:
                 start = slices[letter][0]
@@ -600,23 +604,61 @@ class Diagram:
             motor["powered"] = port_labels.get(meta.get("powered"))
 
     def _pushes_side_by_side(self, a, path, ni, container):
-        """A ``push`` of width n is n pushes side by side: one mark each, ``F_j dx_j``."""
+        """A ``push`` of width n is n pushes side by side: one mark each, ``F_j dx_j``.
+
+        Where the wiring computes ``x_j`` as the difference of two of its wires, or as minus one
+        of them, the mark is joined to those wires themselves, as a spring's stretch is, and its
+        target is written in them, ``F d(x - y)`` or ``F d(-x)``. Its kind is then what
+        ``feeding_parts.term_kind`` says of that target, so a push on a difference of two stores
+        (spilling, laying out) is a Petri transition and is drawn as one (``glyph``). A push the
+        library declares half of a transition (``meta['half']``, the half of taking that reaches)
+        is drawn as that half."""
         w = a.in_dim_N // 2
+        half = a.meta.get("half")
         for j in range(w):
-            name = f"{a.label} {j + 1}"
-            node = self.node(_slug(name), container, name, "field", rubric="push of everything",
-                             rubricRank=fp.RUBRIC["push of everything"],
-                             description="A push F dx, kind (4) of the rubric: it pushes F on what it reads at x.")
+            name = a.label if w == 1 else f"{a.label} {j + 1}"
+            owner = name.removeprefix("push: ")
+            x_ref = ni[w + j]
+            fn = self.fn_list[x_ref[1]] if x_ref[0] == "fn" else None
+            shape = fn.kinds[x_ref[2]] if fn else ("wire",)
+            if shape[0] == "diff":
+                h_text, ends = "x - y", [("x", shape[1]), ("y", shape[2])]
+            elif shape[0] == "scale" and shape[2] == -1.:
+                h_text, ends = "-x", [("x", shape[1])]
+            else:
+                h_text, ends = "x", None
+            kind = _push_kind(h_text)
+            node = self.node(_slug(name), container, name, "field", rubric="Petri transition" if half else kind,
+                             rubricRank=fp.RUBRIC["Petri transition" if half else kind],
+                             description=(f"A push F d({h_text}), kind ({fp.RUBRIC[kind]}) of the rubric, a {kind}: "
+                                          f"it pushes F on what it reads at {h_text}.") + (_half_words(half) if half else ""),
+                             **_transition(kind, half))
             items = [("val", r) for r in ni]
             letters = {}
-            owner = name.removeprefix("push: ")
-            for letter, k in (("F", j), ("x", w + j)):
-                port, labels = self.port_items([ni[k]], node, f"{'push' if letter == 'F' else 'pushed'} of {owner}")
+            port, labels = self.port_items([ni[j]], node, f"push of {owner}")
+            f_label = None
+            if port and port[0][0] == "br":
+                items[j] = port[0]
+                letters[labels[0]] = "F"
+                f_label = labels[0]
+            if ends:
+                perturbed = {}
+                for letter, arg in ends:
+                    b = self._end(fn.args[arg], node, f"pushed of {owner}")
+                    perturbed[arg] = (b, 0)
+                    letters[self.branches[b]["label"]] = letter
+                items[w + j] = ("fn", fn.fid, x_ref[2], perturbed)
+            else:
+                port, labels = self.port_items([x_ref], node, f"pushed of {owner}")
                 if port and port[0][0] == "br":
-                    items[k] = port[0]
-                    letters[labels[0]] = letter
+                    items[w + j] = port[0]
+                    letters[labels[0]] = "x"
             self.marks.append(dict(node=node, path=path, term=0, items=items, read=["F", "x"], mask=[j, w + j]))
-            self._node(node)["form"] = dict(letters=letters, constants={}, terms=[dict(c="F", h="x")])
+            # The push may be one of its target's own wires (laying out: the rate is the mass
+            # handed, which is also what it moves), so the form names it by that wire's letter.
+            c_text = letters.get(f_label, "F") if f_label else "F"
+            self._node(node)["form"] = dict(letters=letters, constants={}, words={},
+                                            terms=[dict(c=c_text, h=h_text)])
 
     def _spring(self, a, path, ni, container):
         """A spring as one mark: minus d of half its stiffness times its squared stretch,
@@ -759,6 +801,37 @@ def _factors(a: Arrangement) -> List[Arrangement]:
     if a.construction and a.construction[0] == "tensor" and not (a.meta or {}).get("part"):
         return _factors(a.construction[1]) + _factors(a.construction[2])
     return [a]
+
+
+_PUSH_TARGETS = {"x": (2, lambda v: v[1]), "-x": (2, lambda v: -v[1]), "x - y": (3, lambda v: v[1] - v[2])}
+_PUSH_KINDS: Dict[str, str] = {}
+
+
+def _push_kind(h_text: str) -> str:
+    """The rubric kind of a bare push ``F d(h)`` with the target ``h`` of ``_PUSH_TARGETS``,
+    by ``feeding_parts.term_kind``."""
+    if h_text not in _PUSH_KINDS:
+        dim, h = _PUSH_TARGETS[h_text]
+        inputs = [("F", "push", 1), ("x", "pushed", 1), ("y", "pushed", 1)][:dim]
+        _PUSH_KINDS[h_text] = fp.term_kind(dict(inputs=inputs, terms=[dict(c=lambda v: v[0], h=h)]), 0)
+    return _PUSH_KINDS[h_text]
+
+
+def _transition(kind: str, half: Optional[dict]) -> dict:
+    """What a field node carries to be drawn as a Petri transition (``viewer/EXPLORER.md``, *A
+    Petri transition is drawn as a machine*): ``glyph`` for a term ``term_kind`` calls one, and
+    for a half the library declares (``meta['half'] = {'open': 'takes' or 'gives', 'other': where
+    the other half is, in words}``) also the side its other half's arrows are on and those words."""
+    # A half is drawn as a plain machine with only its own arrows: the rate's wire entering it is
+    # what joins it to its other half (David, 2026-11-23, c34e1b43: "why an extra wire when we
+    # have one already"), so no break and no words are sent.
+    if half:
+        return dict(glyph="transition")
+    return dict(glyph="transition") if kind == "Petri transition" else {}
+
+
+def _half_words(half: dict) -> str:
+    return f" It is half of a Petri transition, cut in two by a box's boundary: its other half's arrows run {half['other']}."
 
 
 def _numbers(d):

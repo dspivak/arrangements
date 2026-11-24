@@ -89,7 +89,8 @@ def test_a_closed_run_is_the_same():
     inputs, loads = (EMPTY, trivial_omega(0)), (lambda _: (jnp.zeros(2), EMPTY))
     ends = []
     for arr in (old, new):
-        dynamics = PhiK(arr)
+        # The flat coupling is the comparison, over seven by design: run unwatched.
+        dynamics = PhiK(arr) if arr is new else getattr(PhiK, "__wrapped__", PhiK)(arr)
 
         @jax.jit
         def run(state):
@@ -99,6 +100,45 @@ def test_a_closed_run_is_the_same():
     start = np.asarray(ravel_pytree(old.P.init)[0])
     assert np.abs(ends[0] - start).max() > 1e-3
     np.testing.assert_allclose(ends[1], ends[0][perm], rtol=0, atol=1e-10)
+
+
+def test_casings_boxed_at_the_top_are_the_flat_world():
+    """At four and six casings the top level would hold eight and ten (absorber, seeker, the
+    casings, pile, coupling), so the casings sit in one box ``casings 1-n``: every box then holds
+    at most seven, and 100 steps of the closed run end the same at every store as with the
+    casings side by side at the top."""
+    from arrangements import feeding_recursive as fr
+    from arrangements.feeding import DEFAULTS
+    from arrangements.nesting import box_counts
+    from arrangements.wiring import tensor_arrangements
+    places, foods = (1., -3., 5., -7., 9., -11.), (10.,) * 6
+    inputs, loads = (EMPTY, trivial_omega(0)), (lambda _: (jnp.zeros(2), EMPTY))
+    step = dict(stages=4, h=.004)
+    for n in (4, 6):
+        new = fc.feeding_with_slot(places[:n], foods[:n], **step)
+        counts = box_counts(new)
+        assert not [(label, k) for label, k in counts if k > 7], counts
+        assert dict(counts)[f"casings 1-{n}"] == n and dict(counts)["(top level)"] == 5
+        p = dict(DEFAULTS)
+        robot = compose_seq(fc.absorber_filler(p), fc.seeker_with_slot(parameters=p, battery=3., **step))
+        casings = [fc.source(x, f, parameters=p, hinge=False, **step) for x, f in zip(places[:n], foods[:n])]
+        _, _, coupling = new.construction
+        old = compose_seq(tensor_arrangements([robot, *casings, fr.pile(0., "pile on the ground", **step)]),
+                          coupling)
+        perm = _permutation(old, new)
+        assert (perm == np.arange(len(perm))).all()
+        ends = []
+        for arr in (old, new):
+            # The flat world is the comparison, over seven at the top by design: run unwatched.
+            dynamics = PhiK(arr) if arr is new else getattr(PhiK, "__wrapped__", PhiK)(arr)
+
+            @jax.jit
+            def run(state):
+                return jax.lax.fori_loop(0, 100, lambda _, s: dynamics.with_state(s).run_one(inputs, loads)[1], state)
+
+            ends.append(np.asarray(ravel_pytree(run(dynamics.state))[0]))
+        assert np.abs(ends[0] - np.asarray(ravel_pytree(old.P.init)[0])).max() > 1e-3
+        np.testing.assert_allclose(ends[1], ends[0], rtol=0, atol=1e-12)
 
 
 def _same_as_its_construction(arr):
@@ -120,7 +160,8 @@ def test_the_nested_body_and_seeker_are_the_flat_ones():
 
 
 def test_no_feeding_box_holds_more_than_seven():
-    """As the explorer draws it (``nesting.box_counts``): the spatial coupling holds the three
+    """Boxes and parts, as ``nesting.box_counts`` counts them (not the operations the explorer also
+    draws for the wirings' computations): the spatial coupling holds the three
     handling boxes and the hands' power, the body five boxes, the seeker four (its slot, a bare
     identity, is drawn as wires)."""
     from arrangements.nesting import box_counts

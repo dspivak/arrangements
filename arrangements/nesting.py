@@ -428,6 +428,14 @@ def contents(a: Arrangement) -> List[Arrangement]:
     return out
 
 
+def drawn(a: Arrangement) -> List[Arrangement]:
+    """What ``a`` is drawn as where it sits: itself if it is a box or a part, else the boxes and
+    parts it is looked through to (wirings left out)."""
+    out: List[Arrangement] = []
+    _flatten(a, out)
+    return out
+
+
 def box_name(a: Arrangement) -> str:
     if is_box(a) and _default_label(a):
         return a.construction[2].label
@@ -436,9 +444,12 @@ def box_name(a: Arrangement) -> str:
 
 def box_counts(a: Arrangement) -> List[Tuple[str, int]]:
     """Every box under ``a`` (``a`` itself if it is one, else the boxes at its top level, which
-    is counted too, as ``"(top level)"``) with how many boxes and parts it holds directly: the
-    property of being well-factored is that each count is between 2 and 7 (book task
-    well-factored, David, 2026-11-23: "good factorizations should have 2-7 boxes inside")."""
+    is counted too, as ``"(top level)"``) with how many boxes and parts it holds directly (book task
+    well-factored, David, 2026-11-23: "good factorizations should have 2-7 boxes inside"). This is
+    not all the explorer draws: it also draws each computation of a box's wiring (a gate, a sum, a
+    choice) as an operation node, which this does not count; inside the feeding spatial coupling it
+    counted 4 where the explorer drew 16 (3bd2e654, 2026-11-24; David: "many boxes have more than 7
+    things in them")."""
     found: List[Tuple[str, int]] = []
     seen = set()
 

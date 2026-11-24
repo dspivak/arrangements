@@ -577,7 +577,12 @@ def _kit():
 
 def denote(term: Tuple[Any, ...]) -> Arrangement:
     """The arrangement a term denotes: one clause per kit part, one for 'seq', one for 'tensor'. ``term`` is
-    as ``to_term`` returns it."""
+    as ``to_term`` returns it. A composite one is labeled "denoted net", so the explorer and the
+    well-factored guard (``tests/well_factored.py``) see it as one box: its leaves and layers are not yet
+    grouped by meaning, since ``Net`` does not record which leaves belong together (book task well-factored,
+    an open question for David)."""
+    from dataclasses import replace
+
     from .wiring import compose_seq, tensor_arrangements
 
     kit = _kit()
@@ -591,7 +596,8 @@ def denote(term: Tuple[Any, ...]) -> Arrangement:
             return parts[0] if len(parts) == 1 else tensor_arrangements(parts)
         return kit[head](*rest)
 
-    return go(term)
+    net = go(term)
+    return replace(net, label="denoted net") if net.construction else net
 
 
 def flat_state(state: Any) -> list:
@@ -697,7 +703,7 @@ def library_run_jit(net: Net, steps: int, check: int = 2, every: int = 1) -> Lis
 
 
 def couple(net_a: Net, net_b: Net, a_to_b: Sequence[int], b_to_a: Sequence[int],
-           names: Tuple[str, str] = ("net a", "net b")) -> Arrangement:
+           names: Tuple[str, str] = ("denoted net a", "denoted net b")) -> Arrangement:
     """Two nets with ports, wired to each other: b's i-th inbox hears a's output a_to_b[i], and
     a's i-th inbox hears b's output b_to_a[i]. Returns the closed library arrangement, whose wiring
     holds two boxes, each net named by ``names`` (book task well-factored-2ac0e890: unnamed, the

@@ -28,6 +28,25 @@
   function writeHtml(parent,runs){
     for(const r of runs)html(r.shift===1?'sup':r.shift===-1?'sub':r.italic?'i':'span',{},parent,r.text);
   }
+  // The arcs of a Petri transition, read off its written form: a transition is one term, rate d(h), with h a sum of
+  // its stores' letters with fixed weights. Returns the weight of each entering wire that has one, by the wire's
+  // label (negative: a store it takes from; positive: one it gives to), or null when the form is not of that shape
+  // (no form, several terms, an h that is not linear in the letters), and the mark is then drawn as a plain field.
+  // The form is the one the view checks against the model's loads at every snapshot, so the arcs are no more
+  // trusted than it is.
+  function transitionArcs(form){
+    if(!Forms||!form||!form.letters||form.terms?.length!==1)return null;
+    try{
+      const letters=Object.values(form.letters),zero=Object.fromEntries(letters.map(letter=>[letter,0]));
+      const h=Forms.parse(form.terms[0].h),at=values=>Forms.value(h,Forms.environment(form,values)),base=at(zero),arcs={};
+      for(const [label,letter] of Object.entries(form.letters)){
+        const w=at({...zero,[letter]:1})-base,twice=at({...zero,[letter]:2})-base;
+        if(!Number.isFinite(w)||Math.abs(twice-2*w)>1e-9)return null;
+        if(Math.abs(w)>1e-12)arcs[label]=w;
+      }
+      return Object.keys(arcs).length?arcs:null;
+    }catch{return null;}
+  }
   class View {
     constructor(container,adapter,options={}) {
       this.adapter=adapter;this.options=options;this.renderers=options.renderers||{};
@@ -215,6 +234,8 @@
     }
     layout(project,strict=false){
       const toggled=this.hoses[this.model.scope],hoseAbove=this.options.hoseAbove;
+      // A transition's arcs are read off its form, for the layout to give each its row (explorer-layout.js, `TRANSITION`).
+      for(const n of project.nodes)if(n.glyph==='transition'&&n.arcs===undefined)n.arcs=transitionArcs(n.form);
       const key=JSON.stringify([this.model.scope,project.nodes.map(n=>[n.id,n.kind,n.column,n.row,n.userGroup]),
         project.wires.map(w=>[w.id,w.source,w.target,w.signal,w.targetPort,w.label,E.dimension(w)]),this.placements[this.model.scope],toggled]);
       if(key!==this.layoutKey){
@@ -403,6 +424,62 @@
       // under the battery's wire, which may come up to the plug from the row below it
       if(inside)svg('text',{x,y:M.cordY+24,'text-anchor':'middle',class:'ex-secondary'},g,inside+' inside');
     }
+    // A Petri transition, the field rate d(a signed sum of stores with fixed weights): one mark, a picture of David's
+    // account of it (2026-11-19: "it is like a conveyor belt that takes things of input-types and they go into a
+    // machine and out comes a conveyer belt of things of output type, and the machine runs at some rate"). The
+    // machine is a box with a gear in it, on the fill of a field's mark and outlined in the load red of the spring's
+    // resistor; like the resistor it stands on an upright stretch. Each store it takes from has an arc into the
+    // machine's top, each store it gives to an arc out of its bottom, each arc with an arrowhead and, where it is
+    // not 1, its weight; an arc points the way its wire's load packets travel. The wires the rate only hears end at
+    // the machine's side, behind the black wall of a load-free port. A transition cut in two by a box's boundary
+    // (`open`: the side its other half's arcs are on) has there a short dashed arc that ends at a break, the zigzag
+    // of a drawing's break line, with where the other half is, in words (`openWords`), beside it. The places are
+    // explorer-layout.js's `TRANSITION`; the arcs and their weights are read off the node's form (`transitionArcs`).
+    // It is drawn in the mark's own group, so a click on it is a click on the mark, as on the circle it replaces.
+    drawTransition(g,node,p,selected){
+      const T=E.geometry.transition,S=p.transition,x=p.glyphX+T.spine,red=selected?'#1474ab':'#cc0000',turn=6;
+      const arcs=role=>p.inputs.filter(port=>port.arc===role).sort((a,b)=>a.arcRow-b.arcRow);
+      const head=(tipX,tipY,dx,dy)=>svg('path',{d:`M ${tipX-7*dx-4*dy} ${tipY-7*dy-4*dx} L ${tipX} ${tipY} L ${tipX-7*dx+4*dy} ${tipY-7*dy+4*dx} Z`,
+        fill:red,stroke:red,'stroke-width':1,'stroke-linejoin':'round','data-glyph':'arc-head'},g);
+      const line=(d,dashed)=>svg('path',{d,fill:'none',stroke:red,'stroke-width':2.2,'stroke-linecap':dashed?'butt':'round','stroke-linejoin':'round',
+        ...(dashed?{'stroke-dasharray':'4 3','data-glyph':'arc-cut'}:{'data-glyph':'arc'})},g);
+      // The arc's weight, over its level run, where it is not 1.
+      const weight=(port,from,to,y)=>{
+        const w=Math.abs(port.weight);if(Math.abs(w-1)<1e-9)return;
+        svg('text',{x:(from+to)/2,y:y-5,'text-anchor':'middle',class:'ex-form ex-weight',stroke:'white','stroke-width':3,'paint-order':'stroke','data-glyph':'arc-weight'},g,String(+w.toPrecision(3)));
+      };
+      // The rows nearest the machine take the slots nearest the wires, so that no two arcs cross; a cut arc has the last slot.
+      const takes=arcs('take').reverse(),gives=arcs('give');
+      const slot=(j,count)=>x+(j-(count-1)/2)*T.slot;
+      takes.forEach((port,j)=>{
+        const sx=slot(j,S.above),y=port.glyphY,from=port.glyphX;
+        line(`M ${from} ${y} L ${sx-turn} ${y} Q ${sx} ${y} ${sx} ${y+turn} L ${sx} ${S.top-6}`);
+        head(sx,S.top,0,1);weight(port,from,sx-turn,y);
+      });
+      gives.forEach((port,j)=>{
+        const sx=slot(j,S.below),y=port.glyphY,to=port.glyphX;
+        line(`M ${sx} ${S.bottom} L ${sx} ${y-turn} Q ${sx} ${y} ${sx-turn} ${y} L ${to+6} ${y}`);
+        head(to,y,-1,0);weight(port,to+7,sx-turn,y);
+      });
+      if(p.open){
+        const up=p.open==='takes',sx=slot((up?S.above:S.below)-1,up?S.above:S.below),y=S.breakY;
+        if(up){line(`M ${sx} ${y} L ${sx} ${S.top-6}`,true);head(sx,S.top,0,1);}
+        else{line(`M ${sx} ${S.bottom} L ${sx} ${y}`,true);head(sx,y-9,0,1);}
+        svg('path',{d:`M ${sx-8} ${y} L ${sx-3} ${y} L ${sx-1.5} ${y-4} L ${sx+1.5} ${y+4} L ${sx+3} ${y} L ${sx+8} ${y}`,fill:'none',stroke:red,'stroke-width':1.8,
+          'stroke-linejoin':'round','stroke-linecap':'round','data-glyph':'break'},g);
+        // where the other half is, in words: beside the break, the lines running away from the machine's side of it
+        const lines=p.openLines||[],first=up?y+4-(lines.length-1)*T.line/2:y+4;
+        lines.forEach((text,k)=>svg('text',{x:sx+12,y:first+k*T.line,'text-anchor':'start',class:'ex-port-label',stroke:'white','stroke-width':3,'paint-order':'stroke','data-glyph':'open-words'},g,text));
+      }
+      // the machine over the arcs' ends: its box, and a gear in it
+      const cy=(S.top+S.bottom)/2;
+      svg('rect',{x:x-S.boxW/2,y:S.top,width:S.boxW,height:S.boxH,rx:4,fill:selected?'#e0effa':'#f8e8dc',stroke:red,'stroke-width':selected?3:2.2,class:'ex-focus-ring','data-glyph':'transition'},g);
+      let teeth='';
+      for(let k=0;k<8;k++){const a=k*Math.PI/4,c=Math.cos(a),s=Math.sin(a);teeth+=`M ${x+5.6*c} ${cy+5.6*s} L ${x+9*c} ${cy+9*s} `;}
+      svg('path',{d:teeth,fill:'none',stroke:red,'stroke-width':2.8,'stroke-linecap':'butt'},g);
+      svg('circle',{cx:x,cy,r:5.6,fill:'none',stroke:red,'stroke-width':1.8},g);
+      svg('circle',{cx:x,cy,r:1.6,fill:red},g);
+    }
     // The book's mark for a load-free input port (Ch 3: "We draw a black wall at each input port where an arrangement
     // is load-free"): a short thick black bar across the wire at the port, in place of the port's ring. At a hose
     // port it stands just before the hose's mouth and spans the tube.
@@ -488,13 +565,15 @@
               // bend's corner and turns there into the upright stretch.
               const corner={x:port.glyphX,y:py};
               // A spring's third terminal, the wire that sets its stiffness, runs level to the resistor's side.
-              const segments=port.third?[{a:T,b:G}]:node.glyph==='spring'?[{a:T,b:B},{a:B,c:corner,d:corner,b:G}]
+              // A transition's wire runs level to where its arc begins, or to its machine's side.
+              const segments=port.third||port.arc?[{a:T,b:G}]:node.glyph==='spring'?[{a:T,b:B},{a:B,c:corner,d:corner,b:G}]
                 :left?[{a:T,b:B},{a:B,c:B,d:K,b:G}]:[{a:G,c:K,d:B,b:B},{a:B,b:T}];
               const whole=port.wires.length>1?E.forkWire(port.wires.flatMap(w=>w.branches||[w])):port.wires[0];
               this.drawLead(g,port.group?E.strand(whole,port.index):whole,E.geometry.wireTracks(segments),E.geometry.path(segments));
             }
             if(node.glyph==='spring')this.drawSpring(g,node,p,selected);
             else if(node.glyph==='motor')this.drawMotor(g,node,p,selected,hasChildren);
+            else if(p.glyph==='transition')this.drawTransition(g,node,p,selected);
             else svg('circle',{cx:p.glyphX,r:p.radius,fill:selected?'#e0effa':node.kind==='field'?'#f8e8dc':'#eef1f4',
               stroke:selected?'#1474ab':'#91a1af','stroke-width':selected?3:1.5,class:'ex-focus-ring'},g);
           }
@@ -550,7 +629,8 @@
           // Clicked, it or its mark opens the side panel, where each thing in it is explained (`writeGlossary`).
           if(Forms&&node.form){
             const line=Forms.written(node.form),long=Forms.plain(line).length>44;
-            const tag=svg('text',{y:p.h/2+15,'text-anchor':'middle',class:'ex-form ex-form-open'+(this.formCheck(node).ok?'':' ex-form-wrong'),stroke:'white','stroke-width':3,'paint-order':'stroke'},g);
+            // (a transition's mark ends in its lowest arc's row, which has room under it: its form stands nearer)
+            const tag=svg('text',{y:p.h/2+(p.glyph==='transition'?8:15),'text-anchor':'middle',class:'ex-form ex-form-open'+(this.formCheck(node).ok?'':' ex-form-wrong'),stroke:'white','stroke-width':3,'paint-order':'stroke'},g);
             writeSvg(tag,long?[{text:Forms.plain(line).slice(0,42)+'…'}]:line);
             svg('title',{},tag,'Click: what each letter is');
           }
@@ -716,5 +796,5 @@
     }
     destroy(){this.options.playback?.setPlaying(false);this.destroyed=true;cancelAnimationFrame(this.raf);if(this.zoomFrame)cancelAnimationFrame(this.zoomFrame);clearTimeout(this.zoomSaveTimer);this.persist();window.removeEventListener('pointermove',this.onDragMove);window.removeEventListener('pointerup',this.onDragEnd);window.removeEventListener('pointercancel',this.onDragCancel);for(const cleanup of this.cleanups)cleanup();this.cleanups=[];this.adapter.dispose?.();this.el.remove();}
   }
-  E.View=View;
+  E.View=View;E.transitionArcs=transitionArcs;
 })(globalThis);

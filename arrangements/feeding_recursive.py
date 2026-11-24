@@ -71,18 +71,24 @@ def process_rate(speed: float, capacity: float | None = None) -> RateLaw:
 
 
 def absorber(energy_yield: float, uptake: float | Callable[[Array, Array, Array, Array], Array],
-             label: str = "absorber") -> Arrangement:
+             label: str = "absorber", *, rate_text: str | None = None, constants: dict | None = None,
+             words: dict | None = None) -> Arrangement:
     """The physical absorber ``1 -> F``: stateless, field ``j (-d food + epsilon d reserve)``
     with ``j = uptake(food, reserve, parentMass, parentAccept)``; a number ``k`` for
-    ``uptake`` is the law ``k * food``. It puts no load on the discard pair."""
+    ``uptake`` is the law ``k * food``. It puts no load on the discard pair.
+
+    A function ``uptake`` may be written for the drawing: ``rate_text`` in the letters ``f``,
+    ``e``, ``m_p``, ``a_p`` and its ``constants``, each with ``words`` (``pushes`` holds the
+    formula to the code); without it the mark has no written form."""
     rate = uptake if callable(uptake) else (lambda food, reserve, mass, accept: uptake * food)
     return fp.pushes(label, 4, [("absorb", lambda v: rate(v[0], v[1], v[2], v[3]),
                                  lambda v: -v[0] + energy_yield * v[1])],
                      inputs=[("f", "food", 1), ("e", "reserve", 1), ("m_p", "parent mass", 1),
                              ("a_p", "parent acceptance", 1)],
-                     forms=[(None if callable(uptake) else "k*f", "-f + ε*e")],
-                     constants={"ε": energy_yield, **({} if callable(uptake) else {"k": uptake})},
-                     words={"ε": "the energy the reserve gains per gram", "k": "the share of the food absorbed per unit of duration"})
+                     forms=[(rate_text if callable(uptake) else "k*f", "-f + ε*e")],
+                     constants={"ε": energy_yield, **({} if callable(uptake) else {"k": uptake}), **(constants or {})},
+                     words={"ε": "the energy the reserve gains per gram",
+                            "k": "the share of the food absorbed per unit of duration", **(words or {})})
 
 
 def collector(clearance: float, capacity: float | None = None, mass: float = 0., label: str = "collector", *,
@@ -163,12 +169,23 @@ def wrap_yield(settings: Tuple[float, float], pair: Tuple[float, float]) -> Tupl
 
 
 def settle(pass_fraction: float, cost: float, ready: float = 0., label: str = "mouth", *,
-           stages: int = 1, h: float = 1.) -> Arrangement:
+           stages: int = 1, h: float = 1., half: dict | None = None) -> Arrangement:
     """The half of a separator that settles, ``1 -> <4|1>``: a store ``z`` of ready mass,
     sent out. Inputs: the rate ``taken`` at which food is being taken, the reserve, and the
     local discard pair. Field ``taken (p dz + (1 - p) d localMass - c d reserve)``,
-    load-free at ``taken``."""
+    load-free at ``taken``.
+
+    Its field's ``meta['half']`` says it is half of a transition, for the drawing: the stores
+    it takes from are in the other half (``open='takes'``), and ``other`` says in words where
+    that half is; ``half`` replaces the default words."""
     p, c = pass_fraction, cost
+    half = half or dict(open="takes", other="from the food, in the half that reaches")
+    field = fp.with_meta(_settle_field(label, p, c), half=half)
+    wiring = fp.transfer(label, 5, 1, 4, 1, lambda m, n: jnp.concatenate([m, n]), lambda m: m)
+    return fp.fill([fp.rod_segment(1., ready, f"{label} ready store", stages=stages, h=h), field], wiring)
+
+
+def _settle_field(label: str, p: float, c: float) -> Arrangement:
     field = fp.pushes(f"{label}: settle", 5,
                       [("settle", lambda v: v[1], lambda v: p * v[0] + (1 - p) * v[3] - c * v[2])],
                       inputs=[("z", "ready store", 1), ("J", "taken", 1), ("e", "reserve", 1),
@@ -176,8 +193,7 @@ def settle(pass_fraction: float, cost: float, ready: float = 0., label: str = "m
                       forms=[("J", "p*z + (1 - p)*m_l - c*e")], constants={"p": p, "c": c},
                       words={"p": "the share of each gram taken that passes into the ready store z",
                              "c": "what e pays per gram taken"})
-    wiring = fp.transfer(label, 5, 1, 4, 1, lambda m, n: jnp.concatenate([m, n]), lambda m: m)
-    return fp.fill([fp.rod_segment(1., ready, f"{label} ready store", stages=stages, h=h), field], wiring)
+    return field
 
 
 def reach(gate: Callable[[Array], Array], rate_law: RateLaw, count: int = 1, further: int = 0,
@@ -195,7 +211,8 @@ def reach(gate: Callable[[Array], Array], rate_law: RateLaw, count: int = 1, fur
         rates = gate(values) * rate_law(m[0], food, reserve, local_mass, local_accept)
         return jnp.concatenate([jnp.stack([rates.sum(), reserve, local_mass, local_accept]), -rates, food])
 
-    inside = parallel_arrangements(fp.identity(4, 1, "separator sent its rate"), fp.push("push: taking", count))
+    taking = fp.with_meta(fp.push("push: taking", count), half=dict(open="gives", other="to the half that settles"))
+    inside = parallel_arrangements(fp.identity(4, 1, "separator sent its rate"), taking)
     wiring = fp.transfer(label, 4 + 2 * count, 1, further + count + 3, 1, route, lambda m: m)
     return replace(compose_seq(inside, wiring), label=label)
 

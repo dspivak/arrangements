@@ -226,6 +226,40 @@
   // hears stand between and end at the body's side. `MOTOR_RADIUS` sets the mark's width and where its wires bend.
   const MOTOR_RADIUS=19,MOTOR={half:11,top:-9,bottom:16,hubY:-19,hub:4.5,cordY:23,plugX:-15,height:102};
   const motorRole=(p,port)=>{const name=port.group?port.group.label:port.label;return name===p.turns?0:name===p.powered?2:1;};
+  // A Petri transition's mark (explorer.js, `drawTransition`): a machine, a box with a gear in it, standing on an
+  // upright stretch as a spring's resistor does. A transition node carries `arcs`, the weight of each store's wire
+  // in the signed sum its rate pushes (the view reads them off the node's written form): a wire with a negative
+  // weight is a store it takes from and has a row above the machine, one with a positive weight a store it gives
+  // to and has a row below, and a wire with no weight is one its rate only hears and ends at the machine's side.
+  // Each store's wire ends `reach` left of the glyph's middle; from there its arc runs level and turns into the
+  // machine's top or out of its bottom at a slot of its own. A transition cut in two by a box's boundary names the
+  // side its other half's arcs are on (`open`: 'takes' or 'gives') and where that half is, in words (`openWords`):
+  // that side has one more slot, for a short dashed arc that ends at a break, with the words beside it, on a line
+  // for each part a comma ends (`openLines`).
+  const TRANSITION={radius:34,reach:32,spine:13,pitch:20,box:30,slot:11,gap:16,stub:22,tail:40,line:12};
+  const arcRole=(p,port)=>{const w=p.arcs?.[port.group?port.group.label:port.label];return w<0?0:w>0?2:1;};
+  const openLines=words=>words?words.split(/(?<=,)\s+/):[];
+  function transitionShape(p){
+    const T=TRANSITION,count=role=>p.inputs.filter(port=>arcRole(p,port)===role).length;
+    const takes=count(0),heard=count(1),gives=count(2),above=takes+(p.open==='takes'?1:0),below=gives+(p.open==='gives'?1:0);
+    const shape={boxW:Math.max(T.box,Math.max(above,below)*T.slot+10),boxH:Math.max(T.box,heard*T.pitch+6),takeY:[],heardY:[],giveY:[],above,below};
+    let y=0;
+    // (a cut arc with no row beside it is longer, so that its dashes and its break are seen apart from its arrowhead)
+    if(p.open==='takes'){shape.breakY=y+5;y+=takes?T.stub-T.pitch/2:T.tail;}
+    for(let i=0;i<takes;i++){shape.takeY.push(y+T.pitch/2);y+=T.pitch;}
+    if(takes)y+=T.gap-T.pitch/2;
+    shape.top=y;
+    for(let i=0;i<heard;i++)shape.heardY.push(y+shape.boxH/2+(i-(heard-1)/2)*T.pitch);
+    y+=shape.boxH;shape.bottom=y;
+    if(gives)y+=T.gap-T.pitch/2;
+    for(let i=0;i<gives;i++){shape.giveY.push(y+T.pitch/2);y+=T.pitch;}
+    if(p.open==='gives'){y+=gives?T.stub-T.pitch/2:T.tail;shape.breakY=y-5;}
+    shape.height=y;
+    const lift=v=>v-y/2;
+    for(const key of ['takeY','heardY','giveY'])shape[key]=shape[key].map(lift);
+    for(const key of ['top','bottom','breakY'])if(shape[key]!==undefined)shape[key]=lift(shape[key]);
+    return shape;
+  }
   // A spring with a third terminal (`third`, the label of the wire that sets its stiffness) has that terminal
   // on a row of its own between its two ends, where its wire meets the resistor from the side. A spring to an
   // anchor (`anchor`) has one end; the row below it is the anchor's, which has no port.
@@ -243,7 +277,9 @@
     const edges=E.aggregate(project.wires).map(w=>({...w,signal:E.signalKey(w)}));
     const toggled=new Set(options.toggled||[]),hoseAbove=options.hoseAbove??4;
     const positions=new Map(),inner=project.nodes.filter(n=>n.kind!=='boundary'),boundaries=project.nodes.filter(n=>n.kind==='boundary');
-    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,glyph:n.glyph,third:n.third,anchor:n.anchor,turns:n.turns,powered:n.powered,inputs:[],outputs:[],groups:[],x:0,y:0,w:0,h:0});
+    // (a transition whose arcs could not be read off its form is drawn as a plain field mark)
+    for(const n of project.nodes)positions.set(n.id,{id:n.id,kind:n.kind,glyph:n.glyph==='transition'&&!n.arcs?undefined:n.glyph,third:n.third,anchor:n.anchor,turns:n.turns,powered:n.powered,
+      arcs:n.arcs,open:n.open,openWords:n.openWords,inputs:[],outputs:[],groups:[],x:0,y:0,w:0,h:0});
     for(const w of edges){
       const a=positions.get(w.source),b=positions.get(w.target);w.outKey=w.signal;w.inKey=w.targetPort??w.signal;
       w.dimension=E.dimension(w);
@@ -289,14 +325,16 @@
       if(compact){
         // The mark has a fixed size. Its labeled terminals occupy their own
         // rows. Adding an argument extends only that list of terminals.
-        p.radius=n.glyph==='motor'?MOTOR_RADIUS:n.renderer?34:15;
+        p.radius=n.glyph==='motor'?MOTOR_RADIUS:p.glyph==='transition'?TRANSITION.radius:n.renderer?34:15;
         // A terminal of a field with a written 1-form carries, after its name, the letter the formula uses.
         // (A strand's letter is its hose's, with the strand's number under it.)
         const lettered=port=>{const letter=(n.form||n.law)?.letters?.[port.group?port.group.label:port.label];
           return port.label.length+(letter?letter.replace('_','').length+(port.group?4:2):0);};
         const labelWidth=ports=>ports.reduce((width,port)=>
           Math.max(width,lettered(port)*6.7+18),0);
-        const left=labelWidth(p.inputs),right=labelWidth(p.outputs);
+        // A transition cut in two writes, right of its break, where its other half is.
+        if(p.glyph==='transition'&&p.open)p.openLines=openLines(p.openWords);
+        const left=labelWidth(p.inputs),right=labelWidth(p.outputs)+(p.openLines?.length?Math.max(...p.openLines.map(line=>line.length))*6.4+6:0);
         p.w=Math.max(left+2*p.radius+right,(n.label??n.id).length*7.8+8);
         p.glyphX=(left-right)/2;
         p.h=Math.max(2*p.radius+10,count*20+12);
@@ -305,6 +343,8 @@
         if(n.glyph==='spring')p.h=(springRows(p)-1)*springPitch(p)+40;
         // A motor's mark holds its pulley, body, cord and, under them, the count of the parts it opens into.
         if(n.glyph==='motor')p.h=Math.max(p.h,MOTOR.height);
+        // A transition's mark holds its rows of arcs above and below its machine.
+        if(p.glyph==='transition'){p.transition=transitionShape(p);p.h=p.transition.height+12;}
       }
       if(n.kind==='state')p.h=Math.max(132,100+count*24);
       // How far from the part an unwrapped hose's mouth stands: further for a taller fan of strands.
@@ -368,6 +408,10 @@
         // A motor's wires stand in the order of its picture: what it turns on top, what powers it at the bottom.
         if(p.glyph==='motor'&&side==='in')ports.splice(0,ports.length,...ports.slice().sort((a,b)=>motorRole(p,a)-motorRole(p,b)));
         const heard=p.glyph==='motor'&&side==='in'?ports.filter(port=>motorRole(p,port)===1):[];
+        // A transition's wires stand in the order of its picture: the stores it takes from above its machine, the
+        // wires its rate only hears at the machine, the stores it gives to below.
+        if(p.glyph==='transition'&&side==='in')ports.splice(0,ports.length,...ports.slice().sort((a,b)=>arcRole(p,a)-arcRole(p,b)));
+        const arcRows=[0,0,0];
         ports.forEach((port,i)=>{
           let dy=(i-(ports.length-1)/2)*22,dx=p.w/2;
           if(p.kind==='boundary'){dy=0;dx=0;}
@@ -392,6 +436,14 @@
               if(role===0){port.glyphX=p.glyphX-MOTOR.hub;port.glyphY=MOTOR.hubY;}
               else if(role===2){port.glyphX=p.glyphX+MOTOR.plugX;port.glyphY=MOTOR.cordY;}
               else{port.glyphX=p.glyphX-MOTOR.half;port.glyphY=heard.length===1?3:-5+16*j/(heard.length-1);}
+            }
+            // A transition's wire runs level to where its arc begins, or to the side of the machine.
+            if(p.glyph==='transition'&&side==='in'){
+              const role=arcRole(p,port),S=p.transition,k=arcRows[role]++;
+              port.arc=['take','heard','give'][role];port.arcRow=k;
+              port.weight=p.arcs[port.group?port.group.label:port.label];
+              dy=(role===0?S.takeY:role===1?S.heardY:S.giveY)[k];
+              port.glyphX=p.glyphX+(role===1?TRANSITION.spine-S.boxW/2:-TRANSITION.reach);port.glyphY=dy;
             }
           }
           port.side=side;port.x=p.x+(side==='in'?-dx:dx);port.y=p.y+dy;
@@ -438,6 +490,6 @@
     return {result:{positions,width,height,edges,forks},short};
     }
   }
-  E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks,springRows:SPRING_ROWS,springTurn:SPRING_TURN,motor:MOTOR};
+  E.layout=layout;E.wheelZoom=wheelZoom;E.hoseEnd=hoseEnd;E.geometry={sample,path,inside,trackOffset,wireTracks,springRows:SPRING_ROWS,springTurn:SPRING_TURN,motor:MOTOR,transition:TRANSITION};
   if(typeof module!=='undefined'&&module.exports)module.exports={layout,sample,path,inside,wheelZoom,hoseEnd,endAt};
 })(globalThis);

@@ -123,6 +123,28 @@ def test_0_parts_equal_one_coupler():
         np.testing.assert_allclose(a, o, atol=1e-12)
 
 
+def test_0_collective_nested_equals_flat():
+    """Book task well-factored-2ac0e890 (David, 2026-11-23: "good factorizations should have 2-7 boxes
+    inside"): the collective is the box ``wiring`` (the parts' box, the supply, the cut wire) beside the box
+    ``needs`` (a box per part's hearing), seven to a group; every box holds at most seven, and the nested
+    composite equals the flat one, forcing at random points and 300 steps, with a cut supply, n = 8."""
+    from arrangements.nesting import box_counts
+    n, q0 = 8, [0.4, 1.3, 0.9, 1.1, 0.7, 1.2, 1.0, 0.8]
+    mask = [1, 1, 0, 1, 1, 1, 1, 1]
+    for wiring, k in (("mean", None), ("softmin", 8.0)):
+        nested = collective(n, wiring, q0, 4.0, mask, k)
+        flat = mp.collective(n, "all", q0, 4.0, 0.0, s_mask=mask, receive=receive_box(wiring, k), nested=False)
+        counts = box_counts(nested)
+        assert counts[0] == ("(top level)", 2) and all(c <= 7 for _, c in counts), counts
+        rng = np.random.default_rng(2)
+        e = jnp.zeros(0)
+        for _ in range(3):
+            q = jnp.asarray(rng.uniform(0.1, 2.0, n + 1))
+            np.testing.assert_allclose(np.asarray(nested.omega(q, e, e)[0]), np.asarray(flat.omega(q, e, e)[0]),
+                                       atol=1e-13)
+        np.testing.assert_allclose(mp.trajectory(nested, 300), mp.trajectory(flat, 300), atol=1e-12)
+
+
 def sum_roots(n, s, cut=False, alpha=ALPHA, b=DISS, K=KGATE):
     """Sum wiring's symmetric nonzero fixed points ``(q-, q+, s_*)``, with ``c = n-1``
     intact or ``c = n-2`` for the survivors of one cut."""

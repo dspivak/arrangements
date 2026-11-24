@@ -40,6 +40,8 @@ For agents: the file's earlier head, with the predictions fixed before the code,
 weirdness checks, is in ``notes/P31-B-CH1-HISTORY-2026-11-03.md``; the predictions and numbers in ``notes/MANY-PARTS-PREDICTIONS-2026-09-29.md``, ``notes/MANY-PARTS-RESULTS.md``.
 """
 
+from dataclasses import replace
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -105,7 +107,7 @@ def mean_of(k):
 
 
 def collective(n, wiring, q0, s, beta=0.0, h=MOB, b=DISS, s_mask=None, out_mask=None, receive=None,
-               alpha=ALPHA, K=KGATE):
+               alpha=ALPHA, K=KGATE, nested=True):
     """The collective as parts (P43 (b) job 8, Claude Opus 5.5, de71554a, 2026-10-10): the ``n`` parts and
     the supply, a box presenting ``0`` (what a cut wire delivers), and per part a need box hearing the part,
     what arrives from the parts it needs and the supply. The wiring decides what arrives: *ring*, the
@@ -125,10 +127,41 @@ def collective(n, wiring, q0, s, beta=0.0, h=MOB, b=DISS, s_mask=None, out_mask=
         idx += [i] + senders + [n if s_mask[i] else n + 1]
         recv = (fan_box(1, [0], "neighbour") if wiring == "ring"
                 else (receive(n - 1) if receive is not None else mean_of(n - 1)))
-        stages.append(compose_seq(tensor_arrangements([fan_box(1, [0], "own"), recv, fan_box(1, [0], "supply")]),
-                                  need_box(beta, alpha, K, f"need {i}")))
-    routed = compose_seq(tensor_arrangements(parts), fan_box(n + 2, idx, "wiring"))
-    return compose_seq(routed, tensor_arrangements(stages))
+        stage = compose_seq(tensor_arrangements([fan_box(1, [0], "own"), recv, fan_box(1, [0], "supply")]),
+                            need_box(beta, alpha, K, f"need {i}"))
+        stages.append(replace(stage, label=f"P{i} hears"))
+    # Well-factored (book task well-factored-2ac0e890, David, 2026-11-23: "good factorizations should have
+    # 2-7 boxes inside"): the parts in a box ``parts`` beside the supply and the cut wire, and each part's
+    # hearing (its own wire, what arrives, the supply, its need) a box, all of them in a box ``needs``; more
+    # than seven nested seven to a group. Each box is an identity wiring around its contents, so the
+    # composite, its configuration (q_1..q_n, s) and its numbers are the flat one's
+    # (``test_many_parts_wirings.test_0_collective_nested_equals_flat``).
+    if not nested:
+        return compose_seq(compose_seq(tensor_arrangements(parts), fan_box(n + 2, idx, "wiring")),
+                           tensor_arrangements(stages))
+    nested_parts = _grouped(parts[:n], "parts", lambda xs, name: compose_seq(
+        tensor_arrangements(xs), fan_box(sum(x.out_dim_N for x in xs), range(sum(x.out_dim_N for x in xs)), name)))
+    routed = compose_seq(tensor_arrangements([nested_parts] + parts[n:]), fan_box(n + 2, idx, "wiring"))
+    needs = _grouped(stages, "needs", lambda xs, name: replace(compose_seq(
+        fan_box(sum(x.out_dim_M for x in xs), range(sum(x.out_dim_M for x in xs)), name),
+        tensor_arrangements(xs)), label=name))
+    return compose_seq(routed, needs)
+
+
+def _grouped(items, name, box, most=7):
+    """``items`` in one box ``name`` (``box(items, name)``), groups of at most ``most`` inside it, named
+    ``f"{name} i-j"`` by the 0-based indices they hold, grouped again while there are more than ``most``."""
+    from arrangements.nesting import even_blocks
+    spans = [(k, k) for k in range(len(items))]
+    while len(items) > most:
+        out, new_spans, at = [], [], 0
+        for s in even_blocks(len(items), most):
+            lo, hi = spans[at][0], spans[at + s - 1][1]
+            out.append(box(items[at:at + s], f"{name} {lo}-{hi}"))
+            new_spans.append((lo, hi))
+            at += s
+        items, spans = out, new_spans
+    return box(items, name)
 
 
 def collective_one_coupler(n, wiring, q0, s, beta=0.0, h=MOB, b=DISS, **kw):
