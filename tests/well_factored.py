@@ -6,7 +6,8 @@ and there are not too many parts in any given arrangement").
 A pytest plugin, loaded by ``conftest.py``. It watches the dynamics functors (``functors.Phi``,
 ``functors.closed_step``, ``functors.open_step``, ``pcK.PhiK``): each arrangement handed to one is
 read with ``nesting.box_counts`` (boxes and parts only: the operations the explorer draws for a
-wiring's computations are not counted, so a box can pass here and hold more than seven on the page), and a test that runs an arrangement
+wiring's computations are not counted, so a box can pass here and hold more than seven on the page;
+for feeding, ``test_feeding_nested.py`` counts what the explorer draws), and a test that runs an arrangement
 with a box holding more than ``LIMIT`` fails, naming the box, unless the box is one of ``KNOWN``,
 the composites not yet regrouped, each with where its regrouping stands. Fewer than two is not
 checked: a part beside its port adapter (a motor and its rate's static map) is David's B.
@@ -18,15 +19,14 @@ import sys
 import pytest
 
 LIMIT = 7
-# Box names (prefixes) still over seven, 2026-11-23, 8b0d215f: the book plan's P109 (m)
-# paragraph says which stage regroups each. Remove a line when its composite is regrouped.
+# Box names (prefixes) still over seven, 2026-11-23, 8b0d215f: the book plan's P115 regroups
+# them (feeding's are done, P109 (m)). Remove a line when its composite is regrouped.
 KNOWN = (
     "route",                # attention_beside_physics.wired_attention: K pendulums with their delays, and the weights
     "portsplit",            # runner.denote: a denoted net's leaves
     "denoted net",          # runner.denote's own label, and couple's default names "denoted net a", "b"
                             # (test_market_runner A4b: 10; A2c: 8)
     "wires",                # runner.py's static route box (tests/test_market_runner.py, up to 14); was under "wire"
-    "one_sun_tilted",       # tests/test_competing_wholes.py K10
     # Found 2026-11-23 by 3bd2e654's guard inventory (every test file run under the guard's watch, recording):
     "burst_room",           # acceptable.py / stored_account.py: 11
     "room_",                # available.py: room_lamp_guest 9, room_with_guest 8, room_lamp 8

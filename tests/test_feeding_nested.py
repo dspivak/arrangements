@@ -2,12 +2,13 @@
 2026-11-23: "good factorizations should have 2-7 boxes inside").
 
 * ``feeding_composed.mouth_coupling``, nested by hand as ``choose . (handling casing 1 (x) ... (x)
-  hands power) . split``, against ``_mouth_coupling_flat``: the same interface, readout, inputs
+  hands power) . telling the seeker``, against ``_mouth_coupling_flat``: the same interface, readout, inputs
   sent and inclination field, the configuration matched store by store by label; and a closed
   run of ``feeding_with_slot`` with each, the same at every store.
 * ``body`` and ``seeker_with_slot``, nested by ``nesting.factor_tree`` and run by the flat maps
   (``run_flat``): their own nested construction gives the same maps.
-* Every box of the composite feeding holds at most seven boxes.
+* Every box of the composite feeding holds at most seven boxes, and every box of the two
+  explorer data files draws at most seven things (boxes, stores, marks, static maps).
 
 What runs in IMC: every side is a library arrangement; fields are their own ``omega``; the run is
 ``pcK.PhiK``.
@@ -30,12 +31,14 @@ from export_step_js import stores  # noqa: E402
 
 jax.config.update("jax_enable_x64", True)
 EMPTY = jnp.zeros(0)
-SKIP = {"spatial coupling", "inner spatial coupling", "hands power", "choose"}
+SKIP = {"spatial coupling", "inner spatial coupling", "hands power", "choose",
+        # the boxes inside a handling box (book task well-factored, aee89bf9)
+        "telling the seeker", "attaching", "latching", "taking", "the lid", "spilling", "spilling and laying out"}
 
 
 def _key(s):
     return tuple(x for x in s["path"] if x not in SKIP and not x.startswith("handling casing")
-                 and not x.startswith("casings ")) + (s["label"],)
+                 and not x.startswith("casings ") and not x.endswith(" wiring")) + (s["label"],)
 
 
 def _permutation(old, new):
@@ -71,11 +74,14 @@ def _same_coupling(n, feeder):
 
 
 def test_the_nested_coupling_is_the_flat_one():
-    _same_coupling(2, False)
+    """One, two, three casings, and seven, where the handling boxes are grouped."""
+    for n in (1, 2, 3, 7):
+        _same_coupling(n, False)
 
 
 def test_the_nested_inner_coupling_is_the_flat_one():
-    _same_coupling(2, True)
+    for n in (1, 2, 3):
+        _same_coupling(n, True)
 
 
 def test_a_closed_run_is_the_same():
@@ -160,14 +166,47 @@ def test_the_nested_body_and_seeker_are_the_flat_ones():
 
 
 def test_no_feeding_box_holds_more_than_seven():
-    """Boxes and parts, as ``nesting.box_counts`` counts them (not the operations the explorer also
-    draws for the wirings' computations): the spatial coupling holds the three
-    handling boxes and the hands' power, the body five boxes, the seeker four (its slot, a bare
-    identity, is drawn as wires)."""
+    """Boxes and parts, as ``nesting.box_counts`` counts them (the operations the explorer also
+    draws for the wirings' computations are counted by the next test): the spatial coupling holds
+    telling the seeker, the three handling boxes and the hands' power, a handling box its six
+    boxes, the body five boxes, the seeker four (its slot, a bare identity, is drawn as wires)."""
     from arrangements.nesting import box_counts
     counts = box_counts(fc.feeding_with_slot(learning=True))
     over = [(label, k) for label, k in counts if k > 7]
     assert not over, over
     labels = dict(counts)
-    assert labels["spatial coupling"] == 4
+    assert labels["spatial coupling"] == 5 and labels["handling casing 1"] == 6
     assert labels["body and motors"] == 5 and labels["seeker with a slot"] == 4
+
+
+VIEWER = Path(__file__).resolve().parent.parent / "viewer"
+
+
+def drawn_counts(path):
+    """For each box of an explorer data file, how many nodes it draws directly inside: boxes,
+    states, fields and operations (static maps), as David sees them (book task well-factored,
+    David, 2026-11-24: "many boxes have more than 7 things in them")."""
+    import json
+    from collections import Counter
+    text, decoder, at = path.read_text(), json.JSONDecoder(), 0
+    kids, labels = {}, {}
+    while (at := text.find('{"id": ', at)) >= 0:
+        try:
+            node, _ = decoder.raw_decode(text, at)
+        except json.JSONDecodeError:
+            at += 1
+            continue
+        if "kind" in node and "parent" in node:
+            kids.setdefault(node["parent"], Counter())[node["kind"]] += 1
+            labels[node["id"]] = node.get("label", node["id"])
+        at += 1
+    return {labels.get(p, p): c for p, c in kids.items()}
+
+
+def test_the_explorer_draws_at_most_seven_in_a_box():
+    """Both explorer data files, as generated (``scripts/export_feeding_explorer.py``): no box
+    draws more than seven things."""
+    for name in ("feeding-explorer-data.js", "feeding-explorer-robot-data.js"):
+        counts = drawn_counts(VIEWER / name)
+        over = {box: dict(c) for box, c in counts.items() if sum(c.values()) > 7}
+        assert not over, (name, over)

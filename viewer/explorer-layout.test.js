@@ -22,11 +22,11 @@ test('the two directions separate along the route and meet at each port and fork
     }
   }
 });
-// Three checks fail on the composite scene, as layout findings for explorer-layout.js, not as regressions: marked
-// todo so they run and report (2026-11-23: the seeker level has 4.8% of its wire length on another wire, 17.0% since
-// P109 (k) added the organs' batteries and cords; at the
-// spatial coupling a casing's height crosses a latch's map; a wire leaving the nested group crosses the time-away rule).
-test('two wires meet only where they cross, at a point, never along a stretch',{todo:'17.0% at the seeker level of the composite'},()=>{
+// One check fails on the composite scene, a layout finding for explorer-layout.js, not a regression: marked
+// todo so it runs and reports (2026-11-23: the seeker level has 4.8% of its wire length on another wire, 17.0% since
+// P109 (k) added the organs' batteries and cords, 9.6% since the well-factored regrouping of 2026-11-24, which also
+// ended the other two: a casing's height crossing a latch's map, a wire leaving the nested group crossing a rule).
+test('two wires meet only where they cross, at a point, never along a stretch',{todo:'9.6% at the seeker level of the composite'},()=>{
   // David, 2026-11-21: the Mouth's incoming wires were "blocked by other wires … crossings should raise codimension".
   // A wire runs on top of another where it lies within 10 px of it, nearly parallel, away from its two ends; before
   // the separating pass that was 61% of the receiver's wire length and 29% of the mouth's.
@@ -74,14 +74,15 @@ function check(project,options){
   for(const f of g.forks){close(f.start,f.port);assert.ok(f.end.x>f.start.x);assert.equal(f.end.y,f.start.y);}
   return g;
 }
-test('every feeding level has connected horizontal endpoints and clears unrelated parts',{todo:'a wire crosses a box at the spatial coupling'},()=>{
+test('every feeding level has connected horizontal endpoints and clears unrelated parts',()=>{
   const m=new E.Model(scene());let levels=0;
   for(const n of m.scene.nodes)if(m.children(n.id).length){m.enter(n.id);check(m.project());levels++;}
   assert.ok(levels>=60);   // every box of the composite: 69 on 2026-11-23
 });
-test('nested grouping preserves distinct crossing ports and routes them',{todo:'a wire leaving the group crosses a rule box'},()=>{
-  const m=new E.Model(scene());m.enter('body-and-motors');const group=m.group(['eye','wheels'],'Guidance');
-  check(m.project());m.enter(group);check(m.project());m.enter('body-and-motors');const outer=m.group([group,'lever'],'Movement');
+test('nested grouping preserves distinct crossing ports and routes them',()=>{
+  const m=new E.Model(scene());m.enter('body-and-motors');const group=m.group(['seeing','wheels'],'Guidance');
+  // the body's parts since the well-factored nesting: seeing holds the eye, the hand the lever
+  check(m.project());m.enter(group);check(m.project());m.enter('body-and-motors');const outer=m.group([group,'hand'],'Movement');
   check(m.project());m.enter(outer);check(m.project());m.ungroup();check(m.project());m.undo();check(m.project());
 });
 test('equal values with equal labels from different readouts stay distinct after projection',()=>{

@@ -938,6 +938,10 @@ def live_function(build: Callable[..., Arrangement], example_args: tuple,
 
 
 def _call(prim, side, sizes, args):
+    # The composite built again (perhaps traced) must have the diagram's shapes, or a wiring would
+    # read its arguments short and a nested block's wiring would silently read zeros (well-factored).
+    if (prim.out_dim_M, prim.in_dim_N if side == "in" else 0) != (sizes[1], sizes[2] if side == "in" else 0):
+        raise ValueError(f"readings: {prim.label!r} was built with another shape than the diagram's")
     q = jnp.zeros(0)
     flat = jnp.asarray(args) if len(args) else EMPTY
     m = flat[sizes[0]:sizes[0] + sizes[1]]

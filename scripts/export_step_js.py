@@ -1200,7 +1200,11 @@ def slot_model(count, places=None, foods=None, h=H, knobs=KNOBS):
         rate = ravel_pytree(euler.step(unravel1(flat))[1](inputs)[1](loads(None))[1])[0] - flat
 
         # What each part puts on the battery: its own one-form at the inputs it is sent.
-        robot = _factors(world, count + 2)[0]
+        # The robot is the world's first factor, however the casings beside it are boxed
+        # (``feeding_composed._casings_at_top`` boxes them from four casings on).
+        robot = world
+        while robot.construction and robot.construction[0] == "tensor":
+            robot = robot.construction[1]
         _, filler, seeker = robot.construction
         q_robot = q_world[:robot.P.Q_dim]
         q_filler, q_seeker = q_robot[:filler.P.Q_dim], q_robot[filler.P.Q_dim:]

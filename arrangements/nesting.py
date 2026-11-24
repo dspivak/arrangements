@@ -168,7 +168,8 @@ def _supports(fn, sizes, rows):
 
 def factor_route(parts: Sequence[Arrangement], w: Arrangement,
                  blocks: Sequence[Tuple[Sequence[int], str]], label: str | None = None,
-                 fast: bool = True, block_meta: Sequence[dict] | None = None) -> Arrangement:
+                 fast: bool = True, block_meta: Sequence[dict] | None = None,
+                 boxed: Sequence[int] = ()) -> Arrangement:
     """``w . (x) parts`` regrouped by meaning, for any static wiring ``w`` (its maps may compute:
     gates, rates, sums), with each computation moved into the block whose parts it feeds.
 
@@ -184,7 +185,8 @@ def factor_route(parts: Sequence[Arrangement], w: Arrangement,
 
     The configuration is the parts' in block order. With ``fast`` the result computes by the
     flat composite of the parts in that order (``run_flat``). ``block_meta`` adds meta to each
-    block (port names for the explorer).
+    block (port names for the explorer). A block whose index is in ``boxed`` is a box even when
+    it holds one part: the part with the computations that feed it (a motor beside its rate).
     """
     parts = list(parts)
     order = [i for idx, _ in blocks for i in idx]
@@ -200,12 +202,12 @@ def factor_route(parts: Sequence[Arrangement], w: Arrangement,
     read_out = set().union(*out_sup) if out_sup else set()
 
     infos = []
-    for idx, name in blocks:
+    for at, (idx, name) in enumerate(blocks):
         I = np.concatenate([np.arange(a_at[i], a_at[i + 1]) for i in idx]).astype(int)
         O = np.concatenate([np.arange(b_at[i], b_at[i + 1]) for i in idx]).astype(int)
         Oset = set(O.tolist())
         reads = set().union(*[in_sup[i] for i in I]) if len(I) else set()
-        single = len(idx) == 1
+        single = len(idx) == 1 and at not in boxed
         # A block of one part is the part itself; ``u`` computes its inputs, so everything they
         # read is exposed, its own outputs included. A larger block computes its own.
         sources = sorted(reads) if single else sorted(reads - Oset)
@@ -217,11 +219,16 @@ def factor_route(parts: Sequence[Arrangement], w: Arrangement,
             x["exposed"] = x["O"].tolist()      # a bare part shows every output it has
 
     def embed(pairs, size):
-        z = jnp.zeros(size)
+        """A vector of ``size`` with ``values`` at ``where``, zero elsewhere, by slices and a
+        concatenation, so the explorer's trace sees which entry each number is (a scatter it
+        cannot read, and every number would look as if it read everything)."""
+        stock, index, at = [jnp.zeros(1)], np.zeros(size, dtype=int), 1
         for where, values in pairs:
             if len(where) and jnp.size(values):
-                z = z.at[jnp.asarray(where)].set(values)
-        return z
+                stock.append(values)
+                index[np.asarray(where, dtype=int)] = at + np.arange(len(where))
+                at += len(where)
+        return _pick(jnp.concatenate(stock), index)
 
     def full(x, size):
         """``x``, or zeros of ``size`` when called with no arguments: the explorer evaluates a
@@ -236,16 +243,16 @@ def factor_route(parts: Sequence[Arrangement], w: Arrangement,
         O, I, src, exp = x["O"], x["I"], x["sources"], x["exposed"]
         src_m = [s for s in src if s < B]
         src_n = [s - B for s in src if s >= B]
-        local_exp = jnp.asarray([int(np.where(O == j)[0][0]) for j in exp], dtype=int)
+        local_exp = [int(np.where(O == j)[0][0]) for j in exp]
 
         def v_out(q, m, local_exp=local_exp, O=O):
-            return full(m, len(O))[local_exp] if len(local_exp) else jnp.zeros(0)
+            return _pick(full(m, len(O)), local_exp)
 
         def v_in(q, m, e, O=O, I=I, src_m=src_m, src_n=src_n, src=src):
             m, e = full(m, len(O)), full(e, len(src))
             full_m = embed([(O, m), (src_m, e[:len(src_m)])], B)
             full_n = embed([(src_n, e[len(src_m):])], C)
-            return w.in_f(q0, full_m, full_n)[jnp.asarray(I)] if len(I) else jnp.zeros(0)
+            return _pick(w.in_f(q0, full_m, full_n), I)
 
         v = Arrangement(trivial_parameter(), len(I), len(O), len(src), len(exp), v_out, v_in, zero_form,
                         f"{x['name']} wiring")
@@ -266,10 +273,10 @@ def factor_route(parts: Sequence[Arrangement], w: Arrangement,
         for x in infos:
             if x["single"]:     # a bare part's inputs, computed here from what they read
                 rows = w.in_f(q0, embed([(exp_all, m)], B), n)
-                vals.append(rows[jnp.asarray(x["I"])] if len(x["I"]) else jnp.zeros(0))
+                vals.append(_pick(rows, x["I"]))
             else:               # a block's exposed inputs: copies
-                vals.append(jnp.stack([m[pos[s]] if s < B else n[s - B] for s in x["sources"]])
-                            if x["sources"] else jnp.zeros(0))
+                both = jnp.concatenate([m, n])
+                vals.append(_pick(both, [pos[s] if s < B else len(exp_all) + s - B for s in x["sources"]]))
         return jnp.concatenate(vals) if vals else jnp.zeros(0)
 
     u = Arrangement(trivial_parameter(), width, len(exp_all), C, w.out_dim_N, u_out, u_in, zero_form, w.label)
@@ -277,6 +284,24 @@ def factor_route(parts: Sequence[Arrangement], w: Arrangement,
     if not fast:
         return nested
     return run_flat(nested, _flat_in_order(parts, w, order))
+
+
+def _pick(x, idx):
+    """``x[idx]`` for a fixed list ``idx``, as slices of ``x`` joined by one concatenation: each
+    run of consecutive indices one slice. A gather would hide from the explorer's trace
+    (``_explorer_inputs``) which entry each number is."""
+    idx = [int(i) for i in idx]
+    if not idx:
+        return jnp.zeros(0)
+    pieces, start, prev = [], idx[0], idx[0]
+    for i in idx[1:]:
+        if i == prev + 1:
+            prev = i
+            continue
+        pieces.append(x[start:prev + 1])
+        start = prev = i
+    pieces.append(x[start:prev + 1])
+    return pieces[0] if len(pieces) == 1 else jnp.concatenate(pieces)
 
 
 def _leaves(tree):
@@ -288,10 +313,13 @@ def _leaves(tree):
 Tree = Union[int, Tuple[str, list]]     # a part's index, or (a box's name, its children)
 
 
-def factor_tree(parts: Sequence[Arrangement], w: Arrangement, tree: Tree, fast: bool = True) -> Arrangement:
+def factor_tree(parts: Sequence[Arrangement], w: Arrangement, tree: Tree, fast: bool = True,
+                box_singles: bool = False) -> Arrangement:
     """``w . (x) parts`` nested as ``tree`` says: a tree is a part's index, or ``(name, children)``
     for a box named ``name`` holding its children; the root's name labels the whole. Each level
-    is ``factor_route``; the configuration is the parts' in the tree's left-to-right order."""
+    is ``factor_route``; the configuration is the parts' in the tree's left-to-right order. With
+    ``box_singles`` a node ``(name, [i])`` is a box holding part ``i`` and the computations that
+    feed it; otherwise it is the part itself."""
     parts = list(parts)
 
     def build(ps, wiring, node):
@@ -299,7 +327,8 @@ def factor_tree(parts: Sequence[Arrangement], w: Arrangement, tree: Tree, fast: 
         local = {i: k for k, i in enumerate(ps_index[id(ps)])} if id(ps) in ps_index else None
         blocks = [([local[i] if local else i for i in _leaves(c)], c[0] if not isinstance(c, int) else "")
                   for c in children]
-        whole = factor_route(ps, wiring, blocks, label=name, fast=False)
+        boxed = [k for k, c in enumerate(children) if box_singles and not isinstance(c, int)]
+        whole = factor_route(ps, wiring, blocks, label=name, fast=False, boxed=boxed)
         _, inner, u = whole.construction
         pieces = []
         _flatten_tensor(inner, pieces, len(children))
@@ -333,6 +362,8 @@ def _flatten_tensor(a, out, count):
 def _flat_in_order(parts, w, order):
     """``w . (x) parts`` with the parts taken in ``order``: the same composite, its configuration
     and ports permuted (the wiring reads its arguments back in the original order)."""
+    if list(order) == list(range(len(parts))):     # the same order: the composite itself
+        return compose_seq(tensor_arrangements(list(parts)), w)
     a = [p.in_dim_N for p in parts]
     b = [p.out_dim_N for p in parts]
     a_at, b_at = np.cumsum([0] + a), np.cumsum([0] + b)
@@ -447,9 +478,9 @@ def box_counts(a: Arrangement) -> List[Tuple[str, int]]:
     is counted too, as ``"(top level)"``) with how many boxes and parts it holds directly (book task
     well-factored, David, 2026-11-23: "good factorizations should have 2-7 boxes inside"). This is
     not all the explorer draws: it also draws each computation of a box's wiring (a gate, a sum, a
-    choice) as an operation node, which this does not count; inside the feeding spatial coupling it
-    counted 4 where the explorer drew 16 (3bd2e654, 2026-11-24; David: "many boxes have more than 7
-    things in them")."""
+    choice) as an operation node, which this does not count (David, 2026-11-24: "many boxes have
+    more than 7 things in them"); ``tests/test_feeding_nested.py`` counts what the explorer draws
+    from its data files."""
     found: List[Tuple[str, int]] = []
     seen = set()
 

@@ -31,7 +31,11 @@ def _propagate(graph, constants, inputs):
         return np.zeros(var.aval.shape, dtype=object) if isinstance(var, core.Literal) else env[var]
 
     def constant(var):
-        return var.val if isinstance(var, core.Literal) else known.get(var)
+        # A constant closed over from an outer trace (a parameter traced by ``jax.jit``) has no
+        # value here: it is treated as unknown, never as an error, so a map traced inside a jitted
+        # build gets the same coordinates as when it is built concretely (book task well-factored).
+        x = var.val if isinstance(var, core.Literal) else known.get(var)
+        return None if isinstance(x, jax.core.Tracer) else x
 
     for eq in graph.eqns:
         op, p = eq.primitive.name, eq.params

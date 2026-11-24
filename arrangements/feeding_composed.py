@@ -113,10 +113,13 @@ def source(place: float, food: float = 10., *, parameters: Mapping[str, float] |
         wiring = fp.transfer(f"casing({fp.number(place)})", 3, 2, 0, 4,
                              lambda m, n: jnp.stack([m[1], m[1], m[1]]), publish)
         return fp.with_meta(fp.fill([fp.rod_segment(1., food, "food", **step), *body], wiring), outputs=outputs)
-    wiring = fp.transfer(f"casing({fp.number(place)})", 3, 4, 0, 6,
-                         lambda m, n: jnp.stack([m[2], m[2], m[2]]), publish)
-    return fp.with_meta(fp.fill([fp.rod_segment(1., food, "food", **step),
-                                 fp.rod_segment(p['cLid'], 0., "lid", **step), *body], wiring),
+    name = f"casing({fp.number(place)})"
+    wiring = fp.transfer(name, 3, 4, 0, 6, lambda m, n: jnp.stack([m[2], m[2], m[2]]), publish)
+    # Nested (book task well-factored; David, 2026-11-24: "many boxes have more than 7 things in
+    # them"): the food and the lid beside the casing's motion (its mass, gravity, the air's drag
+    # and the ground), so the casing draws five things, the motion four.
+    parts = [fp.rod_segment(1., food, "food", **step), fp.rod_segment(p['cLid'], 0., "lid", **step), *body]
+    return fp.with_meta(factor_tree(parts, wiring, (name, [0, 1, ("motion", [2, 3, 4, 5])])),
                         outputs=outputs + [("c", "lid", 1), ("v", "speed", 1)])
 
 
@@ -395,6 +398,35 @@ SLOT_SEEKER_INPUTS = ("seen", "climb", "K", "pull on grip", "pull on tip", "take
 SLOT_SEEKER_OUTPUTS = ("battery", "grip", "tip", "cart", "look", "effort", "hunger")
 
 
+def _satiety(p: Mapping[str, float], battery, *, stages: int = 1, h: float = 1.) -> Arrangement:
+    """Satiety, ``1 -> <3|1>``: a store the mouth's battery drives through its motor
+    (b679b569, proposed), read out as hunger, ``theta((0.8 - sated) / 0.6)``, 1 while satiety
+    is below 0.2 and 0 above 0.8. Its inputs are the mouth's battery, the robot's battery ``b``
+    and the chamber ``z``: the store moves toward 1 once the room left in the battery, the
+    chamber's pending energy counted, is below sateRoom, toward 0 once it is above
+    hungryRoom, and holds in between (P109 (k)). It starts sated when the battery alone leaves
+    less than sateRoom below the cap. One box, so hunger is computed once, inside it, for the
+    body that reads it and for the seeker's readout (book task well-factored, aee89bf9)."""
+    step = dict(stages=stages, h=h)
+    store = fp.rod_segment(p['memoryCost'], float(battery >= p['battCap'] - p['sateRoom'])
+                           if isinstance(battery, (int, float)) else 0., "satiety", **step)
+    motor = fp.send(fp.motor_at_rate(p['memoryCost'], p['wLocal'], "satiety motor"), {3: 0.}, "satiety motor, P=0")
+
+    def route(m: Array, n: Array) -> Array:
+        sated = m[0]
+        mouth, b, z = n[0], n[1], n[2]
+        room = p['battCap'] - b - p['absorbYield'] * z
+        w = p['hungerWidth']
+        rate = p['satRate'] * (theta((p['sateRoom'] - room) / w) * (1 - sated)
+                               - theta((room - p['hungryRoom']) / w) * sated)
+        return jnp.stack([mouth, sated, rate])
+
+    wiring = fp.transfer("satiety", 3, 1, 3, 1, route, lambda m: theta((.8 - m[:1]) / .6))
+    return fp.with_meta(fp.fill([store, motor], wiring),
+                        inputs=[(None, "mouth battery", 1), (None, "battery", 1), (None, "chamber", 1)],
+                        outputs=[(None, "hunger", 1)])
+
+
 def seeker_with_slot(*, parameters: Mapping[str, float] | None = None, stages: int = 1, h: float = 1.,
                      learning: bool = False, memory=None, cart: float = 0., battery: float | None = None) -> Arrangement:
     """The seeker with a separator mouth and an open slot, ``F -> <8|7>``.
@@ -427,45 +459,29 @@ def seeker_with_slot(*, parameters: Mapping[str, float] | None = None, stages: i
              fr.collector(p['clearance'], p['collectorCap'], 0., "husk collector", **step),
              fp.identity(4, 0, "seeker slot"),
              *organ_battery("mouth", battery, p, **step),
-             # Satiety, a store the mouth's motor drives (b679b569, proposed): it starts sated when
-             # the battery alone leaves less than sateRoom below the cap.
-             fp.rod_segment(p['memoryCost'], float(battery >= p['battCap'] - p['sateRoom'])
-                            if isinstance(battery, (int, float)) else 0., "satiety", **step),
-             fp.send(fp.motor_at_rate(p['memoryCost'], p['wLocal'], "satiety motor"), {3: 0.}, "satiety motor, P=0"),
+             _satiety(p, battery, **step),
              basal_cost(p['basal'], p['wLocal'])]
 
-    def satiety_rate(b: Array, z: Array, sated: Array) -> Array:
-        """Toward 1 once the room left in the battery, the chamber's pending energy counted, is
-        below sateRoom; toward 0 once it is above hungryRoom; held in between (P109 (k))."""
-        room = p['battCap'] - b - p['absorbYield'] * z
-        w = p['hungerWidth']
-        return p['satRate'] * (theta((p['sateRoom'] - room) / w) * (1 - sated)
-                               - theta((room - p['hungryRoom']) / w) * sated)
-
-    def hunger(sated: Array) -> Array:
-        """Hunger, 1 while satiety is below 0.2 and 0 above 0.8."""
-        return theta((.8 - sated) / .6)
-
     def route(m: Array, n: Array) -> Array:
-        b, z, local, mouth, sated = m[0], m[5], m[6:8], m[8], m[9]
+        b, z, local, mouth, hunger = m[0], m[5], m[6:8], m[8], m[9]
         seen, climb, keep, pull_grip, pull_tip, taken, parent = n[0], n[1], n[2], n[3], n[4], n[5], n[6:8]
-        return jnp.concatenate([jnp.stack([seen, climb, keep, pull_grip, pull_tip, hunger(sated), taken]),
+        return jnp.concatenate([jnp.stack([seen, climb, keep, pull_grip, pull_tip, hunger, taken]),
                                 jnp.stack([taken, mouth]), local,
                                 parent,
                                 jnp.stack([z, b]), local,
                                 (b - mouth)[None],
-                                jnp.stack([mouth, sated, satiety_rate(b, z, sated)]),
+                                jnp.stack([mouth, b, z]),                     # satiety
                                 b[None]])                                     # the basal cost
 
     def publish(m: Array) -> Array:
-        grip, z, accept, mouth, sated = m[1], m[5], m[7], m[8], m[9]
+        grip, z, accept, mouth, hunger = m[1], m[5], m[7], m[8], m[9]
         effort = p['leat'] * theta(mouth / p['wLocal']) * theta(grip) * chamber_admits(z) * accept
-        return jnp.concatenate([m[:5], effort[None], hunger(sated)[None]])
+        return jnp.concatenate([m[:5], effort[None], hunger[None]])
 
     wiring = fp.transfer("seeker with a slot", 7 + 4 + 2 + 4 + 1 + 3 + 1, 5 + 1 + 2 + 1 + 1, 8, 7, route, publish)
     # Five boxes (book task well-factored): the body; the mouth (the chamber, the husk collector,
-    # the mouth's battery and cord); the slot; satiety (its store and motor); the basal cost.
-    tree = ("seeker with a slot", [0, ("mouth", [1, 2, 4, 5]), 3, ("satiety", [6, 7]), 8])
+    # the mouth's battery and cord); the slot; satiety, which reads out hunger; the basal cost.
+    tree = ("seeker with a slot", [0, ("mouth", [1, 2, 4, 5]), 3, 6, 7])
     return fp.with_meta(factor_tree(parts, wiring, tree),
                         inputs=[(f"n_{i + 1}", name, 1) for i, name in enumerate(SLOT_SEEKER_INPUTS)],
                         outputs=[(f"o_{i + 1}", name, 1) for i, name in enumerate(SLOT_SEEKER_OUTPUTS)])
@@ -503,11 +519,9 @@ def hopper_filler(pass_fraction: float = .5, cost: float = .02, speed: float = 2
 
 
 def _casing_gates(p: Mapping[str, float]):
-    """What the spatial coupling computes at one casing from the seeker's readouts and the
-    casing's: shared by ``mouth_coupling``'s casing boxes, whose choosing reads the scores."""
-    def score(seeker: Array, casing: Array) -> Array:
-        tip, cart = seeker[2], seeker[3]
-        food, height, place = casing[0], casing[1], casing[3]
+    """A casing's score, from the hand's tip and the cart and the casing's food, height and place:
+    what ``mouth_coupling``'s handling boxes compare to choose the casing to reach for."""
+    def score(tip: Array, cart: Array, food: Array, height: Array, place: Array) -> Array:
         offered = near(height - tip, p['R']) * near(cart - place, p['Rh']) * theta((food - p['f0']) / p['f0'])
         return offered / (1 + ((height - tip) / p['R']) ** 2 + ((cart - place) / p['Rh']) ** 2)
     return score
@@ -517,32 +531,36 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
                    stages: int = 1, h: float = 1., feeder: bool = False, battery: float = 6.) -> Arrangement:
     """The spatial coupling of a seeker with a slot, ``count`` hingeless casings and the pile,
     ``<8|7> (x) <0|6>^count (x) <0|2> -> <0|2>`` (with ``feeder``, ``<8|7> (x) <0|6>^count -> F``),
-    nested so that no box holds more than seven (book task well-factored; David, 2026-11-23:
-    "good factorizations should have 2-7 boxes inside"). The same morphism as
-    ``_mouth_coupling_flat``, which documents what it computes (``tests/test_feeding_mouth.py``).
+    nested so that no box draws more than seven things, boxes, stores, marks or static maps
+    (book task well-factored; David, 2026-11-23: "good factorizations should have 2-7 boxes
+    inside"; 2026-11-24: "many boxes have more than 7 things in them"). The same morphism as
+    ``_mouth_coupling_flat``, which documents what it computes (``tests/test_feeding_nested.py``).
 
-    ``coupling = choose . (handling 1 (x) ... (x) handling n (x) hands power [(x) parent]) . split``:
+    ``coupling = choose . (handling 1 (x) ... (x) handling n (x) hands power [(x) parent]) . telling``:
 
-    * ``split``, a static map out of the seeker's, casings' and pile's interface: forward it
-      copies the seeker's readouts and the pile's to every casing's handling box, with that
-      casing's readouts, and the battery and grip to the hands' power; backward it adds the
-      handling boxes' shares of what the seeker is told (the ``+`` dot) and hands the seeker the
-      pile's pair (for a feeder, the parent's, from the ``parent`` box).
-    * ``handling k``, ``<6|15> -> <3|2>`` (``<6|13> -> <5|2>`` for a feeder): casing ``k``'s
-      attachment (a contact), its latch, taking (a ``push``), its lid motor and spilling (a
-      ``push``), for a feeder laying out (a ``push``); it reads out the casing's score and its
-      latch, receives the hands' level, ``first_k`` and ``free_k`` (for a feeder also the mass
-      handed in and the parent's mass), and tells the seeker its share: the casing's signal and
-      its gaze term, its keep, its pulls on grip and tip, and what is taken from it. Its share
-      goes back through its domain, since a readout cannot depend on an input.
+    * ``telling the seeker``, the box of the static map ``split`` out of the seeker's, casings'
+      and pile's interface: forward it copies the seeker's readouts (all but the battery) and the
+      pile's mass to every casing's handling box, with that casing's readouts, and the battery and
+      grip to the hands' power; backward it adds the handling boxes' shares of what the seeker is
+      told (the six ``+`` dots) and hands the seeker the pile's pair (for a feeder, the parent's,
+      from the ``parent`` box).
+    * ``handling k``, ``<6|13> -> <2n-1|2>`` (``<6|12> -> <2n+1|2>`` for a feeder): casing ``k``'s
+      attaching (the attachment, a contact, with its two gates and its stretch), latching (its
+      latch, with whether the casing is first and free and the latch's targets and load), taking
+      (a ``push`` with its rate), the lid (its motor with its rate), spilling (a ``push`` with its
+      rate), for a feeder also laying out (a ``push``, beside spilling), and telling the seeker its
+      share (the casing's signal and its gaze term, its keep, its pulls on grip and tip, and what
+      is taken), which goes back through its domain since a readout cannot depend on an input.
+      It reads out the casing's score and its latch, and receives the hands' level and the other
+      casings' scores and latches (for a feeder also the mass handed in and the parent's mass):
+      whether casing ``k`` is first and free is computed in its own latching, from those.
     * ``hands power``, ``<0|2> -> <0|3>`` (``<1|3>`` for a feeder): the hands' battery and cord
       (for a feeder also the cord to the reserve); reads out the hands' level, the battery and
       the grip.
-    * ``choose``, a static map: copies the hands' level to every handling box and computes
-      which casing is first (by score) and which latches are free (no other engaged); it
-      publishes the battery and grip.
+    * ``choose``, a static map that only copies: the hands' level and every casing's score and
+      latch to the others' handling boxes; it publishes the battery and grip.
 
-    With more than seven boxes at the top the handling boxes are grouped (``nesting.factor_route``).
+    With more than seven things at the top the handling boxes are grouped (``nesting.factor_route``).
     """
     from .nesting import even_blocks, factor_route
     p = {**DEFAULTS, **(parameters or {})}
@@ -551,17 +569,18 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
     cost = fp.contact_cost(p['kappa0'], p['kd'])
     score_of = _casing_gates(p)
     S, C = 7, 6
-    P = 0 if feeder else 2                         # the pile's readouts, in each handling box's domain
-    W = S + C + P                                  # a handling box's domain outputs
-    K = 5 if feeder else 3                         # a handling box's inputs
+    R = S - 1                                      # the seeker's readouts a handling box reads: all but the battery
+    P = 0 if feeder else 1                         # the pile's mass, in each handling box's domain
+    W = R + C + P                                  # a handling box's domain outputs
+    K = 2 * n - 1 + (2 if feeder else 0)           # a handling box's inputs
 
     def handling(k: int) -> Arrangement:
         def route(m: Array, outer: Array) -> Array:
-            b, grip, tip, cart, look, effort, hunger = m[:S]
-            food, height, red, place, lid, speed = m[S:S + C]
+            grip, tip, cart, look, effort, hunger = m[:R]
+            food, height, red, place, lid, speed = m[R:R + C]
             stroke, latch = m[W], m[W + 1]
-            hands, first, free = outer[0], outer[1], outer[2]
-            pile_mass = outer[4] if feeder else m[S + C]
+            hands, scores, latches = outer[0], outer[1:n], outer[n:2 * n - 1]
+            pile_mass = outer[2 * n] if feeder else m[R + C]
             along = near(cart - place, p['Rh'])
 
             def gate(grip, tip, latch):
@@ -574,6 +593,9 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
             pulls = jax.grad(attachment, argnums=(0, 1, 2))(grip, tip, latch)
             g = gate(grip, tip, latch)
             s = fp.engagement(latch)
+            mine = score_of(tip, cart, food, height, place)
+            first = jnp.prod(theta((mine - scores) / .05))      # ahead of every other casing
+            free = jnp.prod(1 - theta(latches / .3))            # no other casing engaged
             offered = near(height - tip, p['R']) * along * theta((food - p['f0']) / p['f0'])
             held = theta((grip + .8) / .4)
             want = hunger * offered
@@ -594,29 +616,33 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
                       hands, lid, lid_rate,                                                       # lid motor
                       spill, pile_mass - food]                                                    # spilling
             if feeder:
-                handed = outer[3]
+                handed = outer[2 * n - 1]
                 values += [p['layRate'] * handed / n, food - handed]                             # laying out
             return jnp.stack(values)
 
         def publish(m: Array) -> Array:
-            return jnp.stack([score_of(m[:S], m[S:S + C]), m[W + 1]])
+            return jnp.stack([score_of(m[1], m[2], m[R], m[R + 1], m[R + 3]), m[W + 1]])
 
-        pieces = [fp.contact(p['kappa0'], p['kd'], p['bd'], p['kr'], 0., f"attachment {k + 1}", **step),
-                  fp.latch(p['latchCost'], p['latchRate'], p['wLocal'], 0., f"contact latch {k + 1}", **step),
-                  fp.with_meta(fp.push("push: taking"), half=TAKING_REACHES),
-                  fp.send(fp.motor_at_rate(p['cLid'], p['wLocal'], f"lid motor {k + 1}"), {3: 0.},
-                          f"lid motor {k + 1}, P=0"),
-                  fp.push("push: spilling")]
+        told = fp.with_meta(fp.identity(6, 0, f"told from casing {k + 1}"),
+                            inputs=[(None, f"{name} from casing {k + 1}", 1) for name in SLOT_SEEKER_INPUTS[:6]])
+        read = fp.identity(0, W, f"seeker and casing {k + 1}" if feeder else f"seeker, casing {k + 1} and pile")
+        parts = [told, read,
+                 fp.contact(p['kappa0'], p['kd'], p['bd'], p['kr'], 0., f"attachment {k + 1}", **step),
+                 fp.latch(p['latchCost'], p['latchRate'], p['wLocal'], 0., f"contact latch {k + 1}", **step),
+                 fp.with_meta(fp.push("push: taking"), half=TAKING_REACHES),
+                 fp.send(fp.motor_at_rate(p['cLid'], p['wLocal'], f"lid motor {k + 1}"), {3: 0.},
+                         f"lid motor {k + 1}, P=0"),
+                 fp.push("push: spilling")]
         if feeder:
-            pieces.append(fp.push("push: laying out"))
+            parts.append(fp.push("push: laying out"))
         inner_in = 6 + 15 + (2 if feeder else 0)
-        # Named for the explorer: the casing's share of what the seeker is told, and the box's readouts.
-        domain = fp.with_meta(fp.identity(6, W, f"seeker and casing {k + 1}" if feeder
-                                          else f"seeker, casing {k + 1} and pile"),
-                              inputs=[(None, f"{name} from casing {k + 1}", 1) for name in SLOT_SEEKER_INPUTS[:6]])
-        inside = parallel_arrangements(domain, tensor_arrangements(pieces))
         wiring = fp.transfer(f"handling casing {k + 1}", inner_in, W + 2, K, 2, route, publish)
-        box = replace(compose_seq(inside, wiring), label=f"handling casing {k + 1}")
+        # Each computation sits in the box of the part it feeds (``nesting.factor_tree``): seven at the top.
+        name = f"handling casing {k + 1}"
+        tree = (name, [("telling the seeker", [0]), 1, ("attaching", [2]), ("latching", [3]), ("taking", [4]),
+                       ("the lid", [5]),
+                       ("spilling and laying out", [6, 7]) if feeder else ("spilling", [6])])
+        box = factor_tree(parts, wiring, tree, box_singles=True)
         return replace(box, meta={**(box.meta or {}),
                                   "outputs": [(None, f"casing {k + 1}'s score", 1), (None, "latch", 1)]})
 
@@ -640,30 +666,32 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
     if feeder:
         boxes.append(fp.identity(2, 0, "parent"))
 
-    # split: the seeker's, casings' and pile's interface to the boxes' domains.
-    D_out = S + C * n + P
+    # telling the seeker: the seeker's, casings' and pile's interface to the boxes' domains.
+    D_out = S + C * n + (0 if feeder else 2)
 
     def split_out(m: Array) -> Array:
-        seeker, casings, pile = m[:S], m[S:S + C * n].reshape((n, C)), m[S + C * n:D_out]
-        return jnp.concatenate([*[jnp.concatenate([seeker, casings[k], pile]) for k in range(n)], m[:2]])
+        seeker, pile = m[1:S], m[S + C * n:S + C * n + P]
+        return jnp.concatenate([*[jnp.concatenate([seeker, m[S + C * k:S + C * (k + 1)], pile]) for k in range(n)],
+                                m[:2]])
 
     def split_in(m: Array, shares: Array) -> Array:
         told = shares[:6 * n].reshape((n, 6)).sum(axis=0)
         return jnp.concatenate([told, shares[6 * n:6 * n + 2] if feeder else m[S + C * n:D_out]])
 
     split = fp.transfer("split", 8, D_out, 6 * n + (2 if feeder else 0), n * W + 2, split_in, split_out)
+    telling = replace(compose_seq(fp.identity(8, D_out, "seeker, casings and pile"), split),
+                      label="telling the seeker")
 
-    # choose: copies the hands' level, computes first and free, publishes battery and grip.
+    # choose: copies the hands' level and the scores and latches; publishes battery and grip.
     def choose_in(m: Array, outer: Array) -> Array:
-        score, latch = m[:2 * n].reshape((n, 2)).T
-        hands = m[2 * n]
-        others = ~jnp.eye(n, dtype=bool)
-        first = jnp.prod(jnp.where(others, theta((score[:, None] - score[None, :]) / .05), 1.), axis=1)
-        free = jnp.prod(jnp.where(others, 1 - theta(latch / .3), 1.), axis=1)
-        each = [jnp.broadcast_to(hands, (n,)), first, free]
-        if feeder:
-            each += [jnp.broadcast_to(outer[0], (n,)), jnp.broadcast_to(outer[2], (n,))]
-        rows = [jnp.stack(each, axis=1).ravel()]
+        # Slices only, so the explorer's trace sees each number as the copy it is.
+        rows = []
+        for k in range(n):
+            others = [j for j in range(n) if j != k]
+            rows += [m[2 * n:2 * n + 1], *[m[2 * j:2 * j + 1] for j in others],
+                     *[m[2 * j + 1:2 * j + 2] for j in others]]
+            if feeder:
+                rows += [outer[0:1], outer[2:3]]
         if feeder:
             rows += [outer[1:2], outer[2:4]]
         return jnp.concatenate(rows)
@@ -672,7 +700,7 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
     choose = fp.transfer("choose", E_in, 2 * n + 3, 4 if feeder else 0, 0 if feeder else 2, choose_in,
                          (lambda m: jnp.zeros(0)) if feeder else (lambda m: m[2 * n + 1:2 * n + 3]))
     label = "inner spatial coupling" if feeder else "spatial coupling"
-    if len(boxes) > 7:     # group the handling boxes, at most seven to a group
+    if n + 2 > 7:     # the handling boxes, hands power and telling the seeker: group the handling boxes
         at, blocks = 0, []
         for size in even_blocks(n, 7):
             blocks.append((list(range(at, at + size)), f"casings {at + 1}-{at + size}"))
@@ -681,19 +709,20 @@ def mouth_coupling(count: int, *, parameters: Mapping[str, float] | None = None,
         _, boxes_side_by_side, choose = factor_route(boxes, choose, blocks, label="choose", fast=False).construction
     else:
         # The names of what choose hands each box, for the explorer (else "input 2 of (((handling
-        # casing 1 || ...)))"): the hands' level, whether the casing is first, whether it is free.
+        # casing 1 || ...)))"): the hands' level, the other casings' scores and latches.
         names = []
         for k in range(n):
-            names += [(None, "the hands' battery level", 1), (None, f"casing {k + 1} is first", 1),
-                      (None, "free to engage", 1)]
+            names += [(None, "the hands' battery level", 1)]
+            names += [(None, f"casing {j + 1}'s score", 1) for j in range(n) if j != k]
+            names += [(None, f"casing {j + 1}'s latch", 1) for j in range(n) if j != k]
             if feeder:
                 names += [(None, "the mass handed in", 1), (None, "the parent's mass", 1)]
         if feeder:
             names += [(None, "the reserve's battery", 1), (None, "the parent's pair", 2)]
         side = tensor_arrangements(boxes)
         boxes_side_by_side = replace(side, meta={**(side.meta or {}), "inputs": names})
-    # (choose . (boxes . split)): the boxes drawn directly inside the coupling, split and choose its wiring.
-    return replace(compose_seq(compose_seq(split, boxes_side_by_side), choose), label=label)
+    # (choose . (boxes . telling)): telling the seeker and the boxes drawn inside the coupling, choose its wiring.
+    return replace(compose_seq(compose_seq(telling, boxes_side_by_side), choose), label=label)
 
 
 def _mouth_coupling_flat(count: int, *, parameters: Mapping[str, float] | None = None,
